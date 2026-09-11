@@ -6191,7 +6191,14 @@
           console.warn('OneSignal initialization error:', err);
           appointmentNotificationHostState.ready = true;
           appointmentNotificationHostState.supported = false;
-          appointmentNotificationHostState.error = err?.message || 'Failed to initialize OneSignal';
+          const rawMessage = String(err?.message || '');
+          if (rawMessage.includes('can only be used on') || rawMessage.includes('site URL') || rawMessage.includes('origin') || rawMessage.includes('chatgpt.site')) {
+            appointmentNotificationHostState.error = currentUiLanguage === 'ar'
+              ? `لتفعيل الإشعارات، يرجى تحديث رابط الموقع (Site URL) في لوحة تحكم OneSignal ليصبح: ${window.location.origin}`
+              : `To enable notifications, please update the Site URL in your OneSignal dashboard to: ${window.location.origin}`;
+          } else {
+            appointmentNotificationHostState.error = rawMessage || 'Failed to initialize notifications';
+          }
           initializeAppointmentNotificationSettings();
         }
       });
