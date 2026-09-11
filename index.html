@@ -17,6 +17,7 @@
   <script src="vendor/lucide.min.js"></script>
   <script src="vendor/supabase.js"></script>
   <script src="lumin-loyalty.js?v=5"></script>
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   
   <style>
     .surface-poly {
@@ -6107,7 +6108,98 @@
       );
     }
 
-    function sendOneSignalIdentity() {
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    let oneSignalInitialized = false;
+
+    async function syncOneSignalState() {
+      if (typeof window.OneSignal === 'undefined' || !oneSignalInitialized) return;
+      try {
+        const isPushSupported = Boolean(OneSignal.Notifications && OneSignal.Notifications.isPushSupported());
+        const permission = Boolean(OneSignal.Notifications && OneSignal.Notifications.permission);
+        const pushSub = OneSignal.User ? OneSignal.User.PushSubscription : null;
+        const optedIn = Boolean(pushSub && pushSub.optedIn);
+        const subscriptionId = (pushSub && typeof pushSub.id === 'string' && pushSub.id) ? pushSub.id : null;
+        const currentExternalId = (OneSignal.User && typeof OneSignal.User.externalId === 'string') ? OneSignal.User.externalId : null;
+        const expectedUserId = currentUserAccess?.userId || null;
+        const identityMatched = Boolean(
+          expectedUserId && currentExternalId && currentExternalId === expectedUserId
+        );
+        const isEnabled = Boolean(
+          isPushSupported &&
+          permission &&
+          optedIn &&
+          subscriptionId &&
+          (!expectedUserId || identityMatched)
+        );
+
+        appointmentNotificationHostState = {
+          ready: true,
+          supported: isPushSupported,
+          permission: permission,
+          optedIn: optedIn,
+          subscriptionId: subscriptionId,
+          identityMatched: identityMatched,
+          enabled: isEnabled,
+          error: ''
+        };
+
+        storeAppointmentNotificationPreference(isEnabled);
+        initializeAppointmentNotificationSettings();
+      } catch (e) {
+        console.warn('syncOneSignalState error:', e);
+      }
+    }
+
+    try {
+      OneSignalDeferred.push(async function(OneSignal) {
+        try {
+          await OneSignal.init({
+            appId: '1796b727-661f-43cb-9770-1b3938e4db8c',
+            serviceWorkerPath: 'OneSignalSDKWorker.js',
+            serviceWorkerParam: { scope: '/' },
+            notifyButton: { enable: false },
+            allowLocalhostAsSecureOrigin: true
+          });
+          oneSignalInitialized = true;
+          await syncOneSignalState();
+
+          if (OneSignal.User?.PushSubscription) {
+            OneSignal.User.PushSubscription.addEventListener('change', () => {
+              void syncOneSignalState();
+            });
+          }
+          if (OneSignal.Notifications) {
+            OneSignal.Notifications.addEventListener('permissionChange', () => {
+              void syncOneSignalState();
+            });
+            OneSignal.Notifications.addEventListener('foregroundWillDisplay', event => {
+              try {
+                const notification = event?.notification;
+                if (notification) {
+                  const title = notification.title || (currentUiLanguage === 'ar' ? 'إشعار جديد' : 'New Notification');
+                  const body = notification.body || '';
+                  showAppointmentNotificationToast(title, body);
+                }
+              } catch (_) {}
+            });
+          }
+
+          if (currentUserAccess) {
+            await sendOneSignalIdentity();
+          }
+        } catch (err) {
+          console.warn('OneSignal initialization error:', err);
+          appointmentNotificationHostState.ready = true;
+          appointmentNotificationHostState.supported = false;
+          appointmentNotificationHostState.error = err?.message || 'Failed to initialize OneSignal';
+          initializeAppointmentNotificationSettings();
+        }
+      });
+    } catch (e) {
+      console.warn('OneSignalDeferred push failed:', e);
+    }
+
+    async function sendOneSignalIdentity() {
       if (!currentUserAccess) return;
       postToLuminHost({
         type: 'lumin:identity',
@@ -6116,6 +6208,23 @@
         roleName: currentUserAccess.roleName,
         canViewAppointments: hasPageAccess('appointments')
       });
+
+      if (window.OneSignal && oneSignalInitialized) {
+        try {
+          if (OneSignal.User?.externalId !== currentUserAccess.userId) {
+            await OneSignal.login(currentUserAccess.userId);
+          }
+          if (OneSignal.User?.addTags) {
+            await OneSignal.User.addTags({
+              role: currentUserAccess.roleName || '',
+              language: currentUserAccess.language === 'ar' ? 'ar' : 'en'
+            });
+          }
+          await syncOneSignalState();
+        } catch (err) {
+          console.warn('OneSignal login error:', err);
+        }
+      }
     }
 
     window.addEventListener('message', event => {
@@ -6723,6 +6832,9 @@
         resetAuthRecoveryState();
         stopRealtimeSync();
         postToLuminHost({ type: 'lumin:logout' });
+        if (window.OneSignal && oneSignalInitialized) {
+          try { void OneSignal.logout(); } catch (_) {}
+        }
         currentSession = null;
         currentUserAccess = null;
         resetLoyaltyState();
@@ -6959,12 +7071,14 @@
         invoicedFindingIds = new Set();
         chartInvoiceStatePatientId = null;
         chartInvoiceStateLoading = false;
-        const initialView = firstAuthorizedView();
+        const urlParams = new URLSearchParams(window.location.search);
+        const requestedView = urlParams.get('view');
+        const initialView = (requestedView && hasPageAccess(requestedView)) ? requestedView : firstAuthorizedView();
         if (initialView) await switchView(initialView);
         document.getElementById('auth-gate').classList.add('hidden');
         document.getElementById('app-shell').classList.remove('hidden');
         resetAuthRecoveryState();
-        sendOneSignalIdentity();
+        void sendOneSignalIdentity();
         postToLuminHost({ type: 'lumin:request-host-state' });
         startRealtimeSync();
         lucide.createIcons();
@@ -7083,6 +7197,9 @@
       resetAuthRecoveryState();
       stopRealtimeSync();
       postToLuminHost({ type: 'lumin:logout' });
+      if (window.OneSignal && oneSignalInitialized) {
+        try { void OneSignal.logout(); } catch (_) {}
+      }
       try {
         await db.auth.signOut({ scope: 'local' });
       } finally {
@@ -7290,11 +7407,13 @@
       card.classList.toggle('hidden', !allowed);
       if (!allowed) return;
 
-      if (window.parent !== window && !appointmentNotificationHostState.ready) {
+      if (!appointmentNotificationHostState.ready) {
         toggle.checked = storedAppointmentNotificationPreference();
         toggle.disabled = true;
         setAppointmentNotificationMessage('Notification service is loading...');
-        postToLuminHost({ type: 'lumin:request-host-state' });
+        if (window.parent !== window) {
+          postToLuminHost({ type: 'lumin:request-host-state' });
+        }
         return;
       }
 
@@ -7351,12 +7470,10 @@
         try {
           const bridge = window.parent.LuminNotificationBridge;
           if (bridge && typeof bridge.setPreference === 'function') {
-            // Calling the host bridge synchronously preserves the iOS user tap
-            // for the native notification permission prompt.
             directRequest = bridge.setPreference(Boolean(enabled));
           }
         } catch (_) {}
-        if (enabled) sendOneSignalIdentity();
+        if (enabled) void sendOneSignalIdentity();
         if (directRequest) {
           try {
             await directRequest;
@@ -7373,20 +7490,46 @@
         }
         return;
       }
-      if (!enabled) {
-        storeAppointmentNotificationPreference(false);
-        initializeAppointmentNotificationSettings();
-        return;
-      }
-
-      if (!('Notification' in window)) {
-        toggle.checked = false;
-        initializeAppointmentNotificationSettings();
-        return;
-      }
 
       toggle.disabled = true;
       try {
+        if (window.OneSignal && oneSignalInitialized) {
+          if (enabled) {
+            let permission = Boolean(OneSignal.Notifications && OneSignal.Notifications.permission);
+            if (!permission && OneSignal.Notifications?.requestPermission) {
+              permission = await OneSignal.Notifications.requestPermission();
+            }
+            if (permission) {
+              if (OneSignal.User?.PushSubscription?.optIn) {
+                await OneSignal.User.PushSubscription.optIn();
+              }
+              await sendOneSignalIdentity();
+              storeAppointmentNotificationPreference(true);
+            } else {
+              storeAppointmentNotificationPreference(false);
+            }
+          } else {
+            if (OneSignal.User?.PushSubscription?.optOut) {
+              await OneSignal.User.PushSubscription.optOut();
+            }
+            storeAppointmentNotificationPreference(false);
+          }
+          await syncOneSignalState();
+          return;
+        }
+
+        if (!enabled) {
+          storeAppointmentNotificationPreference(false);
+          initializeAppointmentNotificationSettings();
+          return;
+        }
+
+        if (!('Notification' in window)) {
+          toggle.checked = false;
+          initializeAppointmentNotificationSettings();
+          return;
+        }
+
         const permission = Notification.permission === 'granted'
           ? 'granted'
           : await Notification.requestPermission();
@@ -7400,7 +7543,8 @@
             `appointment-notifications-enabled-${currentUserAccess.userId}`
           );
         }
-      } catch (_) {
+      } catch (err) {
+        console.warn('Appointment notification toggle error:', err);
         storeAppointmentNotificationPreference(false);
         toggle.checked = false;
       } finally {

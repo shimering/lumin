@@ -1,4 +1,4 @@
-const LUMIN_CACHE = "lumin-dental-shell-v17";
+const LUMIN_CACHE = "lumin-dental-shell-v18";
 const LUMIN_SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -38,7 +38,12 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin || url.pathname.startsWith("/push/onesignal/")) return;
+  if (
+    url.origin !== self.location.origin ||
+    url.pathname.startsWith("/push/onesignal/") ||
+    url.pathname.endsWith("OneSignalSDKWorker.js") ||
+    url.pathname.includes("OneSignal")
+  ) return;
 
   if (url.pathname === "/app-version.json") {
     event.respondWith(fetch(request, { cache: "no-store" }));
