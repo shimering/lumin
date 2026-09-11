@@ -4860,6 +4860,24 @@
 
   <!-- JavaScript Application Logic -->
   <script>
+    // Fast return if this window is an OAuth popup callback
+    (function handleOAuthPopupCallback() {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const oauthResult = urlParams.get('google_calendar');
+        if (oauthResult && window.opener && window.opener !== window) {
+          try {
+            window.opener.postMessage({
+              type: 'GOOGLE_CALENDAR_AUTH_RESULT',
+              result: oauthResult,
+              message: urlParams.get('google_calendar_message') || ''
+            }, '*');
+          } catch (_) {}
+          window.close();
+        }
+      } catch (_) {}
+    })();
+
     // ================= SUPABASE CLIENT CONFIG =================
     const SUPABASE_URL = 'https://pqbayjkypzfxvnksgwwf.supabase.co'; // NewLumin
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxYmF5amt5cHpmeHZua3Nnd3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkxMjI4NzAsImV4cCI6MjEwNDY5ODg3MH0.e5tPe3PKUiFiS_ZnXcpDF9CRtGtp_B1oZsK37phOQ8Q'; // NewLumin
@@ -7084,7 +7102,10 @@
         chartInvoiceStatePatientId = null;
         chartInvoiceStateLoading = false;
         const urlParams = new URLSearchParams(window.location.search);
-        const requestedView = urlParams.get('view');
+        const hashView = window.location.hash ? window.location.hash.replace(/^#/, '') : null;
+        const requestedView = urlParams.get('view')
+          || (urlParams.has('google_calendar') ? 'settings' : null)
+          || (hashView && hasPageAccess(hashView) ? hashView : null);
         const initialView = (requestedView && hasPageAccess(requestedView)) ? requestedView : firstAuthorizedView();
         if (initialView) await switchView(initialView);
         document.getElementById('auth-gate').classList.add('hidden');
@@ -7988,6 +8009,18 @@
       }
     }
 
+    window.addEventListener('message', async (event) => {
+      if (event.data?.type === 'GOOGLE_CALENDAR_AUTH_RESULT') {
+        if (event.data.result === 'connected') {
+          setGoogleCalendarMessage('Google Calendar connected successfully. Loading settings…', 'success');
+          await loadGoogleCalendarSettings();
+          await syncGoogleCalendarNow({ oauthCompletion: true });
+        } else if (event.data.result === 'error') {
+          setGoogleCalendarMessage(event.data.message || 'Google Calendar connection failed.', 'error');
+        }
+      }
+    });
+
     async function connectGoogleCalendar() {
       if (!currentSession) return;
       const button = document.getElementById('settings-google-calendar-connect-button');
@@ -7996,10 +8029,20 @@
       button.textContent = 'Opening Google…';
       setGoogleCalendarMessage('');
       try {
-        const result = await invokeGoogleCalendar('begin-connect');
+        const currentAppUrl = window.location.origin + window.location.pathname;
+        const result = await invokeGoogleCalendar('begin-connect', { app_url: currentAppUrl });
         if (!result.authorization_url) throw new Error('Google authorization link was not returned.');
-        if (popup) popup.location.replace(result.authorization_url);
-        else window.location.assign(result.authorization_url);
+        if (popup) {
+          popup.location.replace(result.authorization_url);
+          const popupCheck = setInterval(() => {
+            if (popup.closed) {
+              clearInterval(popupCheck);
+              void loadGoogleCalendarSettings();
+            }
+          }, 1200);
+        } else {
+          window.location.assign(result.authorization_url);
+        }
         setGoogleCalendarMessage('Finish signing in with Google, then return to My Settings.');
       } catch (error) {
         if (popup) popup.close();
