@@ -4210,8 +4210,13 @@
               <span class="pointer-events-none absolute left-1 h-4 w-4 rounded-full bg-white shadow-sm transition peer-checked:translate-x-5"></span>
             </span>
           </label>
-          <p id="settings-notification-message" class="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500" role="status">Notifications are off.</p>
-          <p class="text-[11px] leading-5 text-slate-400">With this local app, alerts are delivered while the app is open. Background alerts after closing the app require a hosted version.</p>
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <p id="settings-notification-message" class="min-w-0 flex-1 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500" role="status">Notifications are off.</p>
+            <button id="btn-test-notification" type="button" onclick="sendTestNotificationPrompt()" class="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50">
+              <i data-lucide="bell-ring" class="inline h-3.5 w-3.5 ltr:mr-1 rtl:ml-1 text-blue-600"></i> Test alert
+            </button>
+          </div>
+          <p class="text-[11px] leading-5 text-slate-400">Alerts notify you of new, changed, or cancelled appointments assigned to you.</p>
         </div>
 
         <div id="settings-google-calendar-card" class="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
@@ -7512,6 +7517,7 @@
               }
               await sendOneSignalIdentity();
               storeAppointmentNotificationPreference(true);
+              void sendTestNotificationPrompt();
             } else {
               storeAppointmentNotificationPreference(false);
             }
@@ -7544,11 +7550,7 @@
         storeAppointmentNotificationPreference(granted);
         toggle.checked = granted;
         if (granted) {
-          showAppointmentBrowserNotification(
-            currentUiLanguage === 'ar' ? 'تم تفعيل إشعارات المواعيد' : 'Appointment notifications enabled',
-            currentUiLanguage === 'ar' ? 'ستصلك تنبيهات عند إضافة موعد أو تغيير وقته.' : 'You will be alerted when an appointment is added or its time changes.',
-            `appointment-notifications-enabled-${currentUserAccess.userId}`
-          );
+          void sendTestNotificationPrompt();
         }
       } catch (err) {
         console.warn('Appointment notification toggle error:', err);
@@ -7558,6 +7560,51 @@
         toggle.disabled = false;
         initializeAppointmentNotificationSettings();
       }
+    }
+
+    async function sendTestNotificationPrompt() {
+      const isArabic = currentUiLanguage === 'ar';
+      const title = isArabic ? 'لومين لطب الأسنان' : 'Lumin Dental Clinic';
+      const body = isArabic
+        ? 'تم تفعيل الإشعارات بنجاح! هذا إشعار تجريبي لاختبار التنبيهات على جهازك.'
+        : 'Notifications active! This is a test alert to verify notifications on your device.';
+
+      let osDelivered = false;
+      try {
+        if ('serviceWorker' in navigator) {
+          const reg = await navigator.serviceWorker.ready;
+          if (reg && typeof reg.showNotification === 'function') {
+            await reg.showNotification(title, {
+              body,
+              icon: 'icons/dental-icon-v1-192.png',
+              badge: 'icons/dental-icon-v1-32.png',
+              tag: 'lumin-test-alert',
+              renotify: true,
+              data: { url: '/?view=appointments' }
+            });
+            osDelivered = true;
+          }
+        }
+      } catch (e) {
+        console.warn('ServiceWorker test notification error:', e);
+      }
+
+      if (!osDelivered && 'Notification' in window && Notification.permission === 'granted') {
+        try {
+          const n = new Notification(title, {
+            body,
+            icon: 'icons/dental-icon-v1-192.png',
+            tag: 'lumin-test-alert'
+          });
+          n.onclick = () => {
+            window.focus();
+            n.close();
+          };
+          osDelivered = true;
+        } catch (_) {}
+      }
+
+      showAppointmentNotificationToast(title, body);
     }
 
     function showAppointmentNotificationToast(title, body) {
