@@ -3198,25 +3198,19 @@
 
     <!-- ================= IMPLANT PROGRESS ================= -->
     <section id="view-implants" class="hidden space-y-5">
+      <!-- Top Page Bar Card -->
       <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-        <div class="flex flex-col gap-4 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600">
-                <i data-lucide="activity" class="h-5 w-5"></i>
-              </span>
-              <h2 class="text-lg font-black text-slate-900 sm:text-xl">Implant Progress</h2>
-            </div>
-            <p class="mt-1 text-xs font-bold text-slate-400">
-              Track surgical placement, osseointegration timeline, and prosthetic delivery for all dental implants.
-            </p>
+        <div class="app-page-bar app-page-bar-embedded">
+          <div class="app-page-heading">
+            <span class="app-page-icon" aria-hidden="true"><i data-lucide="activity"></i></span>
+            <h2 class="app-page-title">Implant Progress</h2>
           </div>
           <div class="flex flex-wrap items-center gap-2">
-            <button type="button" onclick="openTrackedProceduresModal()" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-black text-slate-700 shadow-xs transition hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-800">
+            <button type="button" onclick="openTrackedProceduresModal()" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-black text-slate-600 shadow-xs transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700">
               <i data-lucide="sliders-horizontal" class="h-4 w-4 text-cyan-600"></i>
               <span>Tracked Procedures</span>
             </button>
-            <button type="button" onclick="refreshImplantProgress({ force: true })" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-black text-slate-700 shadow-xs transition hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-800">
+            <button type="button" onclick="refreshImplantProgress({ force: true })" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-black text-slate-600 shadow-xs transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700">
               <i data-lucide="refresh-cw" class="h-4 w-4 text-slate-500"></i>
               <span>Refresh</span>
             </button>
@@ -3226,42 +3220,46 @@
             </button>
           </div>
         </div>
+      </div>
 
-        <!-- Metric KPI Cards -->
-        <div class="grid grid-cols-2 gap-3 border-b border-slate-100 bg-slate-50/50 p-4 sm:grid-cols-4 sm:p-5">
-          <div class="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs">
-            <div class="flex items-center justify-between">
-              <span class="text-[10px] font-black uppercase tracking-wider text-slate-400">Active Implants</span>
-              <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-50 text-cyan-600"><i data-lucide="clock" class="h-3.5 w-3.5"></i></span>
-            </div>
-            <p id="implant-stat-active" class="mt-2 text-2xl font-black text-slate-800">0</p>
-            <p class="mt-0.5 text-[10px] font-bold text-slate-400">Currently in healing</p>
+      <!-- Metric KPI Summary Cards -->
+      <div id="implant-kpi-summary" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="implant-stat-card rounded-2xl border border-cyan-200 bg-gradient-to-br from-white to-cyan-50/80 p-4 shadow-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-black uppercase tracking-wider text-cyan-700">Active Implants</span>
+            <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600 shadow-xs"><i data-lucide="clock" class="h-4 w-4"></i></span>
           </div>
-          <div class="rounded-2xl border border-amber-200/80 bg-white p-3.5 shadow-xs">
-            <div class="flex items-center justify-between">
-              <span class="text-[10px] font-black uppercase tracking-wider text-amber-600">Due Soon (≤30d)</span>
-              <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50 text-amber-600"><i data-lucide="alert-circle" class="h-3.5 w-3.5"></i></span>
-            </div>
-            <p id="implant-stat-due-soon" class="mt-2 text-2xl font-black text-amber-600">0</p>
-            <p class="mt-0.5 text-[10px] font-bold text-slate-400">Ready for prosthetics</p>
-          </div>
-          <div class="rounded-2xl border border-emerald-200/80 bg-white p-3.5 shadow-xs">
-            <div class="flex items-center justify-between">
-              <span class="text-[10px] font-black uppercase tracking-wider text-emerald-600">Completed</span>
-              <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600"><i data-lucide="check-circle-2" class="h-3.5 w-3.5"></i></span>
-            </div>
-            <p id="implant-stat-completed" class="mt-2 text-2xl font-black text-emerald-600">0</p>
-            <p class="mt-0.5 text-[10px] font-bold text-slate-400">Restoration delivered</p>
-          </div>
-          <div class="rounded-2xl border border-indigo-200/80 bg-white p-3.5 shadow-xs">
-            <div class="flex items-center justify-between">
-              <span class="text-[10px] font-black uppercase tracking-wider text-indigo-600">Standard / Economic</span>
-              <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600"><i data-lucide="pie-chart" class="h-3.5 w-3.5"></i></span>
-            </div>
-            <p id="implant-stat-ratio" class="mt-2 text-xl font-black text-indigo-700">0 / 0</p>
-            <p class="mt-0.5 text-[10px] font-bold text-slate-400">B&B vs Dual system</p>
-          </div>
+          <p id="implant-stat-active" class="mt-2 text-2xl font-black text-slate-800">0</p>
+          <p class="mt-1 text-[10px] font-bold text-slate-400">Currently in healing</p>
         </div>
+        <div class="implant-stat-card rounded-2xl border border-amber-200 bg-gradient-to-br from-white to-amber-50/80 p-4 shadow-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-black uppercase tracking-wider text-amber-700">Due Soon (≤30d)</span>
+            <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-50 text-amber-600 shadow-xs"><i data-lucide="alert-circle" class="h-4 w-4"></i></span>
+          </div>
+          <p id="implant-stat-due-soon" class="mt-2 text-2xl font-black text-amber-600">0</p>
+          <p class="mt-1 text-[10px] font-bold text-slate-400">Ready for prosthetics</p>
+        </div>
+        <div class="implant-stat-card rounded-2xl border border-emerald-200 bg-gradient-to-br from-white to-emerald-50/80 p-4 shadow-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-black uppercase tracking-wider text-emerald-700">Completed</span>
+            <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 shadow-xs"><i data-lucide="check-circle-2" class="h-4 w-4"></i></span>
+          </div>
+          <p id="implant-stat-completed" class="mt-2 text-2xl font-black text-emerald-600">0</p>
+          <p class="mt-1 text-[10px] font-bold text-slate-400">Restoration delivered</p>
+        </div>
+        <div class="implant-stat-card rounded-2xl border border-indigo-200 bg-gradient-to-br from-white to-indigo-50/80 p-4 shadow-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-black uppercase tracking-wider text-indigo-700">Standard / Economic</span>
+            <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 shadow-xs"><i data-lucide="pie-chart" class="h-4 w-4"></i></span>
+          </div>
+          <p id="implant-stat-ratio" class="mt-2 text-xl font-black text-indigo-700">0 / 0</p>
+          <p class="mt-1 text-[10px] font-bold text-slate-400">B&B vs Dual system</p>
+        </div>
+      </div>
+
+      <!-- Main Table Card -->
+      <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
 
         <!-- Filter and Search Controls -->
         <div class="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">

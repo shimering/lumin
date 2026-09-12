@@ -142,6 +142,52 @@ body.lumin-raised #view-dashboard #dashboard-attendance-card {
       color: #ffffff;
       box-shadow: var(--lumin-small-raised);
     }
+    body.lumin-raised #app-shell .app-page-bar :is(button, select):not([class*="bg-cyan-6"]):not([class*="bg-blue-6"]):not([class*="bg-emerald-6"]):not([class*="bg-rose-6"]):not([class*="bg-indigo-6"]) {
+      border: 1px solid #ffffff;
+      border-top-width: 2px;
+      background: var(--lumin-face);
+      color: var(--lumin-muted);
+      box-shadow: var(--lumin-small-raised);
+    }
+    body.lumin-raised #app-shell .app-page-bar :is(button, select):not([class*="bg-cyan-6"]):not([class*="bg-blue-6"]):not([class*="bg-emerald-6"]):not([class*="bg-rose-6"]):not([class*="bg-indigo-6"]):hover {
+      color: hsl(var(--lumin-hue) calc(65.6% * var(--lumin-chroma)) 41.0%);
+    }
+    body.lumin-raised #view-implants .implant-stat-card {
+      border: 1px solid #ffffff;
+      border-top-width: 2px;
+      border-radius: 1.25rem;
+      box-shadow: var(--lumin-card-raised);
+    }
+    body.lumin-raised #view-implants .implant-stat-card:nth-child(1) {
+      background: linear-gradient(145deg, #ffffff 0%, hsl(var(--lumin-hue) calc(100% * var(--lumin-chroma)) 98%) 45%, #ecfeff 100%);
+    }
+    body.lumin-raised #view-implants .implant-stat-card:nth-child(2) {
+      background: linear-gradient(145deg, #ffffff 0%, hsl(var(--lumin-hue) calc(100% * var(--lumin-chroma)) 98%) 45%, #fffbeb 100%);
+    }
+    body.lumin-raised #view-implants .implant-stat-card:nth-child(3) {
+      background: linear-gradient(145deg, #ffffff 0%, hsl(var(--lumin-hue) calc(100% * var(--lumin-chroma)) 98%) 45%, #f0fdf4 100%);
+    }
+    body.lumin-raised #view-implants .implant-stat-card:nth-child(4) {
+      background: linear-gradient(145deg, #ffffff 0%, hsl(var(--lumin-hue) calc(100% * var(--lumin-chroma)) 98%) 45%, #eef2ff 100%);
+    }
+    body.lumin-raised #view-implants button.bg-cyan-600 {
+      border: 2px solid hsl(187 85% 75%);
+      background: linear-gradient(145deg, hsl(187 85% 48%), hsl(187 85% 38%));
+      color: #ffffff;
+      box-shadow: 0 5px 2px hsl(187 85% 48% / 0.3), 0 10px 15px hsl(187 85% 38% / 0.4), -4px -4px 10px #ffffff;
+    }
+    body.lumin-raised #view-implants #implant-search-input,
+    body.lumin-raised #view-implants #implant-type-filter {
+      border: 1px solid #ffffff;
+      border-top-width: 2px;
+      box-shadow: 0 4px 7px hsl(var(--lumin-hue) calc(44.8% * var(--lumin-chroma)) 77.3% / 0.322), -2px -2px 6px #ffffff;
+    }
+    body.lumin-raised #view-implants .implant-filter-btn.bg-white {
+      border: 1px solid #ffffff;
+      border-top-width: 2px;
+      background: var(--lumin-face);
+      box-shadow: var(--lumin-small-raised);
+    }
     body.lumin-raised #dashboard-scroll-panels { gap: 1.5rem; }
     body.lumin-raised #view-dashboard .dashboard-scroll-card > div:first-child {
       padding: 1.25rem;
