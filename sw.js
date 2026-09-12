@@ -1,4 +1,4 @@
-const LUMIN_CACHE = "lumin-dental-shell-v22";
+const LUMIN_CACHE = "lumin-dental-shell-v23";
 const LUMIN_SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -11,7 +11,15 @@ const LUMIN_SHELL = [
   "/lumin-theme.css?v=8",
   "/lumin-loyalty.js?v=5",
   "/vendor/lucide.min.js",
-  "/vendor/supabase.js"
+  "/vendor/supabase.js",
+  "/assets/teeth-3d/upper-molar.png",
+  "/assets/teeth-3d/lower-molar.png",
+  "/assets/teeth-3d/upper-premolar.png",
+  "/assets/teeth-3d/lower-premolar.png",
+  "/assets/teeth-3d/upper-canine.png",
+  "/assets/teeth-3d/lower-canine.png",
+  "/assets/teeth-3d/upper-incisor.png",
+  "/assets/teeth-3d/lower-incisor.png"
 ];
 
 self.addEventListener("install", (event) => {
