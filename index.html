@@ -837,29 +837,45 @@
     .clinical-odontogram-stage .tooth-card {
       min-height: clamp(148px, 14vw, 178px);
       justify-content: center;
-      gap: 0.2rem;
-      border: 0;
-      border-radius: 0;
+      gap: 0.25rem;
+      border: 1.5px solid transparent;
+      border-radius: 0.75rem;
       background: transparent;
       padding: clamp(3px, 0.4vw, 7px) clamp(1px, 0.2vw, 4px);
       box-shadow: none;
       overflow: visible;
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+      touch-action: manipulation;
+      position: relative;
     }
     .clinical-odontogram-stage .tooth-card:hover {
       z-index: 8;
-      border-color: transparent;
-      background: transparent;
-      box-shadow: none;
-      transform: none;
+      border-color: rgba(186, 230, 253, 0.7);
+      background: rgba(240, 249, 255, 0.5);
+      border-radius: 0.75rem;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px -2px rgba(14, 165, 233, 0.12);
     }
     .clinical-odontogram-stage .tooth-card.is-active-tooth {
-      border-color: transparent !important;
-      background: transparent !important;
-      box-shadow: none !important;
+      z-index: 15 !important;
+      border-color: #0284c7 !important;
+      border-radius: 0.75rem !important;
+      background: linear-gradient(180deg, rgba(224, 242, 254, 0.55) 0%, rgba(255, 255, 255, 0.95) 100%) !important;
+      box-shadow: 0 0 0 2px #38bdf8, 0 10px 24px -3px rgba(14, 165, 233, 0.38) !important;
+      transform: translateY(-5px) scale(1.045) !important;
     }
     .clinical-odontogram-stage .tooth-card.is-primary-tooth {
       border-color: transparent;
       background: transparent;
+    }
+    .clinical-odontogram-stage .tooth-card.is-primary-tooth:hover {
+      border-color: rgba(199, 210, 254, 0.7);
+      background: rgba(238, 242, 255, 0.5);
+    }
+    .clinical-odontogram-stage .tooth-card.is-primary-tooth.is-active-tooth {
+      border-color: #6366f1 !important;
+      background: linear-gradient(180deg, rgba(238, 242, 255, 0.65) 0%, rgba(255, 255, 255, 0.95) 100%) !important;
+      box-shadow: 0 0 0 2px #818cf8, 0 10px 24px -3px rgba(99, 102, 241, 0.38) !important;
     }
     .clinical-odontogram-stage .tooth-card.has-charted-finding::after { display: none; }
     .clinical-odontogram-stage .odontogram-anatomy {
@@ -868,18 +884,67 @@
       height: auto !important;
       margin: 0;
       aspect-ratio: 64 / 92;
-      filter: none;
-      transition: filter 0.18s ease, transform 0.18s ease;
+      filter: drop-shadow(0 3px 4px rgba(71, 50, 25, 0.18));
+      transition: filter 0.2s ease, transform 0.2s ease;
     }
     .clinical-odontogram-stage .tooth-photo-stage {
-      filter: drop-shadow(0 2px 2px rgba(71, 50, 25, 0.16));
+      position: relative;
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 3px 5px rgba(71, 50, 25, 0.22));
+      transition: filter 0.2s ease, transform 0.2s ease;
     }
-    .clinical-odontogram-stage .tooth-card:hover .odontogram-anatomy {
-      filter: drop-shadow(0 4px 5px rgba(71, 50, 25, 0.18));
-      transform: translateY(-1px) scale(1.025);
+    .clinical-odontogram-stage .tooth-card:hover .tooth-photo-stage {
+      filter: drop-shadow(0 6px 10px rgba(71, 50, 25, 0.28));
+      transform: translateY(-2px) scale(1.02);
     }
-    .clinical-odontogram-stage .tooth-card.is-active-tooth .odontogram-anatomy {
-      filter: drop-shadow(0 0 4px rgba(37, 99, 235, 0.72));
+    .clinical-odontogram-stage .tooth-card.is-active-tooth .tooth-photo-stage {
+      filter: drop-shadow(0 0 12px rgba(0, 229, 255, 0.75)) drop-shadow(0 8px 16px rgba(0, 0, 0, 0.22));
+      transform: translateY(-2px) scale(1.04);
+    }
+
+    /* Slide 2 Glowing Cyan Halo Ring */
+    .tooth-touch-halo {
+      position: absolute;
+      pointer-events: none;
+      opacity: 0;
+      border-radius: 9999px;
+      border: 2.5px solid #00e5ff;
+      box-shadow: 0 0 16px 4px rgba(0, 229, 255, 0.7), inset 0 0 10px rgba(0, 229, 255, 0.4);
+      transition: opacity 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transform: scale(0.65);
+      z-index: 8;
+      width: clamp(34px, 4vw, 46px);
+      height: clamp(34px, 4vw, 46px);
+      left: 50%;
+      translate: -50% 0;
+    }
+    #upper-arch .tooth-touch-halo {
+      bottom: 2px;
+      top: auto;
+    }
+    #lower-arch .tooth-touch-halo {
+      top: 2px;
+      bottom: auto;
+    }
+    .clinical-odontogram-stage .tooth-card.is-active-tooth .tooth-touch-halo {
+      opacity: 1;
+      transform: scale(1.08);
+      animation: toothHaloPulse 2.4s ease-in-out infinite alternate;
+    }
+    .clinical-odontogram-stage .tooth-card.is-primary-tooth.is-active-tooth .tooth-touch-halo {
+      border-color: #818cf8;
+      box-shadow: 0 0 16px 4px rgba(129, 140, 248, 0.75), inset 0 0 10px rgba(129, 140, 248, 0.4);
+    }
+    @keyframes toothHaloPulse {
+      0% {
+        box-shadow: 0 0 14px 3px rgba(0, 229, 255, 0.6), inset 0 0 8px rgba(0, 229, 255, 0.3);
+        border-color: #00e5ff;
+      }
+      100% {
+        box-shadow: 0 0 24px 6px rgba(0, 229, 255, 0.9), inset 0 0 14px rgba(0, 229, 255, 0.5);
+        border-color: #38bdf8;
+      }
     }
     .clinical-odontogram-stage .clinical-tooth-svg {
       overflow: visible;
@@ -949,9 +1014,9 @@
     }
     .clinical-odontogram-stage .tooth-number-badge {
       width: 100%;
-      height: 2rem;
-      border: 0;
-      border-radius: 0;
+      height: 1.85rem;
+      border: 1px solid transparent;
+      border-radius: 0.4rem;
       background: transparent;
       box-shadow: none;
       color: #475569;
@@ -959,15 +1024,27 @@
       font-size: clamp(9px, 1vw, 13px);
       font-weight: 700;
       letter-spacing: 0.01em;
+      transition: all 0.2s ease;
     }
-    .clinical-odontogram-stage .tooth-card.has-charted-finding .tooth-number-badge,
+    .clinical-odontogram-stage .tooth-card.has-charted-finding .tooth-number-badge {
+      color: #4338ca;
+      font-weight: 800;
+    }
     .clinical-odontogram-stage .tooth-card.is-active-tooth .tooth-number-badge {
-      color: #5b21b6;
-      background: transparent;
+      color: #ffffff !important;
+      background: #0284c7 !important;
+      border-color: #0284c7 !important;
+      font-weight: 800;
+      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.4) !important;
     }
     .clinical-odontogram-stage .tooth-card.is-primary-tooth .tooth-number-badge {
-      color: #4f46e5;
-      background: transparent;
+      color: #6366f1;
+    }
+    .clinical-odontogram-stage .tooth-card.is-primary-tooth.is-active-tooth .tooth-number-badge {
+      color: #ffffff !important;
+      background: #6366f1 !important;
+      border-color: #6366f1 !important;
+      box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4) !important;
     }
     .clinical-odontogram-stage .photo-implant {
       width: 0.9rem;
@@ -2465,7 +2542,7 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="lumin-theme.css?v=7" />
+  <link rel="stylesheet" href="lumin-theme.css?v=8" />
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 font-sans antialiased selection:bg-blue-100">
 
@@ -12371,6 +12448,7 @@
         <div id="anatomy-wrapper-${id}" class="anatomy-wrapper odontogram-anatomy relative select-none ${showRootsAnatomy ? '' : 'hidden'} pointer-events-none" style="width:${isPrimary ? '44px' : '48px'};height:78px;min-width:${isPrimary ? '44px' : '48px'}">
           <div id="anatomy-group-${id}" class="absolute inset-0">
             <div class="tooth-photo-stage">
+              <span class="tooth-touch-halo" aria-hidden="true"></span>
               <img id="tooth-photo-${id}" src="${TOOTH_PHOTO_ASSETS[family]}" alt="" aria-hidden="true" draggable="false" class="${photoClasses}" />
               <img id="tooth-crown-overlay-${id}" src="${TOOTH_PHOTO_ASSETS[family]}" alt="" aria-hidden="true" draggable="false" class="${photoClasses} tooth-crown-color-overlay" />
               <div id="rct-layer-${id}" class="hidden photo-rct-mask family-${family} ${isUpper ? 'is-upper' : 'is-lower'} ${isPrimary ? 'is-primary-rct' : ''}">
@@ -12485,7 +12563,7 @@
              aria-keyshortcuts="Shift+Enter"
              aria-label="${chartToothLabel(id)}. ${escapeHtml(longPressLabel)}."
              title="${escapeHtml(longPressLabel)}"
-             class="tooth-card relative flex min-w-0 flex-1 cursor-pointer select-none flex-col items-center transition-colors ${isPrimary ? 'is-primary-tooth' : ''} ${hasFinding ? 'has-charted-finding' : ''}">
+             class="tooth-card relative flex min-w-0 flex-1 cursor-pointer select-none flex-col items-center transition-all ${isPrimary ? 'is-primary-tooth' : ''} ${hasFinding ? 'has-charted-finding' : ''}">
           ${isUpper
             ? anatomyPhoto + surfaceMap + `<span class="tooth-number-badge pointer-events-none">${escapeHtml(palmerQuadrantLabel(id, slot))}</span>`
             : `<span class="tooth-number-badge pointer-events-none">${escapeHtml(palmerQuadrantLabel(id, slot))}</span>` + surfaceMap + anatomyPhoto}
@@ -18750,6 +18828,9 @@
         });
         setChartSelectionTargets(targets, tooth);
       }
+      if (typeof window !== 'undefined' && window.navigator?.vibrate) {
+        try { window.navigator.vibrate(15); } catch (_) {}
+      }
       updateSelectionUI();
     }
 
@@ -18866,6 +18947,9 @@
         }
       }
       setChartSelectionTargets(targets, id);
+      if (typeof window !== 'undefined' && window.navigator?.vibrate) {
+        try { window.navigator.vibrate(12); } catch (_) {}
+      }
       updateSelectionUI();
     }
 
