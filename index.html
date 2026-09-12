@@ -2679,6 +2679,9 @@
         <button id="nav-btn-clinic-management" onclick="switchView('clinic-management')" class="hidden flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900" aria-label="Clinic Management">
           <i data-lucide="building-2" class="w-4 h-4"></i><span class="app-nav-label">Clinic Management</span>
         </button>
+        <button id="nav-btn-prices" onclick="switchView('prices')" class="hidden flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900" aria-label="Prices">
+          <i data-lucide="badge-dollar-sign" class="w-4 h-4"></i><span class="app-nav-label">Prices</span>
+        </button>
         <button id="nav-btn-admin" onclick="switchView('admin')" class="hidden flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900" aria-label="Admin">
           <i data-lucide="shield-check" class="w-4 h-4"></i><span class="app-nav-label">Admin</span>
         </button>
@@ -3913,6 +3916,7 @@
               </div>
               <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 p-3 text-xs font-bold text-slate-600"><input type="checkbox" value="analytics" class="h-4 w-4 rounded border-slate-300 text-blue-600" /> Analytics</label>
               <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 p-3 text-xs font-bold text-slate-600"><input type="checkbox" value="hr" onchange="syncNewRoleHrModifyToggle()" class="h-4 w-4 rounded border-slate-300 text-blue-600" /> HR</label>
+              <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 p-3 text-xs font-bold text-slate-600"><input type="checkbox" value="prices" class="h-4 w-4 rounded border-slate-300 text-blue-600" /> Prices</label>
             </div>
           </fieldset>
           <label class="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
@@ -4305,6 +4309,112 @@
           </form>
         </div>
 
+      </div>
+    </section>
+
+    <!-- ================= VIEW: PRICES & PROCEDURES ================= -->
+    <section id="view-prices" class="hidden space-y-5">
+      <!-- Page Header & Action Bar -->
+      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex items-center gap-3.5">
+            <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm ring-4 ring-blue-50">
+              <i data-lucide="badge-dollar-sign" class="h-6 w-6"></i>
+            </span>
+            <div>
+              <div class="flex items-center gap-2">
+                <h2 id="prices-page-title" class="text-xl font-black text-slate-900 tracking-tight">قائمة الأسعار</h2>
+                <span id="prices-total-badge" class="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-black text-blue-700">0 إجراء</span>
+              </div>
+              <p id="prices-page-subtitle" class="mt-0.5 text-xs font-semibold text-slate-400">دليل الإجراءات الطبية والأسعار المعتمدة بالعيادة</p>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2.5 sm:justify-end">
+            <!-- Independent Language Switcher for Prices -->
+            <div class="flex items-center rounded-xl border border-slate-200 bg-slate-50/80 p-1 shadow-2xs" role="group" aria-label="Prices page language">
+              <button type="button" id="prices-lang-en-btn" onclick="setPricesLanguage('en')" class="rounded-lg px-3 py-1.5 text-xs font-bold transition text-slate-600 hover:text-slate-900">
+                English
+              </button>
+              <button type="button" id="prices-lang-ar-btn" onclick="setPricesLanguage('ar')" class="rounded-lg px-3 py-1.5 text-xs font-bold transition bg-white text-blue-700 shadow-xs">
+                العربية
+              </button>
+            </div>
+
+            <!-- Admin Manage Shortcut -->
+            <button id="prices-admin-link" type="button" onclick="openAdminCustomizationTab()" class="hidden items-center gap-1.5 rounded-xl border border-cyan-200 bg-cyan-50/60 px-3.5 py-2 text-xs font-bold text-cyan-800 transition hover:bg-cyan-100">
+              <i data-lucide="sliders-horizontal" class="h-4 w-4"></i>
+              <span id="prices-admin-link-text">تعديل باللوحة</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search & Filters Container -->
+      <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <!-- Real-time Search Input -->
+          <div class="relative flex-1">
+            <span class="pointer-events-none absolute inset-y-0 flex items-center px-3.5 text-slate-400">
+              <i data-lucide="search" class="h-4 w-4"></i>
+            </span>
+            <input id="prices-search-input" type="text" oninput="handlePricesSearch(this.value)" placeholder="ابحث عن إجراء أو كود أو تخصص..." class="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 px-10 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20" />
+            <button id="prices-search-clear" type="button" onclick="clearPricesSearch()" class="hidden absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-600" aria-label="Clear search">
+              <i data-lucide="x" class="h-4 w-4"></i>
+            </button>
+          </div>
+
+          <!-- Sort Select -->
+          <div class="flex items-center gap-2">
+            <span id="prices-sort-label" class="shrink-0 text-xs font-bold text-slate-500">الترتيب:</span>
+            <select id="prices-sort-select" onchange="handlePricesSort(this.value)" class="rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-bold text-slate-700 outline-none transition focus:border-blue-500 focus:bg-white">
+              <option value="default">الترتيب المعتمد</option>
+              <option value="name-asc">الاسم (أ - ي)</option>
+              <option value="name-desc">الاسم (ي - أ)</option>
+              <option value="price-asc">السعر (الأقل أولاً)</option>
+              <option value="price-desc">السعر (الأعلى أولاً)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Horizontal Category Tabs -->
+        <div class="mt-4 border-t border-slate-100 pt-3">
+          <div class="flex items-center justify-between mb-2.5">
+            <span id="prices-category-label" class="text-xs font-black uppercase tracking-wider text-slate-400">الأقسام والتخصصات</span>
+            <span id="prices-filtered-count" class="text-xs font-bold text-slate-500">0 نتيجة</span>
+          </div>
+          <div id="prices-category-tabs" role="tablist" aria-label="Procedure categories" class="flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain pb-2 scrollbar-none touch-pan-x">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Procedures Table Container -->
+      <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm" id="prices-procedures-table">
+            <thead class="border-b border-slate-200 bg-slate-50/75 text-[11px] font-black uppercase tracking-wider text-slate-500">
+              <tr>
+                <th scope="col" class="w-14 px-4 py-3.5 text-center">#</th>
+                <th scope="col" id="th-procedure-name" class="px-4 py-3.5">الإجراء الطبي</th>
+                <th scope="col" id="th-procedure-category" class="px-4 py-3.5">التخصص / القسم</th>
+                <th scope="col" id="th-procedure-scope" class="px-4 py-3.5">النطاق</th>
+                <th scope="col" id="th-procedure-price" class="px-4 py-3.5 text-right font-black">السعر</th>
+              </tr>
+            </thead>
+            <tbody id="prices-table-body" class="divide-y divide-slate-100 font-medium">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+        <!-- Empty State -->
+        <div id="prices-empty-state" class="hidden p-12 text-center">
+          <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+            <i data-lucide="search-x" class="h-6 w-6"></i>
+          </span>
+          <h4 id="prices-empty-title" class="mt-3 text-sm font-black text-slate-700">لم يتم العثور على أي إجراءات</h4>
+          <p id="prices-empty-subtitle" class="mt-1 text-xs text-slate-400">جرّب تغيير كلمات البحث أو اختيار قسم آخر.</p>
+        </div>
       </div>
     </section>
 
@@ -5427,7 +5537,8 @@
       { key: 'finances', label: 'Finances' },
       { key: 'analytics', label: 'Analytics' },
       { key: 'hr', label: 'HR' },
-      { key: 'implants', label: 'Implant Progress' }
+      { key: 'implants', label: 'Implant Progress' },
+      { key: 'prices', label: 'Prices' }
     ]);
     const ROLE_PERMISSION_PAGES = Object.freeze([...APP_PAGES, { key: 'dashboard_invoices', label: 'Dashboard invoices' }, { key: 'loyalty', label: 'Patient Loyalty tab' }, { key: 'finance_depts', label: 'Finance Depts tab' }]);
     const WHATSAPP_TEMPLATE_VARIABLES = Object.freeze([
@@ -5745,6 +5856,7 @@
       'EMR & Realistic Odontogram': 'السجل الطبي ومخطط الأسنان',
       'Patient Query Directory': 'دليل المرضى',
       'Patients': 'المرضى',
+      'Prices': 'الأسعار',
       'Patient Directory': 'دليل المرضى',
       'Dashboard': 'لوحة التحكم',
       'My daily schedule': 'جدولي اليومي',
@@ -6379,7 +6491,7 @@
 
     function isUiTranslationExcluded(node) {
       const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
-      return Boolean(element?.closest('#view-chart, #view-admin'));
+      return Boolean(element?.closest('#view-chart, #view-admin, #view-prices'));
     }
 
     function arabicUiPhrase(source) {
@@ -6538,6 +6650,8 @@
       document.getElementById('view-chart')?.setAttribute('dir', 'ltr');
       document.getElementById('view-admin')?.setAttribute('lang', 'en');
       document.getElementById('view-admin')?.setAttribute('dir', 'ltr');
+      const viewPricesEl = document.getElementById('view-prices');
+      if (viewPricesEl) viewPricesEl.setAttribute('dir', pricesPageLanguage === 'ar' ? 'rtl' : 'ltr');
       const languageToggle = document.getElementById('settings-language-toggle');
       if (languageToggle) languageToggle.checked = isArabic;
       configureAppointmentFormatters();
@@ -6909,6 +7023,7 @@
       if (hasPageAccess('chart')) return 'chart';
       if (hasPageAccess('appointments')) return 'appointments';
       if (hasPageAccess('clinic-management')) return 'clinic-management';
+      if (hasPageAccess('prices')) return 'prices';
       if (hasPageAccess('admin')) return 'admin';
       if (hasPageAccess('settings')) return 'settings';
       return null;
@@ -6920,6 +7035,7 @@
         document.getElementById(`nav-btn-${pageKey}`).classList.toggle('hidden', !hasPageAccess(pageKey));
       });
       document.getElementById('nav-btn-clinic-management').classList.toggle('hidden', !hasPageAccess('clinic-management'));
+      document.getElementById('nav-btn-prices')?.classList.toggle('hidden', !hasPageAccess('prices'));
       document.getElementById('nav-btn-admin').classList.toggle('hidden', !hasPageAccess('admin'));
       document.getElementById('btn-new-patient').classList.toggle('hidden', !hasPageAccess('patients'));
       const financeDeptsTab = document.getElementById('finance-tab-depts');
@@ -9128,7 +9244,7 @@
     }
 
     async function fetchDentalCustomization() {
-      if (!currentSession || !hasPageAccess('chart')) {
+      if (!currentSession || (!hasPageAccess('chart') && !hasPageAccess('prices') && !hasPageAccess('admin'))) {
         dentalSpecialties = [];
         dentalOperations = [];
         dentalCustomizationLoaded = false;
@@ -9147,6 +9263,7 @@
       dentalCustomizationLoaded = true;
       renderClinicalActionSelectors();
       if (hasPageAccess('admin')) renderAdminDentalCustomization();
+      if (hasPageAccess('prices') && !document.getElementById('view-prices')?.classList.contains('hidden')) renderPricesPage();
       if (activePatientId) {
         document.querySelectorAll('[data-tooth-card]').forEach(card => renderToothVisuals(card.dataset.toothCard));
         renderFindingsList();
@@ -9156,7 +9273,7 @@
 
     async function ensureDentalCustomizationLoaded() {
       if (dentalCustomizationLoaded) return true;
-      if (!currentSession || !hasPageAccess('chart')) return false;
+      if (!currentSession || (!hasPageAccess('chart') && !hasPageAccess('prices') && !hasPageAccess('admin'))) return false;
       if (!dentalCustomizationLoadPromise) {
         dentalCustomizationLoadPromise = fetchDentalCustomization()
           .finally(() => { dentalCustomizationLoadPromise = null; });
@@ -18383,6 +18500,488 @@
       lucide.createIcons();
     }
 
+    // ================= PRICES & PROCEDURES CONTROLLER =================
+    const DENTAL_TRANSLATIONS_AR = Object.freeze({
+      // Specialties / Categories
+      'All': 'الكل',
+      'Cosmetics': 'تجميل الأسنان',
+      'Crown': 'تركيبات وتيجان',
+      'Dentolize historical import': 'إجراءات أخرى مستوردة',
+      'Diagnosis': 'كشف وفحوصات',
+      'Endo': 'علاج الجذور والعصب',
+      'Implantation': 'زراعة الأسنان',
+      'Orthodontics': 'تقويم الأسنان',
+      'Pedo': 'طب أسنان الأطفال',
+      'Perio': 'علاج اللثة وتنظيف الأسنان',
+      'Prosthesis': 'التركيبات المتحركة',
+      'Restoration': 'حشوات وترميم الأسنان',
+      'Surgery': 'جراحة الفم والأسنان',
+
+      // Operations - Cosmetics
+      'Chemical bleaching': 'تبييض كيميائي للأسنان',
+      'Emax veneers': 'فينير إيماكس',
+      'Light bleaching (egypt)': 'تبييض بالضوء (محلي)',
+      'Light bleaching (german)': 'تبييض بالضوء (ألماني)',
+      'Snap on smile': 'ابتسامة هوليوود المتحركة (سناب أون)',
+
+      // Operations - Crown
+      'E-Max Cementation': 'تثبيت تركيبة إيماكس',
+      'Emax crown (Emax cad)': 'تاج إيماكس (Emax CAD)',
+      'Emax veneer': 'فينير إيماكس',
+      'Endo-crown (Emax)': 'إندو كراون إيماكس',
+      'Inlay (Emax CAD)': 'إنلاي إيماكس',
+      'Overlay (Emax CAD)': 'أوفرلاي إيماكس',
+      'PFM Crown': 'تاج بورسلين مدمج بمعدن (PFM)',
+      'Re-cement crown': 'إعادة تثبيت تاج',
+      'Zircomax (cutback)': 'تاج زيركوماكس (كات باك)',
+      'Zirconium crown': 'تاج زركونيا',
+
+      // Operations - Diagnosis
+      'Bitewing X-Ray': 'أشعة بايت وينج (أشعة الأجنحة)',
+      'Blood test': 'تحليل دم',
+      'Cephalometric X-ray': 'أشعة سيفالومترية للرأس',
+      'ConeBeam CT X-ray (1 jaw)': 'أشعة مقطعية ثلاثية الأبعاد (فك واحد)',
+      'ConeBeam CT X-ray (2 jaw)': 'أشعة مقطعية ثلاثية الأبعاد (فكين)',
+      'Consultation and treatment Plan': 'استشارة وكشف وخطة علاجية',
+      'Diagnosis': 'كشف وتشخيص',
+      'Panoramic X-Ray': 'أشعة بانوراما للفكين',
+      'Periapical X-Ray': 'أشعة صغيرة للضرس (حول الذروة)',
+
+      // Operations - Endo
+      'Abscess drainage/Abscess treatment': 'علاج وتفريغ خراج',
+      'Direct Pulp capping': 'تغطية العصب المباشرة',
+      'Root canal re-treatment (anterior)': 'إعادة علاج جذور (أسنان أمامية)',
+      'Root canal re-treatment (molar)': 'إعادة علاج جذور (ضروس خلفية)',
+      'Root canal re-treatment (premolar)': 'إعادة علاج جذور (ضواحك)',
+      'Root canal treatment (anterior)': 'علاج جذور وعصب (أسنان أمامية)',
+      'Root canal treatment (molar)': 'علاج جذور وعصب (ضروس خلفية)',
+      'Root canal treatment (premolar)': 'علاج جذور وعصب (ضواحك)',
+
+      // Operations - Implantation
+      'Bone grafting': 'زراعة عظم للفك',
+      'Economic Implant (Dual)': 'زراعة أسنان اقتصادية (Dual)',
+      'Standard Implant b&b': 'زراعة أسنان قياسية (B&B)',
+
+      // Operations - Orthodontics
+      'Invisalign': 'تقويم شفاف (إنفزلاين)',
+      'Ortho Follow Up': 'جلسة متابعة تقويم',
+      'Orthodontic bracket': 'براكيت تقويم',
+      'Traditional ceramic braces - Complicated case: lost of molar, root treated teeth etc': 'تقويم سيراميك تقليدي - حالة معقدة',
+      'Traditional ceramic braces - Requires extraction (fee for extraction is not included': 'تقويم سيراميك تقليدي - يتطلب خلع',
+      'Traditional ceramic braces - Simple case: no extraction required': 'تقويم سيراميك تقليدي - حالة بسيطة (بدون خلع)',
+      'Traditional metal braces - Complicated case: lost of molar, root treated teeth, etc': 'تقويم معدني تقليدي - حالة معقدة',
+      'Traditional metal braces - requires extraction': 'تقويم معدني تقليدي - يتطلب خلع',
+      'Traditional metal braces - Simple case: no extraction required': 'تقويم معدني تقليدي - حالة بسيطة (بدون خلع)',
+
+      // Operations - Pedo
+      'Composite filling': 'حشو كومبوزيت تجميلي للأطفال',
+      'Deciduous tooth extraction': 'خلع سن لبني',
+      'floride varnish': 'تطبيق فلورايد فارنيش للأطفال',
+      'Pits & fissure sealant': 'سدادات الشقوق والميازيب الوقائية',
+      'Pulpectomy': 'استئصال عصب كامل للأطفال (علاج جذور لبني)',
+      'Pulpotomy': 'بتر العصب الجزئي للأطفال',
+      'Reinforced glass inomer (fugi)': 'حشو جلاس أينومر مقوى (فوجي)',
+      'SDF': 'تطبيق فلورايد الفضة الديامين (SDF)',
+      'Space Maintainer': 'حافظ مسافة لأسنان الأطفال',
+      'Stainless steal crown': 'تاج ستانلس ستيل للأطفال (SSC)',
+      'Zirconia crown': 'تاج زركونيا للأطفال',
+
+      // Operations - Perio
+      'Crown lengthening': 'تطويل التاج السريري',
+      'Florid application': 'تطبيق الفلورايد الوقائي',
+      'Gingivectomy': 'استئصال جزء من اللثة (قص لثة)',
+      'Gum grafting': 'طعم لثوي (زراعة لثة)',
+      'Operculectomy': 'إزالة الغطاء اللثوي فوق ضرس العقل',
+      'Periodontal Pocket treatment (non-surgical)': 'علاج الجيوب اللثوية (غير جراحي)',
+      'PRF': 'علاج بالصفائح الدموية الغنية بالفيبرين (PRF)',
+      'Scaling and polishing (promo)': 'تنظيف جير وتلميع الأسنان (عرض)',
+      'Teeth cleaning and Polishing (Minimal)': 'تنظيف وتلميع أسنان (بسيط)',
+      'Teeth cleaning and polishing (severe)': 'تنظيف وتلميع أسنان (جير متقدم)',
+
+      // Operations - Prosthesis
+      'Acrylic complete denture': 'طقم أسنان كامل أكريليك',
+      'Flexi Denture': 'طقم أسنان مرن (فليكسي)',
+      'Flexible complete denture': 'طقم أسنان كامل مرن',
+      'Night Guard one arch': 'واقي ليلي للأسنان (فك واحد)',
+      'Nightguard two arches': 'واقي ليلي للأسنان (فكين)',
+      'Removable Partial denture': 'طقم أسنان جزئي متحرك',
+      'Single tooth removable': 'تركيبة سن واحد متحرك',
+
+      // Operations - Restoration
+      'Amalgam restoration': 'حشو أملجم (فضي)',
+      'Composite filling (extensive)': 'حشو كومبوزيت ضوئي (كبير / ممتد)',
+      'Composite filling (minimal)': 'حشو كومبوزيت ضوئي (بسيط)',
+      'Composite inlay': 'إنلاي كومبوزيت',
+      'Composite onlay': 'أوفرلاي كومبوزيت',
+      'Composite veneer': 'فينير كومبوزيت مباشر',
+      'Post & Core': 'وتد وبناء السن (Post & Core)',
+      'Resin reinforced glass inomer': 'جلاس أينومر مدعم بالراتنج',
+      'Sealant': 'حشوة سادة وقائية للأسنان',
+
+      // Operations - Surgery
+      'Cyst removal': 'استئصال كيس فكي',
+      'Simple tooth extraction': 'خلع سن بسيط',
+      'Surgical tooth extraction': 'خلع سن جراحي',
+      'Surgical wisdom tooth extraction': 'خلع جراحي لضرس العقل',
+      'Tooth extraction with bone grafting': 'خلع سن مع زراعة عظم',
+      'Wisdom tooth extraction': 'خلع ضرس العقل',
+
+      // Operations - Historical Import
+      'Composite Compound': 'حشو كومبوزيت مركب',
+      'Endo One canal': 'علاج عصب (قناة واحدة)',
+      'Endo Two Canals': 'علاج عصب (قناتين)',
+      'Endo Three Canals': 'علاج عصب (3 قنوات)',
+      'Endo Four Canals': 'علاج عصب (4 قنوات)',
+      'Examination': 'فحص وكشف طبي',
+      'Excision': 'استئصال نسيجي',
+      'Extraction': 'خلع أسنان',
+      'Fiber Post & Core': 'وتد فايبر وبناء السن',
+      'Fixture 1': 'زرعة أسنان 1',
+      'G. Ionomer (fugi)': 'حشو جلاس أينومر (فوجي)',
+      'Initial Oral Examination': 'كشف وفحص فموي أولي',
+      'K-Line Ortho': 'تقويم كي لاين الشفاف',
+      'Metal Braces': 'تقويم معدني',
+      'Metal Bracket': 'براكيت معدني',
+      'Metal Post & Core': 'وتد معدني وبناء السن',
+      'Moderate Extraction': 'خلع سن متوسط الصعوبة',
+
+      // Scopes & General
+      'Surfaces': 'الأسطح',
+      'Selected surfaces': 'الأسطح المحددة',
+      'Whole tooth': 'السن بالكامل',
+      'Whole mouth': 'الفم بالكامل',
+      'surface': 'الأسطح',
+      'whole': 'السن بالكامل',
+      'mouth': 'الفم بالكامل'
+    });
+
+    let pricesPageLanguage = (() => {
+      try {
+        return localStorage.getItem('lumin_prices_lang') || 'ar';
+      } catch (_) {
+        return 'ar';
+      }
+    })();
+    let selectedPricesCategory = 'all';
+    let pricesSearchQuery = '';
+    let pricesSortOrder = 'default';
+
+    function dentalTranslate(term, lang = pricesPageLanguage) {
+      if (!term) return '';
+      if (lang !== 'ar') return term;
+      return DENTAL_TRANSLATIONS_AR[term] || ARABIC_UI_TEXT[term] || term;
+    }
+
+    function formatPricesMoney(amount, lang = pricesPageLanguage) {
+      const num = Number(amount) || 0;
+      const formatted = new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en-US', {
+        minimumFractionDigits: num % 1 === 0 ? 0 : 2,
+        maximumFractionDigits: 2
+      }).format(num);
+      return lang === 'ar' ? `${formatted} ج.م` : `${formatted} EGP`;
+    }
+
+    function formatPricesScope(scope, lang = pricesPageLanguage) {
+      const normalized = (scope || '').toLowerCase();
+      if (lang === 'ar') {
+        if (normalized === 'surface' || normalized === 'surfaces') return 'الأسطح';
+        if (normalized === 'whole') return 'السن كامل';
+        if (normalized === 'mouth') return 'الفم كامل';
+        return DENTAL_TRANSLATIONS_AR[scope] || scope || 'الأسطح';
+      }
+      if (normalized === 'surface') return 'Surfaces';
+      if (normalized === 'whole') return 'Whole tooth';
+      if (normalized === 'mouth') return 'Whole mouth';
+      return scope || 'Surfaces';
+    }
+
+    function setPricesLanguage(lang) {
+      pricesPageLanguage = lang === 'en' ? 'en' : 'ar';
+      try {
+        localStorage.setItem('lumin_prices_lang', pricesPageLanguage);
+      } catch (_) {}
+      updatePricesLanguageUi();
+      renderPricesPage();
+    }
+
+    function updatePricesLanguageUi() {
+      const isAr = pricesPageLanguage === 'ar';
+      const viewPrices = document.getElementById('view-prices');
+      if (viewPrices) {
+        viewPrices.setAttribute('dir', isAr ? 'rtl' : 'ltr');
+      }
+
+      const enBtn = document.getElementById('prices-lang-en-btn');
+      const arBtn = document.getElementById('prices-lang-ar-btn');
+      const activeClass = 'rounded-lg px-3 py-1.5 text-xs font-bold transition bg-white text-blue-700 shadow-xs';
+      const inactiveClass = 'rounded-lg px-3 py-1.5 text-xs font-bold transition text-slate-600 hover:text-slate-900';
+      if (enBtn && arBtn) {
+        enBtn.className = isAr ? inactiveClass : activeClass;
+        arBtn.className = isAr ? activeClass : inactiveClass;
+      }
+
+      const titleEl = document.getElementById('prices-page-title');
+      if (titleEl) titleEl.textContent = isAr ? 'قائمة الأسعار' : 'Price List';
+
+      const subtitleEl = document.getElementById('prices-page-subtitle');
+      if (subtitleEl) subtitleEl.textContent = isAr ? 'دليل الإجراءات الطبية والأسعار المعتمدة بالعيادة' : 'Clinic procedures & approved pricing catalog';
+
+      const searchInput = document.getElementById('prices-search-input');
+      if (searchInput) searchInput.placeholder = isAr ? 'ابحث عن إجراء أو كود أو تخصص...' : 'Search procedures, codes, or specialties...';
+
+      const sortLabel = document.getElementById('prices-sort-label');
+      if (sortLabel) sortLabel.textContent = isAr ? 'الترتيب:' : 'Sort:';
+
+      const sortSelect = document.getElementById('prices-sort-select');
+      if (sortSelect) {
+        const currentVal = sortSelect.value;
+        sortSelect.innerHTML = isAr ? `
+          <option value="default">الترتيب المعتمد</option>
+          <option value="name-asc">الاسم (أ - ي)</option>
+          <option value="name-desc">الاسم (ي - أ)</option>
+          <option value="price-asc">السعر (الأقل أولاً)</option>
+          <option value="price-desc">السعر (الأعلى أولاً)</option>
+        ` : `
+          <option value="default">Default Order</option>
+          <option value="name-asc">Name (A - Z)</option>
+          <option value="name-desc">Name (Z - A)</option>
+          <option value="price-asc">Price (Low to High)</option>
+          <option value="price-desc">Price (High to Low)</option>
+        `;
+        sortSelect.value = currentVal || 'default';
+      }
+
+      const catLabel = document.getElementById('prices-category-label');
+      if (catLabel) catLabel.textContent = isAr ? 'الأقسام والتخصصات' : 'Categories & Specialties';
+
+      const thName = document.getElementById('th-procedure-name');
+      if (thName) {
+        thName.textContent = isAr ? 'الإجراء الطبي' : 'Procedure';
+        thName.className = isAr ? 'px-4 py-3.5 text-right' : 'px-4 py-3.5 text-left';
+      }
+      const thCat = document.getElementById('th-procedure-category');
+      if (thCat) {
+        thCat.textContent = isAr ? 'التخصص / القسم' : 'Category';
+        thCat.className = isAr ? 'px-4 py-3.5 text-right' : 'px-4 py-3.5 text-left';
+      }
+      const thScope = document.getElementById('th-procedure-scope');
+      if (thScope) {
+        thScope.textContent = isAr ? 'النطاق' : 'Scope';
+        thScope.className = 'px-4 py-3.5 text-center';
+      }
+      const thPrice = document.getElementById('th-procedure-price');
+      if (thPrice) {
+        thPrice.textContent = isAr ? 'السعر' : 'Price';
+        thPrice.className = isAr ? 'px-4 py-3.5 text-left font-black' : 'px-4 py-3.5 text-right font-black';
+      }
+
+      const adminLinkText = document.getElementById('prices-admin-link-text');
+      if (adminLinkText) adminLinkText.textContent = isAr ? 'تعديل باللوحة' : 'Manage in Admin';
+
+      const emptyTitle = document.getElementById('prices-empty-title');
+      if (emptyTitle) emptyTitle.textContent = isAr ? 'لم يتم العثور على أي إجراءات' : 'No procedures found';
+
+      const emptySubtitle = document.getElementById('prices-empty-subtitle');
+      if (emptySubtitle) emptySubtitle.textContent = isAr ? 'جرّب تغيير كلمات البحث أو اختيار قسم آخر.' : 'Try adjusting your search terms or selecting another category.';
+    }
+
+    async function openAdminCustomizationTab() {
+      if (!hasPageAccess('admin')) return;
+      await switchView('admin');
+      switchAdminTab('customization');
+    }
+
+    function handlePricesSearch(query) {
+      pricesSearchQuery = (query || '').trim().toLowerCase();
+      const clearBtn = document.getElementById('prices-search-clear');
+      if (clearBtn) clearBtn.classList.toggle('hidden', !pricesSearchQuery);
+      renderPricesTable();
+    }
+
+    function clearPricesSearch() {
+      const searchInput = document.getElementById('prices-search-input');
+      if (searchInput) {
+        searchInput.value = '';
+        searchInput.focus();
+      }
+      pricesSearchQuery = '';
+      document.getElementById('prices-search-clear')?.classList.add('hidden');
+      renderPricesTable();
+    }
+
+    function handlePricesSort(order) {
+      pricesSortOrder = order || 'default';
+      renderPricesTable();
+    }
+
+    function selectPricesCategory(categoryId) {
+      selectedPricesCategory = categoryId;
+      renderPricesCategoryTabs();
+      renderPricesTable();
+    }
+
+    function renderPricesCategoryTabs() {
+      const container = document.getElementById('prices-category-tabs');
+      if (!container) return;
+      const isAr = pricesPageLanguage === 'ar';
+      const activeOps = dentalOperations.filter(op => op.active);
+
+      // "All" tab
+      const allSelected = selectedPricesCategory === 'all';
+      const allActiveClasses = 'border-blue-500 bg-blue-600 text-white shadow-sm ring-2 ring-blue-500/20';
+      const allInactiveClasses = 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white';
+
+      let html = `
+        <button type="button" role="tab" aria-selected="${allSelected}" onclick="selectPricesCategory('all')" class="relative flex shrink-0 items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-bold transition ${allSelected ? allActiveClasses : allInactiveClasses}">
+          <i data-lucide="layers" class="h-4 w-4 ${allSelected ? 'text-white' : 'text-blue-600'}"></i>
+          <span>${escapeHtml(dentalTranslate('All'))}</span>
+          <span class="rounded-full px-2 py-0.5 text-[10px] font-black ${allSelected ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'}">${activeOps.length}</span>
+        </button>
+      `;
+
+      // Specialties tabs
+      for (const specialty of dentalSpecialties) {
+        if (!specialty.active) continue;
+        const count = activeOps.filter(op => op.specialtyId === specialty.id).length;
+        const isSelected = selectedPricesCategory === specialty.id;
+        const accent = normaliseSpecialtyAccentColor(specialty.accentColor);
+        const tabActiveClasses = 'border-blue-500 bg-blue-600 text-white shadow-sm ring-2 ring-blue-500/20';
+        const tabInactiveClasses = 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white';
+
+        html += `
+          <button type="button" role="tab" aria-selected="${isSelected}" onclick="selectPricesCategory('${specialty.id}')" class="relative flex shrink-0 items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-bold transition ${isSelected ? tabActiveClasses : tabInactiveClasses}">
+            <span class="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full" style="background:${accent};opacity:${isSelected ? '1' : '0.85'}"></span>
+            <span>${escapeHtml(dentalTranslate(specialty.name))}</span>
+            <span class="rounded-full px-2 py-0.5 text-[10px] font-black ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'}">${count}</span>
+          </button>
+        `;
+      }
+
+      container.innerHTML = html;
+      lucide.createIcons();
+    }
+
+    function renderPricesTable() {
+      const tbody = document.getElementById('prices-table-body');
+      const emptyState = document.getElementById('prices-empty-state');
+      const filteredCountEl = document.getElementById('prices-filtered-count');
+      const totalBadge = document.getElementById('prices-total-badge');
+      if (!tbody) return;
+
+      const isAr = pricesPageLanguage === 'ar';
+      const activeOps = dentalOperations.filter(op => op.active);
+
+      if (totalBadge) {
+        totalBadge.textContent = `${activeOps.length} ${isAr ? 'إجراء' : 'procedures'}`;
+      }
+
+      // Filter by category
+      let ops = selectedPricesCategory === 'all'
+        ? activeOps
+        : activeOps.filter(op => op.specialtyId === selectedPricesCategory);
+
+      // Filter by search query
+      if (pricesSearchQuery) {
+        const q = pricesSearchQuery;
+        ops = ops.filter(op => {
+          const nameEn = (op.name || '').toLowerCase();
+          const nameAr = dentalTranslate(op.name, 'ar').toLowerCase();
+          const code = (op.code || '').toLowerCase();
+          const specialty = dentalSpecialties.find(s => s.id === op.specialtyId);
+          const specNameEn = (specialty?.name || '').toLowerCase();
+          const specNameAr = dentalTranslate(specialty?.name || '', 'ar').toLowerCase();
+          return nameEn.includes(q) || nameAr.includes(q) || code.includes(q) || specNameEn.includes(q) || specNameAr.includes(q);
+        });
+      }
+
+      // Sort operations
+      if (pricesSortOrder === 'price-asc') {
+        ops = [...ops].sort((a, b) => a.price - b.price);
+      } else if (pricesSortOrder === 'price-desc') {
+        ops = [...ops].sort((a, b) => b.price - a.price);
+      } else if (pricesSortOrder === 'name-asc') {
+        ops = [...ops].sort((a, b) => dentalTranslate(a.name).localeCompare(dentalTranslate(b.name), isAr ? 'ar' : 'en'));
+      } else if (pricesSortOrder === 'name-desc') {
+        ops = [...ops].sort((a, b) => dentalTranslate(b.name).localeCompare(dentalTranslate(a.name), isAr ? 'ar' : 'en'));
+      } else {
+        ops = [...ops].sort((a, b) => {
+          const specA = dentalSpecialties.find(s => s.id === a.specialtyId);
+          const specB = dentalSpecialties.find(s => s.id === b.specialtyId);
+          const specSort = (specA?.sortOrder ?? 999) - (specB?.sortOrder ?? 999);
+          if (specSort !== 0) return specSort;
+          const opSort = (a.sortOrder ?? 999) - (b.sortOrder ?? 999);
+          if (opSort !== 0) return opSort;
+          return (a.name || '').localeCompare(b.name || '');
+        });
+      }
+
+      if (filteredCountEl) {
+        filteredCountEl.textContent = `${ops.length} ${isAr ? 'نتيجة' : 'results'}`;
+      }
+
+      if (!ops.length) {
+        tbody.innerHTML = '';
+        if (emptyState) emptyState.classList.remove('hidden');
+        lucide.createIcons();
+        return;
+      }
+
+      if (emptyState) emptyState.classList.add('hidden');
+
+      const specialtyMap = new Map(dentalSpecialties.map(s => [s.id, s]));
+
+      tbody.innerHTML = ops.map((op, idx) => {
+        const specialty = specialtyMap.get(op.specialtyId);
+        const specName = specialty ? specialty.name : 'General';
+        const specNameTranslated = dentalTranslate(specName);
+        const specAccent = normaliseSpecialtyAccentColor(specialty?.accentColor || '#2563eb');
+        const primaryName = dentalTranslate(op.name);
+        const secondaryName = isAr && primaryName !== op.name ? op.name : '';
+        const scopeBadge = formatPricesScope(op.actionScope);
+        const formattedPrice = formatPricesMoney(op.price);
+
+        return `
+          <tr class="transition hover:bg-slate-50/80">
+            <td class="px-4 py-3.5 text-center text-xs font-mono font-bold text-slate-400">${idx + 1}</td>
+            <td class="px-4 py-3.5 ${isAr ? 'text-right' : 'text-left'}">
+              <div class="font-bold text-slate-800 text-sm leading-snug">${escapeHtml(primaryName)}</div>
+              ${secondaryName ? `<div class="mt-0.5 font-mono text-[11px] font-semibold text-slate-400">${escapeHtml(secondaryName)}</div>` : `<div class="mt-0.5 font-mono text-[10px] text-slate-400">${escapeHtml(op.code)}</div>`}
+            </td>
+            <td class="px-4 py-3.5 ${isAr ? 'text-right' : 'text-left'}">
+              <span class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 shadow-2xs">
+                <span class="h-2 w-2 rounded-full shrink-0" style="background:${specAccent}"></span>
+                <span>${escapeHtml(specNameTranslated)}</span>
+              </span>
+            </td>
+            <td class="px-4 py-3.5 text-center">
+              <span class="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">${escapeHtml(scopeBadge)}</span>
+            </td>
+            <td class="px-4 py-3.5 ${isAr ? 'text-left' : 'text-right'} font-black text-sm text-slate-900">
+              <span class="inline-block rounded-lg ${op.price > 0 ? 'bg-violet-50 text-violet-700' : 'bg-slate-100 text-slate-500'} px-2.5 py-1 font-mono text-xs font-black">
+                ${escapeHtml(formattedPrice)}
+              </span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    function renderPricesPage() {
+      const isAr = pricesPageLanguage === 'ar';
+      const adminLink = document.getElementById('prices-admin-link');
+      if (adminLink) {
+        const showAdmin = Boolean(currentUserAccess?.isAdmin);
+        adminLink.classList.toggle('hidden', !showAdmin);
+        adminLink.classList.toggle('inline-flex', showAdmin);
+      }
+
+      updatePricesLanguageUi();
+      renderPricesCategoryTabs();
+      renderPricesTable();
+    }
+
     async function switchView(viewName) {
       closeWhatsAppTemplatePicker();
       if (['finances', 'analytics', 'hr', 'implants'].includes(viewName)) {
@@ -18412,6 +19011,7 @@
         { id: 'nav-btn-patients', view: 'patients' },
         { id: 'nav-btn-appointments', view: 'appointments' },
         { id: 'nav-btn-clinic-management', view: 'clinic-management' },
+        { id: 'nav-btn-prices', view: 'prices' },
         { id: 'nav-btn-admin', view: 'admin' },
         { id: 'nav-btn-settings', view: 'settings' }
       ];
@@ -18443,6 +19043,8 @@
         await Promise.all([ensurePatientsLoaded(), ensureDentalCustomizationLoaded()]);
       } else if (viewName === 'appointments') {
         await ensureAppointmentsLoaded();
+      } else if (viewName === 'prices') {
+        await ensureDentalCustomizationLoaded();
       }
 
       const viewDashboard = document.getElementById('view-dashboard');
@@ -18459,6 +19061,7 @@
       const viewPrescriptions = document.getElementById('view-prescriptions');
       const viewChart = document.getElementById('view-chart');
       const viewAppointments = document.getElementById('view-appointments');
+      const viewPrices = document.getElementById('view-prices');
       const viewAdmin = document.getElementById('view-admin');
       const viewSettings = document.getElementById('view-settings');
 
@@ -18480,6 +19083,7 @@
       viewPayments.classList.add('hidden');
       viewChart.classList.add('hidden');
       viewAppointments.classList.add('hidden');
+      viewPrices?.classList.add('hidden');
       viewAdmin.classList.add('hidden');
       viewSettings.classList.add('hidden');
 
@@ -18527,6 +19131,9 @@
       } else if (viewName === 'appointments') {
         viewAppointments.classList.remove('hidden');
         renderAppointments();
+      } else if (viewName === 'prices') {
+        viewPrices?.classList.remove('hidden');
+        renderPricesPage();
       } else if (viewName === 'clinic-management') {
         viewClinicManagement.classList.remove('hidden');
         await switchClinicManagementTab(firstAuthorizedClinicManagementTab(), { updateHash: false });
