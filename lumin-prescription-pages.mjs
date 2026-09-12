@@ -184,7 +184,8 @@ export function layoutPrescription(model, settings, context, logo = null) {
     }
   });
   if (model.notes) {
-    const lines = textLines(`Note: ${model.notes}`, contentWidth - 2 * pad);
+    const notePrefix = model.isAr || rtl(model.notes) ? 'ملاحظة: ' : 'Note: ';
+    const lines = textLines(`${notePrefix}${model.notes}`, contentWidth - 2 * pad);
     y += 14;
     for (const line of lines) {
       if (y + leading > bodyBottom) newPage(false);

@@ -1923,9 +1923,13 @@
 
       /* Keep the normal iPad patient table presentation on phones, with contained scrolling. */
       #view-patients .mobile-scroll-region,
+      #view-clinic-management .overflow-x-auto,
       #view-finances .mobile-scroll-region,
+      #view-finances .overflow-x-auto,
       #view-hr .mobile-scroll-region,
+      #view-hr .overflow-x-auto,
       #view-analytics .mobile-scroll-region,
+      #view-analytics .overflow-x-auto,
       #view-implants .overflow-x-auto {
         overflow-x: auto;
         overscroll-behavior-inline: contain;
@@ -2461,7 +2465,7 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="lumin-theme.css?v=6" />
+  <link rel="stylesheet" href="lumin-theme.css?v=7" />
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 font-sans antialiased selection:bg-blue-100">
 
@@ -3229,12 +3233,12 @@
     <section id="view-implants" class="hidden space-y-5">
       <!-- Top Page Bar Card -->
       <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-        <div class="app-page-bar app-page-bar-embedded flex-wrap sm:flex-nowrap gap-2.5 sm:gap-4">
-          <div class="app-page-heading min-w-0 shrink-0">
+        <div class="app-page-bar app-page-bar-embedded flex flex-col gap-3 py-3 sm:py-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4 h-auto sm:h-16">
+          <div class="app-page-heading min-w-0 w-full sm:w-auto">
             <span class="app-page-icon shrink-0" aria-hidden="true"><i data-lucide="activity"></i></span>
-            <h2 class="app-page-title text-base sm:text-lg">Implant Progress</h2>
+            <h2 class="app-page-title whitespace-nowrap text-base sm:text-lg">Implant Progress</h2>
           </div>
-          <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 shrink-0">
+          <div class="flex flex-wrap items-center justify-start sm:justify-end gap-1.5 sm:gap-2 w-full sm:w-auto">
             <button type="button" onclick="openTrackedProceduresModal()" class="inline-flex min-h-9 sm:min-h-10 items-center justify-center gap-1.5 sm:gap-2 rounded-xl border border-slate-200 bg-white px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-black text-slate-600 shadow-xs transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700" title="Tracked Procedures">
               <i data-lucide="sliders-horizontal" class="h-3.5 w-3.5 sm:h-4 sm:w-4 text-cyan-600"></i>
               <span class="hidden md:inline">Tracked Procedures</span>
@@ -3254,38 +3258,22 @@
       </div>
 
       <!-- Metric KPI Summary Cards -->
-      <div id="implant-kpi-summary" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div class="implant-stat-card rounded-2xl border border-cyan-200 bg-gradient-to-br from-white to-cyan-50/80 p-4 shadow-xs">
+      <div id="implant-kpi-summary" class="grid grid-cols-2 gap-3">
+        <div class="implant-stat-card rounded-2xl border border-cyan-200 bg-gradient-to-br from-white to-cyan-50/80 p-3 sm:p-4 shadow-xs">
           <div class="flex items-center justify-between">
             <span class="text-[10px] font-black uppercase tracking-wider text-cyan-700">Active Implants</span>
-            <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600 shadow-xs"><i data-lucide="clock" class="h-4 w-4"></i></span>
+            <span class="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600 shadow-xs"><i data-lucide="clock" class="h-3.5 w-3.5 sm:h-4 sm:w-4"></i></span>
           </div>
-          <p id="implant-stat-active" class="mt-2 text-2xl font-black text-slate-800">0</p>
-          <p class="mt-1 text-[10px] font-bold text-slate-400">Currently in healing</p>
+          <p id="implant-stat-active" class="mt-1.5 sm:mt-2 text-xl sm:text-2xl font-black text-slate-800">0</p>
+          <p class="mt-1 text-[9px] sm:text-[10px] font-bold text-slate-400">Currently in healing</p>
         </div>
-        <div class="implant-stat-card rounded-2xl border border-amber-200 bg-gradient-to-br from-white to-amber-50/80 p-4 shadow-xs">
+        <div class="implant-stat-card rounded-2xl border border-amber-200 bg-gradient-to-br from-white to-amber-50/80 p-3 sm:p-4 shadow-xs">
           <div class="flex items-center justify-between">
             <span class="text-[10px] font-black uppercase tracking-wider text-amber-700">Due Soon (≤30d)</span>
-            <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-50 text-amber-600 shadow-xs"><i data-lucide="alert-circle" class="h-4 w-4"></i></span>
+            <span class="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl bg-amber-50 text-amber-600 shadow-xs"><i data-lucide="alert-circle" class="h-3.5 w-3.5 sm:h-4 sm:w-4"></i></span>
           </div>
-          <p id="implant-stat-due-soon" class="mt-2 text-2xl font-black text-amber-600">0</p>
-          <p class="mt-1 text-[10px] font-bold text-slate-400">Ready for prosthetics</p>
-        </div>
-        <div class="implant-stat-card rounded-2xl border border-emerald-200 bg-gradient-to-br from-white to-emerald-50/80 p-4 shadow-xs">
-          <div class="flex items-center justify-between">
-            <span class="text-[10px] font-black uppercase tracking-wider text-emerald-700">Completed</span>
-            <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 shadow-xs"><i data-lucide="check-circle-2" class="h-4 w-4"></i></span>
-          </div>
-          <p id="implant-stat-completed" class="mt-2 text-2xl font-black text-emerald-600">0</p>
-          <p class="mt-1 text-[10px] font-bold text-slate-400">Restoration delivered</p>
-        </div>
-        <div class="implant-stat-card rounded-2xl border border-indigo-200 bg-gradient-to-br from-white to-indigo-50/80 p-4 shadow-xs">
-          <div class="flex items-center justify-between">
-            <span class="text-[10px] font-black uppercase tracking-wider text-indigo-700">Standard / Economic</span>
-            <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 shadow-xs"><i data-lucide="pie-chart" class="h-4 w-4"></i></span>
-          </div>
-          <p id="implant-stat-ratio" class="mt-2 text-xl font-black text-indigo-700">0 / 0</p>
-          <p class="mt-1 text-[10px] font-bold text-slate-400">B&B vs Dual system</p>
+          <p id="implant-stat-due-soon" class="mt-1.5 sm:mt-2 text-xl sm:text-2xl font-black text-amber-600">0</p>
+          <p class="mt-1 text-[9px] sm:text-[10px] font-bold text-slate-400">Ready for prosthetics</p>
         </div>
       </div>
 
@@ -3341,8 +3329,30 @@
             </tbody>
           </table>
         </div>
-        <div id="implant-table-footer" class="flex items-center justify-between border-t border-slate-100 px-5 py-3 text-xs font-bold text-slate-400">
-          <span id="implant-count-summary">Showing 0 implants</span>
+        <div id="implant-table-footer" class="flex flex-col gap-3 border-t border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 text-xs font-bold text-slate-500">
+          <div class="flex flex-wrap items-center gap-3">
+            <span id="implant-count-summary">Showing 0 implants</span>
+            <div class="flex items-center gap-1.5 text-xs text-slate-500">
+              <span>Show</span>
+              <select id="implant-page-size" onchange="changeImplantPageSize(this.value)" class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-slate-700 outline-none focus:border-cyan-500">
+                <option value="10">10</option>
+                <option value="20" selected>20</option>
+                <option value="50">50</option>
+              </select>
+              <span>per page</span>
+            </div>
+          </div>
+          <div id="implant-pagination-controls" class="flex items-center gap-2 self-end sm:self-auto">
+            <span id="implant-page-info" class="text-xs font-bold text-slate-500">Page 1 of 1</span>
+            <div class="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 shadow-xs">
+              <button id="implant-prev-btn" type="button" onclick="changeImplantPage(-1)" disabled class="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 disabled:opacity-40 hover:bg-slate-100 hover:text-slate-700" title="Previous Page">
+                <i data-lucide="chevron-left" class="h-4 w-4"></i>
+              </button>
+              <button id="implant-next-btn" type="button" onclick="changeImplantPage(1)" disabled class="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 disabled:opacity-40 hover:bg-slate-100 hover:text-slate-700" title="Next Page">
+                <i data-lucide="chevron-right" class="h-4 w-4"></i>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -5357,6 +5367,8 @@
     let implantStatusFilter = 'all';
     let implantTypeFilter = 'all';
     let implantSearchQuery = '';
+    let implantPage = 1;
+    let implantPageSize = 20;
     let activeHrStaffDetailsId = null;
     let activeHrDayDate = '';
     let clinicAttendanceSettings = {
@@ -6274,8 +6286,96 @@
       'left': 'متبقي',
       'Filter procedures by name or code...': 'تصفية الإجراءات بالاسم أو الرمز...',
       'Standard and Economic implants are enabled by default.': 'زرعات Standard و Economic مفعلة افتراضياً.',
-      'Delete this implant progress entry? This will not delete the patient chart record.': 'هل تريد حذف سجل متابعة هذه الزرعة؟ لن يؤدي ذلك لحذف السجل من مخطط الأسنان.'
+      'Delete this implant progress entry? This will not delete the patient chart record.': 'هل تريد حذف سجل متابعة هذه الزرعة؟ لن يؤدي ذلك لحذف السجل من مخطط الأسنان.',
+      'Prescriptions': 'الروشتات',
+      'Prescription': 'روشتة',
+      'New prescription': 'روشتة جديدة',
+      'New Prescription': 'روشتة جديدة',
+      'Patient prescription': 'روشتة المريض',
+      'Prescription template': 'قالب روشتة',
+      'Prescription templates': 'قوالب الروشتات',
+      'Prescription note': 'ملاحظات الروشتة',
+      'Save prescription': 'حفظ الروشتة',
+      'Template name': 'اسم القالب',
+      'Add template': 'إضافة قالب',
+      'Adds the template medications to this draft. Review doses and instructions for this patient before saving.': 'يضيف أدوية القالب إلى هذه المسودة. راجع الجرعات والتعليمات لهذا المريض قبل الحفظ.',
+      'Choose a template': 'اختر قالبًا',
+      'Medication library': 'مكتبة الأدوية',
+      'Choose a saved medication, or type below': 'اختر دواءً محفوظًا، أو اكتب أدناه',
+      'Medication name': 'اسم الدواء',
+      'Form': 'الشكل الدوائي',
+      'Dose': 'الجرعة',
+      'Dosage': 'الجرعة',
+      'Times per day': 'المرات في اليوم',
+      'Times / day': 'المرات / اليوم',
+      'Duration': 'المدة',
+      'Duration (days)': 'المدة (أيام)',
+      'Method / route': 'طريقة الاستخدام',
+      'Method': 'طريقة الاستخدام',
+      'Instructions': 'تعليمات الاستخدام',
+      'Add medication': 'إضافة دواء',
+      'Cancel edit': 'إلغاء التعديل',
+      'Listed medications': 'الأدوية المضافة',
+      '0 medications': '0 دواء',
+      'Print': 'طباعة',
+      'Printing blocked': 'تم حظر الطباعة',
+      'Allow pop-ups for Lumin, then choose Print again.': 'اسمح بالنوافذ المنبثقة للومين، ثم اضغط على طباعة مرة أخرى.',
+      'No prescriptions for this patient yet.': 'لا توجد روشتات لهذا المريض حتى الآن.',
+      'Create the first prescription to save it in the patient record.': 'أنشئ أول روشتة لحفظها في سجل المريض.',
+      'Reusable medications and instructions — no patient record is changed.': 'أدوية وتعليمات قابلة لإعادة الاستخدام — لا يتم تغيير أي سجل مريض.',
+      'Loading prescriptions...': 'جارٍ تحميل الروشتات...',
+      'Could not load prescriptions.': 'تعذر تحميل الروشتات.',
+      'Try again': 'حاول مرة أخرى',
+      'Prescription saved': 'تم حفظ الروشتة',
+      'The prescription is ready to print from the patient record.': 'الروشتة جاهزة للطباعة من سجل المريض.',
+      'Doctor': 'الطبيب',
+      'Patient no.': 'رقم المريض',
+      'Age': 'العمر',
+      'Date of birth': 'تاريخ الميلاد',
+      'Show': 'عرض',
+      'per page': 'في الصفحة',
+      'Page 1 of 1': 'صفحة 1 من 1',
+      'In Progress': 'قيد التنفيذ',
+      'Due Soon': 'مستحق قريباً',
+      'Due Soon (≤30d)': 'مستحق قريباً (≤30 يوم)',
+      'Currently in healing': 'حالياً في مرحلة الالتئام',
+      'Ready for prosthetics': 'جاهز للتركيبات',
+      'Restoration delivered': 'تم تسليم التركيبة',
+      'Search patient, phone, or tooth #...': 'البحث عن مريض أو هاتف أو رقم السن...',
+      'Tooth (Palmer)': 'السن (بالمر)',
+      'Implant Type': 'نوع الزراعة',
+      'Size': 'المقاس',
+      'Healing Collar': 'مسمار التئام',
+      'Yes': 'نعم',
+      'Delivered': 'تم التسليم',
+      'Not set': 'غير محدد',
+      'Toggle Healing Collar': 'تبديل مسمار الالتئام',
+      'Edit Size': 'تعديل المقاس',
+      'Edit implant': 'تعديل الزراعة',
+      'WhatsApp reminder': 'تذكير واتساب',
+      'Delete record': 'حذف السجل',
+      'Tracked Procedures': 'الإجراءات المتابعة',
+      'Procedures': 'الإجراءات',
+      'New Implant Entry': 'إضافة زراعة جديدة',
+      'New Entry': 'إضافة جديدة',
+      'All Types': 'جميع الأنواع',
+      'Standard (b&b)': 'قياسي (B&B)',
+      'Economic (dual)': 'اقتصادي (Dual)',
+      'Loading implant progress records...': 'جارٍ تحميل سجلات متابعة الزراعة...',
+      'No implant progress records match the current filters.': 'لا توجد سجلات متابعة زراعة تطابق الفلاتر الحالية.',
+      'Showing 0 implants': 'عرض 0 زراعة'
     });
+
+    function cleanArabicText(text) {
+      if (!text || typeof text !== 'string') return text || '';
+      return text
+        .replace(/[\uFFFD\u0085]+/g, 'م')
+        .replace(/اس…_ال…ريض/g, 'اسم_المريض')
+        .replace(/اس…/g, 'اسم')
+        .replace(/ال…ريض/g, 'المريض')
+        .replace(/ال…وعد/g, 'الموعد')
+        .replace(/ال…ستقبل/g, 'المستقبل');
+    }
 
     function isUiTranslationExcluded(node) {
       const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
@@ -6302,6 +6402,22 @@
       if (match) return `${match[1]} فاتورة`;
       match = source.match(/^(\d+)\s+item(?:s)?$/);
       if (match) return `${match[1]} بند`;
+      match = source.match(/^(\d+)\s+medication(?:s)?$/);
+      if (match) return `${match[1]} ${match[1] === '1' ? 'دواء' : Number(match[1]) <= 10 ? 'أدوية' : 'دواء'}`;
+      match = source.match(/^(\d+)\s+days?$/);
+      if (match) return `${match[1]} ${Number(match[1]) <= 10 ? 'أيام' : 'يوم'}`;
+      match = source.match(/^Due in (\d+)d$/);
+      if (match) return `مستحق خلال ${match[1]} يوم`;
+      match = source.match(/^Overdue \((\d+)d\)$/);
+      if (match) return `متأخر (${match[1]} يوم)`;
+      match = source.match(/^Healing \((\d+)d\)$/);
+      if (match) return `التئام (${match[1]} يوم)`;
+      match = source.match(/^Showing (\d+)–(\d+) of (\d+) implants$/);
+      if (match) return `عرض ${match[1]}–${match[2]} من ${match[3]} زراعة`;
+      match = source.match(/^Showing (\d+) of (\d+) implants$/);
+      if (match) return `عرض ${match[1]} من ${match[2]} زراعة`;
+      match = source.match(/^Page (\d+) of (\d+)$/);
+      if (match) return `صفحة ${match[1]} من ${match[2]}`;
       match = source.match(/^Appointments for (.+)$/);
       if (match) return `مواعيد ${match[1]}`;
       match = source.match(/^Change appointment status for (.+)$/);
@@ -6440,6 +6556,11 @@
           loyaltyPanel.dataset.initialized = '';
           if (hasPageAccess('admin') && adminActiveTab === 'loyalty') void renderAdminLoyalty();
         }
+        if (hasPageAccess('implants') && !document.getElementById('view-implants')?.classList.contains('hidden')) renderImplantProgressTable();
+        if (hasPageAccess('finances') && !document.getElementById('view-finances')?.classList.contains('hidden')) void switchFinanceTab(activeFinanceTab);
+        if (hasPageAccess('hr') && !document.getElementById('view-hr')?.classList.contains('hidden')) void refreshHrDirectory();
+        if (hasPageAccess('analytics') && !document.getElementById('view-analytics')?.classList.contains('hidden')) void refreshIncomeStatement();
+        if (canViewPatientPrescriptions() && !document.getElementById('view-prescriptions')?.classList.contains('hidden')) void renderPatientPrescriptions();
       }
       lucide.createIcons();
     }
@@ -9970,30 +10091,31 @@
     }
 
     function prescriptionPrintModel(prescription, patient, settings) {
+      const isAr = currentUiLanguage === 'ar';
       const referenceDate = new Date(`${prescription.prescribedAt || new Date().toISOString().slice(0, 10)}T12:00:00`);
       const age = currentPatientAge(patient, referenceDate);
       const fields = [];
-      if (settings.doctorVisible) fields.push(['Doctor', prescription.prescriberName || 'Clinic doctor']);
-      if (settings.dateVisible) fields.push(['Date', prescriptionDateLabel(prescription.prescribedAt)]);
-      fields.push(['Patient', patient?.name || 'Patient']);
-      if (settings.patientNumberVisible) fields.push(['Patient no.', formatPatientNumber(patient)]);
-      if (settings.patientAgeVisible) fields.push(['Age', age == null ? '—' : `${age} years`]);
-      if (settings.patientBirthDateVisible) fields.push(['Date of birth', formatPatientBirthDate(patient?.birthDate) || '—']);
+      if (settings.doctorVisible) fields.push([isAr ? 'الطبيب' : 'Doctor', prescription.prescriberName || (isAr ? 'طبيب العيادة' : 'Clinic doctor')]);
+      if (settings.dateVisible) fields.push([isAr ? 'التاريخ' : 'Date', prescriptionDateLabel(prescription.prescribedAt)]);
+      fields.push([isAr ? 'المريض' : 'Patient', patient?.name || (isAr ? 'المريض' : 'Patient')]);
+      if (settings.patientNumberVisible) fields.push([isAr ? 'رقم المريض' : 'Patient no.', formatPatientNumber(patient)]);
+      if (settings.patientAgeVisible) fields.push([isAr ? 'العمر' : 'Age', age == null ? '—' : (isAr ? `${age} سنة` : `${age} years`)]);
+      if (settings.patientBirthDateVisible) fields.push([isAr ? 'تاريخ الميلاد' : 'Date of birth', formatPatientBirthDate(patient?.birthDate) || '—']);
       const columns = [
-        { label: 'Medication', key: 'medication', visible: true },
-        { label: 'Dosage', key: 'dose', visible: settings.dosageVisible },
-        { label: 'Times / day', key: 'frequency', visible: settings.frequencyVisible },
-        { label: 'Duration', key: 'duration', visible: settings.durationVisible },
-        { label: 'Method', key: 'route', visible: settings.routeVisible }
+        { label: isAr ? 'الدواء' : 'Medication', key: 'medication', visible: true },
+        { label: isAr ? 'الجرعة' : 'Dosage', key: 'dose', visible: settings.dosageVisible },
+        { label: isAr ? 'المرات / اليوم' : 'Times / day', key: 'frequency', visible: settings.frequencyVisible },
+        { label: isAr ? 'المدة' : 'Duration', key: 'duration', visible: settings.durationVisible },
+        { label: isAr ? 'طريقة الاستخدام' : 'Method', key: 'route', visible: settings.routeVisible }
       ].filter(column => column.visible);
       const rows = (prescription.items || []).map(item => ({
-        medication: `${item.medicationName}${item.form ? ` (${item.form})` : ''}${settings.instructionsVisible && item.instructions ? `\n${item.instructions}` : ''}`,
+        medication: `${item.medicationName}${item.form ? ` (${item.form})` : ''}${settings.instructionsVisible && item.instructions ? `\n${cleanArabicText(item.instructions)}` : ''}`,
         dose: item.dose || '—',
         frequency: String(item.frequencyPerDay),
-        duration: item.durationDays ? `${item.durationDays} days` : '—',
+        duration: item.durationDays ? (isAr ? `${item.durationDays} ${item.durationDays <= 10 ? 'أيام' : 'يوم'}` : `${item.durationDays} days`) : '—',
         route: item.route || '—'
       }));
-      return { fields, columns, rows, notes: prescription.notes || '' };
+      return { fields, columns, rows, notes: cleanArabicText(prescription.notes || ''), isAr };
     }
 
     let prescriptionPreviewToken = 0;
@@ -10199,6 +10321,7 @@
       const modal = document.getElementById('modal-prescription');
       modal.classList.remove('hidden');
       modal.classList.add('flex');
+      translateUiTree(modal, currentUiLanguage);
       document.getElementById('prescription-template-name').focus();
     }
 
@@ -10387,6 +10510,7 @@
       const modal = document.getElementById('modal-prescription');
       modal.classList.remove('hidden');
       modal.classList.add('flex');
+      translateUiTree(modal, currentUiLanguage);
       lucide.createIcons();
       requestAnimationFrame(() => document.getElementById('prescription-medication-name')?.focus());
     }
@@ -10463,8 +10587,39 @@
     }
 
     function prescriptionHistoryCardMarkup(record) {
+      const isAr = currentUiLanguage === 'ar';
       const summary = record.items.slice(0, 3).map(item => item.medicationName).join(' · ');
-      return `<article class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs"><div class="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5"><div class="flex min-w-0 items-start gap-3"><span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700"><i data-lucide="pill" class="h-5 w-5"></i></span><div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><h3 class="text-sm font-black text-slate-900">${escapeHtml(prescriptionDateLabel(record.prescribedAt))}</h3><span class="rounded-lg bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-600">${record.items.length} medication${record.items.length === 1 ? '' : 's'}</span></div><p class="mt-1 text-xs font-bold text-blue-700">${escapeHtml(record.prescriberName)}</p><p class="mt-2 break-words text-sm text-slate-600">${escapeHtml(summary)}${record.items.length > 3 ? ` · +${record.items.length - 3} more` : ''}</p></div></div><button type="button" onclick="printPrescription('${record.id}')" class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-black text-emerald-700 transition hover:bg-emerald-100"><i data-lucide="printer" class="h-4 w-4"></i> Print</button></div><div class="border-t border-slate-100 bg-slate-50/45 px-4 py-3 sm:px-5"><ol class="grid gap-2 md:grid-cols-2">${record.items.map(item => `<li class="rounded-xl border border-slate-100 bg-white px-3 py-2.5"><p class="text-xs font-black text-slate-800">${escapeHtml(item.medicationName)}${item.form ? ` <span class="font-semibold text-slate-400">(${escapeHtml(item.form)})</span>` : ''}</p><p class="mt-1 text-[11px] font-bold text-slate-500">${escapeHtml(item.dose)} · ${item.frequencyPerDay} / day${item.durationDays ? ` · ${item.durationDays} days` : ''}${item.route ? ` · ${escapeHtml(item.route)}` : ''}</p>${item.instructions ? `<p class="mt-1 text-[11px] text-slate-500" dir="auto">${escapeHtml(item.instructions)}</p>` : ''}</li>`).join('')}</ol>${record.notes ? `<p class="mt-3 text-xs text-slate-600" dir="auto"><strong>Note:</strong> ${escapeHtml(record.notes)}</p>` : ''}</div></article>`;
+      const medicationCountLabel = isAr
+        ? `${record.items.length} ${record.items.length === 1 ? 'دواء' : record.items.length <= 10 ? 'أدوية' : 'دواء'}`
+        : `${record.items.length} medication${record.items.length === 1 ? '' : 's'}`;
+      const moreLabel = isAr ? ` · +${record.items.length - 3} أخرى` : ` · +${record.items.length - 3} more`;
+      const printLabel = isAr ? 'طباعة' : 'Print';
+      const perDayLabel = isAr ? 'يومياً' : '/ day';
+      const daysLabel = isAr ? (days => days <= 10 ? 'أيام' : 'يوم') : (days => 'days');
+      const noteLabel = isAr ? 'ملاحظة:' : 'Note:';
+
+      return `<article class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+        <div class="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
+          <div class="flex min-w-0 items-start gap-3">
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700"><i data-lucide="pill" class="h-5 w-5"></i></span>
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <h3 class="text-sm font-black text-slate-900">${escapeHtml(prescriptionDateLabel(record.prescribedAt))}</h3>
+                <span class="rounded-lg bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-600">${medicationCountLabel}</span>
+              </div>
+              <p class="mt-1 text-xs font-bold text-blue-700">${escapeHtml(record.prescriberName)}</p>
+              <p class="mt-2 break-words text-sm text-slate-600">${escapeHtml(summary)}${record.items.length > 3 ? moreLabel : ''}</p>
+            </div>
+          </div>
+          <button type="button" onclick="printPrescription('${record.id}')" class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-black text-emerald-700 transition hover:bg-emerald-100"><i data-lucide="printer" class="h-4 w-4"></i> ${printLabel}</button>
+        </div>
+        <div class="border-t border-slate-100 bg-slate-50/45 px-4 py-3 sm:px-5">
+          <ol class="grid gap-2 md:grid-cols-2">
+            ${record.items.map(item => `<li class="rounded-xl border border-slate-100 bg-white px-3 py-2.5"><p class="text-xs font-black text-slate-800">${escapeHtml(item.medicationName)}${item.form ? ` <span class="font-semibold text-slate-400">(${escapeHtml(item.form)})</span>` : ''}</p><p class="mt-1 text-[11px] font-bold text-slate-500">${escapeHtml(item.dose)} · ${item.frequencyPerDay} ${perDayLabel}${item.durationDays ? ` · ${item.durationDays} ${daysLabel(item.durationDays)}` : ''}${item.route ? ` · ${escapeHtml(item.route)}` : ''}</p>${item.instructions ? `<p class="mt-1 text-[11px] text-slate-500" dir="auto">${escapeHtml(cleanArabicText(item.instructions))}</p>` : ''}</li>`).join('')}
+          </ol>
+          ${record.notes ? `<p class="mt-3 text-xs text-slate-600" dir="auto"><strong>${noteLabel}</strong> ${escapeHtml(cleanArabicText(record.notes))}</p>` : ''}
+        </div>
+      </article>`;
     }
 
     function resetPatientPrescriptionsState() {
@@ -10497,6 +10652,7 @@
         if (!isCurrent()) return;
         patientPrescriptionRecords = records;
         content.innerHTML = records.length ? records.map(prescriptionHistoryCardMarkup).join('') : '<div class="rounded-2xl border border-slate-200 bg-white px-6 py-14 text-center"><span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600"><i data-lucide="notebook-tabs" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-700">No prescriptions for this patient yet.</p><p class="mt-1 text-xs text-slate-400">Create the first prescription to save it in the patient record.</p></div>';
+        translateUiTree(content, currentUiLanguage);
         lucide.createIcons();
       } catch (error) {
         if (!isCurrent()) return;
@@ -10642,6 +10798,7 @@
     }
 
     function resolveWhatsAppMessageTemplate(body, entry) {
+      const cleanBody = cleanArabicText(body);
       const start = entry?.startAt ? new Date(entry.startAt) : null;
       const hasAppointmentTime = Boolean(start && Number.isFinite(start.getTime()));
       const assignedStaff = appointmentStaffMember(entry?.assignedUserId);
@@ -10662,7 +10819,7 @@
       };
       return WHATSAPP_TEMPLATE_VARIABLES.reduce(
         (message, variable) => message.split(variable).join(replacements[variable]),
-        String(body || '')
+        String(cleanBody || '')
       );
     }
 
@@ -14909,10 +15066,42 @@
         return true;
       });
 
-      const countEl = document.getElementById('implant-count-summary');
-      if (countEl) countEl.textContent = `Showing ${filtered.length} of ${validRecords.length} implants`;
+      const totalFiltered = filtered.length;
+      const totalPages = Math.max(1, Math.ceil(totalFiltered / implantPageSize));
+      if (implantPage > totalPages) implantPage = totalPages;
+      if (implantPage < 1) implantPage = 1;
 
-      if (!filtered.length) {
+      const startIndex = (implantPage - 1) * implantPageSize;
+      const paginatedRecords = filtered.slice(startIndex, startIndex + implantPageSize);
+      const endIndex = Math.min(startIndex + paginatedRecords.length, totalFiltered);
+
+      const countEl = document.getElementById('implant-count-summary');
+      if (countEl) {
+        countEl.textContent = totalFiltered > 0
+          ? (currentUiLanguage === 'ar'
+              ? `عرض ${startIndex + 1}–${endIndex} من ${totalFiltered} زراعة`
+              : `Showing ${startIndex + 1}–${endIndex} of ${totalFiltered} implants`)
+          : (currentUiLanguage === 'ar' ? 'عرض 0 زراعة' : 'Showing 0 implants');
+      }
+
+      const pageInfoEl = document.getElementById('implant-page-info');
+      if (pageInfoEl) {
+        pageInfoEl.textContent = currentUiLanguage === 'ar'
+          ? `صفحة ${implantPage} من ${totalPages}`
+          : `Page ${implantPage} of ${totalPages}`;
+      }
+
+      const prevBtn = document.getElementById('implant-prev-btn');
+      const nextBtn = document.getElementById('implant-next-btn');
+      if (prevBtn) prevBtn.disabled = implantPage <= 1;
+      if (nextBtn) nextBtn.disabled = implantPage >= totalPages;
+
+      const pageSizeSelect = document.getElementById('implant-page-size');
+      if (pageSizeSelect && String(pageSizeSelect.value) !== String(implantPageSize)) {
+        pageSizeSelect.value = String(implantPageSize);
+      }
+
+      if (!paginatedRecords.length) {
         tbody.innerHTML = `
           <tr>
             <td colspan="9" class="py-12 text-center text-xs font-bold text-slate-400">
@@ -14928,7 +15117,7 @@
         return;
       }
 
-      tbody.innerHTML = filtered.map(record => {
+      tbody.innerHTML = paginatedRecords.map(record => {
         const patient = record.patients || patients.find(p => p.id === record.patient_id);
         const patientName = patient?.name || 'Unknown patient';
         const patientPhone = patient?.phone || '';
@@ -15021,16 +15210,32 @@
       lucide.createIcons();
     }
 
+    function changeImplantPage(delta) {
+      implantPage += delta;
+      renderImplantProgressTable();
+    }
+
+    function changeImplantPageSize(val) {
+      const parsed = parseInt(val, 10);
+      if ([10, 20, 50].includes(parsed)) {
+        implantPageSize = parsed;
+        implantPage = 1;
+        renderImplantProgressTable();
+      }
+    }
+
     function filterImplantProgressTable() {
       const searchInput = document.getElementById('implant-search-input');
       const typeSelect = document.getElementById('implant-type-filter');
       implantSearchQuery = searchInput?.value || '';
       implantTypeFilter = typeSelect?.value || 'all';
+      implantPage = 1;
       renderImplantProgressTable();
     }
 
     function setImplantStatusFilter(filter) {
       implantStatusFilter = filter;
+      implantPage = 1;
       document.querySelectorAll('.implant-filter-btn').forEach(btn => {
         const isActive = btn.dataset.implantFilter === filter;
         btn.className = `implant-filter-btn rounded-lg px-3 py-1.5 text-xs font-black transition ${isActive ? 'bg-white text-cyan-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`;
