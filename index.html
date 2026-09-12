@@ -839,13 +839,13 @@
     .clinical-odontogram-stage #upper-arch::before { top: clamp(38px, 4vw, 54px); }
     .clinical-odontogram-stage #lower-arch::before { bottom: clamp(38px, 4vw, 54px); }
     .clinical-odontogram-stage .tooth-card {
-      min-height: clamp(158px, 15vw, 195px);
+      min-height: clamp(175px, 17vw, 220px);
       justify-content: center;
       gap: 0.15rem;
       border: 0;
       border-radius: 0;
       background: transparent;
-      padding: clamp(2px, 0.3vw, 5px) clamp(0.5px, 0.15vw, 2px);
+      padding: clamp(2px, 0.3vw, 4px) clamp(0.5px, 0.1vw, 2px);
       box-shadow: none;
       overflow: visible;
     }
@@ -867,17 +867,17 @@
     }
     .clinical-odontogram-stage .tooth-card.has-charted-finding::after { display: none; }
     .clinical-odontogram-stage .odontogram-anatomy {
-      width: clamp(44px, 5.2vw, 68px) !important;
-      min-width: clamp(44px, 5.2vw, 68px) !important;
+      width: clamp(52px, 6.2vw, 84px) !important;
+      min-width: clamp(52px, 6.2vw, 84px) !important;
       height: auto !important;
       margin: 0;
-      aspect-ratio: 64 / 96;
+      aspect-ratio: 64 / 100;
       filter: none;
       transition: filter 0.18s ease, transform 0.18s ease;
     }
     .clinical-odontogram-stage .odontogram-anatomy.is-lateral-anatomy {
-      width: clamp(38px, 4.4vw, 58px) !important;
-      min-width: clamp(38px, 4.4vw, 58px) !important;
+      width: clamp(42px, 5.0vw, 68px) !important;
+      min-width: clamp(42px, 5.0vw, 68px) !important;
     }
     .tooth-photo.is-upper-lateral {
       transform: rotate(var(--tooth-photo-rotation)) scaleX(var(--tooth-photo-mirror)) scale(0.9);
@@ -1001,14 +1001,14 @@
     @media (max-width: 899px) {
       .clinical-odontogram-stage { --odontogram-columns: 16; }
       .clinical-odontogram-stage .tooth-card,
-      .clinical-odontogram-empty { min-height: 146px; }
+      .clinical-odontogram-empty { min-height: 156px; }
       .clinical-odontogram-stage .odontogram-anatomy {
-        width: clamp(34px, 9vw, 50px) !important;
-        min-width: clamp(34px, 9vw, 50px) !important;
+        width: clamp(38px, 10vw, 56px) !important;
+        min-width: clamp(38px, 10vw, 56px) !important;
       }
       .clinical-odontogram-stage .odontogram-anatomy.is-lateral-anatomy {
-        width: clamp(30px, 8vw, 44px) !important;
-        min-width: clamp(30px, 8vw, 44px) !important;
+        width: clamp(32px, 8.5vw, 48px) !important;
+        min-width: clamp(32px, 8.5vw, 48px) !important;
       }
       .clinical-odontogram-stage .odontogram-surface-view {
         width: clamp(30px, 9vw, 48px) !important;
@@ -12396,7 +12396,7 @@
         isUpperLateral ? 'is-lateral-anatomy' : ''
       ].filter(Boolean).join(' ');
       return `
-        <div id="anatomy-wrapper-${id}" class="${wrapperClasses}" style="width:${isPrimary ? '48px' : '56px'};height:96px;min-width:${isPrimary ? '48px' : '56px'}">
+        <div id="anatomy-wrapper-${id}" class="${wrapperClasses}" style="width:${isPrimary ? '54px' : '68px'};height:110px;min-width:${isPrimary ? '54px' : '68px'}">
           <div id="anatomy-group-${id}" class="absolute inset-0">
             <div class="tooth-photo-stage">
               <img id="tooth-photo-${id}" src="${TOOTH_PHOTO_ASSETS[family]}" alt="" aria-hidden="true" draggable="false" class="${photoClasses}" />
