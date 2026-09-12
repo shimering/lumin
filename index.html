@@ -1922,7 +1922,11 @@
       #admin-users-table-body button { min-height: 2.75rem; }
 
       /* Keep the normal iPad patient table presentation on phones, with contained scrolling. */
-      #view-patients .mobile-scroll-region {
+      #view-patients .mobile-scroll-region,
+      #view-finances .mobile-scroll-region,
+      #view-hr .mobile-scroll-region,
+      #view-analytics .mobile-scroll-region,
+      #view-implants .overflow-x-auto {
         overflow-x: auto;
         overscroll-behavior-inline: contain;
         scrollbar-gutter: stable;
@@ -2430,8 +2434,16 @@
       white-space: nowrap;
     }
     @media (max-width: 639px) {
-      #app-shell .app-page-bar { gap: 0.5rem; padding-inline: 0.75rem; }
-      .app-page-heading { gap: 0.5rem; }
+      #app-shell .app-page-bar {
+        height: auto;
+        min-height: 3.75rem;
+        flex-wrap: wrap;
+        padding-block: 0.625rem;
+        gap: 0.5rem;
+        padding-inline: 0.75rem;
+      }
+      .app-page-heading { min-width: 0; flex-shrink: 0; gap: 0.5rem; }
+      .app-page-heading .app-page-title { overflow: visible; white-space: normal; }
       #patient-query-input { padding-inline-end: 0.5rem; }
       #appointments-read-only-badge > span { display: none; }
     }
@@ -2449,7 +2461,7 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="lumin-theme.css?v=5" />
+  <link rel="stylesheet" href="lumin-theme.css?v=6" />
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 font-sans antialiased selection:bg-blue-100">
 
@@ -2836,17 +2848,17 @@
           <div class="app-page-heading"><span class="app-page-icon" aria-hidden="true"><i data-lucide="building-2"></i></span><h2 class="app-page-title">Clinic Management</h2></div>
         </div>
         <div class="px-3 pt-3 sm:px-5">
-          <div id="clinic-management-tabs" role="tablist" aria-label="Clinic management sections" class="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 sm:flex sm:w-fit">
-            <button id="clinic-management-tab-finances" data-clinic-management-tab="finances" type="button" role="tab" aria-selected="true" aria-controls="view-finances" onclick="switchClinicManagementTab('finances')" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-[11px] font-black text-emerald-700 shadow-xs sm:px-4 sm:text-xs">
+          <div id="clinic-management-tabs" role="tablist" aria-label="Clinic management sections" class="flex items-center gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1 sm:w-fit mobile-scroll-region scrollbar-none">
+            <button id="clinic-management-tab-finances" data-clinic-management-tab="finances" type="button" role="tab" aria-selected="true" aria-controls="view-finances" onclick="switchClinicManagementTab('finances')" class="inline-flex shrink-0 min-h-10 items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-[11px] font-black text-emerald-700 shadow-xs sm:px-4 sm:text-xs">
               <i data-lucide="landmark" class="h-4 w-4"></i><span>Finances</span>
             </button>
-            <button id="clinic-management-tab-analytics" data-clinic-management-tab="analytics" type="button" role="tab" aria-selected="false" aria-controls="view-analytics" onclick="switchClinicManagementTab('analytics')" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-[11px] font-black text-slate-500 transition hover:bg-white/70 hover:text-indigo-700 sm:px-4 sm:text-xs">
+            <button id="clinic-management-tab-analytics" data-clinic-management-tab="analytics" type="button" role="tab" aria-selected="false" aria-controls="view-analytics" onclick="switchClinicManagementTab('analytics')" class="inline-flex shrink-0 min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-[11px] font-black text-slate-500 transition hover:bg-white/70 hover:text-indigo-700 sm:px-4 sm:text-xs">
               <i data-lucide="chart-no-axes-combined" class="h-4 w-4"></i><span>Analytics</span>
             </button>
-            <button id="clinic-management-tab-hr" data-clinic-management-tab="hr" type="button" role="tab" aria-selected="false" aria-controls="view-hr" onclick="switchClinicManagementTab('hr')" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-[11px] font-black text-slate-500 transition hover:bg-white/70 hover:text-rose-700 sm:px-4 sm:text-xs">
+            <button id="clinic-management-tab-hr" data-clinic-management-tab="hr" type="button" role="tab" aria-selected="false" aria-controls="view-hr" onclick="switchClinicManagementTab('hr')" class="inline-flex shrink-0 min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-[11px] font-black text-slate-500 transition hover:bg-white/70 hover:text-rose-700 sm:px-4 sm:text-xs">
               <i data-lucide="briefcase-business" class="h-4 w-4"></i><span>HR</span>
             </button>
-            <button id="clinic-management-tab-implants" data-clinic-management-tab="implants" type="button" role="tab" aria-selected="false" aria-controls="view-implants" onclick="switchClinicManagementTab('implants')" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-[11px] font-black text-slate-500 transition hover:bg-white/70 hover:text-cyan-700 sm:px-4 sm:text-xs">
+            <button id="clinic-management-tab-implants" data-clinic-management-tab="implants" type="button" role="tab" aria-selected="false" aria-controls="view-implants" onclick="switchClinicManagementTab('implants')" class="inline-flex shrink-0 min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-[11px] font-black text-slate-500 transition hover:bg-white/70 hover:text-cyan-700 sm:px-4 sm:text-xs">
               <i data-lucide="activity" class="h-4 w-4"></i><span>Implant Progress</span>
             </button>
           </div>
@@ -2993,7 +3005,7 @@
           <span class="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-600"><span class="h-2 w-2 rounded-full bg-emerald-500"></span> Live updates</span>
         </div>
         <div class="mobile-scroll-region overflow-x-auto">
-          <table id="finance-invoices-table" class="mobile-card-table w-full min-w-[1160px] text-left text-xs">
+          <table id="finance-invoices-table" class="w-full min-w-[1160px] text-left text-xs">
             <thead class="border-b border-slate-200 bg-white text-[10px] font-black uppercase tracking-wider text-slate-400">
               <tr>
                 <th class="px-5 py-3.5">Invoice</th>
@@ -3044,7 +3056,7 @@
           <span class="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-600"><span class="h-2 w-2 rounded-full bg-emerald-500"></span> Live updates</span>
         </div>
         <div class="mobile-scroll-region overflow-x-auto">
-          <table id="finance-payments-table" class="mobile-card-table w-full min-w-[1040px] text-left text-xs">
+          <table id="finance-payments-table" class="w-full min-w-[1040px] text-left text-xs">
             <thead class="border-b border-slate-200 bg-white text-[10px] font-black uppercase tracking-wider text-slate-400">
               <tr>
                 <th class="px-5 py-3.5">Payment</th>
@@ -3087,7 +3099,7 @@
       <div id="finance-expenses-results" class="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/60 px-4 py-3 sm:px-5"><div><h3 class="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-600"><i data-lucide="list-filter" class="h-4 w-4 text-emerald-600"></i> All expenses</h3><p id="finance-expense-results-summary" class="mt-1 text-[11px] font-semibold text-slate-400" aria-live="polite">Loading expenses...</p></div><span class="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-600"><span class="h-2 w-2 rounded-full bg-emerald-500"></span> Live updates</span></div>
         <div class="mobile-scroll-region overflow-x-auto">
-          <table id="finance-expenses-table" class="mobile-card-table w-full min-w-[1280px] text-left text-xs">
+          <table id="finance-expenses-table" class="w-full min-w-[1280px] text-left text-xs">
             <thead class="border-b border-slate-200 bg-white text-[10px] font-black uppercase tracking-wider text-slate-400"><tr><th class="px-5 py-3.5">Expense</th><th class="px-5 py-3.5">Type</th><th class="px-5 py-3.5">Date</th><th class="px-5 py-3.5 text-right">Total</th><th class="px-5 py-3.5 text-right">Paid expense</th><th class="px-5 py-3.5 text-right">Remaining</th><th class="px-5 py-3.5">Payment</th><th class="px-5 py-3.5">Confirmed</th><th class="px-5 py-3.5">Description</th><th class="px-5 py-3.5 text-right">Actions</th></tr></thead>
             <tbody id="finance-expenses-table-body" class="divide-y divide-slate-100 font-medium text-slate-700"><tr><td colspan="10" class="px-5 py-12 text-center text-sm font-bold text-slate-400">Loading expenses...</td></tr></tbody>
           </table>
@@ -3177,7 +3189,7 @@
         </div>
         <div class="grid grid-cols-2 gap-3 border-b border-slate-100 p-4 lg:grid-cols-4 sm:p-5"><div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4"><span class="text-[10px] font-black uppercase tracking-wider text-slate-400">Team shown</span><p id="hr-team-total" class="mt-2 text-xl font-black text-slate-900">0</p></div><div class="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4"><span class="text-[10px] font-black uppercase tracking-wider text-emerald-600">Attended shifts</span><p id="hr-attended-total" class="mt-2 text-xl font-black text-emerald-800">0</p></div><div class="rounded-2xl border border-amber-200 bg-amber-50/60 p-4"><span class="text-[10px] font-black uppercase tracking-wider text-amber-600">Late arrivals</span><p id="hr-late-total" class="mt-2 text-xl font-black text-amber-800">0</p></div><div class="rounded-2xl border border-violet-200 bg-violet-50/60 p-4"><span class="text-[10px] font-black uppercase tracking-wider text-violet-600">Salary total</span><p id="hr-salary-total" class="mt-2 text-xl font-black text-violet-800">EGP 0</p></div></div>
         <div class="space-y-3 border-b border-slate-100 p-4 sm:p-5"><div class="grid gap-3 md:grid-cols-[minmax(220px,1fr)_auto]"><label class="relative block"><i data-lucide="search" class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i><input id="hr-team-search" type="search" oninput="renderHrDirectory()" placeholder="Search by name or user type" class="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-rose-400 focus:bg-white" /></label><button type="button" onclick="setHrRoleFilter('all')" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-600">All user types</button></div><div id="hr-role-filters" class="flex gap-2 overflow-x-auto pb-1"></div></div>
-        <div class="mobile-scroll-region overflow-x-auto"><table id="hr-team-table" class="mobile-card-table w-full min-w-[1120px] text-left text-xs"><thead class="border-b border-slate-200 bg-white text-[10px] font-black uppercase tracking-wider text-slate-400"><tr><th class="px-5 py-3.5">Team member</th><th class="px-5 py-3.5">Schedule</th><th class="px-5 py-3.5">Attendance</th><th class="px-5 py-3.5">Performance</th><th class="px-5 py-3.5">Salary calculation</th><th class="px-5 py-3.5">Payment</th><th class="px-5 py-3.5 text-right">Actions</th></tr></thead><tbody id="hr-team-table-body" class="divide-y divide-slate-100 font-medium text-slate-700"><tr><td colspan="7" class="px-5 py-12 text-center text-sm font-bold text-slate-400">Loading monthly HR records...</td></tr></tbody></table></div>
+        <div class="mobile-scroll-region overflow-x-auto"><table id="hr-team-table" class="w-full min-w-[1120px] text-left text-xs"><thead class="border-b border-slate-200 bg-white text-[10px] font-black uppercase tracking-wider text-slate-400"><tr><th class="px-5 py-3.5">Team member</th><th class="px-5 py-3.5">Schedule</th><th class="px-5 py-3.5">Attendance</th><th class="px-5 py-3.5">Performance</th><th class="px-5 py-3.5">Salary calculation</th><th class="px-5 py-3.5">Payment</th><th class="px-5 py-3.5 text-right">Actions</th></tr></thead><tbody id="hr-team-table-body" class="divide-y divide-slate-100 font-medium text-slate-700"><tr><td colspan="7" class="px-5 py-12 text-center text-sm font-bold text-slate-400">Loading monthly HR records...</td></tr></tbody></table></div>
         <p id="hr-directory-error" class="hidden border-t border-red-100 bg-red-50 px-5 py-3 text-xs font-bold text-red-700" role="alert"></p>
       </div>
       </div>
@@ -3217,23 +3229,25 @@
     <section id="view-implants" class="hidden space-y-5">
       <!-- Top Page Bar Card -->
       <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-        <div class="app-page-bar app-page-bar-embedded">
-          <div class="app-page-heading">
-            <span class="app-page-icon" aria-hidden="true"><i data-lucide="activity"></i></span>
-            <h2 class="app-page-title">Implant Progress</h2>
+        <div class="app-page-bar app-page-bar-embedded flex-wrap sm:flex-nowrap gap-2.5 sm:gap-4">
+          <div class="app-page-heading min-w-0 shrink-0">
+            <span class="app-page-icon shrink-0" aria-hidden="true"><i data-lucide="activity"></i></span>
+            <h2 class="app-page-title text-base sm:text-lg">Implant Progress</h2>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <button type="button" onclick="openTrackedProceduresModal()" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-black text-slate-600 shadow-xs transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700">
-              <i data-lucide="sliders-horizontal" class="h-4 w-4 text-cyan-600"></i>
-              <span>Tracked Procedures</span>
+          <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 shrink-0">
+            <button type="button" onclick="openTrackedProceduresModal()" class="inline-flex min-h-9 sm:min-h-10 items-center justify-center gap-1.5 sm:gap-2 rounded-xl border border-slate-200 bg-white px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-black text-slate-600 shadow-xs transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700" title="Tracked Procedures">
+              <i data-lucide="sliders-horizontal" class="h-3.5 w-3.5 sm:h-4 sm:w-4 text-cyan-600"></i>
+              <span class="hidden md:inline">Tracked Procedures</span>
+              <span class="inline md:hidden">Procedures</span>
             </button>
-            <button type="button" onclick="refreshImplantProgress({ force: true })" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-black text-slate-600 shadow-xs transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700">
-              <i data-lucide="refresh-cw" class="h-4 w-4 text-slate-500"></i>
-              <span>Refresh</span>
+            <button type="button" onclick="refreshImplantProgress({ force: true })" class="inline-flex min-h-9 sm:min-h-10 items-center justify-center gap-1.5 sm:gap-2 rounded-xl border border-slate-200 bg-white px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-black text-slate-600 shadow-xs transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700" title="Refresh" aria-label="Refresh implant progress">
+              <i data-lucide="refresh-cw" class="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-500"></i>
+              <span class="hidden sm:inline">Refresh</span>
             </button>
-            <button type="button" onclick="openNewImplantModal()" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-cyan-600 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-cyan-700">
-              <i data-lucide="plus" class="h-4 w-4"></i>
-              <span>New Implant Entry</span>
+            <button type="button" onclick="openNewImplantModal()" class="inline-flex min-h-9 sm:min-h-10 items-center justify-center gap-1.5 sm:gap-2 rounded-xl bg-cyan-600 px-3 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-black text-white shadow-sm transition hover:bg-cyan-700">
+              <i data-lucide="plus" class="h-3.5 w-3.5 sm:h-4 sm:w-4"></i>
+              <span class="hidden sm:inline">New Implant Entry</span>
+              <span class="sm:hidden">New Entry</span>
             </button>
           </div>
         </div>
@@ -6218,7 +6232,9 @@
       'Implant Progress': 'متابعة الزراعة',
       'Track surgical placement, osseointegration timeline, and prosthetic delivery for all dental implants.': 'متابعة مراحل الجراحة، فترة الالتئام العظمي، وموعد تركيب التركيبات لجميع زرعات الأسنان.',
       'Tracked Procedures': 'إجراءات الزراعة المتابعة',
+      'Procedures': 'الإجراءات',
       'New Implant Entry': 'إضافة زراعة جديدة',
+      'New Entry': 'إضافة جديدة',
       'Active Implants': 'زرعات قيد الالتئام',
       'Currently in healing': 'مرحلة الالتئام حالياً',
       'Due Soon (≤30d)': 'قريب الاستحقاق (≤30 يوم)',
@@ -18148,7 +18164,7 @@
         const button = document.getElementById(`clinic-management-tab-${candidate}`);
         const panel = document.getElementById(`view-${candidate}`);
         if (button) {
-          button.className = `${allowed ? '' : 'hidden '}inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-[11px] font-black transition sm:px-4 sm:text-xs ${isActive ? `bg-white ${tabStyles[candidate]} shadow-xs` : 'text-slate-500 hover:bg-white/70 hover:text-slate-800'}`;
+          button.className = `${allowed ? '' : 'hidden '}inline-flex shrink-0 min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-[11px] font-black transition sm:px-4 sm:text-xs ${isActive ? `bg-white ${tabStyles[candidate]} shadow-xs` : 'text-slate-500 hover:bg-white/70 hover:text-slate-800'}`;
           button.setAttribute('aria-selected', isActive ? 'true' : 'false');
           button.tabIndex = allowed && isActive ? 0 : -1;
         }

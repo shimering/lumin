@@ -135,6 +135,12 @@ body.lumin-raised #view-dashboard #dashboard-attendance-card {
       box-shadow: var(--lumin-raised);
     }
     body.lumin-raised #app-shell .app-page-bar-embedded { box-shadow: none; }
+    @media (max-width: 639px) {
+      body.lumin-raised #app-shell .app-page-bar {
+        height: auto;
+        min-height: 3.75rem;
+      }
+    }
     body.lumin-raised #app-shell .app-page-title { color: var(--lumin-ink); }
     body.lumin-raised .app-page-icon {
       border-color: hsl(var(--lumin-hue) calc(100% * var(--lumin-chroma)) 89%);
