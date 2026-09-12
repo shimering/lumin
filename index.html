@@ -1503,6 +1503,7 @@
     html[dir="rtl"] #view-finances,
     html[dir="rtl"] #view-analytics,
     html[dir="rtl"] #view-hr,
+    html[dir="rtl"] #view-implants,
     html[dir="rtl"] #view-patient-profile,
     html[dir="rtl"] #view-invoices,
     html[dir="rtl"] #view-payments,
@@ -1513,13 +1514,16 @@
     html[dir="rtl"] #modal-payment,
     html[dir="rtl"] #modal-expense-payment,
     html[dir="rtl"] #modal-invoice-date,
-    html[dir="rtl"] #modal-dental-operation-delete { text-align: right; }
+    html[dir="rtl"] #modal-dental-operation-delete,
+    html[dir="rtl"] #modal-implant-record,
+    html[dir="rtl"] #modal-tracked-procedures { text-align: right; }
     html[dir="rtl"] #view-dashboard .text-left,
     html[dir="rtl"] #view-patients .text-left,
     html[dir="rtl"] #view-clinic-management .text-left,
     html[dir="rtl"] #view-finances .text-left,
     html[dir="rtl"] #view-analytics .text-left,
     html[dir="rtl"] #view-hr .text-left,
+    html[dir="rtl"] #view-implants .text-left,
     html[dir="rtl"] #view-patient-profile .text-left,
     html[dir="rtl"] #view-invoices .text-left,
     html[dir="rtl"] #view-payments .text-left,
@@ -1530,13 +1534,16 @@
     html[dir="rtl"] #modal-payment .text-left,
     html[dir="rtl"] #modal-expense-payment .text-left,
     html[dir="rtl"] #modal-invoice-date .text-left,
-    html[dir="rtl"] #modal-dental-operation-delete .text-left { text-align: right !important; }
+    html[dir="rtl"] #modal-dental-operation-delete .text-left,
+    html[dir="rtl"] #modal-implant-record .text-left,
+    html[dir="rtl"] #modal-tracked-procedures .text-left { text-align: right !important; }
     html[dir="rtl"] #view-dashboard .text-right,
     html[dir="rtl"] #view-patients .text-right,
     html[dir="rtl"] #view-clinic-management .text-right,
     html[dir="rtl"] #view-finances .text-right,
     html[dir="rtl"] #view-analytics .text-right,
     html[dir="rtl"] #view-hr .text-right,
+    html[dir="rtl"] #view-implants .text-right,
     html[dir="rtl"] #view-patient-profile .text-right,
     html[dir="rtl"] #view-invoices .text-right,
     html[dir="rtl"] #view-payments .text-right,
@@ -1547,7 +1554,9 @@
     html[dir="rtl"] #modal-payment .text-right,
     html[dir="rtl"] #modal-expense-payment .text-right,
     html[dir="rtl"] #modal-invoice-date .text-right,
-    html[dir="rtl"] #modal-dental-operation-delete .text-right { text-align: left !important; }
+    html[dir="rtl"] #modal-dental-operation-delete .text-right,
+    html[dir="rtl"] #modal-implant-record .text-right,
+    html[dir="rtl"] #modal-tracked-procedures .text-right { text-align: left !important; }
     html[dir="rtl"] #view-chart,
     html[dir="rtl"] #view-admin { direction: ltr; text-align: left; }
     html[dir="rtl"] #appointments-calendar-grid,
@@ -1557,6 +1566,10 @@
     html[dir="rtl"] #appointment-patient-picker > svg { right: 0.875rem; left: auto; }
     html[dir="rtl"] #appointment-patient-search { padding-right: 2.5rem; padding-left: 5rem; }
     html[dir="rtl"] #appointment-patient-add-button { right: auto; left: 0.375rem; }
+    html[dir="rtl"] #implant-search-icon { right: 0.875rem; left: auto; }
+    html[dir="rtl"] #implant-search-input { padding-right: 2.5rem; padding-left: 0.75rem; }
+    html[dir="rtl"] #tracked-procedures-search-icon { right: 0.875rem; left: auto; }
+    html[dir="rtl"] #tracked-procedures-search { padding-right: 2.5rem; padding-left: 0.75rem; }
     #modal-new-patient.is-over-appointment { z-index: 80 !important; }
     #modal-appointment.is-behind-patient-modal > div {
       pointer-events: none;
@@ -2806,7 +2819,7 @@
           <div class="app-page-heading"><span class="app-page-icon" aria-hidden="true"><i data-lucide="building-2"></i></span><h2 class="app-page-title">Clinic Management</h2></div>
         </div>
         <div class="px-3 pt-3 sm:px-5">
-          <div id="clinic-management-tabs" role="tablist" aria-label="Clinic management sections" class="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1 sm:flex sm:w-fit">
+          <div id="clinic-management-tabs" role="tablist" aria-label="Clinic management sections" class="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 sm:flex sm:w-fit">
             <button id="clinic-management-tab-finances" data-clinic-management-tab="finances" type="button" role="tab" aria-selected="true" aria-controls="view-finances" onclick="switchClinicManagementTab('finances')" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-[11px] font-black text-emerald-700 shadow-xs sm:px-4 sm:text-xs">
               <i data-lucide="landmark" class="h-4 w-4"></i><span>Finances</span>
             </button>
@@ -2815,6 +2828,9 @@
             </button>
             <button id="clinic-management-tab-hr" data-clinic-management-tab="hr" type="button" role="tab" aria-selected="false" aria-controls="view-hr" onclick="switchClinicManagementTab('hr')" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-[11px] font-black text-slate-500 transition hover:bg-white/70 hover:text-rose-700 sm:px-4 sm:text-xs">
               <i data-lucide="briefcase-business" class="h-4 w-4"></i><span>HR</span>
+            </button>
+            <button id="clinic-management-tab-implants" data-clinic-management-tab="implants" type="button" role="tab" aria-selected="false" aria-controls="view-implants" onclick="switchClinicManagementTab('implants')" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-[11px] font-black text-slate-500 transition hover:bg-white/70 hover:text-cyan-700 sm:px-4 sm:text-xs">
+              <i data-lucide="activity" class="h-4 w-4"></i><span>Implant Progress</span>
             </button>
           </div>
         </div>
@@ -3176,6 +3192,128 @@
         <div class="grid gap-5 xl:grid-cols-2">
           <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs"><div class="flex items-center justify-between gap-3 border-b border-slate-100 p-4 sm:p-5"><div><h3 class="text-sm font-black text-slate-800">Extra shifts</h3><p class="mt-1 text-[11px] font-bold text-slate-400">Separate dates, rates, reasons, and calculated amounts.</p></div><span id="hr-staff-extra-total" class="rounded-full bg-amber-100 px-3 py-1.5 text-[10px] font-black text-amber-700"></span></div><div class="overflow-x-auto"><table class="w-full min-w-[560px] text-left text-xs"><thead class="border-b border-slate-100 bg-slate-50/70 text-[9px] font-black uppercase tracking-wider text-slate-400"><tr><th class="px-4 py-3">Date</th><th class="px-4 py-3">Shifts</th><th class="px-4 py-3">Rate</th><th class="px-4 py-3">Amount</th><th class="px-4 py-3">Reason</th></tr></thead><tbody id="hr-staff-extra-table" class="divide-y divide-slate-100 font-semibold text-slate-600"></tbody></table></div></div>
           <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs"><div class="flex items-center justify-between gap-3 border-b border-slate-100 p-4 sm:p-5"><div><h3 class="text-sm font-black text-slate-800">Performance entries</h3><p class="mt-1 text-[11px] font-bold text-slate-400">Bonuses and deductions remain separate from attendance.</p></div><span id="hr-staff-performance-total" class="rounded-full bg-violet-100 px-3 py-1.5 text-[10px] font-black text-violet-700"></span></div><div class="overflow-x-auto"><table class="w-full min-w-[560px] text-left text-xs"><thead class="border-b border-slate-100 bg-slate-50/70 text-[9px] font-black uppercase tracking-wider text-slate-400"><tr><th class="px-4 py-3">Date</th><th class="px-4 py-3">Type</th><th class="px-4 py-3">Amount</th><th class="px-4 py-3">Score</th><th class="px-4 py-3">Reason</th></tr></thead><tbody id="hr-staff-performance-table" class="divide-y divide-slate-100 font-semibold text-slate-600"></tbody></table></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= IMPLANT PROGRESS ================= -->
+    <section id="view-implants" class="hidden space-y-5">
+      <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+        <div class="flex flex-col gap-4 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600">
+                <i data-lucide="activity" class="h-5 w-5"></i>
+              </span>
+              <h2 class="text-lg font-black text-slate-900 sm:text-xl">Implant Progress</h2>
+            </div>
+            <p class="mt-1 text-xs font-bold text-slate-400">
+              Track surgical placement, osseointegration timeline, and prosthetic delivery for all dental implants.
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" onclick="openTrackedProceduresModal()" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-black text-slate-700 shadow-xs transition hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-800">
+              <i data-lucide="sliders-horizontal" class="h-4 w-4 text-cyan-600"></i>
+              <span>Tracked Procedures</span>
+            </button>
+            <button type="button" onclick="refreshImplantProgress({ force: true })" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-black text-slate-700 shadow-xs transition hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-800">
+              <i data-lucide="refresh-cw" class="h-4 w-4 text-slate-500"></i>
+              <span>Refresh</span>
+            </button>
+            <button type="button" onclick="openNewImplantModal()" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-cyan-600 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-cyan-700">
+              <i data-lucide="plus" class="h-4 w-4"></i>
+              <span>New Implant Entry</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Metric KPI Cards -->
+        <div class="grid grid-cols-2 gap-3 border-b border-slate-100 bg-slate-50/50 p-4 sm:grid-cols-4 sm:p-5">
+          <div class="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-black uppercase tracking-wider text-slate-400">Active Implants</span>
+              <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-50 text-cyan-600"><i data-lucide="clock" class="h-3.5 w-3.5"></i></span>
+            </div>
+            <p id="implant-stat-active" class="mt-2 text-2xl font-black text-slate-800">0</p>
+            <p class="mt-0.5 text-[10px] font-bold text-slate-400">Currently in healing</p>
+          </div>
+          <div class="rounded-2xl border border-amber-200/80 bg-white p-3.5 shadow-xs">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-black uppercase tracking-wider text-amber-600">Due Soon (≤30d)</span>
+              <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50 text-amber-600"><i data-lucide="alert-circle" class="h-3.5 w-3.5"></i></span>
+            </div>
+            <p id="implant-stat-due-soon" class="mt-2 text-2xl font-black text-amber-600">0</p>
+            <p class="mt-0.5 text-[10px] font-bold text-slate-400">Ready for prosthetics</p>
+          </div>
+          <div class="rounded-2xl border border-emerald-200/80 bg-white p-3.5 shadow-xs">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-black uppercase tracking-wider text-emerald-600">Completed</span>
+              <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600"><i data-lucide="check-circle-2" class="h-3.5 w-3.5"></i></span>
+            </div>
+            <p id="implant-stat-completed" class="mt-2 text-2xl font-black text-emerald-600">0</p>
+            <p class="mt-0.5 text-[10px] font-bold text-slate-400">Restoration delivered</p>
+          </div>
+          <div class="rounded-2xl border border-indigo-200/80 bg-white p-3.5 shadow-xs">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-black uppercase tracking-wider text-indigo-600">Standard / Economic</span>
+              <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600"><i data-lucide="pie-chart" class="h-3.5 w-3.5"></i></span>
+            </div>
+            <p id="implant-stat-ratio" class="mt-2 text-xl font-black text-indigo-700">0 / 0</p>
+            <p class="mt-0.5 text-[10px] font-bold text-slate-400">B&B vs Dual system</p>
+          </div>
+        </div>
+
+        <!-- Filter and Search Controls -->
+        <div class="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div class="relative flex-1 max-w-md">
+            <i id="implant-search-icon" data-lucide="search" class="absolute left-3.5 top-3 h-4 w-4 text-slate-400"></i>
+            <input id="implant-search-input" type="text" oninput="filterImplantProgressTable()" placeholder="Search patient, phone, or tooth #..." class="w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-3 text-xs font-bold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20" />
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="inline-flex rounded-xl bg-slate-100 p-1">
+              <button type="button" data-implant-filter="all" onclick="setImplantStatusFilter('all')" class="implant-filter-btn rounded-lg bg-white px-3 py-1.5 text-xs font-black text-cyan-700 shadow-xs">All</button>
+              <button type="button" data-implant-filter="active" onclick="setImplantStatusFilter('active')" class="implant-filter-btn rounded-lg px-3 py-1.5 text-xs font-black text-slate-500 hover:text-slate-800">In Progress</button>
+              <button type="button" data-implant-filter="due" onclick="setImplantStatusFilter('due')" class="implant-filter-btn rounded-lg px-3 py-1.5 text-xs font-black text-slate-500 hover:text-slate-800">Due Soon</button>
+              <button type="button" data-implant-filter="completed" onclick="setImplantStatusFilter('completed')" class="implant-filter-btn rounded-lg px-3 py-1.5 text-xs font-black text-slate-500 hover:text-slate-800">Completed</button>
+            </div>
+            <select id="implant-type-filter" onchange="filterImplantProgressTable()" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20">
+              <option value="all">All Types</option>
+              <option value="standard">Standard (b&b)</option>
+              <option value="economic">Economic (dual)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Table Container -->
+        <div class="overflow-x-auto">
+          <table class="w-full min-w-[950px] text-left text-xs">
+            <thead class="border-b border-slate-100 bg-slate-50/70 text-[9px] font-black uppercase tracking-wider text-slate-400">
+              <tr>
+                <th class="px-4 py-3.5">Date</th>
+                <th class="px-4 py-3.5">Patient</th>
+                <th class="px-4 py-3.5 text-center">Tooth</th>
+                <th class="px-4 py-3.5">Implant Type</th>
+                <th class="px-4 py-3.5">Size</th>
+                <th class="px-4 py-3.5 text-center">Healing Collar</th>
+                <th class="px-4 py-3.5">Delivery Date</th>
+                <th class="px-4 py-3.5 text-center">Status</th>
+                <th class="px-4 py-3.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="implant-progress-table-body" class="divide-y divide-slate-100 font-semibold text-slate-600">
+              <tr>
+                <td colspan="9" class="py-12 text-center text-xs font-bold text-slate-400">
+                  <div class="flex flex-col items-center justify-center gap-2">
+                    <i data-lucide="loader-2" class="h-6 w-6 animate-spin text-cyan-600"></i>
+                    <span>Loading implant progress records...</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="implant-table-footer" class="flex items-center justify-between border-t border-slate-100 px-5 py-3 text-xs font-bold text-slate-400">
+          <span id="implant-count-summary">Showing 0 implants</span>
         </div>
       </div>
     </section>
@@ -4748,7 +4886,131 @@
     </div>
   </div>
 
-  <!-- ================= DROPDOWN: WHATSAPP TEMPLATES ================= -->
+  <!-- ================= MODAL: ADD / EDIT IMPLANT RECORD ================= -->
+  <div id="modal-implant-record" class="fixed inset-0 z-[85] hidden items-center justify-center bg-slate-900/45 p-4 backdrop-blur-xs">
+    <div role="dialog" aria-modal="true" aria-labelledby="implant-modal-title" class="w-full max-w-lg overflow-hidden rounded-3xl border border-cyan-100 bg-white shadow-2xl">
+      <div class="border-b border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-blue-50/70 p-5">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <span class="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-700">Implant Tracking</span>
+            <h3 id="implant-modal-title" class="mt-1 text-lg font-black text-slate-900">Edit Implant Record</h3>
+            <p id="implant-modal-patient-info" class="mt-1 text-xs font-bold text-slate-500"></p>
+          </div>
+          <button type="button" onclick="closeImplantModal()" aria-label="Close implant form" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-white hover:text-slate-700">
+            <i data-lucide="x" class="h-5 w-5"></i>
+          </button>
+        </div>
+      </div>
+      <form id="implant-record-form" onsubmit="saveImplantRecordForm(event)" class="space-y-4 p-5">
+        <input type="hidden" id="implant-form-id" value="" />
+        <input type="hidden" id="implant-form-patient-id" value="" />
+        <input type="hidden" id="implant-form-finding-id" value="" />
+
+        <!-- Patient Selector (only visible when adding new record) -->
+        <div id="implant-patient-selector-container" class="hidden">
+          <label class="block">
+            <span class="mb-1.5 block text-xs font-black text-slate-700">Patient</span>
+            <select id="implant-form-patient-select" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20">
+              <option value="">Select a patient...</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label class="block">
+            <span class="mb-1.5 block text-xs font-black text-slate-700">Procedure Date</span>
+            <input id="implant-form-procedure-date" type="date" required onchange="onImplantProcedureDateChange()" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20" />
+          </label>
+          <label class="block">
+            <span class="mb-1.5 block text-xs font-black text-slate-700">Delivery Date (+4 Months)</span>
+            <input id="implant-form-delivery-date" type="date" required class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20" />
+          </label>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <label class="block">
+            <span class="mb-1.5 block text-xs font-black text-slate-700">Tooth #</span>
+            <input id="implant-form-tooth" type="text" placeholder="e.g. 19" required class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20" />
+          </label>
+          <label class="block">
+            <span class="mb-1.5 block text-xs font-black text-slate-700">Implant Type</span>
+            <select id="implant-form-type" required class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20">
+              <option value="Standard (b&b)">Standard (b&b)</option>
+              <option value="Economic (dual)">Economic (dual)</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="mb-1.5 block text-xs font-black text-slate-700">Implant Size</span>
+            <input id="implant-form-size" type="text" placeholder="e.g. 4.0 x 10mm" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20" />
+          </label>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label class="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/50 p-3 cursor-pointer">
+            <input id="implant-form-healing-collar" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500" />
+            <div>
+              <span class="block text-xs font-black text-slate-800">Healing Collar Placed</span>
+              <span class="block text-[10px] font-bold text-slate-400">Yes if placed at surgery / second stage</span>
+            </div>
+          </label>
+          <label class="block">
+            <span class="mb-1.5 block text-xs font-black text-slate-700">Status</span>
+            <select id="implant-form-status" required class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20">
+              <option value="In">In Progress (Healing)</option>
+              <option value="C">Completed (Delivered)</option>
+              <option value="P">Planned</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="block">
+          <span class="mb-1.5 block text-xs font-black text-slate-700">Clinical Notes</span>
+          <textarea id="implant-form-notes" rows="2" placeholder="Torque, bone density, primary stability, brand notes..." class="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"></textarea>
+        </label>
+
+        <p id="implant-form-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="alert"></p>
+
+        <div class="flex justify-end gap-2 border-t border-slate-100 pt-4">
+          <button type="button" onclick="closeImplantModal()" class="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 transition hover:bg-slate-50">Cancel</button>
+          <button id="implant-save-button" type="submit" class="inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-5 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-cyan-700 disabled:cursor-wait disabled:opacity-60">
+            <i data-lucide="save" class="h-4 w-4"></i> Save Record
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: TRACKED CLINICAL PROCEDURES ================= -->
+  <div id="modal-tracked-procedures" class="fixed inset-0 z-[86] hidden items-center justify-center bg-slate-900/45 p-4 backdrop-blur-xs">
+    <div role="dialog" aria-modal="true" aria-labelledby="tracked-procedures-title" class="max-h-[min(92vh,46rem)] w-full max-w-2xl overflow-hidden rounded-3xl border border-cyan-100 bg-white shadow-2xl flex flex-col">
+      <div class="border-b border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-blue-50/70 p-5 shrink-0">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <span class="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-700">Procedure Tracking Config</span>
+            <h3 id="tracked-procedures-title" class="mt-1 text-lg font-black text-slate-900">Tracked Implant Procedures</h3>
+            <p class="mt-1 text-xs font-bold text-slate-500">Enable procedures that should automatically be monitored in the Implant Progress tab when scheduled or in progress.</p>
+          </div>
+          <button type="button" onclick="closeTrackedProceduresModal()" aria-label="Close tracked procedures dialog" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-white hover:text-slate-700">
+            <i data-lucide="x" class="h-5 w-5"></i>
+          </button>
+        </div>
+      </div>
+      <div class="p-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
+        <div class="relative">
+          <i id="tracked-procedures-search-icon" data-lucide="search" class="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400"></i>
+          <input id="tracked-procedures-search" type="text" oninput="filterTrackedProceduresList()" placeholder="Filter procedures by name or code..." class="w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-3 text-xs font-bold text-slate-800 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20" />
+        </div>
+      </div>
+      <div class="overflow-y-auto p-4 flex-1 space-y-2" id="tracked-procedures-list">
+        <!-- populated dynamically -->
+      </div>
+      <div class="border-t border-slate-100 p-4 bg-slate-50/50 flex justify-between items-center shrink-0">
+        <p class="text-[11px] font-bold text-slate-400">Standard and Economic implants are enabled by default.</p>
+        <button type="button" onclick="closeTrackedProceduresModal()" class="rounded-xl bg-slate-900 px-4 py-2 text-xs font-black text-white transition hover:bg-slate-800">Done</button>
+      </div>
+    </div>
+  </div>
+
   <div id="whatsapp-template-dropdown" role="menu" aria-label="WhatsApp message templates" class="fixed z-[100] hidden max-h-80 min-w-56 overflow-y-auto rounded-xl border border-emerald-200 bg-white p-1.5 shadow-2xl shadow-emerald-950/15"></div>
 
   <!-- ================= MODAL: ADD OR EDIT EXPENSE ================= -->
@@ -5059,6 +5321,12 @@
     let activeHrTeamTab = 'staff';
     let hrRoleFilter = 'all';
     let hrLoadedMonth = '';
+    let implantProgressRecords = [];
+    let implantProgressLoaded = false;
+    let implantProgressLoadPromise = null;
+    let implantStatusFilter = 'all';
+    let implantTypeFilter = 'all';
+    let implantSearchQuery = '';
     let activeHrStaffDetailsId = null;
     let activeHrDayDate = '';
     let clinicAttendanceSettings = {
@@ -5116,7 +5384,8 @@
       { key: 'appointments', label: 'Appointments' },
       { key: 'finances', label: 'Finances' },
       { key: 'analytics', label: 'Analytics' },
-      { key: 'hr', label: 'HR' }
+      { key: 'hr', label: 'HR' },
+      { key: 'implants', label: 'Implant Progress' }
     ]);
     const ROLE_PERMISSION_PAGES = Object.freeze([...APP_PAGES, { key: 'dashboard_invoices', label: 'Dashboard invoices' }, { key: 'loyalty', label: 'Patient Loyalty tab' }, { key: 'finance_depts', label: 'Finance Depts tab' }]);
     const WHATSAPP_TEMPLATE_VARIABLES = Object.freeze([
@@ -5929,7 +6198,49 @@
       'Mark at least one active login as a doctor in Admin before scheduling.': 'حدد حسابًا نشطًا واحدًا على الأقل كطبيب في صفحة الإدارة قبل الجدولة.',
       'Show Loyalty tab': 'إظهار تبويب الولاء',
       'Includes managing patient membership, points, and rewards.': 'يشمل إدارة عضوية المريض والنقاط والمكافآت.',
-      'Your user type does not allow appointment changes.': 'نوع المستخدم الخاص بك لا يسمح بتغيير المواعيد.'
+      'Your user type does not allow appointment changes.': 'نوع المستخدم الخاص بك لا يسمح بتغيير المواعيد.',
+      'Implant Progress': 'متابعة الزراعة',
+      'Track surgical placement, osseointegration timeline, and prosthetic delivery for all dental implants.': 'متابعة مراحل الجراحة، فترة الالتئام العظمي، وموعد تركيب التركيبات لجميع زرعات الأسنان.',
+      'Tracked Procedures': 'إجراءات الزراعة المتابعة',
+      'New Implant Entry': 'إضافة زراعة جديدة',
+      'Active Implants': 'زرعات قيد الالتئام',
+      'Currently in healing': 'مرحلة الالتئام حالياً',
+      'Due Soon (≤30d)': 'قريب الاستحقاق (≤30 يوم)',
+      'Ready for prosthetics': 'جاهزة للتركيب النهائي',
+      'Restoration delivered': 'تم تسليم التركيبة',
+      'Standard / Economic': 'قياسي / اقتصادي',
+      'B&B vs Dual system': 'زرعات B&B مقابل Dual',
+      'Search patient, phone, or tooth #...': 'ابحث باسم المريض أو الهاتف أو رقم السن...',
+      'In Progress': 'قيد العلاج',
+      'Due Soon': 'مستحق قريباً',
+      'All Types': 'جميع الأنواع',
+      'Standard (b&b)': 'قياسي (b&b)',
+      'Economic (dual)': 'اقتصادي (dual)',
+      'Implant Type': 'نوع الزرعة',
+      'Size': 'المقاس',
+      'Healing Collar': 'غطاء التئام',
+      'Delivery Date': 'تاريخ التسليم',
+      'Edit Implant Record': 'تعديل سجل الزراعة',
+      'Procedure Tracking Config': 'إعدادات تتبع الإجراءات',
+      'Tracked Implant Procedures': 'إجراءات الزراعة المتابعة',
+      'Enable procedures that should automatically be monitored in the Implant Progress tab when scheduled or in progress.': 'تفعيل الإجراءات التي يتم إدراجها تلقائيًا في جدول متابعة الزراعة عند بدء العلاج.',
+      'Procedure Date': 'تاريخ الإجراء',
+      'Delivery Date (+4 Months)': 'تاريخ التسليم (+4 أشهر)',
+      'Tooth #': 'رقم السن',
+      'Implant Size': 'مقاس الزرعة',
+      'Healing Collar Placed': 'تم وضع غطاء الالتئام (Healing Collar)',
+      'Yes if placed at surgery / second stage': 'نعم إذا تم تركيبه أثناء الجراحة أو المرحلة الثانية',
+      'In Progress (Healing)': 'قيد العلاج (فترة الالتئام)',
+      'Completed (Delivered)': 'مكتمل (تم التسليم)',
+      'Save Record': 'حفظ السجل',
+      'Cover screw': 'مسمار تغطية',
+      'Overdue': 'متأخر',
+      'Healing': 'قيد الالتئام',
+      'Due in': 'مستحق خلال',
+      'left': 'متبقي',
+      'Filter procedures by name or code...': 'تصفية الإجراءات بالاسم أو الرمز...',
+      'Standard and Economic implants are enabled by default.': 'زرعات Standard و Economic مفعلة افتراضياً.',
+      'Delete this implant progress entry? This will not delete the patient chart record.': 'هل تريد حذف سجل متابعة هذه الزرعة؟ لن يؤدي ذلك لحذف السجل من مخطط الأسنان.'
     });
 
     function isUiTranslationExcluded(node) {
@@ -6371,6 +6682,17 @@
           || currentUserAccess.permissions.has('finances')
           || currentUserAccess.permissions.has('analytics')
           || currentUserAccess.permissions.has('hr')
+          || currentUserAccess.permissions.has('implants')
+          || currentUserAccess.permissions.has('chart')
+          || currentUserAccess.permissions.has('patients')
+        );
+      }
+      if (pageKey === 'implants') {
+        return Boolean(
+          currentUserAccess.isAdmin
+          || currentUserAccess.permissions.has('implants')
+          || currentUserAccess.permissions.has('chart')
+          || currentUserAccess.permissions.has('patients')
         );
       }
       return Boolean(currentUserAccess.isAdmin || currentUserAccess.permissions.has(pageKey));
@@ -8287,6 +8609,7 @@
         price: Math.max(0, Number(record.price) || 0),
         active: Boolean(record.active),
         sortOrder: Number(record.sort_order) || 0,
+        trackImplantProgress: Boolean(record.track_implant_progress),
         createdAt: record.created_at,
         updatedAt: record.updated_at
       };
@@ -8660,7 +8983,7 @@
 
       const [specialtiesResult, operationsResult] = await Promise.all([
         db.from('dental_specialties').select('id, name, description, icon_name, accent_color, active, sort_order, created_at, updated_at').order('sort_order').order('name'),
-        db.from('dental_operations').select('id, specialty_id, code, name, action_scope, visual_code, price, active, sort_order, created_at, updated_at').order('sort_order').order('name')
+        db.from('dental_operations').select('id, specialty_id, code, name, action_scope, visual_code, price, active, sort_order, track_implant_progress, created_at, updated_at').order('sort_order').order('name')
       ]);
       if (specialtiesResult.error) throw specialtiesResult.error;
       if (operationsResult.error) throw operationsResult.error;
@@ -12126,7 +12449,8 @@
     const REALTIME_EXPENSE_TABLES = new Set(['expense_types', 'expenses']);
     const REALTIME_HR_TABLES = new Set(['hr_staff_settings', 'hr_attendance_sessions', 'hr_extra_shifts', 'hr_performance_adjustments', 'hr_payroll_periods', 'hr_salary_payments']);
     const REALTIME_PRESCRIPTION_TABLES = new Set(['prescription_print_settings', 'medication_catalog', 'prescription_templates', 'prescriptions', 'prescription_items']);
-    const REALTIME_APP_TABLES = new Set(['patients', 'appointments', 'message_templates', 'clinic_settings', 'payment_methods', ...REALTIME_PRESCRIPTION_TABLES, ...REALTIME_LOYALTY_TABLES, ...REALTIME_APPOINTMENT_CONFIGURATION_TABLES, ...REALTIME_EXPENSE_TABLES, ...REALTIME_HR_TABLES, ...REALTIME_INVOICE_TABLES, ...REALTIME_DENTAL_CUSTOMIZATION_TABLES, ...REALTIME_ACCESS_TABLES]);
+    const REALTIME_IMPLANT_TABLES = new Set(['implant_progress']);
+    const REALTIME_APP_TABLES = new Set(['patients', 'appointments', 'message_templates', 'clinic_settings', 'payment_methods', ...REALTIME_PRESCRIPTION_TABLES, ...REALTIME_LOYALTY_TABLES, ...REALTIME_APPOINTMENT_CONFIGURATION_TABLES, ...REALTIME_EXPENSE_TABLES, ...REALTIME_HR_TABLES, ...REALTIME_INVOICE_TABLES, ...REALTIME_DENTAL_CUSTOMIZATION_TABLES, ...REALTIME_ACCESS_TABLES, ...REALTIME_IMPLANT_TABLES]);
 
     function setRealtimeIndicator(status) {
       const indicator = document.getElementById('sync-status');
@@ -12205,6 +12529,7 @@
       if (dentalCustomizationLoaded) REALTIME_DENTAL_CUSTOMIZATION_TABLES.forEach(tableName => realtimePendingTables.add(tableName));
       if (paymentMethodsLoaded) realtimePendingTables.add('payment_methods');
       if (expenseTypesLoaded) realtimePendingTables.add('expense_types');
+      if (implantProgressLoaded) REALTIME_IMPLANT_TABLES.forEach(tableName => realtimePendingTables.add(tableName));
 
       if (realtimeViewIsVisible('dashboard') || realtimeViewIsVisible('invoices') || realtimeViewIsVisible('payments')) {
         REALTIME_INVOICE_TABLES.forEach(tableName => realtimePendingTables.add(tableName));
@@ -12221,6 +12546,8 @@
             .forEach(tableName => realtimePendingTables.add(tableName));
         } else if (activeClinicManagementTab === 'hr') {
           REALTIME_HR_TABLES.forEach(tableName => realtimePendingTables.add(tableName));
+        } else if (activeClinicManagementTab === 'implants') {
+          REALTIME_IMPLANT_TABLES.forEach(tableName => realtimePendingTables.add(tableName));
         }
       }
       if (realtimeViewIsVisible('admin')) {
@@ -12403,6 +12730,10 @@
         }
         if (hrChanged && hasPageAccess('admin') && !document.getElementById('view-admin').classList.contains('hidden') && adminActiveTab === 'attendance') {
           await loadAdminData();
+        }
+        const implantsChanged = [...changedTables].some(table => REALTIME_IMPLANT_TABLES.has(table));
+        if ((accessChanged || implantsChanged) && hasPageAccess('implants') && !document.getElementById('view-implants')?.classList.contains('hidden')) {
+          await refreshImplantProgress({ refresh: true });
         }
         realtimeRefreshRetryCount = 0;
         if (realtimeHasSubscribed) setRealtimeIndicator('connected');
@@ -14202,6 +14533,653 @@
         return false;
       }
       return true;
+    }
+
+    // ================= IMPLANT PROGRESS TRACKING =================
+    function addMonthsToDate(dateString, months = 4) {
+      if (!dateString) return '';
+      const parts = String(dateString).slice(0, 10).split('-');
+      if (parts.length < 3) return '';
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      const d = new Date(year, month, day);
+      d.setMonth(d.getMonth() + months);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dt = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${dt}`;
+    }
+
+    function extractImplantSizeFromNotes(notes) {
+      if (!notes || typeof notes !== 'string') return '';
+      const match = notes.match(/\b\d+(\.\d+)?\s*[xX*\/]\s*\d+(\.\d+)?\s*(mm)?\b/);
+      return match ? match[0] : '';
+    }
+
+    async function fetchImplantProgress(options = {}) {
+      const { refresh = false } = options;
+      if (implantProgressLoaded && !refresh) return implantProgressRecords;
+      if (implantProgressLoadPromise) return implantProgressLoadPromise;
+
+      implantProgressLoadPromise = (async () => {
+        try {
+          const { data, error } = await db
+            .from('implant_progress')
+            .select('*, patients:patient_id(id, name, phone)')
+            .order('procedure_date', { ascending: false });
+
+          if (error) {
+            console.error('Failed to fetch implant progress:', error);
+            return implantProgressRecords;
+          }
+          implantProgressRecords = data || [];
+          implantProgressLoaded = true;
+          return implantProgressRecords;
+        } finally {
+          implantProgressLoadPromise = null;
+        }
+      })();
+      return implantProgressLoadPromise;
+    }
+
+    async function refreshImplantProgress(options = {}) {
+      const { force = false, silent = false } = options;
+      await Promise.all([ensurePatientsLoaded(), ensureDentalCustomizationLoaded()]);
+      await fetchImplantProgress({ refresh: force || true });
+      renderImplantProgressTable();
+    }
+
+    function renderImplantProgressTable() {
+      const tbody = document.getElementById('implant-progress-table-body');
+      if (!tbody) return;
+
+      let activeCount = 0;
+      let dueSoonCount = 0;
+      let completedCount = 0;
+      let standardCount = 0;
+      let economicCount = 0;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      implantProgressRecords.forEach(r => {
+        const isCompleted = r.status === 'C';
+        if (isCompleted) {
+          completedCount++;
+        } else {
+          activeCount++;
+          if (r.delivery_date) {
+            const deliv = new Date(r.delivery_date);
+            deliv.setHours(0, 0, 0, 0);
+            const diffDays = Math.round((deliv - today) / (1000 * 60 * 60 * 24));
+            if (diffDays <= 30) dueSoonCount++;
+          }
+        }
+        const typeLower = String(r.implant_type || '').toLowerCase();
+        if (typeLower.includes('economic') || typeLower.includes('dual')) {
+          economicCount++;
+        } else {
+          standardCount++;
+        }
+      });
+
+      const statActiveEl = document.getElementById('implant-stat-active');
+      const statDueSoonEl = document.getElementById('implant-stat-due-soon');
+      const statCompletedEl = document.getElementById('implant-stat-completed');
+      const statRatioEl = document.getElementById('implant-stat-ratio');
+
+      if (statActiveEl) statActiveEl.textContent = activeCount;
+      if (statDueSoonEl) statDueSoonEl.textContent = dueSoonCount;
+      if (statCompletedEl) statCompletedEl.textContent = completedCount;
+      if (statRatioEl) statRatioEl.textContent = `${standardCount} / ${economicCount}`;
+
+      const q = (implantSearchQuery || '').trim().toLowerCase();
+      const filtered = implantProgressRecords.filter(record => {
+        const patientName = (record.patients?.name || (patients.find(p => p.id === record.patient_id)?.name) || '').toLowerCase();
+        const patientPhone = (record.patients?.phone || (patients.find(p => p.id === record.patient_id)?.phone) || '').toLowerCase();
+        const tooth = String(record.tooth_number || '').toLowerCase();
+        const matchesQuery = !q || patientName.includes(q) || patientPhone.includes(q) || tooth.includes(q);
+
+        if (!matchesQuery) return false;
+
+        if (implantStatusFilter === 'active' && record.status === 'C') return false;
+        if (implantStatusFilter === 'completed' && record.status !== 'C') return false;
+        if (implantStatusFilter === 'due') {
+          if (record.status === 'C') return false;
+          if (!record.delivery_date) return false;
+          const deliv = new Date(record.delivery_date);
+          deliv.setHours(0, 0, 0, 0);
+          const diffDays = Math.round((deliv - today) / (1000 * 60 * 60 * 24));
+          if (diffDays > 30) return false;
+        }
+
+        if (implantTypeFilter === 'standard') {
+          const typeLower = String(record.implant_type || '').toLowerCase();
+          if (typeLower.includes('economic') || typeLower.includes('dual')) return false;
+        } else if (implantTypeFilter === 'economic') {
+          const typeLower = String(record.implant_type || '').toLowerCase();
+          if (!typeLower.includes('economic') && !typeLower.includes('dual')) return false;
+        }
+
+        return true;
+      });
+
+      const countEl = document.getElementById('implant-count-summary');
+      if (countEl) countEl.textContent = `Showing ${filtered.length} of ${implantProgressRecords.length} implants`;
+
+      if (!filtered.length) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="9" class="py-12 text-center text-xs font-bold text-slate-400">
+              <div class="flex flex-col items-center justify-center gap-2">
+                <i data-lucide="inbox" class="h-8 w-8 text-slate-300"></i>
+                <span>No implant progress records match the current filters.</span>
+              </div>
+            </td>
+          </tr>
+        `;
+        translateUiTree(tbody, currentUiLanguage);
+        lucide.createIcons();
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(record => {
+        const patient = record.patients || patients.find(p => p.id === record.patient_id);
+        const patientName = patient?.name || 'Unknown patient';
+        const patientPhone = patient?.phone || '';
+        const isCompleted = record.status === 'C';
+
+        let deliveryBadge = '';
+        if (isCompleted) {
+          deliveryBadge = `<span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-500"><i data-lucide="check" class="h-3 w-3 text-emerald-600"></i> Delivered</span>`;
+        } else if (record.delivery_date) {
+          const deliv = new Date(record.delivery_date);
+          deliv.setHours(0, 0, 0, 0);
+          const diffDays = Math.round((deliv - today) / (1000 * 60 * 60 * 24));
+          if (diffDays < 0) {
+            deliveryBadge = `<span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-700 animate-pulse"><i data-lucide="alert-triangle" class="h-3 w-3"></i> Overdue (${Math.abs(diffDays)}d)</span>`;
+          } else if (diffDays <= 30) {
+            deliveryBadge = `<span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-800"><i data-lucide="clock" class="h-3 w-3"></i> Due in ${diffDays}d</span>`;
+          } else {
+            deliveryBadge = `<span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700"><i data-lucide="activity" class="h-3 w-3"></i> Healing (${diffDays}d)</span>`;
+          }
+        } else {
+          deliveryBadge = `<span class="text-slate-400">—</span>`;
+        }
+
+        const collarBadge = record.healing_collar
+          ? `<button type="button" onclick="toggleHealingCollarQuick('${record.id}')" title="Toggle Healing Collar" class="inline-flex items-center gap-1 rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-black text-cyan-800 hover:bg-cyan-200 transition"><i data-lucide="check" class="h-3 w-3"></i> Yes</button>`
+          : `<button type="button" onclick="toggleHealingCollarQuick('${record.id}')" title="Toggle Healing Collar" class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 hover:bg-slate-200 transition">Cover screw</button>`;
+
+        const rowClass = isCompleted ? 'bg-slate-50/70 text-slate-400 hover:bg-slate-100/70' : 'hover:bg-cyan-50/20';
+
+        return `
+          <tr class="${rowClass} transition border-b border-slate-100/80">
+            <td class="px-4 py-3 whitespace-nowrap text-xs font-bold text-slate-700">
+              ${escapeHtml(record.procedure_date || '—')}
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap">
+              <div class="flex flex-col">
+                <button type="button" onclick="openPatientChartFromImplant('${record.patient_id}')" class="text-left font-black ${isCompleted ? 'text-slate-500' : 'text-blue-600 hover:text-blue-800'} transition hover:underline inline-flex items-center gap-1">
+                  <span>${escapeHtml(patientName)}</span>
+                  <i data-lucide="external-link" class="h-3 w-3 opacity-60"></i>
+                </button>
+                ${patientPhone ? `<span class="text-[10px] font-semibold text-slate-400">${escapeHtml(patientPhone)}</span>` : ''}
+              </div>
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap text-center">
+              <span class="inline-flex items-center justify-center rounded-lg bg-slate-100 px-2 py-1 text-xs font-black text-slate-700">#${escapeHtml(record.tooth_number || '—')}</span>
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap text-xs font-bold text-slate-800">
+              ${escapeHtml(record.implant_type || '—')}
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap">
+              <div class="inline-flex items-center gap-1 group">
+                <span class="font-mono text-xs font-bold ${record.implant_size ? 'text-slate-800' : 'text-slate-400 italic'}">${escapeHtml(record.implant_size || 'Not set')}</span>
+                <button type="button" onclick="quickEditImplantSize('${record.id}')" title="Edit Size" class="opacity-0 group-hover:opacity-100 transition p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-cyan-700">
+                  <i data-lucide="pencil" class="h-3 w-3"></i>
+                </button>
+              </div>
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap text-center">
+              ${collarBadge}
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap">
+              <div class="flex items-center gap-1.5">
+                <span class="text-xs font-bold text-slate-700">${escapeHtml(record.delivery_date || '—')}</span>
+                ${deliveryBadge}
+              </div>
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap text-center">
+              <span class="inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-black ${isCompleted ? 'bg-slate-100 text-slate-500' : record.status === 'In' ? 'bg-cyan-100 text-cyan-800' : 'bg-amber-100 text-amber-800'}">
+                ${record.status === 'C' ? 'Completed' : record.status === 'In' ? 'In Progress' : 'Planned'}
+              </span>
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap text-right">
+              <div class="inline-flex items-center justify-end gap-1">
+                <button type="button" onclick="openEditImplantModal('${record.id}')" title="Edit implant" class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-cyan-50 hover:text-cyan-700 transition">
+                  <i data-lucide="edit-3" class="h-4 w-4"></i>
+                </button>
+                <button type="button" onclick="sendImplantWhatsAppReminder('${record.id}')" title="WhatsApp reminder" class="flex h-8 w-8 items-center justify-center rounded-lg text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 transition">
+                  <i data-lucide="message-circle" class="h-4 w-4"></i>
+                </button>
+                <button type="button" onclick="deleteImplantRecord('${record.id}')" title="Delete record" class="flex h-8 w-8 items-center justify-center rounded-lg text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition">
+                  <i data-lucide="trash-2" class="h-4 w-4"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      translateUiTree(tbody, currentUiLanguage);
+      lucide.createIcons();
+    }
+
+    function filterImplantProgressTable() {
+      const searchInput = document.getElementById('implant-search-input');
+      const typeSelect = document.getElementById('implant-type-filter');
+      implantSearchQuery = searchInput?.value || '';
+      implantTypeFilter = typeSelect?.value || 'all';
+      renderImplantProgressTable();
+    }
+
+    function setImplantStatusFilter(filter) {
+      implantStatusFilter = filter;
+      document.querySelectorAll('.implant-filter-btn').forEach(btn => {
+        const isActive = btn.dataset.implantFilter === filter;
+        btn.className = `implant-filter-btn rounded-lg px-3 py-1.5 text-xs font-black transition ${isActive ? 'bg-white text-cyan-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`;
+      });
+      renderImplantProgressTable();
+    }
+
+    function openPatientChartFromImplant(patientId) {
+      if (!patientId) return;
+      openPatientWorkspace(patientId, 'chart', 'clinic-management');
+    }
+
+    function openNewImplantModal() {
+      const modal = document.getElementById('modal-implant-record');
+      if (!modal) return;
+      document.getElementById('implant-modal-title').textContent = currentUiLanguage === 'ar' ? 'إضافة زراعة جديدة' : 'New Implant Entry';
+      document.getElementById('implant-form-id').value = '';
+      document.getElementById('implant-form-patient-id').value = '';
+      document.getElementById('implant-form-finding-id').value = '';
+      document.getElementById('implant-modal-patient-info').textContent = '';
+
+      const patientSelect = document.getElementById('implant-form-patient-select');
+      const patientContainer = document.getElementById('implant-patient-selector-container');
+      if (patientSelect && patientContainer) {
+        patientContainer.classList.remove('hidden');
+        patientSelect.innerHTML = '<option value="">Select a patient...</option>' +
+          patients.map(p => `<option value="${p.id}">${escapeHtml(p.name)} (${escapeHtml(p.phone || 'No phone')})</option>`).join('');
+      }
+
+      const today = new Date().toISOString().slice(0, 10);
+      document.getElementById('implant-form-procedure-date').value = today;
+      document.getElementById('implant-form-delivery-date').value = addMonthsToDate(today, 4);
+      document.getElementById('implant-form-tooth').value = '';
+      document.getElementById('implant-form-type').value = 'Standard (b&b)';
+      document.getElementById('implant-form-size').value = '';
+      document.getElementById('implant-form-healing-collar').checked = false;
+      document.getElementById('implant-form-status').value = 'In';
+      document.getElementById('implant-form-notes').value = '';
+
+      const msg = document.getElementById('implant-form-message');
+      if (msg) msg.classList.add('hidden');
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      lucide.createIcons();
+    }
+
+    function openEditImplantModal(recordId) {
+      const record = implantProgressRecords.find(r => r.id === recordId);
+      if (!record) return;
+      const modal = document.getElementById('modal-implant-record');
+      if (!modal) return;
+
+      const patient = record.patients || patients.find(p => p.id === record.patient_id);
+      document.getElementById('implant-modal-title').textContent = currentUiLanguage === 'ar' ? 'تعديل سجل الزراعة' : 'Edit Implant Record';
+      document.getElementById('implant-form-id').value = record.id;
+      document.getElementById('implant-form-patient-id').value = record.patient_id;
+      document.getElementById('implant-form-finding-id').value = record.finding_id || '';
+
+      const patientContainer = document.getElementById('implant-patient-selector-container');
+      if (patientContainer) patientContainer.classList.add('hidden');
+      document.getElementById('implant-modal-patient-info').textContent = `${patient?.name || 'Patient'} · Tooth #${record.tooth_number || ''}`;
+
+      document.getElementById('implant-form-procedure-date').value = record.procedure_date || '';
+      document.getElementById('implant-form-delivery-date').value = record.delivery_date || addMonthsToDate(record.procedure_date, 4);
+      document.getElementById('implant-form-tooth').value = record.tooth_number || '';
+
+      const typeSelect = document.getElementById('implant-form-type');
+      if (typeSelect) {
+        const isStandard = !String(record.implant_type || '').toLowerCase().includes('economic') && !String(record.implant_type || '').toLowerCase().includes('dual');
+        typeSelect.value = isStandard ? 'Standard (b&b)' : 'Economic (dual)';
+      }
+
+      document.getElementById('implant-form-size').value = record.implant_size || '';
+      document.getElementById('implant-form-healing-collar').checked = Boolean(record.healing_collar);
+      document.getElementById('implant-form-status').value = record.status || 'In';
+      document.getElementById('implant-form-notes').value = record.notes || '';
+
+      const msg = document.getElementById('implant-form-message');
+      if (msg) msg.classList.add('hidden');
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      lucide.createIcons();
+    }
+
+    function closeImplantModal() {
+      const modal = document.getElementById('modal-implant-record');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    }
+
+    function onImplantProcedureDateChange() {
+      const procDate = document.getElementById('implant-form-procedure-date')?.value;
+      if (procDate) {
+        const deliveryInput = document.getElementById('implant-form-delivery-date');
+        if (deliveryInput) deliveryInput.value = addMonthsToDate(procDate, 4);
+      }
+    }
+
+    async function saveImplantRecordForm(event) {
+      event.preventDefault();
+      const saveBtn = document.getElementById('implant-save-button');
+      const msg = document.getElementById('implant-form-message');
+      const recordId = document.getElementById('implant-form-id').value;
+      let patientId = document.getElementById('implant-form-patient-id').value;
+      const findingId = document.getElementById('implant-form-finding-id').value;
+
+      if (!recordId) {
+        patientId = document.getElementById('implant-form-patient-select')?.value;
+        if (!patientId) {
+          if (msg) {
+            msg.className = 'rounded-xl px-3 py-2 text-xs font-bold bg-rose-50 text-rose-700';
+            msg.textContent = currentUiLanguage === 'ar' ? 'يرجى اختيار مريض.' : 'Please select a patient.';
+            msg.classList.remove('hidden');
+          }
+          return;
+        }
+      }
+
+      const procedureDate = document.getElementById('implant-form-procedure-date').value;
+      const deliveryDate = document.getElementById('implant-form-delivery-date').value;
+      const toothNumber = String(document.getElementById('implant-form-tooth').value || '').trim();
+      const implantType = document.getElementById('implant-form-type').value;
+      const implantSize = String(document.getElementById('implant-form-size').value || '').trim();
+      const healingCollar = document.getElementById('implant-form-healing-collar').checked;
+      const status = document.getElementById('implant-form-status').value;
+      const notes = String(document.getElementById('implant-form-notes').value || '').trim();
+
+      saveBtn.disabled = true;
+      try {
+        const payload = {
+          patient_id: patientId,
+          finding_id: findingId || (recordId ? undefined : `manual_${Date.now()}`),
+          operation_code: implantType.includes('Economic') ? 'dz_implantation_i9' : 'dz_implantation_i10',
+          operation_name: implantType,
+          tooth_number: toothNumber,
+          implant_type: implantType,
+          implant_size: implantSize,
+          healing_collar: healingCollar,
+          procedure_date: procedureDate,
+          delivery_date: deliveryDate,
+          status: status,
+          notes: notes,
+          updated_at: new Date().toISOString()
+        };
+
+        if (recordId) {
+          const { error } = await db.from('implant_progress').update(payload).eq('id', recordId);
+          if (error) throw error;
+        } else {
+          const { error } = await db.from('implant_progress').insert(payload);
+          if (error) throw error;
+        }
+
+        closeImplantModal();
+        await refreshImplantProgress({ force: true });
+        showAppointmentNotificationToast(
+          currentUiLanguage === 'ar' ? 'تم الحفظ' : 'Implant saved',
+          currentUiLanguage === 'ar' ? 'تم حفظ سجل الزراعة بنجاح.' : 'Implant progress record saved successfully.'
+        );
+      } catch (err) {
+        console.error('Failed to save implant record:', err);
+        if (msg) {
+          msg.className = 'rounded-xl px-3 py-2 text-xs font-bold bg-rose-50 text-rose-700';
+          msg.textContent = err.message || 'Failed to save record.';
+          msg.classList.remove('hidden');
+        }
+      } finally {
+        saveBtn.disabled = false;
+      }
+    }
+
+    async function quickEditImplantSize(recordId) {
+      const record = implantProgressRecords.find(r => r.id === recordId);
+      if (!record) return;
+      const currentVal = record.implant_size || '';
+      const promptText = currentUiLanguage === 'ar'
+        ? `أدخل مقاس الزرعة (السن #${record.tooth_number}):`
+        : `Enter implant size for Tooth #${record.tooth_number} (e.g. 4.0 x 10mm):`;
+      const nextVal = window.prompt(promptText, currentVal);
+      if (nextVal === null) return;
+      const trimmed = nextVal.trim();
+      if (trimmed === currentVal) return;
+
+      const { error } = await db.from('implant_progress').update({ implant_size: trimmed, updated_at: new Date().toISOString() }).eq('id', recordId);
+      if (error) {
+        alert('Failed to update implant size: ' + error.message);
+        return;
+      }
+      record.implant_size = trimmed;
+      renderImplantProgressTable();
+    }
+
+    async function toggleHealingCollarQuick(recordId) {
+      const record = implantProgressRecords.find(r => r.id === recordId);
+      if (!record) return;
+      const nextVal = !record.healing_collar;
+      const { error } = await db.from('implant_progress').update({ healing_collar: nextVal, updated_at: new Date().toISOString() }).eq('id', recordId);
+      if (error) {
+        alert('Failed to update healing collar: ' + error.message);
+        return;
+      }
+      record.healing_collar = nextVal;
+      renderImplantProgressTable();
+    }
+
+    async function deleteImplantRecord(recordId) {
+      const isAr = currentUiLanguage === 'ar';
+      const conf = confirm(isAr
+        ? 'هل تريد حذف سجل متابعة هذه الزرعة؟ لن يؤدي ذلك لحذف السجل من مخطط الأسنان.'
+        : 'Delete this implant progress entry? This will not delete the patient chart record.');
+      if (!conf) return;
+
+      const { error } = await db.from('implant_progress').delete().eq('id', recordId);
+      if (error) {
+        alert('Failed to delete implant record: ' + error.message);
+        return;
+      }
+      implantProgressRecords = implantProgressRecords.filter(r => r.id !== recordId);
+      renderImplantProgressTable();
+      showAppointmentNotificationToast(
+        isAr ? 'تم الحذف' : 'Record deleted',
+        isAr ? 'تم حذف سجل متابعة الزرعة.' : 'Implant progress record deleted.'
+      );
+    }
+
+    function sendImplantWhatsAppReminder(recordId) {
+      const record = implantProgressRecords.find(r => r.id === recordId);
+      if (!record) return;
+      const patient = record.patients || patients.find(p => p.id === record.patient_id);
+      const phone = normaliseWhatsAppPhone(patient?.phone);
+      if (!phone) {
+        alert(currentUiLanguage === 'ar' ? 'لا يوجد رقم هاتف مسجل لهذا المريض.' : 'No valid phone number for this patient.');
+        return;
+      }
+      const isAr = currentUiLanguage === 'ar';
+      const patientName = patient?.name || (isAr ? 'عزيزي المريض' : 'Patient');
+      const tooth = record.tooth_number ? ` (#${record.tooth_number})` : '';
+      const delivDate = record.delivery_date || '';
+
+      const msg = isAr
+        ? `مرحباً ${patientName}، نود تذكيركم بمتابعة زراعة الأسنان للسن${tooth}. موعد التركيب النهائي المتوقع هو ${delivDate}. نسعد بتواصلكم لتأكيد الموعد.`
+        : `Hello ${patientName}, this is Lumin Dental Clinic following up on your dental implant for tooth${tooth}. Your expected restoration delivery date is ${delivDate}. Please contact us to confirm your appointment.`;
+
+      openWhatsAppLink(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`);
+    }
+
+    // Tracked procedures modal
+    function openTrackedProceduresModal() {
+      const modal = document.getElementById('modal-tracked-procedures');
+      if (!modal) return;
+      renderTrackedProceduresList();
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      lucide.createIcons();
+    }
+
+    function closeTrackedProceduresModal() {
+      const modal = document.getElementById('modal-tracked-procedures');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    }
+
+    function renderTrackedProceduresList() {
+      const container = document.getElementById('tracked-procedures-list');
+      if (!container) return;
+      const q = (document.getElementById('tracked-procedures-search')?.value || '').trim().toLowerCase();
+
+      const ops = (dentalOperations || []).filter(op => {
+        if (!q) return true;
+        return (op.name || '').toLowerCase().includes(q) || (op.code || '').toLowerCase().includes(q);
+      });
+
+      if (!ops.length) {
+        container.innerHTML = `<div class="py-8 text-center text-xs font-bold text-slate-400">No procedures match your search.</div>`;
+        return;
+      }
+
+      container.innerHTML = ops.map(op => {
+        const spec = dentalSpecialties.find(s => s.id === op.specialtyId);
+        const isTracked = Boolean(op.trackImplantProgress);
+        return `
+          <div class="flex items-center justify-between gap-3 p-3 rounded-2xl border ${isTracked ? 'border-cyan-200 bg-cyan-50/40' : 'border-slate-100 bg-white'} transition hover:border-cyan-300">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-black text-slate-900 truncate">${escapeHtml(op.name)}</span>
+                <span class="inline-flex rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-mono font-bold text-slate-600">${escapeHtml(op.code)}</span>
+              </div>
+              <p class="text-[11px] font-bold text-slate-400 mt-0.5">${escapeHtml(spec?.name || 'General')} · EGP ${op.price.toLocaleString()}</p>
+            </div>
+            <label class="relative inline-flex cursor-pointer items-center shrink-0">
+              <input type="checkbox" ${isTracked ? 'checked' : ''} onchange="toggleTrackedProcedure('${op.id}', this.checked)" class="peer sr-only" />
+              <span class="h-5 w-9 rounded-full bg-slate-200 transition peer-checked:bg-cyan-600 peer-focus-visible:ring-2 peer-focus-visible:ring-cyan-500"></span>
+              <span class="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition peer-checked:translate-x-4"></span>
+            </label>
+          </div>
+        `;
+      }).join('');
+      translateUiTree(container, currentUiLanguage);
+      lucide.createIcons();
+    }
+
+    function filterTrackedProceduresList() {
+      renderTrackedProceduresList();
+    }
+
+    async function toggleTrackedProcedure(operationId, track) {
+      const op = dentalOperations.find(o => o.id === operationId);
+      if (!op) return;
+      op.trackImplantProgress = track;
+
+      const { error } = await db.from('dental_operations').update({ track_implant_progress: track }).eq('id', operationId);
+      if (error) {
+        alert('Failed to update tracked procedure: ' + error.message);
+        op.trackImplantProgress = !track;
+        renderTrackedProceduresList();
+        return;
+      }
+
+      renderTrackedProceduresList();
+      showAppointmentNotificationToast(
+        currentUiLanguage === 'ar' ? 'تم التحديث' : 'Procedure updated',
+        `${op.name} is now ${track ? 'tracked in Implant Progress' : 'untracked'}.`
+      );
+    }
+
+    // Synchronization from chart
+    async function syncImplantProgressFromChartOperation(patient, toothId, finding, prevStatus) {
+      if (!patient || !finding) return;
+      const op = dentalOperationByCode(finding.code);
+      const isTracked = op ? Boolean(op.trackImplantProgress) : ['dz_implantation_i10', 'dz_implantation_i9'].includes(finding.code);
+      if (!isTracked) return;
+
+      const findingId = finding.id;
+      const nextStatus = normaliseOperationStatus(finding.status, 'E');
+
+      if (nextStatus === 'In' || nextStatus === 'C') {
+        const procedureDate = finding.createdAt ? String(finding.createdAt).slice(0, 10) : new Date().toISOString().slice(0, 10);
+        const deliveryDate = addMonthsToDate(procedureDate, 4);
+        const implantType = op?.code === 'dz_implantation_i9'
+          ? 'Economic (dual)'
+          : (op?.code === 'dz_implantation_i10' ? 'Standard (b&b)' : (op?.name || 'Standard (b&b)'));
+
+        const payload = {
+          patient_id: patient.id,
+          finding_id: findingId,
+          operation_code: finding.code,
+          operation_name: op?.name || finding.code,
+          tooth_number: String(toothId || ''),
+          implant_type: implantType,
+          implant_size: finding.notes ? extractImplantSizeFromNotes(finding.notes) : '',
+          procedure_date: procedureDate,
+          delivery_date: deliveryDate,
+          status: nextStatus,
+          updated_at: new Date().toISOString()
+        };
+
+        const existing = (implantProgressRecords || []).find(r => r.patient_id === patient.id && r.finding_id === findingId);
+        if (existing) {
+          payload.implant_size = existing.implant_size || payload.implant_size;
+          payload.healing_collar = existing.healing_collar ?? false;
+          payload.delivery_date = existing.delivery_date || payload.delivery_date;
+          payload.procedure_date = existing.procedure_date || payload.procedure_date;
+          payload.notes = existing.notes || '';
+        }
+
+        const { error } = await db.from('implant_progress').upsert(payload, { onConflict: 'patient_id,finding_id' });
+        if (error) console.error('Failed to sync implant progress:', error);
+        else void refreshImplantProgress({ force: true, silent: true });
+      } else if (nextStatus === 'P') {
+        const { error } = await db.from('implant_progress')
+          .update({ status: 'P', updated_at: new Date().toISOString() })
+          .eq('patient_id', patient.id)
+          .eq('finding_id', findingId);
+        if (error) console.error('Failed to update implant progress status:', error);
+        else void refreshImplantProgress({ force: true, silent: true });
+      }
+    }
+
+    async function deleteImplantProgressByFindingId(findingId) {
+      if (!findingId) return;
+      try {
+        await db.from('implant_progress').delete().eq('finding_id', findingId);
+        implantProgressRecords = implantProgressRecords.filter(r => r.finding_id !== findingId);
+        renderImplantProgressTable();
+      } catch (err) {
+        console.error('Failed to delete implant progress for finding:', err);
+      }
     }
 
     // ================= ADVANCED PATIENT QUERY ENGINE =================
@@ -16877,7 +17855,7 @@
     }
 
     function firstAuthorizedClinicManagementTab(preferredTab = activeClinicManagementTab) {
-      const orderedTabs = [preferredTab, 'finances', 'analytics', 'hr'];
+      const orderedTabs = [preferredTab, 'finances', 'analytics', 'hr', 'implants'];
       return orderedTabs.find((tabName, index) => orderedTabs.indexOf(tabName) === index && hasPageAccess(tabName)) || null;
     }
 
@@ -16893,9 +17871,10 @@
       const tabStyles = {
         finances: 'text-emerald-700',
         analytics: 'text-indigo-700',
-        hr: 'text-rose-700'
+        hr: 'text-rose-700',
+        implants: 'text-cyan-700'
       };
-      ['finances', 'analytics', 'hr'].forEach(candidate => {
+      ['finances', 'analytics', 'hr', 'implants'].forEach(candidate => {
         const allowed = hasPageAccess(candidate);
         const isActive = candidate === authorizedTab;
         const button = document.getElementById(`clinic-management-tab-${candidate}`);
@@ -16911,14 +17890,15 @@
         await switchFinanceTab(activeFinanceTab);
       }
       else if (authorizedTab === 'analytics') await refreshIncomeStatement();
-      else await refreshHrDirectory();
+      else if (authorizedTab === 'hr') await refreshHrDirectory();
+      else if (authorizedTab === 'implants') await refreshImplantProgress();
       if (updateHash) window.location.hash = 'clinic-management';
       lucide.createIcons();
     }
 
     async function switchView(viewName) {
       closeWhatsAppTemplatePicker();
-      if (['finances', 'analytics', 'hr'].includes(viewName)) {
+      if (['finances', 'analytics', 'hr', 'implants'].includes(viewName)) {
         activeClinicManagementTab = viewName;
         viewName = 'clinic-management';
       }
@@ -16956,6 +17936,7 @@
       const viewFinances = document.getElementById('view-finances');
       const viewAnalytics = document.getElementById('view-analytics');
       const viewHr = document.getElementById('view-hr');
+      const viewImplants = document.getElementById('view-implants');
       const patientWorkspaceHeader = document.getElementById('patient-workspace-header');
       const viewPatientProfile = document.getElementById('view-patient-profile');
       const viewInvoices = document.getElementById('view-invoices');
@@ -16980,6 +17961,7 @@
       viewFinances.classList.add('hidden');
       viewAnalytics.classList.add('hidden');
       viewHr.classList.add('hidden');
+      viewImplants?.classList.add('hidden');
       patientWorkspaceHeader.classList.toggle('hidden', !['patient-profile', 'chart', 'invoices', 'payments', 'loyalty', 'patient-appointments', 'patient-prescriptions'].includes(viewName));
       document.getElementById('view-patient-appointments').classList.add('hidden');
       if (viewName !== 'patient-appointments') resetPatientAppointmentsState();
@@ -17548,15 +18530,19 @@
       targets.forEach(target => {
         const toothData = getOrCreateChartTooth(patient, target.tooth);
         const wholeOperations = ensureWholeOperations(toothData);
-        wholeOperations.push(chartFindingStorageRecord(
+        const record = chartFindingStorageRecord(
           operationCode,
           normaliseOperationStatus(operationStatus, 'P'),
           createdAt,
           null,
           catalogPrice,
           batchId
-        ));
+        );
+        wholeOperations.push(record);
         renderToothVisuals(target.tooth);
+        if (record.status === 'In' || record.status === 'C') {
+          void syncImplantProgressFromChartOperation(patient, target.tooth, record, null);
+        }
       });
       setChartSelectionTargets(targets.map(target => ({ ...target, surfaces: [] })));
       updateSelectionUI();
@@ -17780,11 +18766,12 @@
       const nextStatus = normaliseOperationStatus(control.value, 'E');
       const toothData = getOrCreateChartTooth(patient, toothId);
       const wholeOperations = ensureWholeOperations(toothData);
-      if (!Number.isInteger(operationIndex) || !wholeOperations[operationIndex]) return;
+      const prevStatus = wholeOperations[operationIndex].status;
       wholeOperations[operationIndex].status = nextStatus;
       renderToothVisuals(toothId);
       renderFindingsList();
       await saveActivePatientChart();
+      await syncImplantProgressFromChartOperation(patient, toothId, wholeOperations[operationIndex], prevStatus);
     }
 
     async function updateSurfaceOperationStatusFromControl(control) {
@@ -17930,7 +18917,10 @@
 
       let deleted = false;
       findingIds.forEach(findingId => {
-        if (deleteChartFindingById(patient, findingId)) deleted = true;
+        if (deleteChartFindingById(patient, findingId)) {
+          deleted = true;
+          void deleteImplantProgressByFindingId(findingId);
+        }
       });
 
       if (!deleted) return;
@@ -18195,6 +19185,13 @@
           });
         }
         nextFindingIds.push(storedFinding.id);
+      });
+
+      const preservedFindingIds = new Set(nextFindingIds);
+      findingIds.forEach(findingId => {
+        if (!preservedFindingIds.has(findingId)) {
+          void deleteImplantProgressByFindingId(findingId);
+        }
       });
 
       if (preserveInvoiceSelection && Number(templateFinding.price) > 0) {
@@ -18638,6 +19635,13 @@
       renderChartFindingTeeth(chartFindingToothIdsFromControl(control));
       renderFindingsList();
       await saveActivePatientChart();
+      findingIds.forEach(fid => {
+        Object.entries(patient.chartState || {}).forEach(([toothId, toothData]) => {
+          if (toothId === CHART_META_KEY || !toothData || typeof toothData !== 'object') return;
+          const match = ensureWholeOperations(toothData).find(f => f.id === fid);
+          if (match) void syncImplantProgressFromChartOperation(patient, toothId, match, null);
+        });
+      });
     }
 
     function deleteChartFindingById(patient, findingId) {
