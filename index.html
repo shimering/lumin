@@ -3207,8 +3207,8 @@
         </div>
 
         <div class="grid gap-5 xl:grid-cols-2">
-          <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs"><div class="flex items-center justify-between gap-3 border-b border-slate-100 p-4 sm:p-5"><div><h3 class="text-sm font-black text-slate-800">Extra shifts</h3><p class="mt-1 text-[11px] font-bold text-slate-400">Separate dates, rates, reasons, and calculated amounts.</p></div><span id="hr-staff-extra-total" class="rounded-full bg-amber-100 px-3 py-1.5 text-[10px] font-black text-amber-700"></span></div><div class="overflow-x-auto"><table class="w-full min-w-[560px] text-left text-xs"><thead class="border-b border-slate-100 bg-slate-50/70 text-[9px] font-black uppercase tracking-wider text-slate-400"><tr><th class="px-4 py-3">Date</th><th class="px-4 py-3">Shifts</th><th class="px-4 py-3">Rate</th><th class="px-4 py-3">Amount</th><th class="px-4 py-3">Reason</th></tr></thead><tbody id="hr-staff-extra-table" class="divide-y divide-slate-100 font-semibold text-slate-600"></tbody></table></div></div>
-          <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs"><div class="flex items-center justify-between gap-3 border-b border-slate-100 p-4 sm:p-5"><div><h3 class="text-sm font-black text-slate-800">Performance entries</h3><p class="mt-1 text-[11px] font-bold text-slate-400">Bonuses and deductions remain separate from attendance.</p></div><span id="hr-staff-performance-total" class="rounded-full bg-violet-100 px-3 py-1.5 text-[10px] font-black text-violet-700"></span></div><div class="overflow-x-auto"><table class="w-full min-w-[560px] text-left text-xs"><thead class="border-b border-slate-100 bg-slate-50/70 text-[9px] font-black uppercase tracking-wider text-slate-400"><tr><th class="px-4 py-3">Date</th><th class="px-4 py-3">Type</th><th class="px-4 py-3">Amount</th><th class="px-4 py-3">Score</th><th class="px-4 py-3">Reason</th></tr></thead><tbody id="hr-staff-performance-table" class="divide-y divide-slate-100 font-semibold text-slate-600"></tbody></table></div></div>
+          <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs"><div class="flex items-center justify-between gap-3 border-b border-slate-100 p-4 sm:p-5"><div><h3 class="text-sm font-black text-slate-800">Extra shifts</h3><p class="mt-1 text-[11px] font-bold text-slate-400">Separate dates, rates, reasons, and calculated amounts.</p></div><span id="hr-staff-extra-total" class="rounded-full bg-amber-100 px-3 py-1.5 text-[10px] font-black text-amber-700"></span></div><div class="overflow-x-auto"><table class="w-full min-w-[560px] text-left text-xs"><thead class="border-b border-slate-100 bg-slate-50/70 text-[9px] font-black uppercase tracking-wider text-slate-400"><tr><th class="px-4 py-3">Date</th><th class="px-4 py-3">Shifts</th><th class="px-4 py-3">Rate</th><th class="px-4 py-3">Amount</th><th class="px-4 py-3">Reason</th><th class="w-10 px-3 py-3 text-right"></th></tr></thead><tbody id="hr-staff-extra-table" class="divide-y divide-slate-100 font-semibold text-slate-600"></tbody></table></div></div>
+          <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs"><div class="flex items-center justify-between gap-3 border-b border-slate-100 p-4 sm:p-5"><div><h3 class="text-sm font-black text-slate-800">Performance entries</h3><p class="mt-1 text-[11px] font-bold text-slate-400">Bonuses and deductions remain separate from attendance.</p></div><span id="hr-staff-performance-total" class="rounded-full bg-violet-100 px-3 py-1.5 text-[10px] font-black text-violet-700"></span></div><div class="overflow-x-auto"><table class="w-full min-w-[560px] text-left text-xs"><thead class="border-b border-slate-100 bg-slate-50/70 text-[9px] font-black uppercase tracking-wider text-slate-400"><tr><th class="px-4 py-3">Date</th><th class="px-4 py-3">Type</th><th class="px-4 py-3">Amount</th><th class="px-4 py-3">Score</th><th class="px-4 py-3">Reason</th><th class="w-10 px-3 py-3 text-right"></th></tr></thead><tbody id="hr-staff-performance-table" class="divide-y divide-slate-100 font-semibold text-slate-600"></tbody></table></div></div>
         </div>
       </div>
     </section>
@@ -5123,10 +5123,10 @@
   <div id="modal-hr-adjustment" class="fixed inset-0 z-[90] hidden items-center justify-center bg-slate-900/45 p-4 backdrop-blur-xs">
     <div role="dialog" aria-modal="true" aria-labelledby="hr-adjustment-title" class="w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
       <div class="flex items-start justify-between gap-4 border-b border-slate-100 bg-gradient-to-br from-amber-50 to-white p-5"><div><span id="hr-adjustment-eyebrow" class="text-[10px] font-black uppercase tracking-[0.18em] text-amber-700">Monthly payroll</span><h3 id="hr-adjustment-title" class="mt-1 text-lg font-black text-slate-900">Add adjustment</h3><p id="hr-adjustment-summary" class="mt-1 text-xs font-bold text-slate-500"></p></div><button type="button" onclick="closeHrAdjustmentModal()" aria-label="Close adjustment" class="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 hover:bg-white"><i data-lucide="x" class="h-5 w-5"></i></button></div>
-      <form id="hr-adjustment-form" onsubmit="saveHrAdjustment(event)" class="space-y-4 p-5"><input id="hr-adjustment-mode" type="hidden" /><input id="hr-adjustment-id" type="hidden" /><input id="hr-adjustment-user-id" type="hidden" />
+      <form id="hr-adjustment-form" novalidate onsubmit="saveHrAdjustment(event)" class="space-y-4 p-5"><input id="hr-adjustment-mode" type="hidden" /><input id="hr-adjustment-id" type="hidden" /><input id="hr-adjustment-user-id" type="hidden" />
         <label><span class="mb-1.5 block text-xs font-bold text-slate-600">Date</span><input id="hr-adjustment-date" type="date" required class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm" /></label>
         <div id="hr-extra-shift-fields" class="grid grid-cols-2 gap-3"><label><span class="mb-1.5 block text-xs font-bold text-slate-600">Number of extra shifts</span><input id="hr-extra-shift-count" type="number" min="0.25" max="31" step="0.25" value="1" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-black" /></label><label><span class="mb-1.5 block text-xs font-bold text-slate-600">Rate per shift (EGP)</span><input id="hr-extra-shift-rate" type="number" min="0" step="0.01" value="0" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-black" /></label></div>
-        <div id="hr-performance-fields" class="hidden space-y-3"><div class="grid grid-cols-2 gap-3"><label><span class="mb-1.5 block text-xs font-bold text-slate-600">Adjustment</span><select id="hr-performance-kind" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold"><option value="bonus">Bonus</option><option value="deduction">Deduction</option></select></label><label><span class="mb-1.5 block text-xs font-bold text-slate-600">Amount (EGP)</span><input id="hr-performance-amount" type="number" min="0.01" step="0.01" value="0" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-black" /></label></div><label><span class="mb-1.5 block text-xs font-bold text-slate-600">Performance score (optional %)</span><input id="hr-performance-score" type="number" min="0" max="100" step="0.1" placeholder="e.g. 92" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm" /></label></div>
+        <div id="hr-performance-fields" class="hidden space-y-3"><div class="grid grid-cols-2 gap-3"><label><span class="mb-1.5 block text-xs font-bold text-slate-600">Adjustment</span><select id="hr-performance-kind" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold"><option value="bonus">Bonus</option><option value="deduction">Deduction</option></select></label><label><span class="mb-1.5 block text-xs font-bold text-slate-600">Amount (EGP)</span><input id="hr-performance-amount" type="number" min="0" step="0.01" placeholder="0.00" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-black" /></label></div><label><span class="mb-1.5 block text-xs font-bold text-slate-600">Performance score (optional %)</span><input id="hr-performance-score" type="number" min="0" max="100" step="0.1" placeholder="e.g. 92" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm" /></label></div>
         <label><span class="mb-1.5 block text-xs font-bold text-slate-600">Note</span><textarea id="hr-adjustment-note" maxlength="500" rows="3" placeholder="Reason or details" class="w-full resize-y rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm"></textarea></label>
         <p id="hr-adjustment-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="status"></p>
         <div class="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onclick="closeHrAdjustmentModal()" class="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600">Cancel</button><button id="hr-adjustment-save" type="submit" class="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-5 py-2.5 text-xs font-black text-white hover:bg-amber-700"><i data-lucide="save" class="h-4 w-4"></i> Save</button></div>
@@ -13842,10 +13842,11 @@
       renderHrStaffCalendar(user);
       const extraRows = hrExtraShifts.filter(item => item.user_id === user.userId).sort((a, b) => String(a.shift_date).localeCompare(String(b.shift_date)));
       document.getElementById('hr-staff-extra-total').textContent = `${extraRows.length} record${extraRows.length === 1 ? '' : 's'} · ${formatInvoiceMoney(metrics.extraAmount)}`;
-      document.getElementById('hr-staff-extra-table').innerHTML = extraRows.map(row => `<tr><td class="px-4 py-3 font-black text-slate-800">${escapeHtml(hrDateLabel(row.shift_date, { short: true }))}</td><td class="px-4 py-3">${escapeHtml(String(row.shift_count))}</td><td class="px-4 py-3">${escapeHtml(formatInvoiceMoney(row.rate))}</td><td class="px-4 py-3 font-black text-amber-700">${escapeHtml(formatInvoiceMoney(Number(row.shift_count || 0) * Number(row.rate || 0)))}</td><td class="max-w-[220px] px-4 py-3">${escapeHtml(row.note || '—')}</td></tr>`).join('') || '<tr><td colspan="5" class="px-4 py-8 text-center text-xs font-bold text-slate-400">No extra shifts in this month.</td></tr>';
+      const canManageAdjustments = canModifyHr() && !locked;
+      document.getElementById('hr-staff-extra-table').innerHTML = extraRows.map(row => `<tr><td class="px-4 py-3 font-black text-slate-800">${escapeHtml(hrDateLabel(row.shift_date, { short: true }))}</td><td class="px-4 py-3">${escapeHtml(String(row.shift_count))}</td><td class="px-4 py-3">${escapeHtml(formatInvoiceMoney(row.rate))}</td><td class="px-4 py-3 font-black text-amber-700">${escapeHtml(formatInvoiceMoney(Number(row.shift_count || 0) * Number(row.rate || 0)))}</td><td class="max-w-[220px] px-4 py-3">${escapeHtml(row.note || '—')}</td><td class="w-10 px-3 py-3 text-right">${canManageAdjustments ? `<button type="button" onclick="deleteHrExtraShift('${row.id}')" title="Delete extra shift" class="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"><i data-lucide="trash-2" class="h-4 w-4"></i></button>` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="px-4 py-8 text-center text-xs font-bold text-slate-400">No extra shifts in this month.</td></tr>';
       const performanceRows = [...metrics.performanceRows].sort((a, b) => String(a.adjustment_date).localeCompare(String(b.adjustment_date)));
       document.getElementById('hr-staff-performance-total').textContent = `${performanceRows.length} record${performanceRows.length === 1 ? '' : 's'} · ${metrics.performanceAmount >= 0 ? '+' : '−'}${formatInvoiceMoney(Math.abs(metrics.performanceAmount))}`;
-      document.getElementById('hr-staff-performance-table').innerHTML = performanceRows.map(row => `<tr><td class="px-4 py-3 font-black text-slate-800">${escapeHtml(hrDateLabel(row.adjustment_date, { short: true }))}</td><td class="px-4 py-3"><span class="rounded-full px-2 py-1 text-[9px] font-black ${row.kind === 'bonus' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}">${escapeHtml(row.kind)}</span></td><td class="px-4 py-3 font-black ${row.kind === 'bonus' ? 'text-emerald-700' : 'text-red-700'}">${row.kind === 'bonus' ? '+' : '−'}${escapeHtml(formatInvoiceMoney(row.amount))}</td><td class="px-4 py-3">${row.performance_score == null ? '—' : `${escapeHtml(String(row.performance_score))}%`}</td><td class="max-w-[220px] px-4 py-3">${escapeHtml(row.note || '—')}</td></tr>`).join('') || '<tr><td colspan="5" class="px-4 py-8 text-center text-xs font-bold text-slate-400">No performance entries in this month.</td></tr>';
+      document.getElementById('hr-staff-performance-table').innerHTML = performanceRows.map(row => `<tr><td class="px-4 py-3 font-black text-slate-800">${escapeHtml(hrDateLabel(row.adjustment_date, { short: true }))}</td><td class="px-4 py-3"><span class="rounded-full px-2 py-1 text-[9px] font-black ${row.kind === 'bonus' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}">${escapeHtml(row.kind)}</span></td><td class="px-4 py-3 font-black ${row.kind === 'bonus' ? 'text-emerald-700' : 'text-red-700'}">${row.kind === 'bonus' ? '+' : '−'}${escapeHtml(formatInvoiceMoney(row.amount))}</td><td class="px-4 py-3">${row.performance_score == null ? '—' : `${escapeHtml(String(row.performance_score))}%`}</td><td class="max-w-[220px] px-4 py-3">${escapeHtml(row.note || '—')}</td><td class="w-10 px-3 py-3 text-right">${canManageAdjustments ? `<button type="button" onclick="deleteHrPerformanceAdjustment('${row.id}')" title="Delete adjustment" class="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"><i data-lucide="trash-2" class="h-4 w-4"></i></button>` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="px-4 py-8 text-center text-xs font-bold text-slate-400">No performance entries in this month.</td></tr>';
       lucide.createIcons();
     }
 
@@ -14148,40 +14149,155 @@
       document.getElementById('hr-adjustment-mode').value = mode;
       document.getElementById('hr-adjustment-id').value = '';
       document.getElementById('hr-adjustment-user-id').value = userId;
-      document.getElementById('hr-adjustment-date').value = bounds.start;
+
+      const today = new Date();
+      const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const dateInput = document.getElementById('hr-adjustment-date');
+      const maxDate = new Date(bounds.endDate.getTime() - 86400000);
+      const maxIso = `${maxDate.getFullYear()}-${String(maxDate.getMonth() + 1).padStart(2, '0')}-${String(maxDate.getDate()).padStart(2, '0')}`;
+      dateInput.min = bounds.start;
+      dateInput.max = maxIso;
+      dateInput.value = (todayIso >= bounds.start && todayIso <= maxIso) ? todayIso : bounds.start;
+
       document.getElementById('hr-adjustment-note').value = '';
       document.getElementById('hr-adjustment-summary').textContent = `${user.fullName} · ${currentHrMonth()}`;
       document.getElementById('hr-adjustment-title').textContent = mode === 'extra' ? 'Add extra shift' : 'Add performance adjustment';
-      document.getElementById('hr-extra-shift-fields').classList.toggle('hidden', mode !== 'extra');
-      document.getElementById('hr-performance-fields').classList.toggle('hidden', mode !== 'performance');
-      document.getElementById('hr-extra-shift-count').value = 1;
-      document.getElementById('hr-extra-shift-rate').value = hrUserSettings(userId).extraRate;
-      document.getElementById('hr-performance-kind').value = 'bonus';
-      document.getElementById('hr-performance-amount').value = 0;
-      document.getElementById('hr-performance-score').value = '';
+
+      const isExtra = mode === 'extra';
+      document.getElementById('hr-extra-shift-fields').classList.toggle('hidden', !isExtra);
+      document.getElementById('hr-performance-fields').classList.toggle('hidden', isExtra);
+
+      const extraCountInput = document.getElementById('hr-extra-shift-count');
+      const extraRateInput = document.getElementById('hr-extra-shift-rate');
+      const perfKindInput = document.getElementById('hr-performance-kind');
+      const perfAmountInput = document.getElementById('hr-performance-amount');
+      const perfScoreInput = document.getElementById('hr-performance-score');
+
+      extraCountInput.disabled = !isExtra;
+      extraRateInput.disabled = !isExtra;
+      perfKindInput.disabled = isExtra;
+      perfAmountInput.disabled = isExtra;
+      perfScoreInput.disabled = isExtra;
+
+      extraCountInput.value = 1;
+      extraRateInput.value = hrUserSettings(userId).extraRate || 0;
+      perfKindInput.value = 'bonus';
+      perfAmountInput.value = '';
+      perfScoreInput.value = '';
+
       setAdminMessage('hr-adjustment-message', '');
-      const modal = document.getElementById('modal-hr-adjustment'); modal.classList.remove('hidden'); modal.classList.add('flex'); lucide.createIcons();
+      const modal = document.getElementById('modal-hr-adjustment');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      lucide.createIcons();
     }
 
-    function closeHrAdjustmentModal() { const modal = document.getElementById('modal-hr-adjustment'); modal.classList.add('hidden'); modal.classList.remove('flex'); }
+    function closeHrAdjustmentModal() {
+      const modal = document.getElementById('modal-hr-adjustment');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
 
     async function saveHrAdjustment(event) {
-      event.preventDefault();
+      if (event && event.preventDefault) event.preventDefault();
       if (!canModifyHr()) return;
       const mode = document.getElementById('hr-adjustment-mode').value;
       const userId = document.getElementById('hr-adjustment-user-id').value;
       const date = document.getElementById('hr-adjustment-date').value;
       const bounds = hrMonthBounds();
-      if (date < bounds.start || date >= bounds.end) return setAdminMessage('hr-adjustment-message', 'Choose a date inside the selected payroll month.', 'error');
-      const button = document.getElementById('hr-adjustment-save'); button.disabled = true;
+      if (!date || date < bounds.start || date >= bounds.end) {
+        return setAdminMessage('hr-adjustment-message', 'Choose a date inside the selected payroll month.', 'error');
+      }
+
+      let payload;
+      if (mode === 'extra') {
+        const count = Number(document.getElementById('hr-extra-shift-count').value);
+        const rate = Number(document.getElementById('hr-extra-shift-rate').value);
+        if (!count || isNaN(count) || count <= 0) {
+          return setAdminMessage('hr-adjustment-message', 'Please enter a valid number of extra shifts (e.g. 1).', 'error');
+        }
+        if (count > 31) {
+          return setAdminMessage('hr-adjustment-message', 'Extra shifts count cannot exceed 31.', 'error');
+        }
+        if (isNaN(rate) || rate < 0) {
+          return setAdminMessage('hr-adjustment-message', 'Rate per shift cannot be negative.', 'error');
+        }
+        payload = {
+          p_id: null,
+          p_user_id: userId,
+          p_shift_date: date,
+          p_shift_count: count,
+          p_rate: rate,
+          p_note: document.getElementById('hr-adjustment-note').value.trim()
+        };
+      } else {
+        const amount = Number(document.getElementById('hr-performance-amount').value);
+        if (!amount || isNaN(amount) || amount <= 0) {
+          return setAdminMessage('hr-adjustment-message', 'Please enter an adjustment amount greater than zero.', 'error');
+        }
+        const rawScore = document.getElementById('hr-performance-score').value.trim();
+        const score = rawScore === '' ? null : Number(rawScore);
+        if (score !== null && (isNaN(score) || score < 0 || score > 100)) {
+          return setAdminMessage('hr-adjustment-message', 'Performance score must be between 0 and 100.', 'error');
+        }
+        payload = {
+          p_id: null,
+          p_user_id: userId,
+          p_adjustment_date: date,
+          p_kind: document.getElementById('hr-performance-kind').value,
+          p_amount: amount,
+          p_performance_score: score,
+          p_note: document.getElementById('hr-adjustment-note').value.trim()
+        };
+      }
+
+      const button = document.getElementById('hr-adjustment-save');
+      button.disabled = true;
       try {
         const result = mode === 'extra'
-          ? await db.rpc('save_hr_extra_shift', { p_id: null, p_user_id: userId, p_shift_date: date, p_shift_count: Number(document.getElementById('hr-extra-shift-count').value), p_rate: Number(document.getElementById('hr-extra-shift-rate').value), p_note: document.getElementById('hr-adjustment-note').value.trim() })
-          : await db.rpc('save_hr_performance_adjustment', { p_id: null, p_user_id: userId, p_adjustment_date: date, p_kind: document.getElementById('hr-performance-kind').value, p_amount: Number(document.getElementById('hr-performance-amount').value), p_performance_score: document.getElementById('hr-performance-score').value === '' ? null : Number(document.getElementById('hr-performance-score').value), p_note: document.getElementById('hr-adjustment-note').value.trim() });
+          ? await db.rpc('save_hr_extra_shift', payload)
+          : await db.rpc('save_hr_performance_adjustment', payload);
         if (result.error) throw result.error;
-        closeHrAdjustmentModal(); hrDirectoryLoaded = false; await refreshHrDirectory({ refresh: true });
-      } catch (error) { setAdminMessage('hr-adjustment-message', error.message || 'Could not save the adjustment.', 'error'); }
-      finally { button.disabled = false; }
+        closeHrAdjustmentModal();
+        hrDirectoryLoaded = false;
+        await refreshHrDirectory({ refresh: true });
+        showAppointmentNotificationToast(
+          mode === 'extra' ? 'Extra shift saved' : 'Adjustment saved',
+          mode === 'extra' ? 'Extra shift recorded successfully.' : 'Performance adjustment recorded successfully.'
+        );
+      } catch (error) {
+        setAdminMessage('hr-adjustment-message', error.message || 'Could not save the adjustment.', 'error');
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function deleteHrExtraShift(id) {
+      if (!canModifyHr() || ['locked', 'paid'].includes(hrPayrollPeriod?.status)) return;
+      if (!confirm('Are you sure you want to delete this extra shift?')) return;
+      try {
+        const { error } = await db.rpc('delete_hr_extra_shift', { p_id: id });
+        if (error) throw error;
+        showAppointmentNotificationToast('Extra shift deleted', 'The extra shift record was removed.');
+        hrDirectoryLoaded = false;
+        await refreshHrDirectory({ refresh: true });
+      } catch (error) {
+        alert('Could not delete extra shift: ' + error.message);
+      }
+    }
+
+    async function deleteHrPerformanceAdjustment(id) {
+      if (!canModifyHr() || ['locked', 'paid'].includes(hrPayrollPeriod?.status)) return;
+      if (!confirm('Are you sure you want to delete this performance adjustment?')) return;
+      try {
+        const { error } = await db.rpc('delete_hr_performance_adjustment', { p_id: id });
+        if (error) throw error;
+        showAppointmentNotificationToast('Adjustment deleted', 'The adjustment record was removed.');
+        hrDirectoryLoaded = false;
+        await refreshHrDirectory({ refresh: true });
+      } catch (error) {
+        alert('Could not delete adjustment: ' + error.message);
+      }
     }
 
     async function payHrSalary(userId, options = {}) {
