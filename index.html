@@ -74,7 +74,7 @@
       transition: filter 0.18s ease, opacity 0.18s ease, transform 0.18s ease;
       user-select: none;
     }
-    .tooth-photo.is-upper-photo { --tooth-photo-rotation: 0deg; }
+    .tooth-photo.is-upper-photo { --tooth-photo-rotation: 180deg; }
     .tooth-photo.is-mirrored-photo { --tooth-photo-mirror: -1; }
     .tooth-photo.is-primary-photo { inset: 5%; width: 90%; height: 90%; }
     .tooth-crown-color-overlay {
@@ -82,13 +82,9 @@
       opacity: 0;
       mix-blend-mode: multiply;
       pointer-events: none;
-      -webkit-mask-image: linear-gradient(to bottom, #000 0 42%, rgba(0, 0, 0, 0.92) 46%, transparent 54%);
-      mask-image: linear-gradient(to bottom, #000 0 42%, rgba(0, 0, 0, 0.92) 46%, transparent 54%);
+      -webkit-mask-image: linear-gradient(to bottom, #000 0 38%, rgba(0, 0, 0, 0.92) 42%, transparent 49%);
+      mask-image: linear-gradient(to bottom, #000 0 38%, rgba(0, 0, 0, 0.92) 42%, transparent 49%);
       transition: filter 0.18s ease, opacity 0.18s ease;
-    }
-    .tooth-photo.is-upper-photo.tooth-crown-color-overlay {
-      -webkit-mask-image: linear-gradient(to top, #000 0 42%, rgba(0, 0, 0, 0.92) 46%, transparent 54%);
-      mask-image: linear-gradient(to top, #000 0 42%, rgba(0, 0, 0, 0.92) 46%, transparent 54%);
     }
     .photo-rct-mask {
       --operation-status-color: #000000;
@@ -839,116 +835,51 @@
     .clinical-odontogram-stage #upper-arch::before { top: clamp(38px, 4vw, 54px); }
     .clinical-odontogram-stage #lower-arch::before { bottom: clamp(38px, 4vw, 54px); }
     .clinical-odontogram-stage .tooth-card {
-      min-height: clamp(170px, 16.5vw, 215px);
+      min-height: clamp(148px, 14vw, 178px);
       justify-content: center;
-      gap: 0.15rem;
-      border: 1.5px solid transparent;
-      border-radius: 0.75rem;
+      gap: 0.2rem;
+      border: 0;
+      border-radius: 0;
       background: transparent;
       padding: clamp(3px, 0.4vw, 7px) clamp(1px, 0.2vw, 4px);
       box-shadow: none;
       overflow: visible;
-      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
-      touch-action: manipulation;
-      position: relative;
     }
     .clinical-odontogram-stage .tooth-card:hover {
       z-index: 8;
-      border-color: rgba(186, 230, 253, 0.7);
-      background: rgba(240, 249, 255, 0.5);
-      border-radius: 0.75rem;
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px -2px rgba(14, 165, 233, 0.12);
+      border-color: transparent;
+      background: transparent;
+      box-shadow: none;
+      transform: none;
     }
     .clinical-odontogram-stage .tooth-card.is-active-tooth {
-      z-index: 15 !important;
-      border-color: #0284c7 !important;
-      border-radius: 0.75rem !important;
-      background: linear-gradient(180deg, rgba(224, 242, 254, 0.55) 0%, rgba(255, 255, 255, 0.95) 100%) !important;
-      box-shadow: 0 0 0 2px #38bdf8, 0 10px 24px -3px rgba(14, 165, 233, 0.38) !important;
-      transform: translateY(-5px) scale(1.045) !important;
+      border-color: transparent !important;
+      background: transparent !important;
+      box-shadow: none !important;
     }
     .clinical-odontogram-stage .tooth-card.is-primary-tooth {
       border-color: transparent;
       background: transparent;
     }
-    .clinical-odontogram-stage .tooth-card.is-primary-tooth:hover {
-      border-color: rgba(199, 210, 254, 0.7);
-      background: rgba(238, 242, 255, 0.5);
-    }
-    .clinical-odontogram-stage .tooth-card.is-primary-tooth.is-active-tooth {
-      border-color: #6366f1 !important;
-      background: linear-gradient(180deg, rgba(238, 242, 255, 0.65) 0%, rgba(255, 255, 255, 0.95) 100%) !important;
-      box-shadow: 0 0 0 2px #818cf8, 0 10px 24px -3px rgba(99, 102, 241, 0.38) !important;
-    }
     .clinical-odontogram-stage .tooth-card.has-charted-finding::after { display: none; }
     .clinical-odontogram-stage .odontogram-anatomy {
-      width: clamp(46px, 5vw, 72px) !important;
-      min-width: clamp(46px, 5vw, 72px) !important;
-      height: clamp(120px, 13vw, 170px) !important;
+      width: clamp(38px, 4.25vw, 58px) !important;
+      min-width: clamp(38px, 4.25vw, 58px) !important;
+      height: auto !important;
       margin: 0;
-      aspect-ratio: auto;
-      filter: drop-shadow(0 3px 5px rgba(71, 50, 25, 0.22));
-      transition: filter 0.2s ease, transform 0.2s ease;
+      aspect-ratio: 64 / 92;
+      filter: none;
+      transition: filter 0.18s ease, transform 0.18s ease;
     }
     .clinical-odontogram-stage .tooth-photo-stage {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      filter: drop-shadow(0 3px 5px rgba(71, 50, 25, 0.22));
-      transition: filter 0.2s ease, transform 0.2s ease;
+      filter: drop-shadow(0 2px 2px rgba(71, 50, 25, 0.16));
     }
-    .clinical-odontogram-stage .tooth-card:hover .tooth-photo-stage {
-      filter: drop-shadow(0 6px 10px rgba(71, 50, 25, 0.28));
-      transform: translateY(-2px) scale(1.02);
+    .clinical-odontogram-stage .tooth-card:hover .odontogram-anatomy {
+      filter: drop-shadow(0 4px 5px rgba(71, 50, 25, 0.18));
+      transform: translateY(-1px) scale(1.025);
     }
-    .clinical-odontogram-stage .tooth-card.is-active-tooth .tooth-photo-stage {
-      filter: drop-shadow(0 0 14px rgba(0, 229, 255, 0.8)) drop-shadow(0 8px 16px rgba(0, 0, 0, 0.22));
-      transform: translateY(-2px) scale(1.04);
-    }
-
-    /* Slide 2 Glowing Cyan Halo Ring */
-    .tooth-touch-halo {
-      position: absolute;
-      pointer-events: none;
-      opacity: 0;
-      border-radius: 9999px;
-      border: 3px solid #00e5ff;
-      box-shadow: 0 0 20px 5px rgba(0, 229, 255, 0.75), inset 0 0 12px rgba(0, 229, 255, 0.45);
-      transition: opacity 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
-      transform: scale(0.65);
-      z-index: 8;
-      width: clamp(42px, 4.4vw, 56px);
-      height: clamp(42px, 4.4vw, 56px);
-      left: 50%;
-      translate: -50% 0;
-    }
-    #upper-arch .tooth-touch-halo {
-      bottom: 6px;
-      top: auto;
-    }
-    #lower-arch .tooth-touch-halo {
-      top: 6px;
-      bottom: auto;
-    }
-    .clinical-odontogram-stage .tooth-card.is-active-tooth .tooth-touch-halo {
-      opacity: 1;
-      transform: scale(1.08);
-      animation: toothHaloPulse 2.4s ease-in-out infinite alternate;
-    }
-    .clinical-odontogram-stage .tooth-card.is-primary-tooth.is-active-tooth .tooth-touch-halo {
-      border-color: #818cf8;
-      box-shadow: 0 0 20px 5px rgba(129, 140, 248, 0.8), inset 0 0 12px rgba(129, 140, 248, 0.45);
-    }
-    @keyframes toothHaloPulse {
-      0% {
-        box-shadow: 0 0 14px 3px rgba(0, 229, 255, 0.6), inset 0 0 8px rgba(0, 229, 255, 0.3);
-        border-color: #00e5ff;
-      }
-      100% {
-        box-shadow: 0 0 24px 6px rgba(0, 229, 255, 0.9), inset 0 0 14px rgba(0, 229, 255, 0.5);
-        border-color: #38bdf8;
-      }
+    .clinical-odontogram-stage .tooth-card.is-active-tooth .odontogram-anatomy {
+      filter: drop-shadow(0 0 4px rgba(37, 99, 235, 0.72));
     }
     .clinical-odontogram-stage .clinical-tooth-svg {
       overflow: visible;
@@ -971,10 +902,10 @@
       filter: none;
     }
     .clinical-odontogram-stage .odontogram-surface-view {
-      width: clamp(28px, 2.8vw, 38px) !important;
-      min-width: clamp(28px, 2.8vw, 38px) !important;
-      height: clamp(28px, 2.8vw, 38px) !important;
-      margin: 2px 0;
+      width: clamp(34px, 4.2vw, 56px) !important;
+      min-width: clamp(34px, 4.2vw, 56px) !important;
+      height: clamp(34px, 4.2vw, 56px) !important;
+      margin: 0;
       filter: none;
     }
     .clinical-odontogram-stage .odontogram-surface-view > svg {
@@ -1018,9 +949,9 @@
     }
     .clinical-odontogram-stage .tooth-number-badge {
       width: 100%;
-      height: 1.85rem;
-      border: 1px solid transparent;
-      border-radius: 0.4rem;
+      height: 2rem;
+      border: 0;
+      border-radius: 0;
       background: transparent;
       box-shadow: none;
       color: #475569;
@@ -1028,27 +959,15 @@
       font-size: clamp(9px, 1vw, 13px);
       font-weight: 700;
       letter-spacing: 0.01em;
-      transition: all 0.2s ease;
     }
-    .clinical-odontogram-stage .tooth-card.has-charted-finding .tooth-number-badge {
-      color: #4338ca;
-      font-weight: 800;
-    }
+    .clinical-odontogram-stage .tooth-card.has-charted-finding .tooth-number-badge,
     .clinical-odontogram-stage .tooth-card.is-active-tooth .tooth-number-badge {
-      color: #ffffff !important;
-      background: #0284c7 !important;
-      border-color: #0284c7 !important;
-      font-weight: 800;
-      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.4) !important;
+      color: #5b21b6;
+      background: transparent;
     }
     .clinical-odontogram-stage .tooth-card.is-primary-tooth .tooth-number-badge {
-      color: #6366f1;
-    }
-    .clinical-odontogram-stage .tooth-card.is-primary-tooth.is-active-tooth .tooth-number-badge {
-      color: #ffffff !important;
-      background: #6366f1 !important;
-      border-color: #6366f1 !important;
-      box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4) !important;
+      color: #4f46e5;
+      background: transparent;
     }
     .clinical-odontogram-stage .photo-implant {
       width: 0.9rem;
@@ -1063,56 +982,25 @@
       background: transparent;
       box-shadow: none;
     }
-    .clinical-odontogram-stage::after {
-      content: "";
-      display: block !important;
-      position: absolute;
-      left: 0;
-      right: 0;
-      top: 50%;
-      height: 2px;
-      background: linear-gradient(90deg, transparent 0%, #cbd5e1 15%, #94a3b8 50%, #cbd5e1 85%, transparent 100%);
-      transform: translateY(-50%);
-      pointer-events: none;
-      z-index: 5;
-    }
-    .photo-implant-fixture {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 6;
-      pointer-events: none;
-    }
-    .photo-gold-crown {
-      opacity: 0.96 !important;
-      mix-blend-mode: hard-light !important;
-      background: linear-gradient(135deg, #b45309 0%, #fef08a 25%, #d97706 45%, #fde047 70%, #92400e 100%) !important;
-      filter: drop-shadow(0 3px 8px rgba(217, 119, 6, 0.55)) contrast(1.2) brightness(1.08) !important;
-    }
     .clinical-odontogram-empty {
-      min-height: clamp(170px, 16.5vw, 215px);
+      min-height: clamp(148px, 14vw, 178px);
       border: 0;
       background: transparent;
     }
     @media (max-width: 899px) {
       .clinical-odontogram-stage { --odontogram-columns: 16; }
       .clinical-odontogram-stage .tooth-card,
-      .clinical-odontogram-empty { min-height: 155px; }
+      .clinical-odontogram-empty { min-height: 136px; }
       .clinical-odontogram-stage .odontogram-anatomy {
-        width: clamp(34px, 8.8vw, 50px) !important;
-        min-width: clamp(34px, 8.8vw, 50px) !important;
-        height: clamp(100px, 20vw, 135px) !important;
+        width: clamp(30px, 8.5vw, 46px) !important;
+        min-width: clamp(30px, 8.5vw, 46px) !important;
       }
       .clinical-odontogram-stage .odontogram-surface-view {
-        width: clamp(24px, 6vw, 32px) !important;
-        min-width: clamp(24px, 6vw, 32px) !important;
-        height: clamp(24px, 6vw, 32px) !important;
+        width: clamp(30px, 9vw, 48px) !important;
+        min-width: clamp(30px, 9vw, 48px) !important;
+        height: clamp(30px, 9vw, 48px) !important;
       }
-      .clinical-odontogram-stage::after { display: block !important; }
+      .clinical-odontogram-stage::after { display: none; }
     }
 
     .arch-scroll::-webkit-scrollbar { height: 6px; }
@@ -2577,7 +2465,7 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="lumin-theme.css?v=8" />
+  <link rel="stylesheet" href="lumin-theme.css?v=7" />
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 font-sans antialiased selection:bg-blue-100">
 
@@ -3653,49 +3541,21 @@
               </div>
 
               <!-- Open odontogram: realistic anatomy photos, occlusal surfaces, and Palmer labels. -->
-              <div class="clinical-odontogram-stage relative">
-                <!-- Picture 2 Floating Clinical Callout Card -->
-                <div id="chart-floating-procedure-card" class="pointer-events-none absolute z-30 hidden rounded-xl border border-slate-200/95 bg-white/95 px-4 py-2.5 shadow-2xl backdrop-blur-md transition-all duration-200">
-                  <div class="flex items-center gap-3">
-                    <div class="flex flex-col items-center justify-center border-r border-slate-200 pr-3">
-                      <span id="callout-tooth-number" class="text-2xl font-black tracking-tight text-slate-800">13</span>
-                    </div>
-                    <div class="space-y-0.5 text-[11px] font-medium leading-tight text-slate-600">
-                      <div><strong class="font-bold text-slate-800">TOOTH:</strong> <span id="callout-tooth-label">13 / FDI 24</span></div>
-                      <div><strong class="font-bold text-slate-800">STATUS:</strong> <span id="callout-tooth-status" class="font-bold text-emerald-600">Completed TX (Composite)</span></div>
-                      <div><strong class="font-bold text-slate-800">NOTES:</strong> <span id="callout-tooth-notes" class="text-slate-500">Completed by Dr. Smith</span></div>
-                      <div><strong class="font-bold text-slate-800">TX:</strong> <span id="callout-tooth-tx" class="font-bold text-slate-700">1</span></div>
-                    </div>
-                  </div>
-                </div>
-
+              <div class="clinical-odontogram-stage">
                 <div class="arch-scroll" role="region" aria-label="Dental arches; scroll horizontally on smaller screens" tabindex="0">
                   <div id="upper-arch"></div>
                   <div id="lower-arch"></div>
                 </div>
               </div>
 
-              <!-- Panoramic Condition & Treatment Legend (Picture 2) -->
-              <div class="flex flex-wrap items-center justify-between gap-y-3 border-t border-slate-200/80 pt-4 text-[11px] font-semibold text-slate-600">
-                <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-                  <span class="font-black uppercase tracking-wider text-slate-800">Conditions:</span>
-                  <div class="flex items-center gap-1.5"><span class="h-3.5 w-3.5 rounded-sm border border-slate-300 bg-[#fbf7ee]"></span> Sound tooth</div>
-                  <div class="flex items-center gap-1.5"><span class="h-3.5 w-3.5 rounded-sm border border-amber-300 bg-[#fef3c7]"></span> Ivory ceramic</div>
-                  <div class="flex items-center gap-1.5"><span class="h-3.5 w-3.5 rounded-sm bg-rose-600"></span> Decay / Caries</div>
-                  <div class="flex items-center gap-1.5"><span class="h-3.5 w-3.5 rounded-sm bg-blue-600"></span> Develop. fissures</div>
-                  <div class="flex items-center gap-1.5"><span class="h-3.5 w-3.5 rounded-sm bg-purple-600"></span> Ceramic enamel</div>
-                  <div class="flex items-center gap-1.5"><span class="h-3.5 w-3.5 rounded-sm bg-amber-500 shadow-sm"></span> Gold crown</div>
-                  <div class="flex items-center gap-1.5"><span class="h-3.5 w-3.5 rounded-sm bg-slate-600"></span> Titanium implant</div>
-                  <div class="flex items-center gap-1.5"><span class="h-3.5 w-3.5 rounded-sm bg-pink-500"></span> Gum Recession</div>
-                </div>
-                <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[10px]">
-                  <span class="font-black uppercase tracking-wider text-slate-500">Status:</span>
-                  <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-red-600"></span> P · Planned</span>
-                  <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-blue-600"></span> In · In progress</span>
-                  <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-emerald-600"></span> C · Completed</span>
-                  <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-slate-900"></span> E · Existed</span>
-                </div>
-              </div>
+            <!-- Chart Legend -->
+            <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-slate-200 pt-4 text-[11px] font-semibold text-slate-600">
+              <span class="font-black uppercase tracking-wider text-slate-800">Operation status</span>
+              <div class="flex items-center gap-1.5"><span class="h-3.5 w-3.5 rounded-full bg-red-600"></span> P · Planned</div>
+              <div class="flex items-center gap-1.5"><span class="h-3.5 w-3.5 rounded-full bg-blue-600"></span> In · In progress</div>
+              <div class="flex items-center gap-1.5"><span class="h-3.5 w-3.5 rounded-full bg-green-600"></span> C · Completed</div>
+              <div class="flex items-center gap-1.5"><span class="h-3.5 w-3.5 rounded-full bg-black"></span> E · Existed</div>
+            </div>
             </div>
           </div>
         </div>
@@ -12226,15 +12086,6 @@
       return `${quadrant.abbreviation}${value}`;
     }
 
-    function fdiToothNotation(slotNumber) {
-      const slot = Number(slotNumber);
-      if (slot >= 1 && slot <= 8) return String(10 + (9 - slot));
-      if (slot >= 9 && slot <= 16) return String(20 + (slot - 8));
-      if (slot >= 17 && slot <= 24) return String(30 + (slot - 16));
-      if (slot >= 25 && slot <= 32) return String(40 + (33 - slot));
-      return String(slot);
-    }
-
     function palmerNotationSVG(toothId, slotNumber, className = '') {
       const slot = Number(slotNumber || SLOT_BY_PRIMARY_TOOTH[String(toothId || '').toUpperCase()] || toothId);
       const position = palmerPositionForSlot(slot);
@@ -12488,36 +12339,23 @@
     }
 
     const TOOTH_PHOTO_ASSETS = Object.freeze({
-      'upper-molar': 'assets/teeth-3d/upper-molar.png',
-      'lower-molar': 'assets/teeth-3d/lower-molar.png',
-      'upper-premolar': 'assets/teeth-3d/upper-premolar.png',
-      'lower-premolar': 'assets/teeth-3d/lower-premolar.png',
-      'upper-canine': 'assets/teeth-3d/upper-canine.png',
-      'lower-canine': 'assets/teeth-3d/lower-canine.png',
-      'upper-incisor': 'assets/teeth-3d/upper-incisor.png',
-      'lower-incisor': 'assets/teeth-3d/lower-incisor.png',
-      // Backward compatibility aliases
-      incisor: 'assets/teeth-3d/upper-incisor.png',
-      canine: 'assets/teeth-3d/upper-canine.png',
-      premolar: 'assets/teeth-3d/upper-premolar.png',
-      molar: 'assets/teeth-3d/upper-molar.png'
+      incisor: 'assets/teeth-3d/incisor.webp',
+      canine: 'assets/teeth-3d/canine.webp',
+      premolar: 'assets/teeth-3d/premolar.webp',
+      molar: 'assets/teeth-3d/molar.webp'
     });
 
-    function toothPhotoFamily(anatomyType, slotNumber) {
-      const slot = Number(slotNumber || 1);
-      const isUpper = slot >= 1 && slot <= 16;
-      const type = String(anatomyType || '').toLowerCase();
-      if (type.includes('premolar')) return isUpper ? 'upper-premolar' : 'lower-premolar';
-      if (type.includes('molar')) return isUpper ? 'upper-molar' : 'lower-molar';
-      if (type.includes('canine')) return isUpper ? 'upper-canine' : 'lower-canine';
-      return isUpper ? 'upper-incisor' : 'lower-incisor';
+    function toothPhotoFamily(anatomyType) {
+      if (anatomyType.includes('molar')) return anatomyType.includes('premolar') ? 'premolar' : 'molar';
+      if (anatomyType.includes('canine')) return 'canine';
+      return 'incisor';
     }
 
     function generateRealisticToothPhoto(toothId, slotNumber) {
       const id = String(toothId);
       const slot = Number(slotNumber || SLOT_BY_PRIMARY_TOOTH[id] || id);
       const anatomyType = getAnatomyType(id, slot);
-      const family = toothPhotoFamily(anatomyType, slot);
+      const family = toothPhotoFamily(anatomyType);
       const isUpper = slot >= 1 && slot <= 16;
       const isPrimary = isPrimaryToothId(id);
       const isPatientRight = slot <= 8 || slot >= 25;
@@ -12527,13 +12365,12 @@
         isPatientRight ? 'is-mirrored-photo' : '',
         isPrimary ? 'is-primary-photo' : ''
       ].filter(Boolean).join(' ');
-      const rootCanalCount = family.includes('molar') ? 3 : family.includes('premolar') ? 2 : 1;
+      const rootCanalCount = family === 'molar' ? 3 : family === 'premolar' ? 2 : 1;
       const rootCanalMarkup = Array.from({ length: rootCanalCount }, (_, index) => `<span class="rct-canal canal-${index + 1}"></span>`).join('');
       return `
-        <div id="anatomy-wrapper-${id}" class="anatomy-wrapper odontogram-anatomy relative select-none ${showRootsAnatomy ? '' : 'hidden'} pointer-events-none">
+        <div id="anatomy-wrapper-${id}" class="anatomy-wrapper odontogram-anatomy relative select-none ${showRootsAnatomy ? '' : 'hidden'} pointer-events-none" style="width:${isPrimary ? '44px' : '48px'};height:78px;min-width:${isPrimary ? '44px' : '48px'}">
           <div id="anatomy-group-${id}" class="absolute inset-0">
             <div class="tooth-photo-stage">
-              <span class="tooth-touch-halo" aria-hidden="true"></span>
               <img id="tooth-photo-${id}" src="${TOOTH_PHOTO_ASSETS[family]}" alt="" aria-hidden="true" draggable="false" class="${photoClasses}" />
               <img id="tooth-crown-overlay-${id}" src="${TOOTH_PHOTO_ASSETS[family]}" alt="" aria-hidden="true" draggable="false" class="${photoClasses} tooth-crown-color-overlay" />
               <div id="rct-layer-${id}" class="hidden photo-rct-mask family-${family} ${isUpper ? 'is-upper' : 'is-lower'} ${isPrimary ? 'is-primary-rct' : ''}">
@@ -12648,10 +12485,10 @@
              aria-keyshortcuts="Shift+Enter"
              aria-label="${chartToothLabel(id)}. ${escapeHtml(longPressLabel)}."
              title="${escapeHtml(longPressLabel)}"
-             class="tooth-card relative flex min-w-0 flex-1 cursor-pointer select-none flex-col items-center transition-all ${isPrimary ? 'is-primary-tooth' : ''} ${hasFinding ? 'has-charted-finding' : ''}">
+             class="tooth-card relative flex min-w-0 flex-1 cursor-pointer select-none flex-col items-center transition-colors ${isPrimary ? 'is-primary-tooth' : ''} ${hasFinding ? 'has-charted-finding' : ''}">
           ${isUpper
-            ? anatomyPhoto + surfaceMap + `<span class="tooth-number-badge pointer-events-none">${escapeHtml(palmerQuadrantLabel(id, slot))}<span class="text-[9px] opacity-75 font-normal ml-0.5">(${fdiToothNotation(slot)})</span></span>`
-            : `<span class="tooth-number-badge pointer-events-none">${escapeHtml(palmerQuadrantLabel(id, slot))}<span class="text-[9px] opacity-75 font-normal ml-0.5">(${fdiToothNotation(slot)})</span></span>` + surfaceMap + anatomyPhoto}
+            ? anatomyPhoto + surfaceMap + `<span class="tooth-number-badge pointer-events-none">${escapeHtml(palmerQuadrantLabel(id, slot))}</span>`
+            : `<span class="tooth-number-badge pointer-events-none">${escapeHtml(palmerQuadrantLabel(id, slot))}</span>` + surfaceMap + anatomyPhoto}
         </div>`;
     }
 
@@ -18913,9 +18750,6 @@
         });
         setChartSelectionTargets(targets, tooth);
       }
-      if (typeof window !== 'undefined' && window.navigator?.vibrate) {
-        try { window.navigator.vibrate(15); } catch (_) {}
-      }
       updateSelectionUI();
     }
 
@@ -19032,9 +18866,6 @@
         }
       }
       setChartSelectionTargets(targets, id);
-      if (typeof window !== 'undefined' && window.navigator?.vibrate) {
-        try { window.navigator.vibrate(12); } catch (_) {}
-      }
       updateSelectionUI();
     }
 
@@ -19050,12 +18881,10 @@
 
       const targetText = document.getElementById('selection-target-text');
       const selectionBadge = document.getElementById('selection-badge');
-      const floatingCard = document.getElementById('chart-floating-procedure-card');
       if (!targetText || !selectionBadge) return;
 
       const targets = chartSelectionTargets();
       if (!targets.length) {
-        if (floatingCard) floatingCard.classList.add('hidden');
         targetText.textContent = 'Select one or more teeth or surfaces';
         selectionBadge.className = 'flex min-w-0 items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-2 py-0.5 text-[11px] font-bold text-slate-200';
         updateClinicalOperationPreview();
@@ -19070,66 +18899,6 @@
           document.getElementById(`tooth-${target.tooth}-${surface}`)?.classList.add('surface-selected');
         });
       });
-
-      // Update Picture 2 Floating Clinical Callout Card
-      if (floatingCard) {
-        if (targets.length === 1) {
-          const target = targets[0];
-          const toothId = target.tooth;
-          const cardEl = document.getElementById(`tooth-card-${toothId}`);
-          const slot = Number(cardEl?.dataset.slot || SLOT_BY_PRIMARY_TOOTH[toothId] || toothId);
-          const isUpper = slot >= 1 && slot <= 16;
-          const fdi = fdiToothNotation(slot);
-          const patient = getActivePatient();
-          const toothData = chartFindingForTooth(patient, toothId);
-          const wholeFindings = chartWholeFindings(toothData);
-          const activeOp = wholeFindings[wholeFindings.length - 1];
-
-          let statusText = 'Sound tooth (Ready for TX)';
-          let statusClass = 'text-slate-600';
-          let treatmentLabel = `${toothId} / FDI ${fdi}`;
-
-          if (activeOp) {
-            const opDef = operationStatusDefinition(activeOp.status);
-            statusText = `${opDef.label} (${dentalOperationDisplayName(activeOp.code)})`;
-            statusClass = activeOp.status === 'C' ? 'text-emerald-600' : activeOp.status === 'In' ? 'text-blue-600' : 'text-amber-600';
-            treatmentLabel += ` (${dentalOperationDisplayName(activeOp.code)})`;
-          } else if (target.surfaces.length) {
-            statusText = `Selected: ${target.surfaces.map(s => surfaceAbbreviation(toothId, s)).join('-')}`;
-            statusClass = 'text-sky-600';
-          }
-
-          const calloutNum = document.getElementById('callout-tooth-number');
-          const calloutLabel = document.getElementById('callout-tooth-label');
-          const statusEl = document.getElementById('callout-tooth-status');
-          const notesEl = document.getElementById('callout-tooth-notes');
-          const txEl = document.getElementById('callout-tooth-tx');
-
-          if (calloutNum) calloutNum.textContent = toothId;
-          if (calloutLabel) calloutLabel.textContent = treatmentLabel;
-          if (statusEl) {
-            statusEl.textContent = statusText;
-            statusEl.className = `font-bold ${statusClass}`;
-          }
-          if (notesEl) notesEl.textContent = activeOp?.notes || (activeOp ? `Recorded on ${new Date().toLocaleDateString()}` : 'Ready for clinical procedure');
-          if (txEl) txEl.textContent = String(wholeFindings.length || (target.surfaces.length ? 1 : 0));
-
-          floatingCard.classList.remove('hidden');
-          const stageEl = cardEl?.closest('.clinical-odontogram-stage');
-          if (stageEl && cardEl) {
-            const stageRect = stageEl.getBoundingClientRect();
-            const cardRect = cardEl.getBoundingClientRect();
-            const cardMidX = cardRect.left + cardRect.width / 2 - stageRect.left;
-            const cardTop = cardRect.top - stageRect.top;
-            const popWidth = Math.min(290, stageRect.width - 24);
-            const leftPos = Math.max(10, Math.min(stageRect.width - popWidth - 10, cardMidX - (popWidth / 2)));
-            floatingCard.style.left = `${leftPos}px`;
-            floatingCard.style.top = `${Math.max(6, cardTop - 74)}px`;
-          }
-        } else {
-          floatingCard.classList.add('hidden');
-        }
-      }
 
       if (targets.length > 1) {
         const surfaceCount = targets.reduce((sum, target) => sum + target.surfaces.length, 0);
@@ -19393,58 +19162,8 @@
         if (toothPhoto) toothPhoto.style.filter = 'grayscale(1)';
         anatomyOverlay.innerHTML = `<span class="text-2xl font-black drop-shadow-md" style="color:${structureStatus.color}">×</span>`;
       } else if (structureVisualCode === 'implant') {
-        if (toothPhoto) toothPhoto.style.opacity = '0.04';
-        const isUpperImplant = slot >= 1 && slot <= 16;
-        anatomyOverlay.innerHTML = `
-          <div class="photo-implant-fixture ${isUpperImplant ? 'is-upper-implant' : 'is-lower-implant'}">
-            <svg viewBox="0 0 60 140" class="w-full h-full drop-shadow-lg" preserveAspectRatio="xMidYMid meet">
-              <defs>
-                <linearGradient id="titanium-body-${id}" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stop-color="#334155" />
-                  <stop offset="25%" stop-color="#94a3b8" />
-                  <stop offset="50%" stop-color="#f8fafc" />
-                  <stop offset="75%" stop-color="#64748b" />
-                  <stop offset="100%" stop-color="#1e293b" />
-                </linearGradient>
-                <linearGradient id="abutment-metal-${id}" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stop-color="#64748b" />
-                  <stop offset="50%" stop-color="#f1f5f9" />
-                  <stop offset="100%" stop-color="#475569" />
-                </linearGradient>
-                <linearGradient id="crown-ceramic-${id}" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stop-color="#fdfbf7" />
-                  <stop offset="45%" stop-color="#ffffff" />
-                  <stop offset="85%" stop-color="#f5efe6" />
-                  <stop offset="100%" stop-color="#e2d7c8" />
-                </linearGradient>
-              </defs>
-              ${isUpperImplant ? `
-                <ellipse cx="30" cy="54" rx="22" ry="6" fill="#f472b6" opacity="0.45" />
-                <path d="M22 8 L38 8 L36 50 L24 50 Z" fill="url(#titanium-body-${id})" />
-                <line x1="20" y1="14" x2="40" y2="14" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round" />
-                <line x1="21" y1="22" x2="39" y2="22" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round" />
-                <line x1="22" y1="30" x2="38" y2="30" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round" />
-                <line x1="23" y1="38" x2="37" y2="38" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round" />
-                <line x1="24" y1="46" x2="36" y2="46" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round" />
-                <path d="M24 8 Q30 2 36 8 Z" fill="url(#titanium-body-${id})" />
-                <rect x="25" y="48" width="10" height="12" rx="2" fill="url(#abutment-metal-${id})" stroke="#334155" stroke-width="0.8" />
-                <path d="M14 62 Q30 55 46 62 Q50 86 44 114 Q30 120 16 114 Q10 86 14 62 Z" fill="url(#crown-ceramic-${id})" stroke="#c9bba8" stroke-width="1.2" />
-                <path d="M18 68 Q30 62 42 68" fill="none" stroke="#ffffff" stroke-width="2.5" opacity="0.85" />
-              ` : `
-                <path d="M14 58 Q30 65 46 58 Q50 34 44 6 Q30 0 16 6 Q10 34 14 58 Z" fill="url(#crown-ceramic-${id})" stroke="#c9bba8" stroke-width="1.2" />
-                <path d="M18 52 Q30 58 42 52" fill="none" stroke="#ffffff" stroke-width="2.5" opacity="0.85" />
-                <rect x="25" y="60" width="10" height="12" rx="2" fill="url(#abutment-metal-${id})" stroke="#334155" stroke-width="0.8" />
-                <ellipse cx="30" cy="66" rx="22" ry="6" fill="#f472b6" opacity="0.45" />
-                <path d="M24 70 L36 70 L38 112 L22 112 Z" fill="url(#titanium-body-${id})" />
-                <line x1="24" y1="76" x2="36" y2="76" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round" />
-                <line x1="23" y1="84" x2="37" y2="84" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round" />
-                <line x1="22" y1="92" x2="38" y2="92" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round" />
-                <line x1="21" y1="100" x2="39" y2="100" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round" />
-                <line x1="20" y1="108" x2="40" y2="108" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round" />
-                <path d="M22 112 Q30 118 38 112 Z" fill="url(#titanium-body-${id})" />
-              `}
-            </svg>
-          </div>`;
+        if (toothPhoto) toothPhoto.style.opacity = '0.08';
+        anatomyOverlay.innerHTML = `<span class="photo-implant" style="--operation-status-color:${structureStatus.color}"></span>`;
       } else if (structureVisualCode === 'impacted') {
         anatomyGroup.style.transform = 'rotate(25deg) scale(0.9)';
         if (toothPhoto) toothPhoto.style.filter = operationStatusPhotoFilter(structureFinding.status);
@@ -19460,22 +19179,14 @@
 
       if (restorationFinding && !['missing', 'implant'].includes(structureVisualCode)) {
         const restorationStatus = operationStatusDefinition(restorationFinding.status);
-        const isGoldCrown = restorationFinding.visualCode === 'crown' || restorationFinding.code === 'crown' || restorationFinding.code === 'gold_crown';
         if (crownOverlay) {
+          crownOverlay.style.filter = operationStatusPhotoFilter(restorationFinding.status);
           crownOverlay.style.opacity = '1';
-          if (isGoldCrown) {
-            crownOverlay.classList.add('photo-gold-crown');
-            crownOverlay.style.mixBlendMode = 'hard-light';
-            crownOverlay.style.filter = 'drop-shadow(0 3px 8px rgba(217, 119, 6, 0.6)) contrast(1.2) brightness(1.08)';
-          } else {
-            crownOverlay.classList.remove('photo-gold-crown');
-            crownOverlay.style.filter = operationStatusPhotoFilter(restorationFinding.status);
-            crownOverlay.style.mixBlendMode = 'multiply';
-          }
+          crownOverlay.style.mixBlendMode = 'multiply';
         }
         if (crownBody) {
-          crownBody.setAttribute('fill', isGoldCrown ? '#d97706' : restorationStatus.color);
-          crownBody.setAttribute('stroke', isGoldCrown ? '#b45309' : restorationStatus.color);
+          crownBody.setAttribute('fill', restorationStatus.color);
+          crownBody.setAttribute('stroke', restorationStatus.color);
         }
       }
 

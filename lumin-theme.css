@@ -472,11 +472,5 @@ body.lumin-raised #app-header button { border: 1px solid ButtonText; }
       color: #ffffff;
     }
     body.lumin-raised #view-dashboard .dashboard-patient-link:hover:not(:disabled) { color: hsl(var(--lumin-hue) calc(70% * var(--lumin-chroma)) 30%); }
-    body.lumin-raised .clinical-odontogram-stage .tooth-card.is-active-tooth {
-      border-color: #0284c7 !important;
-      background: var(--lumin-face) !important;
-      box-shadow: 0 0 0 2px #38bdf8, 0 10px 25px -3px rgba(14, 165, 233, 0.35), var(--lumin-raised) !important;
-    }
 
 }
-
