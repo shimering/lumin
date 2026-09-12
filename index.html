@@ -10802,20 +10802,18 @@
       const start = entry?.startAt ? new Date(entry.startAt) : null;
       const hasAppointmentTime = Boolean(start && Number.isFinite(start.getTime()));
       const assignedStaff = appointmentStaffMember(entry?.assignedUserId);
-      const doctorName = entry?.assignedUserId
-        ? (entry.doctor || assignedStaff?.fullName || '')
-        : '';
+      const doctorName = entry?.doctor || assignedStaff?.fullName || '';
       const replacements = {
         '{{patient_name}}': entry?.patient || '',
-        '{{doctor_name}}': doctorName || 'Unassigned doctor',
-        '{{appointment_date}}': hasAppointmentTime ? WHATSAPP_TEMPLATE_FORMATTERS.englishDate.format(start) : '',
+        '{{doctor_name}}': doctorName || (currentUiLanguage === 'ar' ? 'طبيب غير محدد' : 'Unassigned doctor'),
+        '{{appointment_date}}': hasAppointmentTime ? WHATSAPP_TEMPLATE_FORMATTERS.englishDate.format(start) : (entry?.date || ''),
         '{{appointment_day}}': hasAppointmentTime ? WHATSAPP_TEMPLATE_FORMATTERS.englishDay.format(start) : '',
-        '{{appointment_time}}': hasAppointmentTime ? WHATSAPP_TEMPLATE_FORMATTERS.englishTime.format(start) : '',
+        '{{appointment_time}}': hasAppointmentTime ? WHATSAPP_TEMPLATE_FORMATTERS.englishTime.format(start) : (entry?.time || ''),
         '{{اسم_المريض}}': entry?.patient || '',
         '{{اسم_الطبيب}}': doctorName || 'طبيب غير محدد',
-        '{{تاريخ_الموعد}}': hasAppointmentTime ? WHATSAPP_TEMPLATE_FORMATTERS.arabicDate.format(start) : '',
+        '{{تاريخ_الموعد}}': hasAppointmentTime ? WHATSAPP_TEMPLATE_FORMATTERS.arabicDate.format(start) : (entry?.date || ''),
         '{{يوم_الموعد}}': hasAppointmentTime ? WHATSAPP_TEMPLATE_FORMATTERS.arabicDay.format(start) : '',
-        '{{وقت_الموعد}}': hasAppointmentTime ? WHATSAPP_TEMPLATE_FORMATTERS.arabicTime.format(start) : ''
+        '{{وقت_الموعد}}': hasAppointmentTime ? WHATSAPP_TEMPLATE_FORMATTERS.arabicTime.format(start) : (entry?.time || '')
       };
       return WHATSAPP_TEMPLATE_VARIABLES.reduce(
         (message, variable) => message.split(variable).join(replacements[variable]),
@@ -15495,7 +15493,7 @@
         ? `مرحباً ${patientName}، نود تذكيركم بمتابعة زراعة الأسنان للسن${tooth}. موعد التركيب النهائي المتوقع هو ${delivDate}. نسعد بتواصلكم لتأكيد الموعد.`
         : `Hello ${patientName}, this is Lumin Dental Clinic following up on your dental implant for tooth${tooth}. Your expected restoration delivery date is ${delivDate}. Please contact us to confirm your appointment.`;
 
-      openWhatsAppLink(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`);
+      openWhatsAppLink(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`, msg);
     }
 
     // Tracked procedures modal
@@ -16452,7 +16450,7 @@
       const phone = normaliseWhatsAppPhone(group?.patientPhone);
       if (!group || !phone) return;
       closeWhatsAppTemplatePicker();
-      openWhatsAppLink(`https://wa.me/${phone}`);
+      openWhatsAppLink(`https://api.whatsapp.com/send?phone=${phone}`);
     }
 
     function cancelFinanceDeptWhatsAppPress() {
@@ -16538,7 +16536,7 @@
       const patientName = context?.patientName || group?.patientName || '';
       const message = resolveWhatsAppMessageTemplate(template.body, { patient: patientName });
       closeWhatsAppTemplatePicker();
-      openWhatsAppLink(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
+      openWhatsAppLink(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`, message);
     }
 
     function financeDeptContactMarkup(group) {
@@ -21037,18 +21035,28 @@
     function dashboardWhatsAppUrl(entry, phone, templateBody = null) {
       const whatsappPhone = normaliseWhatsAppPhone(phone);
       if (!whatsappPhone) return '';
-      if (templateBody === null) return `https://wa.me/${whatsappPhone}`;
+      if (!templateBody) return `https://api.whatsapp.com/send?phone=${whatsappPhone}`;
       const message = resolveWhatsAppMessageTemplate(templateBody, entry);
-      return `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(message)}`;
+      return `https://api.whatsapp.com/send?phone=${whatsappPhone}&text=${encodeURIComponent(message)}`;
     }
 
-    function openWhatsAppLink(url) {
+    function openWhatsAppLink(url, messageToCopy = '') {
       if (!url) return;
-      const link = document.createElement('a');
-      link.href = url;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.click();
+      if (messageToCopy && navigator.clipboard?.writeText) {
+        try {
+          navigator.clipboard.writeText(messageToCopy).catch(() => {});
+        } catch (_) {}
+      }
+      const win = window.open(url, '_blank', 'noopener,noreferrer');
+      if (!win) {
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
     }
 
     function appointmentWhatsAppPhone(entry) {
@@ -21056,35 +21064,50 @@
       return patient?.phone || entry?.patientPhone || '';
     }
 
+    function openWhatsAppDefaultMessage(appointmentId) {
+      if (!hasPageAccess('appointments')) return;
+      const entry = appointments.find(appointment => String(appointment.id) === String(appointmentId));
+      if (!entry) return;
+      const templates = availableWhatsAppTemplates('appointment');
+      const defaultTemplate = templates.find(item => item.isDefault) || templates[0];
+      if (defaultTemplate?.id) {
+        sendWhatsAppTemplate(appointmentId, defaultTemplate.id);
+      } else {
+        openWhatsAppCustomMessage(appointmentId);
+      }
+    }
+
     function whatsAppSplitControlMarkup(entry, options = {}) {
       const enabled = Boolean(normaliseWhatsAppPhone(appointmentWhatsAppPhone(entry)));
       const fullWidth = Boolean(options.fullWidth);
-      const searchLabel = currentUiLanguage === 'ar' ? 'بحث' : 'Search';
-      const customLabel = currentUiLanguage === 'ar'
-        ? `فتح واتساب لكتابة رسالة مخصصة إلى ${entry.patient}`
-        : `Open WhatsApp to write a custom message to ${entry.patient}`;
-      const templateLabel = currentUiLanguage === 'ar'
+      const isAr = currentUiLanguage === 'ar';
+      const whatsAppLabel = isAr ? 'واتساب' : 'WhatsApp';
+      const defaultLabel = isAr
+        ? `إرسال قالب واتساب إلى ${entry.patient}`
+        : `Send WhatsApp template to ${entry.patient}`;
+      const templateLabel = isAr
         ? `عرض قوالب واتساب المتاحة لـ ${entry.patient}`
         : `Show available WhatsApp templates for ${entry.patient}`;
       const disabledClasses = enabled
         ? 'border-emerald-700 bg-emerald-600 text-white shadow-sm'
         : 'border-slate-200 bg-slate-100 text-slate-400';
-      const iconButtonClasses = enabled ? 'bg-emerald-500 hover:bg-emerald-600' : 'cursor-not-allowed';
-      const searchButtonClasses = enabled ? 'bg-emerald-600 hover:bg-emerald-700' : 'cursor-not-allowed';
+      const mainButtonClasses = enabled ? 'bg-emerald-600 hover:bg-emerald-700' : 'cursor-not-allowed';
+      const toggleButtonClasses = enabled ? 'bg-emerald-500 hover:bg-emerald-600' : 'cursor-not-allowed';
       return `
         <span dir="ltr" data-whatsapp-split-control class="inline-flex ${fullWidth ? 'w-full' : ''} min-h-10 overflow-hidden rounded-xl border ${disabledClasses}">
-          <button type="button" onclick="openWhatsAppCustomMessage('${entry.id}')" ${enabled ? '' : 'disabled'} class="inline-flex w-11 shrink-0 items-center justify-center border-r ${enabled ? 'border-emerald-400/80' : 'border-slate-200'} transition ${iconButtonClasses}" aria-label="${escapeAppointmentText(customLabel)}">
-            <i data-lucide="message-circle" class="h-5 w-5"></i>
+          <button type="button" onclick="openWhatsAppDefaultMessage('${entry.id}')" ${enabled ? '' : 'disabled'} class="inline-flex ${fullWidth ? 'flex-1' : ''} items-center justify-center gap-1.5 px-3 py-2 text-xs font-black transition ${mainButtonClasses}" aria-label="${escapeAppointmentText(defaultLabel)}" title="${escapeAppointmentText(defaultLabel)}">
+            <i data-lucide="message-circle" class="h-4 w-4 shrink-0"></i>
+            <span>${whatsAppLabel}</span>
           </button>
-          <button type="button" data-whatsapp-template-toggle data-whatsapp-appointment-id="${escapeAppointmentText(entry.id)}" onclick="openWhatsAppTemplatePicker('${entry.id}', this)" ${enabled ? '' : 'disabled'} class="inline-flex ${fullWidth ? 'flex-1' : ''} items-center justify-center gap-2 px-3 py-2 text-xs font-black transition ${searchButtonClasses}" aria-haspopup="menu" aria-controls="whatsapp-template-dropdown" aria-expanded="false" aria-label="${escapeAppointmentText(templateLabel)}">
-            <span>${searchLabel}</span><i data-lucide="chevron-down" class="h-4 w-4 shrink-0"></i>
+          <button type="button" data-whatsapp-template-toggle data-whatsapp-appointment-id="${escapeAppointmentText(entry.id)}" onclick="openWhatsAppTemplatePicker('${entry.id}', this)" ${enabled ? '' : 'disabled'} class="inline-flex w-9 shrink-0 items-center justify-center border-l ${enabled ? 'border-emerald-400/80' : 'border-slate-200'} transition ${toggleButtonClasses}" aria-haspopup="menu" aria-controls="whatsapp-template-dropdown" aria-expanded="false" aria-label="${escapeAppointmentText(templateLabel)}" title="${escapeAppointmentText(templateLabel)}">
+            <i data-lucide="chevron-down" class="h-4 w-4 shrink-0"></i>
           </button>
         </span>`;
     }
 
     function openWhatsAppCustomMessage(appointmentId) {
       if (!hasPageAccess('appointments')) return;
-      const entry = appointments.find(appointment => appointment.id === appointmentId);
+      const entry = appointments.find(appointment => String(appointment.id) === String(appointmentId));
       if (!entry) return;
       const phone = appointmentWhatsAppPhone(entry);
       const url = dashboardWhatsAppUrl(entry, phone, null);
@@ -21139,7 +21162,7 @@
       const width = Math.min(Math.max(240, anchorBounds.width + 72), Math.max(0, window.innerWidth - margin * 2), 320);
       dropdown.style.width = `${Math.max(0, width)}px`;
       const height = Math.min(dropdown.scrollHeight, 320);
-      const preferredLeft = currentUiLanguage === 'ar' ? anchorBounds.left : anchorBounds.right - width;
+      const preferredLeft = currentUiLanguage === 'ar' ? anchorBounds.right - width : anchorBounds.left;
       const left = Math.max(margin, Math.min(window.innerWidth - width - margin, preferredLeft));
       const roomBelow = window.innerHeight - anchorBounds.bottom - margin;
       const top = roomBelow >= Math.min(height, 180)
@@ -21171,7 +21194,7 @@
       const liveAnchor = refreshWhatsAppTemplatePickerAnchor();
       if (!liveAnchor) return;
       liveAnchor.removeAttribute('aria-busy');
-      const entry = appointments.find(appointment => appointment.id === appointmentId);
+      const entry = appointments.find(appointment => String(appointment.id) === String(appointmentId));
       if (!entry) { closeWhatsAppTemplatePicker(); return; }
       const phone = appointmentWhatsAppPhone(entry);
       if (!normaliseWhatsAppPhone(phone)) {
@@ -21179,16 +21202,27 @@
         return;
       }
 
-      dropdown.innerHTML = availableWhatsAppTemplates().map(template => `
+      const templates = availableWhatsAppTemplates('appointment');
+      const isAr = currentUiLanguage === 'ar';
+      dropdown.innerHTML = templates.map(template => `
         <button type="button" role="menuitem" onclick="sendWhatsAppTemplate('${appointmentId}', '${template.id}')" class="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-emerald-500">
           <span class="flex min-w-0 items-center gap-3">
             <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700"><i data-lucide="message-square-text" class="h-4 w-4"></i></span>
             <span dir="auto" class="truncate text-xs font-black text-slate-800">${escapeHtml(template.name)}</span>
-            ${template.isDefault ? `<span class="shrink-0 rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-black text-blue-700">${currentUiLanguage === 'ar' ? 'افتراضي' : 'Default'}</span>` : ''}
+            ${template.isDefault ? `<span class="shrink-0 rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-black text-blue-700">${isAr ? 'افتراضي' : 'Default'}</span>` : ''}
           </span>
-          <i data-lucide="chevron-${currentUiLanguage === 'ar' ? 'left' : 'right'}" class="h-4 w-4 shrink-0 text-slate-300"></i>
+          <i data-lucide="chevron-${isAr ? 'left' : 'right'}" class="h-4 w-4 shrink-0 text-slate-300"></i>
         </button>
-      `).join('');
+      `).join('') + `
+        <div class="my-1 border-t border-slate-100"></div>
+        <button type="button" role="menuitem" onclick="sendWhatsAppTemplate('${appointmentId}', '__custom__')" class="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left transition hover:bg-slate-50 focus:outline-none">
+          <span class="flex min-w-0 items-center gap-2.5">
+            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500"><i data-lucide="message-circle" class="h-3.5 w-3.5"></i></span>
+            <span dir="auto" class="truncate text-xs font-bold text-slate-600">${isAr ? 'رسالة فارغة (مخصصة)' : 'Blank message (custom)'}</span>
+          </span>
+          <i data-lucide="chevron-${isAr ? 'left' : 'right'}" class="h-3.5 w-3.5 shrink-0 text-slate-300"></i>
+        </button>
+      `;
       dropdown.classList.remove('hidden');
       liveAnchor.setAttribute('aria-expanded', 'true');
       positionWhatsAppTemplateDropdown();
@@ -21217,15 +21251,20 @@
     }
 
     function sendWhatsAppTemplate(appointmentId, templateId) {
-      const entry = appointments.find(appointment => appointment.id === appointmentId);
+      const entry = appointments.find(appointment => String(appointment.id) === String(appointmentId));
       if (!entry) return;
       const phone = appointmentWhatsAppPhone(entry);
-      const template = availableWhatsAppTemplates().find(item => item.id === templateId);
+      if (templateId === '__custom__') {
+        openWhatsAppCustomMessage(appointmentId);
+        return;
+      }
+      const template = availableWhatsAppTemplates('appointment').find(item => String(item.id) === String(templateId));
       if (!template) return;
+      const message = resolveWhatsAppMessageTemplate(template.body, entry);
       const url = dashboardWhatsAppUrl(entry, phone, template.body);
       if (!url) return;
       closeWhatsAppTemplatePicker();
-      openWhatsAppLink(url);
+      openWhatsAppLink(url, message);
     }
 
     function dashboardStatusOptions(selectedStatus) {
