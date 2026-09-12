@@ -472,6 +472,23 @@
       border-color: rgba(79, 70, 229, 0.2);
       background: rgba(99, 102, 241, 0.1);
     }
+    .implant-tooth-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid transparent;
+      border-radius: 0.75rem;
+      background: #ecfeff;
+      color: #0e7490;
+      box-shadow: none;
+    }
+    .implant-tooth-badge:hover {
+      background: #cffafe;
+    }
+    .implant-tooth-badge.implant-tooth-badge-empty {
+      background: #f1f5f9;
+      color: #94a3b8;
+    }
     .clinical-findings-list {
       font-family: "Aptos", "Segoe UI Variable Text", "Inter", system-ui, sans-serif;
       scrollbar-color: #cbd5e1 transparent;
@@ -2432,7 +2449,7 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="lumin-theme.css?v=4" />
+  <link rel="stylesheet" href="lumin-theme.css?v=5" />
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 font-sans antialiased selection:bg-blue-100">
 
@@ -14601,12 +14618,12 @@
 
     function formatImplantToothPalmerBadge(toothInput) {
       if (!toothInput && toothInput !== 0) {
-        return `<span class="inline-flex items-center justify-center rounded-lg bg-slate-100 px-2 py-1 text-xs font-bold text-slate-400">—</span>`;
+        return `<span class="implant-tooth-badge implant-tooth-badge-empty inline-flex items-center justify-center rounded-xl px-2.5 py-1 text-xs font-bold text-slate-400">—</span>`;
       }
       const rawStr = String(toothInput).trim();
       const slot = resolveToothSlotNumber(rawStr);
       if (!slot) {
-        return `<span class="inline-flex items-center justify-center rounded-lg bg-slate-100 px-2 py-1 text-xs font-black text-slate-700">#${escapeHtml(rawStr)}</span>`;
+        return `<span class="implant-tooth-badge inline-flex items-center justify-center rounded-xl px-2.5 py-1 text-xs font-black text-cyan-800">#${escapeHtml(rawStr)}</span>`;
       }
       const toothId = isPrimaryToothId(rawStr) ? rawStr.toUpperCase() : slot;
       const quadLabel = palmerQuadrantLabel(toothId, slot);
@@ -14614,7 +14631,7 @@
       const fullLabel = chartToothLabel(toothId);
 
       return `
-        <div class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-cyan-200/80 bg-cyan-50/60 px-2.5 py-1 shadow-2xs transition hover:border-cyan-400 hover:bg-cyan-100/50" title="${escapeHtml(fullLabel)} (Universal #${slot})">
+        <div class="implant-tooth-badge inline-flex items-center justify-center gap-1.5 rounded-xl px-2.5 py-1 transition" title="${escapeHtml(fullLabel)} (Universal #${slot})">
           ${palmerNotationSVG(toothId, slot, 'h-6 w-8 text-cyan-800')}
           <span class="font-mono text-[10px] font-black text-cyan-800">${escapeHtml(quadLabel)}</span>
         </div>
@@ -14640,7 +14657,7 @@
       const quadLabel = palmerQuadrantLabel(toothId, slot);
       const symbol = palmerToothNotation(toothId, slot);
       preview.innerHTML = `
-        <div class="inline-flex items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-2 py-0.5">
+        <div class="implant-tooth-badge inline-flex items-center gap-2 rounded-xl px-2.5 py-1">
           ${palmerNotationSVG(toothId, slot, 'h-5 w-7 text-cyan-700')}
           <span class="text-[11px] font-black text-cyan-800">${escapeHtml(symbol)} · ${escapeHtml(quadLabel)} (${escapeHtml(quad.name)})</span>
         </div>
@@ -17435,12 +17452,30 @@
         return;
       }
       if (!confirm('Delete ' + invoiceNumber(invoice.id) + ' and all of its operation items? This cannot be undone.')) return;
-      const { data, error } = await db.from('patient_invoices').delete().eq('id', invoice.id).select('id');
-      if (error || !data?.length) {
-        alert('Could not delete the invoice: ' + (error?.message || 'The invoice was not deleted.'));
-        return;
+      let deleteSuccess = false;
+      try {
+        const { error: rpcError } = await db.rpc('delete_patient_invoice', {
+          p_invoice_id: Number(invoice.id)
+        });
+        if (!rpcError) {
+          deleteSuccess = true;
+        } else {
+          console.warn('RPC delete_patient_invoice failed, falling back to direct delete:', rpcError);
+        }
+      } catch (e) {
+        console.warn('RPC delete_patient_invoice error:', e);
+      }
+      if (!deleteSuccess) {
+        const { data, error } = await db.from('patient_invoices').delete().eq('id', invoice.id).select('id');
+        if (error || !data?.length) {
+          alert('Could not delete the invoice: ' + (error?.message || 'The invoice was not deleted.'));
+          return;
+        }
       }
       await renderPatientInvoices();
+      if (activePatientId === invoice.patientId && hasPageAccess('chart')) {
+        await refreshChartFindingInvoiceState(invoice.patientId);
+      }
       showAppointmentNotificationToast('Invoice deleted', invoiceNumber(invoice.id) + ' was removed.');
     }
 
@@ -17600,8 +17635,12 @@
       const undoReleaseButton = invoice.releases.length && canUndoInvoiceRelease()
         ? '<button type="button" onclick="undoLatestInvoiceRelease(' + invoice.id + ', this)" class="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800 transition hover:bg-amber-100"><i data-lucide="undo-2" class="h-3.5 w-3.5"></i> Undo release</button>'
         : '';
+      const canDeleteInvoice = !invoice.payments.length && !invoice.releases.length && hasPageAccess('patients');
+      const deleteInvoiceButton = canDeleteInvoice
+        ? '<button type="button" onclick="deletePatientInvoice(' + invoice.id + ')" title="Delete invoice" aria-label="Delete invoice" class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-xs font-black text-red-600 transition hover:bg-red-100"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i> Delete</button>'
+        : '';
       return '<article class="overflow-hidden rounded-2xl border transition ' + (complete ? 'border-emerald-200 bg-emerald-50/40 shadow-sm shadow-emerald-900/5' : 'border-slate-200 bg-white hover:border-violet-200') + '">'
-        + '<div class="flex flex-col gap-3 border-b border-slate-100 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><div class="flex flex-wrap items-center gap-2"><span class="font-mono text-[11px] font-black text-slate-700">' + escapeHtml(invoiceNumber(invoice.id)) + '</span><span class="text-[10px] font-bold text-slate-400">' + escapeHtml(formatInvoiceDate(invoice.invoiceDate)) + '</span><span class="rounded-lg border px-2.5 py-1 text-[10px] font-black ' + status.className + '">' + escapeHtml(status.label) + '</span>' + (invoice.releasedAmount > 0 ? '<span class="text-[10px] font-black text-rose-600">' + escapeHtml(formatInvoiceMoney(invoice.releasedAmount)) + ' released</span>' : '') + '</div><div class="flex flex-wrap gap-2">' + payButton + releaseButton + undoReleaseButton + '</div></div>'
+        + '<div class="flex flex-col gap-3 border-b border-slate-100 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><div class="flex flex-wrap items-center gap-2"><span class="font-mono text-[11px] font-black text-slate-700">' + escapeHtml(invoiceNumber(invoice.id)) + '</span><span class="text-[10px] font-bold text-slate-400">' + escapeHtml(formatInvoiceDate(invoice.invoiceDate)) + '</span><span class="rounded-lg border px-2.5 py-1 text-[10px] font-black ' + status.className + '">' + escapeHtml(status.label) + '</span>' + (invoice.releasedAmount > 0 ? '<span class="text-[10px] font-black text-rose-600">' + escapeHtml(formatInvoiceMoney(invoice.releasedAmount)) + ' released</span>' : '') + '</div><div class="flex flex-wrap gap-2">' + payButton + releaseButton + undoReleaseButton + deleteInvoiceButton + '</div></div>'
         + (invoice.loyaltyDiscount > 0 ? '<div class="px-4 py-2">' + invoiceLoyaltyBadge(invoice) + '</div>' : '')
         + '<div class="bg-gradient-to-b from-white to-slate-50/70 pt-2">' + (invoice.items.length ? invoice.items.map(item => invoiceItemMarkup(item, invoice)).join('') : '<p class="px-4 py-5 text-center text-xs font-bold text-slate-400">No invoice items.</p>') + '</div></article>';
     }
@@ -18027,6 +18066,34 @@
         return;
       }
 
+      // Synchronously update navigation rail & mobile bottom bar highlights immediately (zero delay)
+      const primaryNavTarget = ['invoices', 'patient-profile', 'payments', 'loyalty', 'patient-appointments', 'patient-prescriptions'].includes(viewName)
+        ? 'patients'
+        : viewName;
+      const activeNavClass = 'flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition bg-white text-blue-700 shadow-xs';
+      const inactiveNavClass = 'flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900';
+      const navBtnMap = [
+        { id: 'nav-btn-dashboard', view: 'dashboard' },
+        { id: 'nav-btn-patients', view: 'patients' },
+        { id: 'nav-btn-appointments', view: 'appointments' },
+        { id: 'nav-btn-clinic-management', view: 'clinic-management' },
+        { id: 'nav-btn-admin', view: 'admin' },
+        { id: 'nav-btn-settings', view: 'settings' }
+      ];
+      for (const item of navBtnMap) {
+        const btn = document.getElementById(item.id);
+        if (!btn) continue;
+        const permitted = item.view === 'settings' || hasPageAccess(item.view);
+        const isActive = item.view === primaryNavTarget;
+        btn.className = `${permitted ? '' : 'hidden '}${isActive ? activeNavClass : inactiveNavClass}`;
+        if (isActive) {
+          btn.setAttribute('aria-current', 'page');
+        } else {
+          btn.removeAttribute('aria-current');
+        }
+      }
+      window.location.hash = viewName;
+
       if (viewName === 'dashboard') {
         await ensureAppointmentsLoaded();
       } else if (viewName === 'patients') {
@@ -18059,14 +18126,6 @@
       const viewAppointments = document.getElementById('view-appointments');
       const viewAdmin = document.getElementById('view-admin');
       const viewSettings = document.getElementById('view-settings');
-      const btnDashboard = document.getElementById('nav-btn-dashboard');
-      const btnPatients = document.getElementById('nav-btn-patients');
-      const btnAppointments = document.getElementById('nav-btn-appointments');
-      const btnClinicManagement = document.getElementById('nav-btn-clinic-management');
-      const btnAdmin = document.getElementById('nav-btn-admin');
-      const btnSettings = document.getElementById('nav-btn-settings');
-      const activeClass = 'flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition bg-white text-blue-700 shadow-xs';
-      const inactiveClass = 'flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900';
 
       viewDashboard.classList.add('hidden');
       viewPatients.classList.add('hidden');
@@ -18088,14 +18147,7 @@
       viewAppointments.classList.add('hidden');
       viewAdmin.classList.add('hidden');
       viewSettings.classList.add('hidden');
-      btnDashboard.className = `${hasPageAccess('dashboard') ? '' : 'hidden '}${inactiveClass}`;
-      btnPatients.className = `${hasPageAccess('patients') ? '' : 'hidden '}${inactiveClass}`;
-      btnAppointments.className = `${hasPageAccess('appointments') ? '' : 'hidden '}${inactiveClass}`;
-      btnClinicManagement.className = `${hasPageAccess('clinic-management') ? '' : 'hidden '}${inactiveClass}`;
-      btnAdmin.className = `${hasPageAccess('admin') ? '' : 'hidden '}${inactiveClass}`;
-      btnSettings.className = inactiveClass;
-      [btnDashboard, btnPatients, btnAppointments, btnClinicManagement, btnAdmin, btnSettings]
-        .forEach(button => button.removeAttribute('aria-current'));
+
       const appointmentsCalendarActive = viewName === 'appointments';
       const patientQueryActive = viewName === 'patients';
       const dashboardActive = viewName === 'dashboard';
@@ -18109,53 +18161,42 @@
 
       if (viewName === 'dashboard') {
         viewDashboard.classList.remove('hidden');
-        btnDashboard.className = activeClass;
         renderDashboard();
         scheduleDashboardViewportUpdate();
       } else if (viewName === 'patients') {
         viewPatients.classList.remove('hidden');
-        btnPatients.className = activeClass;
         runPatientQuery();
         schedulePatientQueryViewportUpdate();
       } else if (viewName === 'patient-profile') {
         viewPatientProfile.classList.remove('hidden');
-        btnPatients.className = activeClass;
         renderPatientProfile();
       } else if (viewName === 'invoices') {
         viewInvoices.classList.remove('hidden');
-        btnPatients.className = activeClass;
         await renderPatientInvoices();
       } else if (viewName === 'payments') {
         viewPayments.classList.remove('hidden');
-        btnPatients.className = activeClass;
         await renderPatientPayments();
       } else if (viewName === 'loyalty') {
         document.getElementById('view-loyalty').classList.remove('hidden');
-        btnPatients.className = activeClass;
         await renderPatientLoyalty();
         if (!canViewPatientLoyalty()) { await switchView('patient-profile'); return; }
       } else if (viewName === 'patient-appointments') {
         document.getElementById('view-patient-appointments').classList.remove('hidden');
-        btnPatients.className = activeClass;
         await renderPatientAppointments();
       } else if (viewName === 'patient-prescriptions') {
         viewPrescriptions.classList.remove('hidden');
-        btnPatients.className = activeClass;
         await renderPatientPrescriptions();
       } else if (viewName === 'chart') {
         viewChart.classList.remove('hidden');
         loadActivePatientChart();
       } else if (viewName === 'appointments') {
         viewAppointments.classList.remove('hidden');
-        btnAppointments.className = activeClass;
         renderAppointments();
       } else if (viewName === 'clinic-management') {
         viewClinicManagement.classList.remove('hidden');
-        btnClinicManagement.className = activeClass;
         await switchClinicManagementTab(firstAuthorizedClinicManagementTab(), { updateHash: false });
       } else if (viewName === 'admin') {
         viewAdmin.classList.remove('hidden');
-        btnAdmin.className = activeClass;
         try {
           await loadAdminData();
         } catch (error) {
@@ -18163,14 +18204,9 @@
         }
       } else if (viewName === 'settings') {
         viewSettings.classList.remove('hidden');
-        btnSettings.className = activeClass;
         void refreshUiThemePreference();
         await loadGoogleCalendarSettings();
       }
-      const activeNavigationButton = document.getElementById(`nav-btn-${viewName}`);
-      if (activeNavigationButton) activeNavigationButton.setAttribute('aria-current', 'page');
-      else if (['invoices', 'patient-profile', 'payments', 'loyalty', 'patient-appointments', 'patient-prescriptions'].includes(viewName)) btnPatients.setAttribute('aria-current', 'page');
-      window.location.hash = viewName;
       lucide.createIcons();
     }
 

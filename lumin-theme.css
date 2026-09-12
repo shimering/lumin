@@ -188,6 +188,46 @@ body.lumin-raised #view-dashboard #dashboard-attendance-card {
       background: var(--lumin-face);
       box-shadow: var(--lumin-small-raised);
     }
+    body.lumin-raised .implant-tooth-badge {
+      border: 1px solid #ffffff !important;
+      border-top-width: 2px !important;
+      border-radius: 0.75rem;
+      background: var(--lumin-face) !important;
+      box-shadow: var(--lumin-small-raised) !important;
+      color: hsl(var(--lumin-hue) calc(70% * var(--lumin-chroma)) 30%) !important;
+    }
+    body.lumin-raised .implant-tooth-badge:hover {
+      box-shadow: var(--lumin-card-raised) !important;
+    }
+    body.lumin-raised .implant-tooth-badge.implant-tooth-badge-empty {
+      background: var(--lumin-face) !important;
+      color: var(--lumin-muted) !important;
+    }
+    body.lumin-raised .implant-tooth-badge .palmer-bracket {
+      stroke: currentColor !important;
+    }
+    body.lumin-raised .implant-tooth-badge .palmer-symbol {
+      color: inherit !important;
+    }
+    body.lumin-raised #view-implants .overflow-hidden.rounded-2xl.border {
+      border: 1px solid #ffffff;
+      border-top-width: 2px;
+      background: var(--lumin-face);
+      box-shadow: var(--lumin-raised);
+    }
+    body.lumin-raised #view-implants table thead {
+      background: transparent;
+      border-bottom-color: hsl(var(--lumin-hue) calc(55.6% * var(--lumin-chroma)) 91.2%);
+    }
+    body.lumin-raised #view-implants table thead th {
+      color: var(--lumin-muted);
+    }
+    body.lumin-raised #view-implants table tbody tr {
+      border-bottom-color: hsl(var(--lumin-hue) calc(55.6% * var(--lumin-chroma)) 93%);
+    }
+    body.lumin-raised #view-implants table tbody tr:hover {
+      background: hsl(var(--lumin-hue) calc(100% * var(--lumin-chroma)) 98% / 0.5);
+    }
     body.lumin-raised #dashboard-scroll-panels { gap: 1.5rem; }
     body.lumin-raised #view-dashboard .dashboard-scroll-card > div:first-child {
       padding: 1.25rem;
