@@ -9245,7 +9245,7 @@
     }
 
     async function fetchDentalCustomization() {
-      if (!currentSession || (!hasPageAccess('chart') && !hasPageAccess('prices') && !hasPageAccess('admin'))) {
+      if (!currentSession || (!hasPageAccess('chart') && !hasPageAccess('prices') && !hasPageAccess('implants') && !hasPageAccess('admin'))) {
         dentalSpecialties = [];
         dentalOperations = [];
         dentalCustomizationLoaded = false;
@@ -9274,7 +9274,7 @@
 
     async function ensureDentalCustomizationLoaded() {
       if (dentalCustomizationLoaded) return true;
-      if (!currentSession || (!hasPageAccess('chart') && !hasPageAccess('prices') && !hasPageAccess('admin'))) return false;
+      if (!currentSession || (!hasPageAccess('chart') && !hasPageAccess('prices') && !hasPageAccess('implants') && !hasPageAccess('admin'))) return false;
       if (!dentalCustomizationLoadPromise) {
         dentalCustomizationLoadPromise = fetchDentalCustomization()
           .finally(() => { dentalCustomizationLoadPromise = null; });
