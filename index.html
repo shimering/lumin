@@ -837,29 +837,43 @@
     .clinical-odontogram-stage .tooth-card {
       min-height: clamp(148px, 14vw, 178px);
       justify-content: center;
-      gap: 0.2rem;
-      border: 0;
-      border-radius: 0;
+      gap: 0.25rem;
+      border: 1.5px solid transparent;
+      border-radius: 0.75rem;
       background: transparent;
       padding: clamp(3px, 0.4vw, 7px) clamp(1px, 0.2vw, 4px);
       box-shadow: none;
       overflow: visible;
+      transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+      touch-action: manipulation;
+      position: relative;
     }
     .clinical-odontogram-stage .tooth-card:hover {
       z-index: 8;
-      border-color: transparent;
-      background: transparent;
-      box-shadow: none;
-      transform: none;
+      border-color: rgba(186, 230, 253, 0.75);
+      background: rgba(240, 249, 255, 0.55);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px -2px rgba(14, 165, 233, 0.12);
     }
     .clinical-odontogram-stage .tooth-card.is-active-tooth {
-      border-color: transparent !important;
-      background: transparent !important;
-      box-shadow: none !important;
+      z-index: 10;
+      border-color: #0284c7 !important;
+      background: linear-gradient(180deg, #f0f9ff 0%, #ffffff 100%) !important;
+      box-shadow: 0 0 0 2px #38bdf8, 0 8px 22px -3px rgba(14, 165, 233, 0.38) !important;
+      transform: translateY(-4px) scale(1.035) !important;
     }
     .clinical-odontogram-stage .tooth-card.is-primary-tooth {
       border-color: transparent;
       background: transparent;
+    }
+    .clinical-odontogram-stage .tooth-card.is-primary-tooth:hover {
+      border-color: rgba(199, 210, 254, 0.75);
+      background: rgba(238, 242, 255, 0.55);
+    }
+    .clinical-odontogram-stage .tooth-card.is-primary-tooth.is-active-tooth {
+      border-color: #6366f1 !important;
+      background: linear-gradient(180deg, #eef2ff 0%, #ffffff 100%) !important;
+      box-shadow: 0 0 0 2px #818cf8, 0 8px 22px -3px rgba(99, 102, 241, 0.38) !important;
     }
     .clinical-odontogram-stage .tooth-card.has-charted-finding::after { display: none; }
     .clinical-odontogram-stage .odontogram-anatomy {
@@ -868,18 +882,19 @@
       height: auto !important;
       margin: 0;
       aspect-ratio: 64 / 92;
-      filter: none;
+      filter: drop-shadow(0 2px 3px rgba(71, 50, 25, 0.12));
       transition: filter 0.18s ease, transform 0.18s ease;
     }
     .clinical-odontogram-stage .tooth-photo-stage {
       filter: drop-shadow(0 2px 2px rgba(71, 50, 25, 0.16));
     }
     .clinical-odontogram-stage .tooth-card:hover .odontogram-anatomy {
-      filter: drop-shadow(0 4px 5px rgba(71, 50, 25, 0.18));
+      filter: drop-shadow(0 4px 8px rgba(71, 50, 25, 0.18));
       transform: translateY(-1px) scale(1.025);
     }
     .clinical-odontogram-stage .tooth-card.is-active-tooth .odontogram-anatomy {
-      filter: drop-shadow(0 0 4px rgba(37, 99, 235, 0.72));
+      filter: drop-shadow(0 0 8px rgba(14, 165, 233, 0.6)) drop-shadow(0 3px 6px rgba(0, 0, 0, 0.15));
+      transform: translateY(-1px) scale(1.03);
     }
     .clinical-odontogram-stage .clinical-tooth-svg {
       overflow: visible;
@@ -949,9 +964,9 @@
     }
     .clinical-odontogram-stage .tooth-number-badge {
       width: 100%;
-      height: 2rem;
-      border: 0;
-      border-radius: 0;
+      height: 1.85rem;
+      border: 1px solid transparent;
+      border-radius: 0.4rem;
       background: transparent;
       box-shadow: none;
       color: #475569;
@@ -959,15 +974,26 @@
       font-size: clamp(9px, 1vw, 13px);
       font-weight: 700;
       letter-spacing: 0.01em;
+      transition: all 0.18s ease;
     }
-    .clinical-odontogram-stage .tooth-card.has-charted-finding .tooth-number-badge,
+    .clinical-odontogram-stage .tooth-card.has-charted-finding .tooth-number-badge {
+      color: #4338ca;
+      font-weight: 800;
+    }
     .clinical-odontogram-stage .tooth-card.is-active-tooth .tooth-number-badge {
-      color: #5b21b6;
-      background: transparent;
+      color: #0369a1;
+      background: rgba(14, 165, 233, 0.14);
+      border-color: rgba(14, 165, 233, 0.35);
+      font-weight: 800;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 1px 3px rgba(14, 165, 233, 0.15);
     }
     .clinical-odontogram-stage .tooth-card.is-primary-tooth .tooth-number-badge {
-      color: #4f46e5;
-      background: transparent;
+      color: #6366f1;
+    }
+    .clinical-odontogram-stage .tooth-card.is-primary-tooth.is-active-tooth .tooth-number-badge {
+      color: #4338ca;
+      background: rgba(99, 102, 241, 0.14);
+      border-color: rgba(99, 102, 241, 0.35);
     }
     .clinical-odontogram-stage .photo-implant {
       width: 0.9rem;
@@ -2465,7 +2491,7 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="lumin-theme.css?v=7" />
+  <link rel="stylesheet" href="lumin-theme.css?v=8" />
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 font-sans antialiased selection:bg-blue-100">
 
@@ -2473,34 +2499,57 @@
   <svg class="hidden" width="0" height="0">
     <defs>
       <linearGradient id="upperEnamelGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stop-color="#ead7ad" />
-        <stop offset="42%" stop-color="#fff8df" />
-        <stop offset="66%" stop-color="#fffef8" />
-        <stop offset="87%" stop-color="#edf7fb" />
+        <stop offset="0%" stop-color="#edd8b2" />
+        <stop offset="35%" stop-color="#fff8df" />
+        <stop offset="65%" stop-color="#fffef8" />
+        <stop offset="86%" stop-color="#edf7fb" />
         <stop offset="100%" stop-color="#cbdde6" />
       </linearGradient>
 
       <linearGradient id="lowerEnamelGrad" x1="0%" y1="0%" x2="0%" y2="100%">
         <stop offset="0%" stop-color="#cbdde6" />
-        <stop offset="13%" stop-color="#edf7fb" />
-        <stop offset="34%" stop-color="#fffef8" />
-        <stop offset="58%" stop-color="#fff8df" />
-        <stop offset="100%" stop-color="#ead7ad" />
+        <stop offset="14%" stop-color="#edf7fb" />
+        <stop offset="35%" stop-color="#fffef8" />
+        <stop offset="65%" stop-color="#fff8df" />
+        <stop offset="100%" stop-color="#edd8b2" />
       </linearGradient>
 
       <linearGradient id="upperRootGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stop-color="#c49355" />
-        <stop offset="16%" stop-color="#dfbd82" />
-        <stop offset="56%" stop-color="#f6e6bf" />
+        <stop offset="0%" stop-color="#b68344" />
+        <stop offset="25%" stop-color="#d8b277" />
+        <stop offset="70%" stop-color="#fcf2dc" />
         <stop offset="100%" stop-color="#ead09b" />
       </linearGradient>
 
       <linearGradient id="lowerRootGrad" x1="0%" y1="0%" x2="0%" y2="100%">
         <stop offset="0%" stop-color="#ead09b" />
-        <stop offset="44%" stop-color="#f6e6bf" />
-        <stop offset="84%" stop-color="#dfbd82" />
-        <stop offset="100%" stop-color="#c49355" />
+        <stop offset="30%" stop-color="#fcf2dc" />
+        <stop offset="75%" stop-color="#d8b277" />
+        <stop offset="100%" stop-color="#b68344" />
       </linearGradient>
+
+      <!-- 3D Cylindrical Volume Shading for Crown & Root -->
+      <linearGradient id="enamelLateralShadow" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#7c5421" stop-opacity="0.24" />
+        <stop offset="20%" stop-color="#e8cf9b" stop-opacity="0.07" />
+        <stop offset="50%" stop-color="#ffffff" stop-opacity="0.30" />
+        <stop offset="80%" stop-color="#e8cf9b" stop-opacity="0.07" />
+        <stop offset="100%" stop-color="#7c5421" stop-opacity="0.24" />
+      </linearGradient>
+
+      <linearGradient id="rootLateralShade" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#694315" stop-opacity="0.30" />
+        <stop offset="28%" stop-color="#deb474" stop-opacity="0.05" />
+        <stop offset="50%" stop-color="#ffffff" stop-opacity="0.25" />
+        <stop offset="72%" stop-color="#deb474" stop-opacity="0.05" />
+        <stop offset="100%" stop-color="#694315" stop-opacity="0.30" />
+      </linearGradient>
+
+      <radialGradient id="enamelSpecularGloss" cx="38%" cy="38%" r="55%">
+        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.60" />
+        <stop offset="50%" stop-color="#ffffff" stop-opacity="0.12" />
+        <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+      </radialGradient>
 
       <linearGradient id="toothCervicalShade" x1="0%" y1="0%" x2="100%" y2="0%">
         <stop offset="0%" stop-color="#b98a4e" stop-opacity="0.48" />
@@ -12312,14 +12361,19 @@
       const rootHighlight = isUpper
         ? '<path d="M22 54 C20 40 21 22 25 10" fill="none" stroke="#fff8e7" stroke-width="1.25" stroke-linecap="round" opacity="0.58" />'
         : '<path d="M22 38 C20 52 21 70 25 82" fill="none" stroke="#fff8e7" stroke-width="1.25" stroke-linecap="round" opacity="0.58" />';
+      const rootFill = isUpper ? 'url(#upperRootGrad)' : 'url(#lowerRootGrad)';
+      const crownFill = isUpper ? 'url(#upperEnamelGrad)' : 'url(#lowerEnamelGrad)';
       const rootSVG = `
         <g>
-          <path id="root-body-${id}" d="${rootPath}" fill="#fff7e7" stroke="${rootStroke}" stroke-width="1.15" stroke-linejoin="round" />
+          <path id="root-body-${id}" d="${rootPath}" fill="${rootFill}" stroke="${rootStroke}" stroke-width="1.15" stroke-linejoin="round" />
+          <path d="${rootPath}" fill="url(#rootLateralShade)" style="mix-blend-mode:multiply;pointer-events:none" />
           ${rootHighlight}${rootDetails}
         </g>`;
       const crownSVG = `
         <g>
-          <path id="crown-body-${id}" d="${crownPath}" fill="#fffcf5" stroke="${crownStroke}" stroke-width="1.25" stroke-linejoin="round" />
+          <path id="crown-body-${id}" d="${crownPath}" fill="${crownFill}" stroke="${crownStroke}" stroke-width="1.25" stroke-linejoin="round" />
+          <path d="${crownPath}" fill="url(#enamelLateralShadow)" style="mix-blend-mode:multiply;pointer-events:none" />
+          <path d="${crownPath}" fill="url(#enamelSpecularGloss)" style="mix-blend-mode:screen;pointer-events:none" />
           ${cervicalLine}${crownHighlight}${crownDetails}
         </g>`;
 
@@ -12464,7 +12518,7 @@
       const id = String(toothId);
       const isUpper = slot >= 1 && slot <= 16;
       const isPrimary = dentition === 'primary';
-      const anatomyPhoto = generateRealisticToothPhoto(id, slot);
+      const anatomyGraphic = generateRealisticToothSVG(id, slot);
       const surfaceMap = generateSurfaceMapSVG(id, slot);
       const correspondingTooth = PRIMARY_TOOTH_BY_SLOT[slot];
       const targetLabel = isPrimary
@@ -12485,10 +12539,10 @@
              aria-keyshortcuts="Shift+Enter"
              aria-label="${chartToothLabel(id)}. ${escapeHtml(longPressLabel)}."
              title="${escapeHtml(longPressLabel)}"
-             class="tooth-card relative flex min-w-0 flex-1 cursor-pointer select-none flex-col items-center transition-colors ${isPrimary ? 'is-primary-tooth' : ''} ${hasFinding ? 'has-charted-finding' : ''}">
+             class="tooth-card relative flex min-w-0 flex-1 cursor-pointer select-none flex-col items-center transition-all ${isPrimary ? 'is-primary-tooth' : ''} ${hasFinding ? 'has-charted-finding' : ''}">
           ${isUpper
-            ? anatomyPhoto + surfaceMap + `<span class="tooth-number-badge pointer-events-none">${escapeHtml(palmerQuadrantLabel(id, slot))}</span>`
-            : `<span class="tooth-number-badge pointer-events-none">${escapeHtml(palmerQuadrantLabel(id, slot))}</span>` + surfaceMap + anatomyPhoto}
+            ? anatomyGraphic + surfaceMap + `<span class="tooth-number-badge pointer-events-none">${escapeHtml(palmerQuadrantLabel(id, slot))}</span>`
+            : `<span class="tooth-number-badge pointer-events-none">${escapeHtml(palmerQuadrantLabel(id, slot))}</span>` + surfaceMap + anatomyGraphic}
         </div>`;
     }
 
@@ -18750,6 +18804,9 @@
         });
         setChartSelectionTargets(targets, tooth);
       }
+      if (typeof window !== 'undefined' && window.navigator?.vibrate) {
+        try { window.navigator.vibrate(15); } catch (_) {}
+      }
       updateSelectionUI();
     }
 
@@ -18866,6 +18923,9 @@
         }
       }
       setChartSelectionTargets(targets, id);
+      if (typeof window !== 'undefined' && window.navigator?.vibrate) {
+        try { window.navigator.vibrate(12); } catch (_) {}
+      }
       updateSelectionUI();
     }
 
@@ -19147,11 +19207,11 @@
       }
 
       if (crownBody) {
-        crownBody.setAttribute('fill', '#fffcf5');
+        crownBody.setAttribute('fill', isUpper ? 'url(#upperEnamelGrad)' : 'url(#lowerEnamelGrad)');
         crownBody.setAttribute('stroke', isPrimary ? '#a5a0d8' : '#d0ad73');
       }
       if (rootBody) {
-        rootBody.setAttribute('fill', '#fff7e7');
+        rootBody.setAttribute('fill', isUpper ? 'url(#upperRootGrad)' : 'url(#lowerRootGrad)');
         rootBody.setAttribute('stroke', '#d0ad73');
       }
 
@@ -19163,6 +19223,10 @@
         anatomyOverlay.innerHTML = `<span class="text-2xl font-black drop-shadow-md" style="color:${structureStatus.color}">×</span>`;
       } else if (structureVisualCode === 'implant') {
         if (toothPhoto) toothPhoto.style.opacity = '0.08';
+        if (rootBody) {
+          rootBody.setAttribute('fill', 'url(#titaniumGrad)');
+          rootBody.setAttribute('stroke', '#475569');
+        }
         anatomyOverlay.innerHTML = `<span class="photo-implant" style="--operation-status-color:${structureStatus.color}"></span>`;
       } else if (structureVisualCode === 'impacted') {
         anatomyGroup.style.transform = 'rotate(25deg) scale(0.9)';
@@ -19185,7 +19249,12 @@
           crownOverlay.style.mixBlendMode = 'multiply';
         }
         if (crownBody) {
-          crownBody.setAttribute('fill', restorationStatus.color);
+          const resCode = restorationFinding.visualCode;
+          let fillValue = restorationStatus.color;
+          if (resCode === 'gold_crown') fillValue = 'url(#goldCrownGrad)';
+          else if (resCode === 'ceramic_crown') fillValue = 'url(#ceramicCrownGrad)';
+          else if (resCode === 'zirconia_crown') fillValue = 'url(#zirconiaCrownGrad)';
+          crownBody.setAttribute('fill', fillValue);
           crownBody.setAttribute('stroke', restorationStatus.color);
         }
       }
