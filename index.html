@@ -1649,6 +1649,63 @@
     #prices-procedures-table tbody tr:last-child td {
       border-bottom: none !important;
     }
+    /* Neomorphic Category Tabs */
+    #prices-category-tabs {
+      scrollbar-width: thin;
+      scrollbar-color: #cbd5e1 transparent;
+    }
+    #prices-category-tabs::-webkit-scrollbar {
+      height: 5px;
+    }
+    #prices-category-tabs::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    #prices-category-tabs::-webkit-scrollbar-thumb {
+      background-color: #cbd5e1;
+      border-radius: 9999px;
+    }
+    #prices-category-tabs::-webkit-scrollbar-thumb:hover {
+      background-color: #94a3b8;
+    }
+    .prices-category-tab {
+      border: none !important;
+      outline: none !important;
+      background: linear-gradient(145deg, #ffffff, #f1f5f9) !important;
+      border-radius: 14px !important;
+      box-shadow: 3px 3px 8px rgba(160, 175, 200, 0.32), -3px -3px 8px rgba(255, 255, 255, 0.95) !important;
+      transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.18s cubic-bezier(0.4, 0, 0.2, 1), background 0.18s ease !important;
+      user-select: none !important;
+      -webkit-user-select: none !important;
+      touch-action: pan-x;
+      cursor: pointer;
+    }
+    .prices-category-tab:hover:not(.is-dragging):not(.is-selected) {
+      box-shadow: 4px 4px 12px rgba(160, 175, 200, 0.42), -4px -4px 11px rgba(255, 255, 255, 1) !important;
+      transform: translateY(-1.5px);
+    }
+    .prices-category-tab.is-selected {
+      background: #edf2f7 !important;
+      box-shadow: inset 2.5px 2.5px 5px rgba(148, 163, 184, 0.4), inset -2.5px -2.5px 5px rgba(255, 255, 255, 0.95), 0 0 0 2px var(--tab-accent, #2563eb) !important;
+      transform: translateY(0) !important;
+    }
+    .prices-category-tab.is-pressing {
+      transform: scale(0.96) !important;
+      box-shadow: inset 2px 2px 4px rgba(160, 175, 200, 0.3), inset -2px -2px 4px rgba(255, 255, 255, 0.9) !important;
+    }
+    .prices-category-tab.is-dragging {
+      z-index: 50 !important;
+      transform: scale(1.08) translateY(-4px) !important;
+      background: #ffffff !important;
+      box-shadow: 0 14px 28px rgba(37, 99, 235, 0.28), 0 6px 12px rgba(0, 0, 0, 0.12), 0 0 0 2.5px var(--tab-accent, #2563eb) !important;
+      opacity: 0.96;
+      cursor: grabbing !important;
+      transition: transform 0.12s ease, box-shadow 0.12s ease !important;
+    }
+    .prices-category-icon-box {
+      border: none !important;
+      outline: none !important;
+      box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.06), inset -1px -1px 2px rgba(255, 255, 255, 0.85);
+    }
     #modal-new-patient.is-over-appointment { z-index: 80 !important; }
     #modal-appointment.is-behind-patient-modal > div {
       pointer-events: none;
@@ -4441,7 +4498,7 @@
             <span id="prices-category-label" class="text-[11px] font-black uppercase tracking-wider text-slate-400">Categories & Specialties</span>
             <span id="prices-filtered-count" class="text-xs font-bold text-slate-500">0 results</span>
           </div>
-          <div id="prices-category-tabs" role="tablist" aria-label="Procedure categories" class="flex snap-x snap-mandatory gap-2.5 overflow-x-auto overscroll-x-contain pb-2 scrollbar-none touch-pan-x">
+          <div id="prices-category-tabs" role="tablist" aria-label="Procedure categories" class="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain py-3 px-1.5 touch-pan-x">
             <!-- Populated dynamically -->
           </div>
         </div>
@@ -9315,6 +9372,7 @@
       if (specialtiesResult.error) throw specialtiesResult.error;
       if (operationsResult.error) throw operationsResult.error;
       dentalSpecialties = (specialtiesResult.data || []).map(normaliseDentalSpecialty);
+      applySavedPricesSpecialtiesOrder();
       dentalOperations = (operationsResult.data || []).map(normaliseDentalOperation);
       dentalCustomizationLoaded = true;
       renderClinicalActionSelectors();
@@ -18860,7 +18918,178 @@
       renderPricesTable();
     }
 
+    let pricesLongPressTimer = null;
+    let pricesActiveDragCard = null;
+    let pricesActivePointerId = null;
+    let pricesDragStartX = 0;
+    let pricesDragStartY = 0;
+    let pricesIsDragging = false;
+    let pricesDidDrag = false;
+    let pricesDragListenersInitialized = false;
+
+    function applySavedPricesSpecialtiesOrder() {
+      try {
+        const raw = localStorage.getItem('lumin_prices_specialties_order');
+        if (!raw) return;
+        const order = JSON.parse(raw);
+        if (!Array.isArray(order) || !order.length) return;
+        const orderMap = new Map(order.map((id, idx) => [id, idx]));
+        dentalSpecialties.sort((a, b) => {
+          const idxA = orderMap.has(a.id) ? orderMap.get(a.id) : (a.sortOrder ?? 999);
+          const idxB = orderMap.has(b.id) ? orderMap.get(b.id) : (b.sortOrder ?? 999);
+          return idxA - idxB;
+        });
+      } catch (e) {
+        console.warn('Could not apply saved specialties order:', e);
+      }
+    }
+
+    function initPricesCategoryDrag() {
+      const container = document.getElementById('prices-category-tabs');
+      if (!container || pricesDragListenersInitialized) return;
+      pricesDragListenersInitialized = true;
+
+      container.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0 && e.button !== undefined) return;
+        const card = e.target.closest('.prices-category-tab');
+        if (!card || !container.contains(card)) return;
+
+        // "All" tab remains fixed anchor at the beginning
+        if (card.dataset.specialtyId === 'all') return;
+
+        pricesActiveDragCard = card;
+        pricesActivePointerId = e.pointerId;
+        pricesDragStartX = e.clientX;
+        pricesDragStartY = e.clientY;
+        pricesIsDragging = false;
+        pricesDidDrag = false;
+
+        card.classList.add('is-pressing');
+
+        clearTimeout(pricesLongPressTimer);
+        pricesLongPressTimer = setTimeout(() => {
+          if (!pricesActiveDragCard) return;
+          pricesIsDragging = true;
+          pricesDidDrag = true;
+          pricesActiveDragCard.classList.remove('is-pressing');
+          pricesActiveDragCard.classList.add('is-dragging');
+
+          try {
+            if (navigator.vibrate) navigator.vibrate(50);
+          } catch (_) {}
+
+          try {
+            pricesActiveDragCard.setPointerCapture(pricesActivePointerId);
+          } catch (_) {}
+        }, 500); // 0.5 sec long-press
+      });
+
+      container.addEventListener('pointermove', (e) => {
+        if (!pricesActiveDragCard) return;
+
+        if (!pricesIsDragging) {
+          const dist = Math.hypot(e.clientX - pricesDragStartX, e.clientY - pricesDragStartY);
+          if (dist > 8) {
+            clearTimeout(pricesLongPressTimer);
+            pricesActiveDragCard.classList.remove('is-pressing');
+            pricesActiveDragCard = null;
+          }
+          return;
+        }
+
+        e.preventDefault();
+
+        // Edge auto-scrolling
+        const containerRect = container.getBoundingClientRect();
+        if (e.clientX < containerRect.left + 50) {
+          container.scrollLeft -= 8;
+        } else if (e.clientX > containerRect.right - 50) {
+          container.scrollLeft += 8;
+        }
+
+        // Reorder specialty cards in real-time
+        const cards = Array.from(container.querySelectorAll('.prices-category-tab:not([data-specialty-id="all"])'));
+        const target = cards.find(c => {
+          if (c === pricesActiveDragCard) return false;
+          const r = c.getBoundingClientRect();
+          return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top - 30 && e.clientY <= r.bottom + 30;
+        });
+
+        if (target) {
+          const targetRect = target.getBoundingClientRect();
+          const isAfter = e.clientX > (targetRect.left + targetRect.width / 2);
+          if (isAfter) {
+            if (target.nextSibling !== pricesActiveDragCard) {
+              container.insertBefore(pricesActiveDragCard, target.nextSibling);
+            }
+          } else {
+            if (target !== pricesActiveDragCard.nextSibling) {
+              container.insertBefore(pricesActiveDragCard, target);
+            }
+          }
+        }
+      });
+
+      const handlePointerEnd = () => {
+        clearTimeout(pricesLongPressTimer);
+        if (!pricesActiveDragCard) return;
+
+        pricesActiveDragCard.classList.remove('is-pressing');
+
+        if (pricesIsDragging) {
+          const card = pricesActiveDragCard;
+          card.classList.remove('is-dragging');
+          try {
+            if (card.hasPointerCapture && card.hasPointerCapture(pricesActivePointerId)) {
+              card.releasePointerCapture(pricesActivePointerId);
+            }
+          } catch (_) {}
+
+          // Read the new order of specialties from DOM
+          const specialtyCards = Array.from(container.querySelectorAll('.prices-category-tab[data-specialty-id]'));
+          const newOrderIds = specialtyCards.map(c => c.dataset.specialtyId).filter(id => id && id !== 'all');
+
+          try {
+            localStorage.setItem('lumin_prices_specialties_order', JSON.stringify(newOrderIds));
+          } catch (_) {}
+
+          const orderMap = new Map(newOrderIds.map((id, idx) => [id, idx]));
+          dentalSpecialties.sort((a, b) => {
+            const idxA = orderMap.has(a.id) ? orderMap.get(a.id) : (a.sortOrder ?? 999);
+            const idxB = orderMap.has(b.id) ? orderMap.get(b.id) : (b.sortOrder ?? 999);
+            return idxA - idxB;
+          });
+
+          // Sync with database if admin
+          if (Boolean(currentUserAccess?.isAdmin) && typeof db !== 'undefined') {
+            newOrderIds.forEach((id, idx) => {
+              db.from('dental_specialties').update({ sort_order: idx + 1 }).eq('id', id).then();
+            });
+          }
+
+          if (pricesSortOrder === 'default') {
+            renderPricesTable();
+          }
+
+          pricesIsDragging = false;
+          pricesActiveDragCard = null;
+          pricesActivePointerId = null;
+
+          setTimeout(() => {
+            pricesDidDrag = false;
+          }, 200);
+        } else {
+          pricesActiveDragCard = null;
+          pricesActivePointerId = null;
+        }
+      };
+
+      container.addEventListener('pointerup', handlePointerEnd);
+      container.addEventListener('pointercancel', handlePointerEnd);
+    }
+
     function selectPricesCategory(categoryId) {
+      if (pricesDidDrag) return;
       selectedPricesCategory = categoryId;
       renderPricesCategoryTabs();
       renderPricesTable();
@@ -18869,17 +19098,18 @@
     function renderPricesCategoryTabs() {
       const container = document.getElementById('prices-category-tabs');
       if (!container) return;
+      applySavedPricesSpecialtiesOrder();
+      initPricesCategoryDrag();
+
       const isAr = pricesPageLanguage === 'ar';
       const activeOps = dentalOperations.filter(op => op.active);
 
       // "All" tab
       const allSelected = selectedPricesCategory === 'all';
-      const allActiveClasses = 'border-blue-400 bg-blue-50/80 text-blue-900 shadow-sm ring-2 ring-blue-500/20';
-      const allInactiveClasses = 'border-slate-200/80 bg-slate-50/70 text-slate-600 hover:border-slate-300 hover:bg-white hover:text-slate-900 shadow-2xs';
 
       let html = `
-        <button type="button" role="tab" aria-selected="${allSelected}" onclick="selectPricesCategory('all')" class="group relative flex shrink-0 snap-start items-center gap-2.5 rounded-xl border px-3.5 py-2 transition ${allSelected ? allActiveClasses : allInactiveClasses}">
-          <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ${allSelected ? 'bg-blue-600 text-white shadow-xs' : 'bg-blue-50 text-blue-600 border border-blue-100'}">
+        <button type="button" role="tab" aria-selected="${allSelected}" data-specialty-id="all" onclick="selectPricesCategory('all')" class="prices-category-tab group relative flex shrink-0 snap-start items-center gap-2.5 px-3.5 py-2.5 ${allSelected ? 'is-selected' : ''}" style="--tab-accent:#2563eb">
+          <span class="prices-category-icon-box flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition ${allSelected ? 'bg-blue-600 text-white shadow-xs' : 'bg-blue-50 text-blue-600'}">
             <i data-lucide="layers" class="h-4 w-4"></i>
           </span>
           <div class="flex flex-col text-start">
@@ -18896,12 +19126,10 @@
         const count = activeOps.filter(op => op.specialtyId === specialty.id).length;
         const isSelected = selectedPricesCategory === specialty.id;
         const accent = normaliseSpecialtyAccentColor(specialty.accentColor);
-        const tabActiveClasses = 'border-slate-300 bg-white text-slate-900 shadow-sm ring-2 ring-blue-500/20';
-        const tabInactiveClasses = 'border-slate-200/80 bg-slate-50/70 text-slate-600 hover:border-slate-300 hover:bg-white hover:text-slate-900 shadow-2xs';
 
         html += `
-          <button type="button" role="tab" aria-selected="${isSelected}" onclick="selectPricesCategory('${specialty.id}')" title="${escapeHtml(specialty.description || specialty.name)}" class="group relative flex shrink-0 snap-start items-center gap-2.5 rounded-xl border px-3 py-2 transition ${isSelected ? tabActiveClasses : tabInactiveClasses}" style="--specialty-accent:${accent}">
-            <span class="flex h-8 w-9 shrink-0 items-center justify-center rounded-lg transition" style="background:${accent}12;border:1px solid ${accent}28">
+          <button type="button" role="tab" aria-selected="${isSelected}" data-specialty-id="${specialty.id}" onclick="selectPricesCategory('${specialty.id}')" title="${escapeHtml(specialty.description || specialty.name)}" class="prices-category-tab group relative flex shrink-0 snap-start items-center gap-2.5 px-3 py-2.5 ${isSelected ? 'is-selected' : ''}" style="--tab-accent:${accent}">
+            <span class="prices-category-icon-box flex h-8 w-9 shrink-0 items-center justify-center rounded-xl transition" style="background:${accent}15;color:${accent}">
               ${specialtyIconMarkup(specialty.iconName, accent, 'compact')}
             </span>
             <div class="flex flex-col text-start">
