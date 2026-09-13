@@ -3649,13 +3649,66 @@
       </div>
     </div>
 
+    <!-- Modal: Change Media Category / Move Photo -->
+    <div id="patient-media-move-modal" role="dialog" aria-modal="true" class="fixed inset-0 z-[95] hidden items-center justify-center p-4 overflow-y-auto" style="background-color: rgba(15, 23, 42, 0.55); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);" onclick="if (event.target === this) closePatientMediaMoveModal()">
+      <div class="relative w-full max-w-sm rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150 my-auto">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+          <div class="flex items-center gap-2.5">
+            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path><path d="m11 10 3 3-3 3"></path><path d="M14 13H8"></path></svg>
+            </span>
+            <div>
+              <h3 class="text-sm font-black text-slate-800">Change Category</h3>
+              <p class="text-[11px] text-slate-400">Move photo to another section</p>
+            </div>
+          </div>
+          <button type="button" onclick="closePatientMediaMoveModal()" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+
+        <div class="mb-4 rounded-xl bg-slate-50 p-3 border border-slate-100">
+          <p class="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-0.5">Selected File</p>
+          <p id="move-media-filename-display" class="text-xs font-bold text-slate-800 truncate"></p>
+          <p id="move-media-current-category" class="text-[11px] text-blue-600 font-semibold mt-0.5"></p>
+        </div>
+
+        <form id="form-move-patient-media" onsubmit="handleMovePatientMediaSubmit(event)" class="space-y-4">
+          <input type="hidden" id="move-media-relative-path" value="" />
+          <div>
+            <label for="move-media-target-category" class="block text-xs font-bold text-slate-700 mb-1.5">New Category *</label>
+            <select id="move-media-target-category" required class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="Panoramic">Panoramic X-Ray</option>
+              <option value="Periapical">Periapical / Bitewings</option>
+              <option value="Intraoral">Intraoral Clinical Photo</option>
+              <option value="Facial">Extraoral / Facial Photo</option>
+              <option value="Lab">Lab Document / Report</option>
+              <option value="General">General Record</option>
+            </select>
+          </div>
+
+          <p id="move-media-error" class="hidden rounded-xl bg-red-50 p-2.5 text-xs font-bold text-red-600"></p>
+
+          <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <button type="button" onclick="closePatientMediaMoveModal()" class="rounded-xl border border-slate-200 px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">Cancel</button>
+            <button id="btn-submit-move-media" type="submit" class="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white hover:bg-blue-700 shadow-sm transition">
+              <span>Save & Move</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- Diagnostic Lightbox Viewer Modal -->
     <div id="patient-media-lightbox" role="dialog" aria-modal="true" onclick="if (event.target === this) closeMediaLightbox()" class="fixed inset-0 z-[85] hidden items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto" style="background-color: rgba(15, 23, 42, 0.55); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);">
       <div class="relative flex flex-col w-full max-w-2xl h-[70vh] max-h-[520px] min-h-[320px] bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150">
         <!-- Lightbox Header / Controls -->
         <div class="flex items-center justify-between border-b border-slate-200/80 bg-slate-50/90 px-3.5 py-2.5 sm:px-4 gap-2 shrink-0 z-20 flex-nowrap backdrop-blur-xs">
           <div class="flex items-center gap-2 min-w-0">
-            <span id="lightbox-category-badge" class="rounded-lg bg-blue-50 text-blue-700 border border-blue-200/70 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider shrink-0"></span>
+            <button type="button" onclick="openMoveCategoryFromCurrentLightbox()" title="Click to change category" class="rounded-lg bg-blue-50 hover:bg-blue-100 active:bg-blue-200 text-blue-700 border border-blue-200/70 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider shrink-0 flex items-center gap-1 transition">
+              <span id="lightbox-category-badge"></span>
+              <svg class="h-3 w-3 opacity-60" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
             <div class="min-w-0">
               <h4 id="lightbox-filename" class="text-xs sm:text-sm font-black text-slate-800 truncate max-w-[120px] sm:max-w-[200px]"></h4>
             </div>
@@ -3682,6 +3735,11 @@
             <!-- Invert Button -->
             <button id="lightbox-invert-btn" type="button" onclick="lightboxToggleInvert()" title="Invert Colors (Radiography Contrast)" aria-label="Invert Contrast" class="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200/90 shadow-2xs transition">
               <svg class="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a10 10 0 0 1 0 20Z" fill="currentColor"></path></svg>
+            </button>
+            
+            <!-- Change Category Button -->
+            <button type="button" onclick="openMoveCategoryFromCurrentLightbox()" title="Change Category" aria-label="Change Category" class="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200/90 shadow-2xs transition">
+              <svg class="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path><path d="m11 10 3 3-3 3"></path><path d="M14 13H8"></path></svg>
             </button>
             
             <!-- Download Button -->
@@ -18982,7 +19040,7 @@
 
         return `
           <article class="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs transition hover:border-blue-300 hover:shadow-md">
-            <div class="relative cursor-pointer overflow-hidden bg-slate-100" onclick="openMediaLightbox('${fileUrl}', '${escapeHtml(file.category)}', '${escapeHtml(file.filename)}', '${escapeHtml(dateDisplay)}', '${thumbUrl}')">
+            <div class="relative cursor-pointer overflow-hidden bg-slate-100" onclick="openMediaLightbox('${fileUrl}', '${escapeHtml(file.category)}', '${escapeHtml(file.filename)}', '${escapeHtml(dateDisplay)}', '${thumbUrl}', '${escapeHtml(file.relativePath)}')">
               ${previewHtml}
               <span class="absolute top-2.5 left-2.5 rounded-lg bg-slate-900/75 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white backdrop-blur-xs">${escapeHtml(file.category)}</span>
               <span class="absolute bottom-2.5 right-2.5 rounded-lg bg-slate-900/60 px-1.5 py-0.5 text-[9px] font-mono font-bold text-white backdrop-blur-xs">${sizeKb} KB</span>
@@ -18992,6 +19050,7 @@
               <div class="mt-2 flex items-center justify-between text-[11px] text-slate-400">
                 <span>${escapeHtml(dateDisplay)}</span>
                 <div class="flex items-center gap-1">
+                  <button type="button" onclick="openPatientMediaMoveModal('${escapeHtml(file.relativePath)}', '${escapeHtml(file.category)}', '${escapeHtml(file.filename)}')" title="Change Category" class="rounded-lg p-1 hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition"><i data-lucide="folder-input" class="h-3.5 w-3.5"></i></button>
                   <a href="${fileUrl}?key=${encodeURIComponent(storageConfig.key)}" download target="_blank" title="Download" class="rounded-lg p-1 hover:bg-slate-100 text-slate-500 hover:text-slate-800"><i data-lucide="download" class="h-3.5 w-3.5"></i></a>
                   <button type="button" onclick="deletePatientMediaFile('${escapeHtml(file.relativePath)}')" title="Delete" class="rounded-lg p-1 hover:bg-rose-50 text-slate-400 hover:text-rose-600"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button>
                 </div>
@@ -19195,6 +19254,7 @@
     }
 
     let currentLightboxOriginalUrl = '';
+    let currentLightboxRelativePath = '';
     let lightboxPanX = 0;
     let lightboxPanY = 0;
     let lightboxIsDragging = false;
@@ -19298,7 +19358,7 @@
       });
     }
 
-    function openMediaLightbox(url, category, filename, dateStr, thumbUrl = '') {
+    function openMediaLightbox(url, category, filename, dateStr, thumbUrl = '', relativePath = '') {
       const modal = document.getElementById('patient-media-lightbox');
       const img = document.getElementById('lightbox-img');
       const spinner = document.getElementById('lightbox-loading-spinner');
@@ -19312,6 +19372,7 @@
       const storageConfig = getStorageServerConfig();
       const fullUrl = `${url}?key=${encodeURIComponent(storageConfig.key)}`;
       currentLightboxOriginalUrl = fullUrl;
+      currentLightboxRelativePath = relativePath;
 
       lightboxScale = 1;
       lightboxRotation = 0;
@@ -19357,6 +19418,7 @@
 
     function closeMediaLightbox() {
       currentLightboxOriginalUrl = '';
+      currentLightboxRelativePath = '';
       const modal = document.getElementById('patient-media-lightbox');
       if (modal) {
         modal.classList.add('hidden');
@@ -19367,6 +19429,105 @@
       const spinner = document.getElementById('lightbox-loading-spinner');
       if (spinner) spinner.classList.add('hidden');
       lightboxResetZoom();
+    }
+
+    function openPatientMediaMoveModal(relativePath, currentCategory, filename) {
+      const modal = document.getElementById('patient-media-move-modal');
+      const pathInput = document.getElementById('move-media-relative-path');
+      const catSelect = document.getElementById('move-media-target-category');
+      const nameEl = document.getElementById('move-media-filename-display');
+      const curCatEl = document.getElementById('move-media-current-category');
+      const errorEl = document.getElementById('move-media-error');
+
+      if (!modal) return;
+      if (pathInput) pathInput.value = relativePath;
+      if (nameEl) nameEl.textContent = filename || relativePath.split('/').pop();
+      if (curCatEl) curCatEl.textContent = `Current Category: ${currentCategory}`;
+      if (catSelect) catSelect.value = currentCategory;
+      if (errorEl) errorEl.classList.add('hidden');
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closePatientMediaMoveModal() {
+      const modal = document.getElementById('patient-media-move-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    }
+
+    function openMoveCategoryFromCurrentLightbox() {
+      if (!currentLightboxRelativePath) return;
+      const file = currentPatientMediaFiles.find(f => f.relativePath === currentLightboxRelativePath);
+      const currentCat = file ? file.category : (document.getElementById('lightbox-category-badge')?.textContent || 'General');
+      const filename = file ? file.filename : (document.getElementById('lightbox-filename')?.textContent || '');
+      openPatientMediaMoveModal(currentLightboxRelativePath, currentCat, filename);
+    }
+
+    async function handleMovePatientMediaSubmit(event) {
+      event.preventDefault();
+      const pathInput = document.getElementById('move-media-relative-path');
+      const catSelect = document.getElementById('move-media-target-category');
+      const submitBtn = document.getElementById('btn-submit-move-media');
+      const errorEl = document.getElementById('move-media-error');
+
+      const relativePath = pathInput?.value;
+      const targetCategory = catSelect?.value;
+      if (!relativePath || !targetCategory) return;
+
+      const storageConfig = getStorageServerConfig();
+      if (!storageConfig.url) return;
+
+      if (errorEl) errorEl.classList.add('hidden');
+      if (submitBtn) submitBtn.disabled = true;
+
+      try {
+        const resp = await fetch(`${storageConfig.url}/api/file/move`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-lumin-key': storageConfig.key
+          },
+          body: JSON.stringify({ relativePath, targetCategory })
+        });
+
+        const resData = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+          throw new Error(resData.error || `HTTP ${resp.status}`);
+        }
+
+        closePatientMediaMoveModal();
+
+        // Update local memory list
+        const fileRecord = currentPatientMediaFiles.find(f => f.relativePath === relativePath);
+        if (fileRecord) {
+          fileRecord.category = resData.newCategory || targetCategory;
+          fileRecord.relativePath = resData.newRelativePath || relativePath;
+        }
+
+        // If lightbox is open and displaying this file, update its badge and path
+        if (currentLightboxRelativePath === relativePath) {
+          currentLightboxRelativePath = resData.newRelativePath || relativePath;
+          const badge = document.getElementById('lightbox-category-badge');
+          if (badge) badge.textContent = resData.newCategory || targetCategory;
+        }
+
+        // Re-render the media grid
+        renderPatientMediaGrid();
+
+        // Refresh from server in background to sync state
+        renderPatientMedia();
+      } catch (err) {
+        console.error('Failed to move file category:', err);
+        if (errorEl) {
+          errorEl.textContent = err.message || 'Failed to move file category.';
+          errorEl.classList.remove('hidden');
+        }
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
     }
 
     function lightboxZoom(delta) {

@@ -11,6 +11,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
+import shutil
 import urllib.request
 from PIL import Image, ImageOps
 from flask import Flask, request, jsonify, send_from_directory
@@ -316,6 +317,79 @@ def delete_file():
     except Exception as e:
         logger.error(f"Failed to delete {clean_rel_path}: {e}")
         return jsonify({"error": f"Failed to delete file: {e}"}), 500
+
+@app.route("/api/file/move", methods=["POST"])
+def move_file():
+    """Move a file to a different category folder."""
+    data = request.get_json(silent=True) or {}
+    rel_path_str = data.get("relativePath")
+    target_category = sanitize_name(data.get("targetCategory") or data.get("category") or "")
+
+    if not rel_path_str or not target_category:
+        return jsonify({"error": "relativePath and targetCategory are required."}), 400
+
+    clean_rel_path = Path(rel_path_str.replace("\\", "/")).as_posix().lstrip("/")
+    source_path = (STORAGE_ROOT / clean_rel_path).resolve()
+
+    if not str(source_path).startswith(str(STORAGE_ROOT)):
+        return jsonify({"error": "Forbidden path access."}), 403
+
+    if not source_path.exists() or not source_path.is_file():
+        return jsonify({"error": "Source file not found."}), 404
+
+    try:
+        parts = clean_rel_path.split("/")
+        if len(parts) < 3:
+            return jsonify({"error": "Invalid relative path format (expected patient/category/filename)."}), 400
+
+        patient_folder = parts[0]
+        filename = parts[-1]
+        dest_dir = STORAGE_ROOT / patient_folder / target_category
+        dest_dir.mkdir(parents=True, exist_ok=True)
+
+        dest_path = dest_dir / filename
+        if dest_path.resolve() == source_path.resolve():
+            return jsonify({
+                "success": True,
+                "message": "File is already in this category",
+                "newRelativePath": clean_rel_path,
+                "newCategory": target_category
+            })
+
+        if dest_path.exists():
+            stem = dest_path.stem
+            suffix = dest_path.suffix
+            dest_path = dest_dir / f"{stem}_{int(datetime.now().timestamp())}{suffix}"
+
+        shutil.move(str(source_path), str(dest_path))
+
+        # Move or update thumbnail
+        old_thumb = (THUMBNAIL_ROOT / clean_rel_path).with_suffix(".webp")
+        new_rel_path = str(dest_path.relative_to(STORAGE_ROOT)).replace("\\", "/")
+        new_thumb = (THUMBNAIL_ROOT / new_rel_path).with_suffix(".webp")
+        new_thumb.parent.mkdir(parents=True, exist_ok=True)
+
+        if old_thumb.exists():
+            try:
+                shutil.move(str(old_thumb), str(new_thumb))
+            except Exception:
+                generate_thumbnail(dest_path)
+        else:
+            generate_thumbnail(dest_path)
+
+        logger.info(f"Moved category: {clean_rel_path} -> {new_rel_path}")
+
+        return jsonify({
+            "success": True,
+            "message": "File moved successfully",
+            "oldRelativePath": clean_rel_path,
+            "newRelativePath": new_rel_path,
+            "newCategory": target_category,
+            "filename": dest_path.name
+        })
+    except Exception as e:
+        logger.error(f"Failed to move file {clean_rel_path}: {e}")
+        return jsonify({"error": f"Failed to move file: {e}"}), 500
 
 @app.route("/api/thumbnail/<path:filename>", methods=["GET"])
 def get_thumbnail(filename):
