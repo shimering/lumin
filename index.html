@@ -12,6 +12,29 @@
   <link rel="icon" type="image/png" sizes="32x32" href="icons/dental-icon-v1-32.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="icons/dental-icon-v1-180.png" />
   <title>Lumin Dental Clinic - Clinical Odontogram</title>
+  <script>
+    (function initDeviceDisplayZoom() {
+      try {
+        const stored = localStorage.getItem('lumin-laptop-zoom');
+        if (stored === 'false' || stored === '100') {
+          document.documentElement.classList.remove('is-laptop-browser');
+          return;
+        }
+        if (stored === 'true' || stored === '110') {
+          document.documentElement.classList.add('is-laptop-browser');
+          return;
+        }
+        const ua = navigator.userAgent || '';
+        const platform = navigator.platform || '';
+        const maxTouchPoints = navigator.maxTouchPoints || 0;
+        if (/iPad|iPhone|iPod|Android|Mobile|Tablet|Silk|Kindle|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua)) return;
+        const isApple = /Macintosh|MacIntel|MacPPC|Mac68K/i.test(ua) || /MacIntel/i.test(platform);
+        if (isApple && maxTouchPoints > 1) return;
+        if (window.innerWidth < 1024) return;
+        document.documentElement.classList.add('is-laptop-browser');
+      } catch (_) {}
+    })();
+  </script>
   <!-- Precompiled utilities avoid compiling Tailwind in every browser session. -->
   <link rel="stylesheet" href="lumin-app.css" />
   <script src="vendor/lucide.min.js"></script>
@@ -2600,7 +2623,12 @@
         white-space: nowrap;
       }
     }
-
+    /* Laptop / Desktop browser 10% comfortable zoom (110%) */
+    @media screen and (min-width: 1024px) {
+      html.is-laptop-browser {
+        zoom: 1.1;
+      }
+    }
   </style>
   <link rel="stylesheet" href="lumin-theme.css?v=8" />
 </head>
@@ -4705,6 +4733,17 @@
             <option value="blue">Blue</option><option value="violet">Violet</option><option value="teal">Teal</option><option value="green">Green</option><option value="rose">Rose</option><option value="amber">Amber</option><option value="slate">Slate</option>
           </select>
           <p id="settings-tint-description" class="text-xs text-slate-500">Applies when the raised theme is on. Clinical and payment status colors keep their meaning.</p>
+          <label class="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <span>
+              <span class="block text-sm font-black text-slate-700">Laptop browser zoom (+10%)</span>
+              <span id="settings-laptop-zoom-description" class="mt-1 block text-xs text-slate-500">Increases scale by 10% on laptop screens for easier reading and comfortable viewing. Automatically off on iPads, tablets, and phones.</span>
+            </span>
+            <span class="relative inline-flex shrink-0 items-center" dir="ltr">
+              <input id="settings-laptop-zoom-toggle" type="checkbox" role="switch" onchange="handleLaptopZoomToggle(this.checked)" class="peer sr-only" aria-label="Laptop browser zoom" aria-describedby="settings-laptop-zoom-description" />
+              <span class="h-7 w-12 rounded-full bg-slate-300 transition peer-checked:bg-blue-600 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2 peer-disabled:opacity-50"></span>
+              <span class="pointer-events-none absolute left-1 h-5 w-5 rounded-full bg-white shadow-sm transition peer-checked:translate-x-5"></span>
+            </span>
+          </label>
           <p id="settings-theme-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="status"></p>
         </div>
 
@@ -6732,6 +6771,10 @@
       'Raised 3D theme is on.': 'المظهر البارز ثلاثي الأبعاد مفعّل.',
       'Original flat appearance restored.': 'تمت استعادة المظهر المسطح الأصلي.',
       'Could not save the appearance preference. Please try again.': 'تعذر حفظ تفضيل المظهر. حاول مرة أخرى.',
+      'Laptop browser zoom (+10%)': 'تكبير شاشات اللابتوب (+10%)',
+      'Increases scale by 10% on laptop screens for easier reading and comfortable viewing. Automatically off on iPads, tablets, and phones.': 'تكبير واجهة التطبيق بنسبة 10% على شاشات اللابتوب لتسهيل القراءة وتوضيح التفاصيل الطبية. يُعطّل تلقائيًا على الآيباد والأجهزة اللوحية والهواتف.',
+      'Laptop zoom (+10%) is on.': 'تكبير شاشات اللابتوب (+10%) مفعّل.',
+      'Standard 100% zoom restored.': 'تمت استعادة التكبير القياسي 100%.',
       'Choose the language used throughout the app. Dental Chart and Admin remain in English.': 'اختر لغة الواجهة. يبقى مخطط الأسنان وصفحة الإدارة باللغة الإنجليزية.',
       'English': 'الإنجليزية',
       'Arabic': 'العربية',
@@ -8303,6 +8346,41 @@
       toggle.disabled = Boolean(themeSaveRequest);
       const tint = document.getElementById('settings-theme-tint');
       if (tint) { tint.value = currentUiTint; tint.disabled = Boolean(themeSaveRequest); }
+      syncLaptopZoomToggle();
+    }
+
+    function isCurrentDeviceLaptop() {
+      try {
+        const ua = navigator.userAgent || '';
+        const platform = navigator.platform || '';
+        const maxTouchPoints = navigator.maxTouchPoints || 0;
+        if (/iPad|iPhone|iPod|Android|Mobile|Tablet|Silk|Kindle|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua)) return false;
+        const isApple = /Macintosh|MacIntel|MacPPC|Mac68K/i.test(ua) || /MacIntel/i.test(platform);
+        if (isApple && maxTouchPoints > 1) return false;
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function syncLaptopZoomToggle() {
+      const toggle = document.getElementById('settings-laptop-zoom-toggle');
+      if (!toggle) return;
+      const stored = localStorage.getItem('lumin-laptop-zoom');
+      const active = stored === 'false' || stored === '100' ? false : (stored === 'true' || stored === '110' ? true : (isCurrentDeviceLaptop() && window.innerWidth >= 1024));
+      toggle.checked = active;
+    }
+
+    function handleLaptopZoomToggle(enabled) {
+      try {
+        localStorage.setItem('lumin-laptop-zoom', enabled ? 'true' : 'false');
+      } catch (_) {}
+      document.documentElement.classList.toggle('is-laptop-browser', enabled);
+      syncLaptopZoomToggle();
+      setAdminMessage('settings-theme-message', enabled ? (currentUiLanguage === 'ar' ? 'تكبير شاشات اللابتوب (+10%) مفعّل.' : 'Laptop zoom (+10%) is on.') : (currentUiLanguage === 'ar' ? 'تمت استعادة التكبير القياسي 100%.' : 'Standard 100% zoom restored.'));
+      if (typeof scheduleDashboardViewportUpdate === 'function') scheduleDashboardViewportUpdate();
+      if (typeof schedulePatientQueryViewportUpdate === 'function') schedulePatientQueryViewportUpdate();
+      if (typeof scheduleAppointmentCalendarViewportUpdate === 'function') scheduleAppointmentCalendarViewportUpdate();
     }
 
     function applyUiTheme(theme, tint = 'blue') {
@@ -26826,6 +26904,12 @@
       }, true);
       window.addEventListener('resize', () => {
         if (whatsappTemplatePickerAnchor) refreshWhatsAppTemplatePickerAnchor();
+        if (isCurrentDeviceLaptop()) {
+          const stored = localStorage.getItem('lumin-laptop-zoom');
+          if (stored !== 'false' && stored !== '100') {
+            document.documentElement.classList.toggle('is-laptop-browser', window.innerWidth >= 1024);
+          }
+        }
       });
       db.auth.onAuthStateChange((event, session) => {
         if (event === 'INITIAL_SESSION') return;
@@ -26834,6 +26918,7 @@
           else if (session) void queueAuthSessionApplication(session);
         }, 0);
       });
+      syncLaptopZoomToggle();
       lucide.createIcons();
       await requestAuthSessionRecovery({ force: true, showProgress: true });
     });
