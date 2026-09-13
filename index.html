@@ -1628,6 +1628,27 @@
       padding-left: 2.5rem !important;
       text-align: right;
     }
+    #prices-procedures-table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    #prices-procedures-table thead th {
+      border-bottom: 2px solid #cbd5e1 !important;
+      font-size: 14px !important;
+      padding-top: 1rem !important;
+      padding-bottom: 1rem !important;
+    }
+    #prices-procedures-table tbody tr {
+      border-bottom: 1.5px solid #cbd5e1 !important;
+    }
+    #prices-procedures-table tbody td {
+      border-bottom: 1.5px solid #cbd5e1 !important;
+      padding-top: 1rem !important;
+      padding-bottom: 1rem !important;
+    }
+    #prices-procedures-table tbody tr:last-child td {
+      border-bottom: none !important;
+    }
     #modal-new-patient.is-over-appointment { z-index: 80 !important; }
     #modal-appointment.is-behind-patient-modal > div {
       pointer-events: none;
@@ -4429,15 +4450,15 @@
       <!-- Procedures Table Container -->
       <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
         <div class="overflow-x-auto">
-          <table class="w-full text-left text-sm" id="prices-procedures-table">
-            <thead class="border-b border-slate-200 bg-slate-50/75 text-[11px] font-black uppercase tracking-wider text-slate-500">
+          <table class="w-full text-left" id="prices-procedures-table">
+            <thead class="border-b-2 border-slate-300 bg-slate-50/75 text-[14px] font-black uppercase tracking-wider text-slate-600">
               <tr>
-                <th scope="col" class="w-14 px-4 py-3.5 text-center">#</th>
-                <th scope="col" id="th-procedure-name" class="px-4 py-3.5">الإجراء الطبي</th>
-                <th scope="col" id="th-procedure-price" class="w-36 px-4 py-3.5 text-right font-black">السعر</th>
+                <th scope="col" class="w-16 px-4 py-4 text-center">#</th>
+                <th scope="col" id="th-procedure-name" class="px-4 py-4">الإجراء الطبي</th>
+                <th scope="col" id="th-procedure-price" class="w-44 px-4 py-4 text-right font-black">السعر</th>
               </tr>
             </thead>
-            <tbody id="prices-table-body" class="divide-y divide-slate-100 font-medium">
+            <tbody id="prices-table-body" class="font-medium">
               <!-- Populated dynamically -->
             </tbody>
           </table>
@@ -18792,12 +18813,12 @@
       const thName = document.getElementById('th-procedure-name');
       if (thName) {
         thName.textContent = isAr ? 'الإجراء الطبي' : 'Procedure';
-        thName.className = isAr ? 'px-4 py-3.5 text-right' : 'px-4 py-3.5 text-left';
+        thName.className = isAr ? 'px-4 py-4 text-right' : 'px-4 py-4 text-left';
       }
       const thPrice = document.getElementById('th-procedure-price');
       if (thPrice) {
         thPrice.textContent = isAr ? 'السعر' : 'Price';
-        thPrice.className = isAr ? 'w-36 px-4 py-3.5 text-left font-black' : 'w-36 px-4 py-3.5 text-right font-black';
+        thPrice.className = isAr ? 'w-44 px-4 py-4 text-left font-black' : 'w-44 px-4 py-4 text-right font-black';
       }
 
       const adminLinkText = document.getElementById('prices-admin-link-text');
@@ -18972,13 +18993,13 @@
 
         return `
           <tr class="transition hover:bg-slate-50/80">
-            <td class="w-14 px-4 py-3.5 text-center text-xs font-mono font-bold text-slate-400">${idx + 1}</td>
-            <td class="px-4 py-3.5 ${isAr ? 'text-right' : 'text-left'}">
-              <div class="font-bold text-slate-800 text-sm leading-snug">${escapeHtml(primaryName)}</div>
-              ${secondaryName ? `<div class="mt-0.5 font-mono text-[11px] font-semibold text-slate-400">${escapeHtml(secondaryName)}</div>` : `<div class="mt-0.5 font-mono text-[10px] text-slate-400">${escapeHtml(op.code)}</div>`}
+            <td class="w-16 px-4 py-4 text-center font-mono font-bold text-slate-400" style="font-size: 15px;">${idx + 1}</td>
+            <td class="px-4 py-4 ${isAr ? 'text-right' : 'text-left'}">
+              <div class="font-bold text-slate-900 leading-snug" style="font-size: 17px;">${escapeHtml(primaryName)}</div>
+              ${secondaryName ? `<div class="mt-1 font-mono font-semibold text-slate-500" style="font-size: 14px;">${escapeHtml(secondaryName)}</div>` : `<div class="mt-1 font-mono text-slate-400" style="font-size: 13px;">${escapeHtml(op.code)}</div>`}
             </td>
-            <td class="w-36 px-4 py-3.5 ${isAr ? 'text-left' : 'text-right'} font-black text-sm text-slate-900 whitespace-nowrap">
-              <span class="inline-block rounded-lg ${op.price > 0 ? 'bg-violet-50 text-violet-700' : 'bg-slate-100 text-slate-500'} px-3 py-1 font-mono text-xs font-black">
+            <td class="w-44 px-4 py-4 ${isAr ? 'text-left' : 'text-right'} font-black text-slate-900 whitespace-nowrap">
+              <span class="inline-block rounded-xl ${op.price > 0 ? 'bg-violet-50 text-violet-700 border border-violet-200/60' : 'bg-slate-100 text-slate-500'} px-3.5 py-1.5 font-mono font-black" style="font-size: 15px;">
                 ${escapeHtml(formattedPrice)}
               </span>
             </td>
