@@ -11,8 +11,55 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
+import urllib.request
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
+
+SUPABASE_URL = "https://pqbayjkypzfxvnksgwwf.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxYmF5amt5cHpmeHZua3Nnd3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkxMjI4NzAsImV4cCI6MjEwNDY5ODg3MH0.e5tPe3PKUiFiS_ZnXcpDF9CRtGtp_B1oZsK37phOQ8Q"
+PATIENT_NAME_CACHE = {}
+
+def sanitize_name(name: str) -> str:
+    """Sanitize names for safe Windows folder/file naming."""
+    # Replace illegal Windows filesystem chars: <>:"/\|?*
+    cleaned = re.sub(r'[<>:"/\\|?*]+', '_', str(name or 'Unknown').strip())
+    # Collapse multiple spaces or underscores
+    cleaned = re.sub(r'[\s_]+', '_', cleaned).strip(' ._')
+    return cleaned or "Unnamed"
+
+def resolve_patient_name(patient_id: str, supplied_name: str = "") -> str:
+    """Resolve clean patient name from argument, local cache, or Supabase RPC."""
+    clean_supplied = sanitize_name(supplied_name) if supplied_name else ""
+    if clean_supplied and clean_supplied != "Patient" and clean_supplied != "Unnamed":
+        PATIENT_NAME_CACHE[patient_id] = clean_supplied
+        return clean_supplied
+
+    if patient_id in PATIENT_NAME_CACHE:
+        return PATIENT_NAME_CACHE[patient_id]
+
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/rpc/get_patient_name"
+        headers = {
+            "apikey": SUPABASE_ANON_KEY,
+            "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = json.dumps({
+            "patient_uuid": patient_id,
+            "clinic_key": config.get("clinic_secret_key", "LuminClinicKey_2026")
+        }).encode("utf-8")
+        req = urllib.request.Request(url, data=payload, headers=headers)
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            raw = resp.read().decode("utf-8").strip()
+            name = json.loads(raw)
+            if name:
+                cleaned = sanitize_name(name)
+                PATIENT_NAME_CACHE[patient_id] = cleaned
+                return cleaned
+    except Exception as e:
+        logger.debug(f"Could not resolve patient name via Supabase for {patient_id}: {e}")
+
+    return ""
 
 # Configure logging
 logging.basicConfig(
@@ -62,13 +109,6 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 app.config['MAX_CONTENT_LENGTH'] = config["max_file_size_mb"] * 1024 * 1024
 
-def sanitize_name(name: str) -> str:
-    """Sanitize names for safe Windows folder/file naming."""
-    # Replace illegal Windows filesystem chars: <>:"/\|?*
-    cleaned = re.sub(r'[<>:"/\\|?*]+', '_', str(name or 'Unknown').strip())
-    # Collapse multiple spaces or underscores
-    cleaned = re.sub(r'[\s_]+', '_', cleaned).strip(' ._')
-    return cleaned or "Unnamed"
 
 def verify_auth():
     """Verify clinic secret key from headers or query parameters."""
@@ -121,11 +161,11 @@ def upload_file():
 
     patient_id = sanitize_name(request.form.get("patientId") or request.form.get("patient_id") or "General")
     raw_name = request.form.get("patientName") or request.form.get("patient_name") or ""
-    patient_name = sanitize_name(raw_name) if raw_name else ""
+    patient_name = resolve_patient_name(patient_id, raw_name)
     category = sanitize_name(request.form.get("category") or "General")
 
     # Folder format: Use clean patient name only (e.g. يحيى_سيد_أبو_غالي)
-    patient_folder_name = patient_name if (patient_name and patient_name != "Patient") else patient_id
+    patient_folder_name = patient_name if patient_name else patient_id
     target_dir = STORAGE_ROOT / patient_folder_name / category
     target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -164,12 +204,12 @@ def list_patient_files(patient_id):
     """List all media files for a specific patient by ID or name."""
     safe_patient_id = sanitize_name(patient_id)
     raw_name = request.args.get("name") or request.args.get("patientName") or ""
-    safe_patient_name = sanitize_name(raw_name) if raw_name else ""
+    safe_patient_name = resolve_patient_name(patient_id, raw_name)
 
     matched_dirs = []
 
     # 1. Primary: match clean patient name folder
-    if safe_patient_name and safe_patient_name != "Patient":
+    if safe_patient_name:
         name_dir = STORAGE_ROOT / safe_patient_name
         if name_dir.is_dir():
             matched_dirs.append(name_dir)
