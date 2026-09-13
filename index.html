@@ -1672,9 +1672,12 @@
       touch-action: none !important;
       user-select: none !important;
       -webkit-user-select: none !important;
+      overflow-x: hidden !important;
+      scroll-behavior: auto !important;
     }
     #prices-category-tabs.is-reordering .prices-category-tab {
       touch-action: none !important;
+      scroll-snap-align: none !important;
     }
     .prices-category-tab {
       border: none !important;
@@ -1685,6 +1688,8 @@
       transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.18s cubic-bezier(0.4, 0, 0.2, 1), background 0.18s ease !important;
       user-select: none !important;
       -webkit-user-select: none !important;
+      -webkit-touch-callout: none !important;
+      -webkit-user-drag: none !important;
       touch-action: pan-x;
       cursor: pointer;
     }
@@ -1707,7 +1712,9 @@
       box-shadow: 0 16px 32px rgba(37, 99, 235, 0.28), 0 6px 14px rgba(0, 0, 0, 0.12), 0 0 20px var(--tab-glow, rgba(37, 99, 235, 0.5)) !important;
       opacity: 0.98;
       cursor: grabbing !important;
-      transition: box-shadow 0.15s ease !important;
+      transition: none !important;
+      touch-action: none !important;
+      pointer-events: auto !important;
     }
     .prices-category-icon-box {
       border: none !important;
@@ -4506,7 +4513,7 @@
             <span id="prices-category-label" class="text-[11px] font-black uppercase tracking-wider text-slate-400">Categories & Specialties</span>
             <span id="prices-filtered-count" class="text-xs font-bold text-slate-500">0 results</span>
           </div>
-          <div id="prices-category-tabs" role="tablist" aria-label="Procedure categories" class="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain py-3 px-1.5 touch-pan-x">
+          <div id="prices-category-tabs" role="tablist" aria-label="Procedure categories" class="flex gap-3 overflow-x-auto py-3 px-1.5">
             <!-- Populated dynamically -->
           </div>
         </div>
@@ -18930,6 +18937,13 @@
     let pricesIsDragging = false;
     let pricesDidDrag = false;
     let pricesDragListenersInitialized = false;
+    let pricesSavedScrollLeft = 0;
+
+    function preventPricesGlobalTouchScroll(e) {
+      if (pricesIsDragging) {
+        if (e.cancelable) e.preventDefault();
+      }
+    }
 
     function applySavedPricesSpecialtiesOrder() {
       try {
@@ -18953,6 +18967,12 @@
       if (!container || pricesDragListenersInitialized) return;
       pricesDragListenersInitialized = true;
 
+      container.addEventListener('contextmenu', (e) => {
+        if (pricesIsDragging || pricesActiveDragCard) {
+          e.preventDefault();
+        }
+      });
+
       container.addEventListener('pointerdown', (e) => {
         if (e.button !== 0 && e.button !== undefined) return;
         const card = e.target.closest('.prices-category-tab');
@@ -18975,9 +18995,18 @@
           if (!pricesActiveDragCard) return;
           pricesIsDragging = true;
           pricesDidDrag = true;
+          pricesSavedScrollLeft = container.scrollLeft;
+
+          // Physically freeze container against any scrolling while dragging
+          container.style.overflowX = 'hidden';
+          container.style.scrollBehavior = 'auto';
+          container.classList.add('is-reordering');
+
           pricesActiveDragCard.classList.remove('is-pressing');
           pricesActiveDragCard.classList.add('is-dragging');
-          container.classList.add('is-reordering');
+          pricesActiveDragCard.style.touchAction = 'none';
+
+          window.addEventListener('touchmove', preventPricesGlobalTouchScroll, { passive: false });
 
           try {
             if (navigator.vibrate) navigator.vibrate(40);
@@ -18994,8 +19023,8 @@
 
         if (!pricesIsDragging) {
           const dist = Math.hypot(e.clientX - pricesDragStartX, e.clientY - pricesDragStartY);
-          // Allow natural finger jitter up to 25px without cancelling long-press
-          if (dist > 25) {
+          // Allow small finger micro-movements (up to 12px) without cancelling long-press
+          if (dist > 12) {
             clearTimeout(pricesLongPressTimer);
             pricesActiveDragCard.classList.remove('is-pressing');
             pricesActiveDragCard = null;
@@ -19006,34 +19035,31 @@
         e.preventDefault();
         e.stopPropagation();
 
-        // Edge auto-scrolling
-        const containerRect = container.getBoundingClientRect();
-        if (e.clientX < containerRect.left + 60) {
-          container.scrollLeft -= 10;
-        } else if (e.clientX > containerRect.right - 60) {
-          container.scrollLeft += 10;
-        }
+        // Lock container scroll position strictly so it never scrolls while dragging
+        container.scrollLeft = pricesSavedScrollLeft;
 
-        // Apply smooth hardware-accelerated translation to dragged card
+        // Apply smooth instant hardware-accelerated translation to dragged card
         const dx = e.clientX - pricesDragStartX;
-        pricesActiveDragCard.style.transform = `translate3d(${dx}px, -4px, 0) scale(1.08)`;
+        pricesActiveDragCard.style.transform = `translate3d(${dx}px, -4px, 0) scale(1.06)`;
 
-        // Reorder specialty cards in real-time
+        // Reorder specialty cards in real-time without scrolling
         const cards = Array.from(container.querySelectorAll('.prices-category-tab:not([data-specialty-id="all"])'));
         for (const target of cards) {
           if (target === pricesActiveDragCard) continue;
           const r = target.getBoundingClientRect();
-          if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top - 40 && e.clientY <= r.bottom + 40) {
+          if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top - 50 && e.clientY <= r.bottom + 50) {
             const isAfter = e.clientX > (r.left + r.width / 2);
             if (isAfter) {
               if (target.nextSibling !== pricesActiveDragCard) {
                 container.insertBefore(pricesActiveDragCard, target.nextSibling);
                 pricesDragStartX = e.clientX;
+                container.scrollLeft = pricesSavedScrollLeft;
               }
             } else {
               if (target !== pricesActiveDragCard.nextSibling) {
                 container.insertBefore(pricesActiveDragCard, target);
                 pricesDragStartX = e.clientX;
+                container.scrollLeft = pricesSavedScrollLeft;
               }
             }
             break;
@@ -19043,6 +19069,8 @@
 
       const handlePointerEnd = () => {
         clearTimeout(pricesLongPressTimer);
+        window.removeEventListener('touchmove', preventPricesGlobalTouchScroll);
+
         if (!pricesActiveDragCard) return;
 
         pricesActiveDragCard.classList.remove('is-pressing');
@@ -19052,7 +19080,11 @@
           card.classList.remove('is-dragging');
           card.style.transform = '';
           card.style.zIndex = '';
+          card.style.touchAction = '';
+
           container.classList.remove('is-reordering');
+          container.style.overflowX = 'auto'; // Restore normal scrolling
+          container.style.scrollBehavior = '';
 
           try {
             if (card.hasPointerCapture && card.hasPointerCapture(pricesActivePointerId)) {
@@ -19123,7 +19155,7 @@
       const allSelected = selectedPricesCategory === 'all';
 
       let html = `
-        <button type="button" role="tab" aria-selected="${allSelected}" data-specialty-id="all" onclick="selectPricesCategory('all')" class="prices-category-tab group relative flex shrink-0 snap-start items-center gap-2.5 px-3.5 py-2.5 ${allSelected ? 'is-selected' : ''}" style="--tab-accent:#2563eb;--tab-glow:rgba(37,99,235,0.45)">
+        <button type="button" role="tab" aria-selected="${allSelected}" data-specialty-id="all" onclick="selectPricesCategory('all')" class="prices-category-tab group relative flex shrink-0 items-center gap-2.5 px-3.5 py-2.5 ${allSelected ? 'is-selected' : ''}" style="--tab-accent:#2563eb;--tab-glow:rgba(37,99,235,0.45)">
           <span class="prices-category-icon-box flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition ${allSelected ? 'bg-blue-600 text-white shadow-xs' : 'bg-blue-50 text-blue-600'}">
             <i data-lucide="layers" class="h-4 w-4"></i>
           </span>
@@ -19144,7 +19176,7 @@
         const glow = accent.length === 7 ? `${accent}70` : `${accent}`;
 
         html += `
-          <button type="button" role="tab" aria-selected="${isSelected}" data-specialty-id="${specialty.id}" onclick="selectPricesCategory('${specialty.id}')" title="${escapeHtml(specialty.description || specialty.name)}" class="prices-category-tab group relative flex shrink-0 snap-start items-center gap-2.5 px-3 py-2.5 ${isSelected ? 'is-selected' : ''}" style="--tab-accent:${accent};--tab-glow:${glow}">
+          <button type="button" role="tab" aria-selected="${isSelected}" data-specialty-id="${specialty.id}" onclick="selectPricesCategory('${specialty.id}')" title="${escapeHtml(specialty.description || specialty.name)}" class="prices-category-tab group relative flex shrink-0 items-center gap-2.5 px-3 py-2.5 ${isSelected ? 'is-selected' : ''}" style="--tab-accent:${accent};--tab-glow:${glow}">
             <span class="prices-category-icon-box flex h-8 w-9 shrink-0 items-center justify-center rounded-xl transition" style="background:${accent}15;color:${accent}">
               ${specialtyIconMarkup(specialty.iconName, accent, 'compact')}
             </span>
