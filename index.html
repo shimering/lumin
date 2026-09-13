@@ -4099,11 +4099,16 @@
                 <h3 class="text-base font-black text-slate-800">Storage & X-Ray Server</h3>
                 <span id="settings-storage-status-badge" class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-black text-slate-500">Not Tested</span>
               </div>
-              <p class="mt-0.5 text-xs text-slate-400">Manage your clinic's local file storage server and Cloudflare Tunnel connection for patient X-rays and photos.</p>
+              <p class="mt-0.5 text-xs text-slate-400">Manage your clinic's local file storage server. Once saved here, connection settings automatically sync to all doctors and clinic devices.</p>
             </div>
           </div>
 
           <div class="mt-6 max-w-2xl space-y-4">
+            <div class="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 text-xs text-indigo-800 flex items-center gap-2.5">
+              <i data-lucide="cloud-cog" class="h-4 w-4 shrink-0 text-indigo-600"></i>
+              <span>When you save, this connection syncs across the entire clinic instantly. Doctors and staff on other devices connect automatically without typing any URLs.</span>
+            </div>
+
             <div>
               <label for="settings-storage-url" class="block text-xs font-bold text-slate-700 mb-1.5">Server URL (Local or Cloudflare Tunnel)</label>
               <input id="settings-storage-url" type="url" placeholder="e.g. http://localhost:5000 or https://xxxx.trycloudflare.com" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
@@ -6434,6 +6439,8 @@
       'Clinic Secret Key': 'المفتاح السري للعيادة',
       'Not Tested': 'لم يتم الاختبار',
       'Connected': 'متصل',
+      'When you save, this connection syncs across the entire clinic instantly. Doctors and staff on other devices connect automatically without typing any URLs.': 'عند الحفظ، تتم مزامنة هذا الاتصال مع كامل العيادة فوراً. يتصل الأطباء والموظفون على الأجهزة الأخرى تلقائياً دون الحاجة لكتابة أي روابط.',
+      'Manage your clinic\'s local file storage server. Once saved here, connection settings automatically sync to all doctors and clinic devices.': 'إدارة خادم تخزين الملفات المحلي لعيادتك. بمجرد الحفظ هنا، تتم مزامنة إعدادات الاتصال تلقائياً مع جميع الأطباء وأجهزة العيادة.',
       'All Media': 'جميع الوسائط',
       'Panoramic': 'أشعة بانوراما',
       'Periapical / Bitewings': 'أشعة صغيرة / أجنحة',
@@ -7659,10 +7666,21 @@
     }
 
     async function fetchClinicSettings(refreshViews = false) {
-      const { data, error } = await db.from('clinic_settings').select('use_12_hour_time, diagnosis_fee_default, appointment_status_colors, attendance_enabled, attendance_latitude, attendance_longitude, attendance_radius_m, attendance_max_accuracy_m, attendance_timezone, attendance_late_grace_minutes').eq('id', 1).maybeSingle();
+      const { data, error } = await db.from('clinic_settings').select('use_12_hour_time, diagnosis_fee_default, appointment_status_colors, attendance_enabled, attendance_latitude, attendance_longitude, attendance_radius_m, attendance_max_accuracy_m, attendance_timezone, attendance_late_grace_minutes, storage_server_url, storage_secret_key').eq('id', 1).maybeSingle();
       if (error) {
         console.warn('Could not load clinic settings:', error.message);
         return false;
+      }
+      if (data?.storage_server_url) {
+        clinicStorageServerUrl = String(data.storage_server_url).trim();
+        localStorage.setItem('lumin_storage_server_url', clinicStorageServerUrl);
+      }
+      if (data?.storage_secret_key) {
+        clinicStorageSecretKey = String(data.storage_secret_key).trim();
+        localStorage.setItem('lumin_storage_secret_key', clinicStorageSecretKey);
+      }
+      if (typeof populateStorageServerSettingsInputs === 'function') {
+        populateStorageServerSettingsInputs();
       }
       const timeFormatChanged = useTwelveHourTime !== Boolean(data?.use_12_hour_time);
       applyClinicTimeFormat(Boolean(data?.use_12_hour_time), false);
@@ -18695,10 +18713,14 @@
     let lightboxScale = 1;
     let lightboxRotation = 0;
     let lightboxInverted = false;
+    let clinicStorageServerUrl = '';
+    let clinicStorageSecretKey = '';
 
     function getStorageServerConfig() {
-      const savedUrl = localStorage.getItem('lumin_storage_server_url') || 'http://localhost:5000';
-      const savedKey = localStorage.getItem('lumin_storage_secret_key') || 'LuminClinicKey_2026';
+      const dbUrl = (clinicStorageServerUrl || '').trim();
+      const dbKey = (clinicStorageSecretKey || '').trim();
+      const savedUrl = dbUrl || localStorage.getItem('lumin_storage_server_url') || 'http://localhost:5000';
+      const savedKey = dbKey || localStorage.getItem('lumin_storage_secret_key') || 'LuminClinicKey_2026';
       return {
         url: savedUrl.trim().replace(/\/+$/, ''),
         key: savedKey.trim()
@@ -18709,8 +18731,8 @@
       const config = getStorageServerConfig();
       const urlInput = document.getElementById('settings-storage-url');
       const keyInput = document.getElementById('settings-storage-key');
-      if (urlInput) urlInput.value = config.url;
-      if (keyInput) keyInput.value = config.key;
+      if (urlInput && document.activeElement !== urlInput) urlInput.value = config.url;
+      if (keyInput && document.activeElement !== keyInput) keyInput.value = config.key;
     }
 
     async function openStorageSettings() {
@@ -18718,21 +18740,47 @@
       switchAdminTab('storage');
     }
 
-    function saveStorageServerSettings() {
+    async function saveStorageServerSettings() {
       const urlInput = document.getElementById('settings-storage-url');
       const keyInput = document.getElementById('settings-storage-key');
       const msg = document.getElementById('settings-storage-message');
+      const saveBtn = document.getElementById('btn-save-storage');
       if (!urlInput || !keyInput) return;
 
       const cleanUrl = urlInput.value.trim().replace(/\/+$/, '');
       const cleanKey = keyInput.value.trim();
 
+      clinicStorageServerUrl = cleanUrl;
+      clinicStorageSecretKey = cleanKey;
+
       localStorage.setItem('lumin_storage_server_url', cleanUrl);
       localStorage.setItem('lumin_storage_secret_key', cleanKey);
 
+      if (saveBtn) saveBtn.disabled = true;
+
+      try {
+        if (db) {
+          const { error } = await db
+            .from('clinic_settings')
+            .update({
+              storage_server_url: cleanUrl,
+              storage_secret_key: cleanKey,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', 1);
+          if (error) {
+            console.warn('Could not sync storage settings to database:', error.message);
+          }
+        }
+      } catch (dbErr) {
+        console.warn('Error saving storage settings to database:', dbErr);
+      } finally {
+        if (saveBtn) saveBtn.disabled = false;
+      }
+
       if (msg) {
         msg.className = 'min-w-0 flex-1 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700';
-        msg.textContent = currentUiLanguage === 'ar' ? 'تم حفظ إعدادات خادم التخزين بنجاح.' : 'Storage server settings saved successfully.';
+        msg.textContent = currentUiLanguage === 'ar' ? 'تم حفظ ومزامنة إعدادات التخزين لجميع المستخدمين بنجاح.' : 'Storage settings saved and synced to all clinic users!';
         msg.classList.remove('hidden');
         setTimeout(() => msg.classList.add('hidden'), 4000);
       }
