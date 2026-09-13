@@ -2628,6 +2628,15 @@
       html.is-laptop-browser {
         zoom: 1.1;
       }
+      html.is-laptop-browser body {
+        min-height: calc(100vh / 1.1);
+      }
+      html.is-laptop-browser #view-dashboard:not(.hidden) {
+        height: var(--dashboard-viewport-height, calc((100dvh - 7rem) / 1.1));
+      }
+      html.is-laptop-browser #view-patients:not(.hidden) {
+        height: var(--patient-query-viewport-height, calc((100dvh - 7rem) / 1.1));
+      }
     }
   </style>
   <link rel="stylesheet" href="lumin-theme.css?v=8" />
@@ -22773,13 +22782,11 @@
       const mobileNavigationHeight = Number.parseFloat(getComputedStyle(appShell).paddingBottom) || 0;
       const mainBottomPadding = Number.parseFloat(getComputedStyle(main).paddingBottom) || 0;
       const bottomToolbarHeight = mobileControlsBelow ? toolbar.getBoundingClientRect().height : 0;
+      const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
       const availableHeight = Math.floor(
-        viewportBottom
-        - calendarTop
+        ((viewportBottom - calendarTop - bottomToolbarHeight - 2) / zoom)
         - mobileNavigationHeight
         - mainBottomPadding
-        - bottomToolbarHeight
-        - 2
       );
       appointmentsView.style.setProperty('--appointment-calendar-viewport-height', `${Math.max(112, availableHeight)}px`);
       updateAppointmentMonthCardVisibility();
@@ -22810,12 +22817,11 @@
         : window.innerHeight;
       const mobileNavigationHeight = Number.parseFloat(getComputedStyle(appShell).paddingBottom) || 0;
       const mainBottomPadding = Number.parseFloat(getComputedStyle(main).paddingBottom) || 0;
+      const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
       const availableHeight = Math.floor(
-        viewportBottom
-        - patientView.getBoundingClientRect().top
+        ((viewportBottom - patientView.getBoundingClientRect().top - 2) / zoom)
         - mobileNavigationHeight
         - mainBottomPadding
-        - 2
       );
       patientView.style.setProperty('--patient-query-viewport-height', `${Math.max(160, availableHeight)}px`);
     }
@@ -22849,12 +22855,11 @@
         : window.innerHeight;
       const mobileNavigationHeight = Number.parseFloat(getComputedStyle(appShell).paddingBottom) || 0;
       const mainBottomPadding = Number.parseFloat(getComputedStyle(main).paddingBottom) || 0;
+      const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
       const availableHeight = Math.floor(
-        viewportBottom
-        - dashboardView.getBoundingClientRect().top
+        ((viewportBottom - dashboardView.getBoundingClientRect().top - 2) / zoom)
         - mobileNavigationHeight
         - mainBottomPadding
-        - 2
       );
       dashboardView.style.setProperty('--dashboard-viewport-height', `${Math.max(240, availableHeight)}px`);
     }
