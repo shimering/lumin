@@ -65,7 +65,7 @@
     }
     body.lumin-raised #app-shell :where(table td) { border-color: hsl(var(--lumin-hue) calc(52.2% * var(--lumin-chroma)) 91.0%); }
     body.lumin-raised #app-shell :where(table tbody tr:hover) { background-color: hsl(var(--lumin-hue) calc(78.6% * var(--lumin-chroma)) 94.5%); }
-    body.lumin-raised :where([role="dialog"], #whatsapp-template-dropdown, #appointment-card-popover) {
+    body.lumin-raised :where([role="dialog"]:not(.fixed), #whatsapp-template-dropdown, #appointment-card-popover) {
       background: var(--lumin-face);
       border-top-color: #ffffff;
       box-shadow: 0 20px 48px hsl(var(--lumin-hue) calc(61.5% * var(--lumin-chroma)) 25.5% / 0.322), 0 6px 12px hsl(var(--lumin-hue) calc(36.4% * var(--lumin-chroma)) 61.2% / 0.302);
