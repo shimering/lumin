@@ -3516,6 +3516,7 @@
         <div role="tablist" aria-label="Patient record sections" class="flex w-full gap-1 overflow-x-auto rounded-xl border border-white/10 bg-white/10 p-1">
           <button type="button" role="tab" aria-controls="view-patient-profile" data-patient-workspace-tab="profile" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('profile')"><i data-lucide="user-round" class="h-4 w-4"></i><span>Profile</span></button>
           <button type="button" role="tab" aria-controls="view-chart" data-patient-workspace-tab="chart" data-workspace-requires="chart" onclick="openPatientWorkspaceTab('chart')"><img src="icons/dental-chart-icon.webp" alt="" aria-hidden="true" class="dental-chart-button-icon h-5 w-5 shrink-0 object-contain" /><span>Dental chart</span></button>
+          <button type="button" role="tab" aria-controls="view-patient-media" data-patient-workspace-tab="media" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('media')"><i data-lucide="images" class="h-4 w-4"></i><span>X-Rays & Media</span></button>
           <button type="button" role="tab" aria-controls="view-patient-appointments" data-patient-workspace-tab="appointments" data-workspace-requires="appointments" onclick="openPatientWorkspaceTab('appointments')"><i data-lucide="calendar-days" class="h-4 w-4"></i><span>Appointments</span></button>
           <button type="button" role="tab" aria-controls="view-prescriptions" data-patient-workspace-tab="prescriptions" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('prescriptions')"><i data-lucide="notebook-tabs" class="h-4 w-4"></i><span>Prescriptions</span></button>
           <button type="button" role="tab" aria-controls="view-invoices" data-patient-workspace-tab="invoices" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('invoices')"><i data-lucide="receipt-text" class="h-4 w-4"></i><span>Invoices</span></button>
@@ -3529,6 +3530,151 @@
       <div class="app-page-bar"><div class="app-page-heading"><span class="app-page-icon" aria-hidden="true"><i data-lucide="badge-check"></i></span><h2 class="app-page-title">Loyalty</h2></div></div>
       <div id="patient-loyalty-content" class="space-y-4" aria-live="polite"></div>
     </section>
+
+    <!-- ================= PATIENT X-RAYS & CLINICAL MEDIA ================= -->
+    <section id="view-patient-media" role="tabpanel" class="hidden space-y-4">
+      <div class="app-page-bar">
+        <div class="app-page-heading">
+          <span class="app-page-icon" aria-hidden="true"><i data-lucide="images"></i></span>
+          <h2 class="app-page-title">X-Rays & Media</h2>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="patient-media-config-btn" type="button" onclick="openStorageSettings()" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50">
+            <i data-lucide="hard-drive" class="h-4 w-4 text-indigo-600"></i>
+            <span>Storage Server</span>
+          </button>
+          <button id="patient-media-upload-btn" type="button" onclick="openPatientMediaUploadModal()" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700">
+            <i data-lucide="upload-cloud" class="h-4 w-4"></i>
+            <span>Upload Photo / X-Ray</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Storage Server Status Banner if offline or not configured -->
+      <div id="patient-media-server-warning" class="hidden rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-800">
+        <div class="flex items-start gap-3">
+          <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700"><i data-lucide="alert-circle" class="h-4 w-4"></i></span>
+          <div class="flex-1 text-xs">
+            <p class="font-black text-amber-900" id="media-warning-title">Storage Server Not Connected</p>
+            <p class="mt-0.5 text-amber-700" id="media-warning-desc">Please make sure your local storage server is running and configured in Settings.</p>
+          </div>
+          <button type="button" onclick="switchView('settings')" class="shrink-0 rounded-lg bg-amber-200 px-3 py-1.5 text-xs font-bold text-amber-900 transition hover:bg-amber-300">
+            Configure
+          </button>
+        </div>
+      </div>
+
+      <!-- Category Filter Chips -->
+      <div class="flex flex-wrap items-center gap-1.5 overflow-x-auto pb-1" id="patient-media-category-filters">
+        <button type="button" onclick="filterPatientMedia('ALL')" class="media-filter-chip active rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-black text-white transition shadow-xs" data-media-filter="ALL">All Media</button>
+        <button type="button" onclick="filterPatientMedia('Panoramic')" class="media-filter-chip rounded-xl bg-white border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition shadow-xs" data-media-filter="Panoramic">Panoramic</button>
+        <button type="button" onclick="filterPatientMedia('Periapical')" class="media-filter-chip rounded-xl bg-white border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition shadow-xs" data-media-filter="Periapical">Periapical / Bitewings</button>
+        <button type="button" onclick="filterPatientMedia('Intraoral')" class="media-filter-chip rounded-xl bg-white border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition shadow-xs" data-media-filter="Intraoral">Intraoral Photos</button>
+        <button type="button" onclick="filterPatientMedia('Facial')" class="media-filter-chip rounded-xl bg-white border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition shadow-xs" data-media-filter="Facial">Extraoral / Facial</button>
+        <button type="button" onclick="filterPatientMedia('Lab')" class="media-filter-chip rounded-xl bg-white border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition shadow-xs" data-media-filter="Lab">Lab Documents</button>
+      </div>
+
+      <!-- Media Content Area -->
+      <div id="patient-media-content" class="min-h-[250px]" aria-live="polite">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- Upload Modal -->
+    <div id="patient-media-upload-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
+      <div class="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+        <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+          <div class="flex items-center gap-2.5">
+            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><i data-lucide="upload-cloud" class="h-4 w-4"></i></span>
+            <h3 class="text-sm font-black text-slate-800">Upload Patient Media / X-Ray</h3>
+          </div>
+          <button type="button" onclick="closePatientMediaUploadModal()" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><i data-lucide="x" class="h-5 w-5"></i></button>
+        </div>
+        <form id="patient-media-upload-form" onsubmit="handlePatientMediaUploadSubmit(event)" class="p-6 space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">Category *</label>
+            <select id="upload-media-category" required class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="Panoramic">Panoramic X-Ray</option>
+              <option value="Periapical">Periapical / Bitewings</option>
+              <option value="Intraoral">Intraoral Clinical Photo</option>
+              <option value="Facial">Extraoral / Facial Photo</option>
+              <option value="Lab">Lab Document / Report</option>
+              <option value="General">General Record</option>
+            </select>
+          </div>
+
+          <!-- Dropzone -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">Select File (Image, PDF, DICOM) *</label>
+            <div id="media-dropzone" onclick="document.getElementById('upload-media-file-input').click()" class="relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-6 text-center transition hover:border-blue-400 hover:bg-blue-50/30 cursor-pointer">
+              <input id="upload-media-file-input" type="file" accept="image/*,.pdf,.dcm" required class="sr-only" onchange="handleMediaFileSelected(this)" />
+              <div id="dropzone-empty" class="space-y-2">
+                <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600"><i data-lucide="cloud-arrow-up" class="h-6 w-6"></i></span>
+                <p class="text-xs font-bold text-slate-700">Click or drag & drop image here</p>
+                <p class="text-[11px] text-slate-400">JPEG, PNG, WEBP, PDF up to 50MB</p>
+              </div>
+              <div id="dropzone-preview" class="hidden space-y-2 w-full">
+                <img id="upload-preview-img" src="" alt="Preview" class="mx-auto max-h-40 rounded-xl object-contain shadow-xs" />
+                <p id="upload-preview-name" class="text-xs font-bold text-slate-700 truncate"></p>
+                <p id="upload-preview-size" class="text-[11px] text-slate-400"></p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">Description / Note (Optional)</label>
+            <input id="upload-media-note" type="text" placeholder="e.g. Tooth #14 pre-op, Upper quadrant..." class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+
+          <div id="upload-progress-container" class="hidden space-y-1.5">
+            <div class="flex justify-between text-[11px] font-bold text-slate-500">
+              <span id="upload-progress-status">Uploading to local server...</span>
+              <span id="upload-progress-pct">0%</span>
+            </div>
+            <div class="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+              <div id="upload-progress-bar" class="h-full bg-blue-600 transition-all duration-300" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <p id="upload-media-error" class="hidden rounded-xl bg-red-50 p-3 text-xs font-bold text-red-600"></p>
+
+          <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <button type="button" onclick="closePatientMediaUploadModal()" class="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">Cancel</button>
+            <button id="btn-submit-media-upload" type="submit" class="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white hover:bg-blue-700 shadow-sm transition">
+              <i data-lucide="upload" class="h-3.5 w-3.5"></i>
+              <span>Upload to Local Storage</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Diagnostic Lightbox Viewer Modal -->
+    <div id="patient-media-lightbox" class="fixed inset-0 z-50 hidden flex flex-col bg-black/90 text-white backdrop-blur-md">
+      <!-- Lightbox Header / Controls -->
+      <div class="flex items-center justify-between border-b border-white/10 px-4 py-3 sm:px-6">
+        <div class="flex items-center gap-3">
+          <span id="lightbox-category-badge" class="rounded-lg bg-blue-600 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white"></span>
+          <div>
+            <h4 id="lightbox-filename" class="text-sm font-black text-white truncate max-w-xs sm:max-w-md"></h4>
+            <p id="lightbox-date" class="text-[11px] text-slate-400"></p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1 sm:gap-2">
+          <!-- Dental Diagnostic Tools: Zoom In, Zoom Out, Rotate, Invert (X-ray bone analysis) -->
+          <button type="button" onclick="lightboxZoom(0.25)" title="Zoom In" class="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white/20 transition"><i data-lucide="zoom-in" class="h-4 w-4"></i></button>
+          <button type="button" onclick="lightboxZoom(-0.25)" title="Zoom Out" class="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white/20 transition"><i data-lucide="zoom-out" class="h-4 w-4"></i></button>
+          <button type="button" onclick="lightboxRotate()" title="Rotate 90°" class="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white/20 transition"><i data-lucide="rotate-cw" class="h-4 w-4"></i></button>
+          <button type="button" onclick="lightboxToggleInvert()" title="Invert Colors (Radiography Contrast)" class="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white/20 transition"><i data-lucide="contrast" class="h-4 w-4"></i></button>
+          <a id="lightbox-download-link" href="#" target="_blank" download title="Download" class="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white/20 transition"><i data-lucide="download" class="h-4 w-4"></i></a>
+          <button type="button" onclick="closeMediaLightbox()" title="Close (Esc)" class="flex h-9 w-9 items-center justify-center rounded-xl bg-red-500/20 text-red-400 hover:bg-red-500/40 transition"><i data-lucide="x" class="h-5 w-5"></i></button>
+        </div>
+      </div>
+      <!-- Lightbox Image Viewport with pan & zoom -->
+      <div id="lightbox-viewport" class="relative flex-1 flex items-center justify-center overflow-hidden p-4 select-none cursor-grab">
+        <img id="lightbox-img" src="" alt="X-Ray Inspection" class="max-h-full max-w-full object-contain transition-transform duration-100 ease-out origin-center" draggable="false" />
+      </div>
+    </div>
 
     <section id="view-patient-appointments" role="tabpanel" class="hidden space-y-4">
       <div class="app-page-bar">
@@ -3937,9 +4083,53 @@
           <i data-lucide="sliders-horizontal" class="h-4 w-4"></i> Customization
         </button>
         <button id="admin-tab-loyalty" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-loyalty" onclick="switchAdminTab('loyalty')" class="inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"><i data-lucide="badge-check" class="h-4 w-4"></i> Loyalty</button>
+        <button id="admin-tab-storage" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-storage" onclick="switchAdminTab('storage')" class="inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black text-slate-500 transition hover:bg-slate-100 hover:text-slate-800">
+          <i data-lucide="hard-drive" class="h-4 w-4"></i> Storage &amp; X-Rays
+        </button>
       </div>
 
       <div id="admin-panel-loyalty" role="tabpanel" aria-labelledby="admin-tab-loyalty" class="hidden space-y-6"></div>
+
+      <div id="admin-panel-storage" role="tabpanel" aria-labelledby="admin-tab-storage" class="hidden space-y-6">
+        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+          <div class="flex items-center gap-3 border-b border-slate-100 pb-5">
+            <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600"><i data-lucide="hard-drive" class="h-5 w-5"></i></span>
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-2.5">
+                <h3 class="text-base font-black text-slate-800">Storage & X-Ray Server</h3>
+                <span id="settings-storage-status-badge" class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-black text-slate-500">Not Tested</span>
+              </div>
+              <p class="mt-0.5 text-xs text-slate-400">Manage your clinic's local file storage server and Cloudflare Tunnel connection for patient X-rays and photos.</p>
+            </div>
+          </div>
+
+          <div class="mt-6 max-w-2xl space-y-4">
+            <div>
+              <label for="settings-storage-url" class="block text-xs font-bold text-slate-700 mb-1.5">Server URL (Local or Cloudflare Tunnel)</label>
+              <input id="settings-storage-url" type="url" placeholder="e.g. http://localhost:5000 or https://xxxx.trycloudflare.com" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <p class="mt-1.5 text-[11px] text-slate-400">Use <code class="font-mono text-indigo-600 bg-slate-100 px-1.5 py-0.5 rounded">http://localhost:5000</code> when running on the main clinic PC, or paste your Cloudflare Tunnel HTTPS address for universal access.</p>
+            </div>
+
+            <div>
+              <label for="settings-storage-key" class="block text-xs font-bold text-slate-700 mb-1.5">Clinic Secret Key</label>
+              <input id="settings-storage-key" type="password" placeholder="e.g. LuminClinicKey_2026" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <p class="mt-1.5 text-[11px] text-slate-400">Must match the <code class="font-mono text-slate-600">clinic_secret_key</code> specified in your storage server's <code class="font-mono text-slate-600">config.json</code>.</p>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+              <p id="settings-storage-message" class="hidden min-w-0 flex-1 rounded-xl px-3.5 py-2.5 text-xs font-bold" role="status"></p>
+              <div class="flex items-center gap-2">
+                <button id="btn-test-storage" type="button" onclick="testStorageServerConnection()" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50">
+                  <i data-lucide="activity" class="h-4 w-4 text-indigo-600"></i> Test Connection
+                </button>
+                <button id="btn-save-storage" type="button" onclick="saveStorageServerSettings()" class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-indigo-700">
+                  <i data-lucide="check" class="h-4 w-4"></i> Save Settings
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div id="admin-panel-access" role="tabpanel" aria-labelledby="admin-tab-access" class="space-y-6">
       <div class="flex flex-col gap-4 rounded-2xl border border-blue-200 bg-gradient-to-br from-white to-blue-50/70 p-5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
@@ -6233,6 +6423,25 @@
       'Admin': 'الإدارة',
       'My Settings': 'إعداداتي',
       'Open my settings': 'فتح إعداداتي',
+      'X-Rays & Media': 'الأشعة والوسائط',
+      'Upload Photo / X-Ray': 'رفع صورة / أشعة',
+      'Storage & X-Ray Server': 'خادم تخزين الأشعة والملفات',
+      'Storage & X-Rays': 'تخزين الأشعة والملفات',
+      'Storage &amp; X-Rays': 'تخزين الأشعة والملفات',
+      'Test Connection': 'اختبار الاتصال',
+      'Save Settings': 'حفظ الإعدادات',
+      'Server URL (Local or Cloudflare Tunnel)': 'رابط الخادم (محلي أو نفق Cloudflare)',
+      'Clinic Secret Key': 'المفتاح السري للعيادة',
+      'Not Tested': 'لم يتم الاختبار',
+      'Connected': 'متصل',
+      'All Media': 'جميع الوسائط',
+      'Panoramic': 'أشعة بانوراما',
+      'Periapical / Bitewings': 'أشعة صغيرة / أجنحة',
+      'Intraoral Photos': 'صور داخل الفم',
+      'Extraoral / Facial': 'صور الوجه والابتسامة',
+      'Lab Documents': 'تقارير المعمل',
+      'No media uploaded for this patient yet.': 'لم يتم رفع أي أشعة أو صور لهذا المريض بعد.',
+      'Upload Patient Media / X-Ray': 'رفع أشعة / وسائط المريض',
       'New Patient': 'مريض جديد',
       'Install App': 'تثبيت التطبيق',
       'Install app': 'تثبيت التطبيق',
@@ -10952,13 +11161,14 @@
 
     function switchAdminTab(tabName) {
       if (!hasPageAccess('admin')) return;
-      adminActiveTab = ['access', 'templates', 'print-forms', 'payments', 'expense-types', 'attendance', 'customization', 'loyalty'].includes(tabName) ? tabName : 'access';
+      adminActiveTab = ['access', 'templates', 'print-forms', 'payments', 'expense-types', 'attendance', 'customization', 'loyalty', 'storage'].includes(tabName) ? tabName : 'access';
       const showTemplates = adminActiveTab === 'templates';
       const showPrintForms = adminActiveTab === 'print-forms';
       const showPayments = adminActiveTab === 'payments';
       const showExpenseTypes = adminActiveTab === 'expense-types';
       const showAttendance = adminActiveTab === 'attendance';
       const showCustomization = adminActiveTab === 'customization';
+      const showStorage = adminActiveTab === 'storage';
       const accessTab = document.getElementById('admin-tab-access');
       const templatesTab = document.getElementById('admin-tab-templates');
       const printFormsTab = document.getElementById('admin-tab-print-forms');
@@ -10966,6 +11176,7 @@
       const expenseTypesTab = document.getElementById('admin-tab-expense-types');
       const attendanceTab = document.getElementById('admin-tab-attendance');
       const customizationTab = document.getElementById('admin-tab-customization');
+      const storageTab = document.getElementById('admin-tab-storage');
       const accessPanel = document.getElementById('admin-panel-access');
       const templatesPanel = document.getElementById('admin-panel-templates');
       const printFormsPanel = document.getElementById('admin-panel-print-forms');
@@ -10973,6 +11184,7 @@
       const expenseTypesPanel = document.getElementById('admin-panel-expense-types');
       const attendancePanel = document.getElementById('admin-panel-attendance');
       const customizationPanel = document.getElementById('admin-panel-customization');
+      const storagePanel = document.getElementById('admin-panel-storage');
       const activeClass = 'inline-flex shrink-0 items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white transition';
       const inactiveClass = 'inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black text-slate-500 transition hover:bg-slate-100 hover:text-slate-800';
 
@@ -10981,6 +11193,17 @@
       document.getElementById('admin-tab-loyalty').setAttribute('aria-selected', String(showLoyalty));
       document.getElementById('admin-panel-loyalty').classList.toggle('hidden', !showLoyalty);
       if (showLoyalty) void renderAdminLoyalty();
+
+      if (storageTab) {
+        storageTab.className = showStorage ? activeClass : inactiveClass;
+        storageTab.setAttribute('aria-selected', String(showStorage));
+      }
+      if (storagePanel) {
+        storagePanel.classList.toggle('hidden', !showStorage);
+      }
+      if (showStorage) {
+        populateStorageServerSettingsInputs();
+      }
 
       accessTab.className = adminActiveTab === 'access' ? activeClass : inactiveClass;
       templatesTab.className = showTemplates ? activeClass : inactiveClass;
@@ -18405,6 +18628,10 @@
         if (canViewPatientLoyalty()) await switchView('loyalty');
         return;
       }
+      if (tabName === 'media' || tabName === 'xrays') {
+        await switchView('patient-media');
+        return;
+      }
       if (!hasPageAccess('patients')) return;
       switchView('patient-profile');
     }
@@ -18444,6 +18671,8 @@
           ? canViewPatientPrescriptions()
           : button.dataset.patientWorkspaceTab === 'invoices'
           ? canViewPatientInvoices()
+          : button.dataset.patientWorkspaceTab === 'media'
+          ? hasPageAccess('patients')
           : button.dataset.workspaceRequires === 'chart'
             ? hasPageAccess('chart')
             : hasPageAccess('patients');
@@ -18458,6 +18687,489 @@
       translateUiTree(document.getElementById('patient-workspace-header'), currentUiLanguage);
       syncLoyaltyVisibility();
     }
+
+    // ================= PATIENT MEDIA & LOCAL STORAGE SERVER =================
+    let currentPatientMediaFiles = [];
+    let activePatientMediaFilter = 'ALL';
+    let activePatientMediaPatientId = null;
+    let lightboxScale = 1;
+    let lightboxRotation = 0;
+    let lightboxInverted = false;
+
+    function getStorageServerConfig() {
+      const savedUrl = localStorage.getItem('lumin_storage_server_url') || 'http://localhost:5000';
+      const savedKey = localStorage.getItem('lumin_storage_secret_key') || 'LuminClinicKey_2026';
+      return {
+        url: savedUrl.trim().replace(/\/+$/, ''),
+        key: savedKey.trim()
+      };
+    }
+
+    function populateStorageServerSettingsInputs() {
+      const config = getStorageServerConfig();
+      const urlInput = document.getElementById('settings-storage-url');
+      const keyInput = document.getElementById('settings-storage-key');
+      if (urlInput) urlInput.value = config.url;
+      if (keyInput) keyInput.value = config.key;
+    }
+
+    async function openStorageSettings() {
+      await switchView('admin');
+      switchAdminTab('storage');
+    }
+
+    function saveStorageServerSettings() {
+      const urlInput = document.getElementById('settings-storage-url');
+      const keyInput = document.getElementById('settings-storage-key');
+      const msg = document.getElementById('settings-storage-message');
+      if (!urlInput || !keyInput) return;
+
+      const cleanUrl = urlInput.value.trim().replace(/\/+$/, '');
+      const cleanKey = keyInput.value.trim();
+
+      localStorage.setItem('lumin_storage_server_url', cleanUrl);
+      localStorage.setItem('lumin_storage_secret_key', cleanKey);
+
+      if (msg) {
+        msg.className = 'min-w-0 flex-1 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700';
+        msg.textContent = currentUiLanguage === 'ar' ? 'تم حفظ إعدادات خادم التخزين بنجاح.' : 'Storage server settings saved successfully.';
+        msg.classList.remove('hidden');
+        setTimeout(() => msg.classList.add('hidden'), 4000);
+      }
+      testStorageServerConnection();
+    }
+
+    async function testStorageServerConnection() {
+      const config = getStorageServerConfig();
+      const badge = document.getElementById('settings-storage-status-badge');
+      const msg = document.getElementById('settings-storage-message');
+
+      if (!config.url) {
+        if (badge) {
+          badge.className = 'rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-500';
+          badge.textContent = currentUiLanguage === 'ar' ? 'غير مهيأ' : 'Not Configured';
+        }
+        return false;
+      }
+
+      if (badge) {
+        badge.className = 'rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-700';
+        badge.textContent = currentUiLanguage === 'ar' ? 'جارٍ الفحص…' : 'Testing…';
+      }
+
+      try {
+        const resp = await fetch(`${config.url}/api/health`, {
+          method: 'GET',
+          headers: { 'x-lumin-key': config.key }
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (badge) {
+          badge.className = 'rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700';
+          badge.textContent = currentUiLanguage === 'ar' ? 'متصل بالخادم' : 'Connected';
+        }
+        if (msg) {
+          msg.className = 'min-w-0 flex-1 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700';
+          msg.textContent = currentUiLanguage === 'ar'
+            ? `تم الاتصال بنجاح بالخادم المحلي (${data.totalPatientFolders} مجلد مرضى).`
+            : `Connected to storage server at ${data.storageRoot} (${data.totalPatientFolders} patient folders).`;
+          msg.classList.remove('hidden');
+          setTimeout(() => msg.classList.add('hidden'), 5000);
+        }
+        return true;
+      } catch (err) {
+        console.error('Storage health check error:', err);
+        if (badge) {
+          badge.className = 'rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-700';
+          badge.textContent = currentUiLanguage === 'ar' ? 'غير متصل' : 'Offline / Error';
+        }
+        if (msg) {
+          msg.className = 'min-w-0 flex-1 rounded-xl bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700';
+          msg.textContent = currentUiLanguage === 'ar'
+            ? `تعذر الاتصال بخادم التخزين: ${err.message}`
+            : `Could not connect to storage server: ${err.message}`;
+          msg.classList.remove('hidden');
+        }
+        return false;
+      }
+    }
+
+    async function renderPatientMedia() {
+      const patientId = activeWorkspacePatientId || patientWorkspaceId();
+      const patient = patients.find(p => p.id === patientId);
+      const content = document.getElementById('patient-media-content');
+      const warning = document.getElementById('patient-media-server-warning');
+      if (!content || !patient) return;
+
+      updatePatientWorkspaceNavigation(patient, 'media');
+
+      const storageConfig = getStorageServerConfig();
+      if (!storageConfig.url) {
+        if (warning) warning.classList.remove('hidden');
+        content.innerHTML = `
+          <div class="rounded-2xl border border-slate-200 bg-white p-12 text-center">
+            <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 mb-3"><i data-lucide="hard-drive" class="h-6 w-6"></i></span>
+            <h4 class="text-sm font-black text-slate-800">${currentUiLanguage === 'ar' ? 'خادم التخزين غير مهيأ' : 'Storage Server Not Configured'}</h4>
+            <p class="mt-1 text-xs text-slate-400 max-w-sm mx-auto">${currentUiLanguage === 'ar' ? 'يرجى إدخال عنوان خادم التخزين المحلي أو رابط Cloudflare Tunnel في الإعدادات.' : 'Please configure your local storage server URL in Settings to view and upload patient X-rays.'}</p>
+            <button type="button" onclick="switchView('settings')" class="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-black text-white hover:bg-indigo-700 shadow-sm transition">
+              <i data-lucide="settings" class="h-4 w-4"></i> <span>${currentUiLanguage === 'ar' ? 'فتح الإعدادات' : 'Go to Settings'}</span>
+            </button>
+          </div>`;
+        lucide.createIcons();
+        return;
+      }
+
+      if (warning) warning.classList.add('hidden');
+      content.innerHTML = `<div class="p-12 text-center text-sm font-bold text-slate-400"><div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 mb-2"></div><p>${currentUiLanguage === 'ar' ? 'جارٍ تحميل الأشعة والوسائط من الخادم المحلي...' : 'Loading patient media from local storage...'}</p></div>`;
+
+      try {
+        const resp = await fetch(`${storageConfig.url}/api/patient/${patient.id}/files`, {
+          method: 'GET',
+          headers: { 'x-lumin-key': storageConfig.key }
+        });
+
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        currentPatientMediaFiles = data.files || [];
+        activePatientMediaPatientId = patient.id;
+        renderPatientMediaGrid();
+      } catch (err) {
+        console.error('Failed to load patient media:', err);
+        if (warning) warning.classList.remove('hidden');
+        content.innerHTML = `
+          <div class="rounded-2xl border border-rose-200 bg-rose-50/50 p-8 text-center text-rose-800">
+            <i data-lucide="alert-triangle" class="mx-auto h-8 w-8 text-rose-500 mb-2"></i>
+            <p class="text-xs font-bold">${currentUiLanguage === 'ar' ? 'تعذر تحميل الوسائط من خادم التخزين المحلي' : 'Could not connect to local storage server'}: ${escapeHtml(err.message)}</p>
+            <p class="mt-1 text-[11px] text-rose-600">${currentUiLanguage === 'ar' ? 'تأكد من تشغيل start-server.bat أو نفق Cloudflare.' : 'Make sure start-server.bat and Cloudflare Tunnel are active on the clinic PC.'}</p>
+            <button type="button" onclick="renderPatientMedia()" class="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700">
+              <i data-lucide="refresh-cw" class="h-3.5 w-3.5"></i> <span>${currentUiLanguage === 'ar' ? 'إعادة المحاولة' : 'Retry'}</span>
+            </button>
+          </div>`;
+        lucide.createIcons();
+      }
+    }
+
+    function filterPatientMedia(category) {
+      activePatientMediaFilter = category;
+      document.querySelectorAll('.media-filter-chip').forEach(btn => {
+        const isMatch = btn.dataset.mediaFilter === category;
+        btn.className = `media-filter-chip rounded-xl px-3 py-1.5 text-xs font-bold transition shadow-xs ${isMatch ? 'active bg-blue-600 text-white font-black' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`;
+      });
+      renderPatientMediaGrid();
+    }
+
+    function renderPatientMediaGrid() {
+      const content = document.getElementById('patient-media-content');
+      if (!content) return;
+
+      const storageConfig = getStorageServerConfig();
+      const filtered = activePatientMediaFilter === 'ALL'
+        ? currentPatientMediaFiles
+        : currentPatientMediaFiles.filter(f => f.category === activePatientMediaFilter);
+
+      if (!filtered.length) {
+        content.innerHTML = `
+          <div class="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center">
+            <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 mb-3"><i data-lucide="image-off" class="h-6 w-6"></i></span>
+            <p class="text-sm font-black text-slate-700">${currentUiLanguage === 'ar' ? 'لا توجد وسائط أو أشعة مسجلة' : 'No media or X-rays found'}</p>
+            <p class="mt-1 text-xs text-slate-400">${activePatientMediaFilter === 'ALL' ? (currentUiLanguage === 'ar' ? 'اضغط على رفع صورة / أشعة لإضافة أول ملف لهذا المريض.' : 'Click Upload Photo / X-Ray to add the first file for this patient.') : (currentUiLanguage === 'ar' ? 'لا توجد ملفات تحت هذا التصنيف.' : 'No files found under this category.')}</p>
+          </div>`;
+        lucide.createIcons();
+        return;
+      }
+
+      const cards = filtered.map(file => {
+        const fileUrl = `${storageConfig.url}/files/${file.relativePath}`;
+        const isPdf = file.filename.toLowerCase().endsWith('.pdf');
+        const isDcm = file.filename.toLowerCase().endsWith('.dcm');
+        const sizeKb = (file.sizeBytes / 1024).toFixed(0);
+        const dateDisplay = file.modifiedAt ? file.modifiedAt.split('T')[0] : '';
+        
+        let previewHtml = '';
+        if (isPdf) {
+          previewHtml = `<div class="flex h-44 w-full items-center justify-center bg-red-50 text-red-500"><i data-lucide="file-text" class="h-12 w-12"></i></div>`;
+        } else if (isDcm) {
+          previewHtml = `<div class="flex h-44 w-full items-center justify-center bg-indigo-50 text-indigo-500"><i data-lucide="box" class="h-12 w-12"></i></div>`;
+        } else {
+          previewHtml = `<img src="${fileUrl}?key=${encodeURIComponent(storageConfig.key)}" alt="${escapeHtml(file.filename)}" loading="lazy" class="h-44 w-full object-cover transition duration-300 group-hover:scale-105" />`;
+        }
+
+        return `
+          <article class="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs transition hover:border-blue-300 hover:shadow-md">
+            <div class="relative cursor-pointer overflow-hidden bg-slate-100" onclick="openMediaLightbox('${fileUrl}', '${escapeHtml(file.category)}', '${escapeHtml(file.filename)}', '${escapeHtml(dateDisplay)}')">
+              ${previewHtml}
+              <span class="absolute top-2.5 left-2.5 rounded-lg bg-slate-900/75 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white backdrop-blur-xs">${escapeHtml(file.category)}</span>
+              <span class="absolute bottom-2.5 right-2.5 rounded-lg bg-slate-900/60 px-1.5 py-0.5 text-[9px] font-mono font-bold text-white backdrop-blur-xs">${sizeKb} KB</span>
+            </div>
+            <div class="p-3">
+              <h5 class="truncate text-xs font-black text-slate-800" title="${escapeHtml(file.filename)}">${escapeHtml(file.filename)}</h5>
+              <div class="mt-2 flex items-center justify-between text-[11px] text-slate-400">
+                <span>${escapeHtml(dateDisplay)}</span>
+                <div class="flex items-center gap-1">
+                  <a href="${fileUrl}?key=${encodeURIComponent(storageConfig.key)}" download target="_blank" title="Download" class="rounded-lg p-1 hover:bg-slate-100 text-slate-500 hover:text-slate-800"><i data-lucide="download" class="h-3.5 w-3.5"></i></a>
+                  <button type="button" onclick="deletePatientMediaFile('${escapeHtml(file.relativePath)}')" title="Delete" class="rounded-lg p-1 hover:bg-rose-50 text-slate-400 hover:text-rose-600"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button>
+                </div>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join('');
+
+      content.innerHTML = `<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">${cards}</div>`;
+      lucide.createIcons();
+    }
+
+    function openPatientMediaUploadModal() {
+      const modal = document.getElementById('patient-media-upload-modal');
+      const form = document.getElementById('patient-media-upload-form');
+      const error = document.getElementById('upload-media-error');
+      const progress = document.getElementById('upload-progress-container');
+      if (!modal) return;
+      if (form) form.reset();
+      if (error) error.classList.add('hidden');
+      if (progress) progress.classList.add('hidden');
+      resetMediaDropzonePreview();
+      modal.classList.remove('hidden');
+      setupMediaDropzoneEvents();
+      lucide.createIcons();
+    }
+
+    function closePatientMediaUploadModal() {
+      document.getElementById('patient-media-upload-modal')?.classList.add('hidden');
+    }
+
+    function setupMediaDropzoneEvents() {
+      const dropzone = document.getElementById('media-dropzone');
+      if (!dropzone || dropzone.dataset.hasDragEvents) return;
+      dropzone.dataset.hasDragEvents = 'true';
+
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropzone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzone.classList.add('border-blue-500', 'bg-blue-50/50');
+        }, false);
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzone.classList.remove('border-blue-500', 'bg-blue-50/50');
+        }, false);
+      });
+
+      dropzone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files && files.length > 0) {
+          const input = document.getElementById('upload-media-file-input');
+          if (input) {
+            input.files = files;
+            handleMediaFileSelected(input);
+          }
+        }
+      }, false);
+    }
+
+    function handleMediaFileSelected(input) {
+      const file = input.files?.[0];
+      if (!file) return;
+      const emptyState = document.getElementById('dropzone-empty');
+      const previewState = document.getElementById('dropzone-preview');
+      const previewImg = document.getElementById('upload-preview-img');
+      const nameLabel = document.getElementById('upload-preview-name');
+      const sizeLabel = document.getElementById('upload-preview-size');
+
+      if (emptyState) emptyState.classList.add('hidden');
+      if (previewState) previewState.classList.remove('hidden');
+      if (nameLabel) nameLabel.textContent = file.name;
+      if (sizeLabel) sizeLabel.textContent = `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
+
+      if (file.type.startsWith('image/') && previewImg) {
+        const reader = new FileReader();
+        reader.onload = (e) => { previewImg.src = e.target.result; previewImg.classList.remove('hidden'); };
+        reader.readAsDataURL(file);
+      } else if (previewImg) {
+        previewImg.classList.add('hidden');
+      }
+    }
+
+    function resetMediaDropzonePreview() {
+      document.getElementById('dropzone-empty')?.classList.remove('hidden');
+      document.getElementById('dropzone-preview')?.classList.add('hidden');
+      const previewImg = document.getElementById('upload-preview-img');
+      if (previewImg) previewImg.src = '';
+    }
+
+    async function handlePatientMediaUploadSubmit(event) {
+      event.preventDefault();
+      const fileInput = document.getElementById('upload-media-file-input');
+      const categorySelect = document.getElementById('upload-media-category');
+      const noteInput = document.getElementById('upload-media-note');
+      const errorEl = document.getElementById('upload-media-error');
+      const progressContainer = document.getElementById('upload-progress-container');
+      const progressBar = document.getElementById('upload-progress-bar');
+      const progressPct = document.getElementById('upload-progress-pct');
+      const submitBtn = document.getElementById('btn-submit-media-upload');
+
+      const file = fileInput?.files?.[0];
+      if (!file) {
+        if (errorEl) { errorEl.textContent = 'Please select a file to upload.'; errorEl.classList.remove('hidden'); }
+        return;
+      }
+
+      const storageConfig = getStorageServerConfig();
+      if (!storageConfig.url) {
+        if (errorEl) { errorEl.textContent = 'Storage server URL is not configured. Please open Settings.'; errorEl.classList.remove('hidden'); }
+        return;
+      }
+
+      const patientId = activeWorkspacePatientId || patientWorkspaceId();
+      const patient = patients.find(p => p.id === patientId);
+      if (!patient) return;
+
+      if (errorEl) errorEl.classList.add('hidden');
+      if (progressContainer) progressContainer.classList.remove('hidden');
+      if (submitBtn) submitBtn.disabled = true;
+
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('patientId', patient.id);
+      formData.append('patientName', patient.name || 'Patient');
+      formData.append('category', categorySelect?.value || 'General');
+      if (noteInput?.value) formData.append('note', noteInput.value.trim());
+
+      try {
+        await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', `${storageConfig.url}/api/upload`);
+          xhr.setRequestHeader('x-lumin-key', storageConfig.key);
+
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              const pct = Math.round((e.loaded / e.total) * 100);
+              if (progressBar) progressBar.style.width = `${pct}%`;
+              if (progressPct) progressPct.textContent = `${pct}%`;
+            }
+          };
+
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                const res = JSON.parse(xhr.responseText);
+                resolve(res);
+              } catch (e) {
+                resolve({ success: true });
+              }
+            } else {
+              try {
+                const errData = JSON.parse(xhr.responseText);
+                reject(new Error(errData.error || `Upload failed with HTTP ${xhr.status}`));
+              } catch (e) {
+                reject(new Error(`Upload failed with HTTP ${xhr.status}`));
+              }
+            }
+          };
+
+          xhr.onerror = () => reject(new Error('Network connection to storage server failed.'));
+          xhr.send(formData);
+        });
+
+        closePatientMediaUploadModal();
+        await renderPatientMedia();
+      } catch (err) {
+        console.error('Upload failed:', err);
+        if (errorEl) {
+          errorEl.textContent = err.message || 'Failed to upload image.';
+          errorEl.classList.remove('hidden');
+        }
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    }
+
+    async function deletePatientMediaFile(relativePath) {
+      if (!confirm(currentUiLanguage === 'ar' ? 'هل أنت متأكد من حذف هذه الصورة/الأشعة نهائياً من الخادم المحلي؟' : 'Are you sure you want to permanently delete this file from local storage?')) return;
+      const storageConfig = getStorageServerConfig();
+      try {
+        const resp = await fetch(`${storageConfig.url}/api/file`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-lumin-key': storageConfig.key
+          },
+          body: JSON.stringify({ relativePath })
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        await renderPatientMedia();
+      } catch (err) {
+        alert(currentUiLanguage === 'ar' ? `تعذر حذف الملف: ${err.message}` : `Failed to delete file: ${err.message}`);
+      }
+    }
+
+    function openMediaLightbox(url, category, filename, dateStr) {
+      const modal = document.getElementById('patient-media-lightbox');
+      const img = document.getElementById('lightbox-img');
+      const badge = document.getElementById('lightbox-category-badge');
+      const nameLabel = document.getElementById('lightbox-filename');
+      const dateLabel = document.getElementById('lightbox-date');
+      const dlLink = document.getElementById('lightbox-download-link');
+
+      if (!modal || !img) return;
+
+      const storageConfig = getStorageServerConfig();
+      const fullUrl = `${url}?key=${encodeURIComponent(storageConfig.key)}`;
+
+      lightboxScale = 1;
+      lightboxRotation = 0;
+      lightboxInverted = false;
+      updateLightboxTransform();
+
+      img.src = fullUrl;
+      if (badge) badge.textContent = category;
+      if (nameLabel) nameLabel.textContent = filename;
+      if (dateLabel) dateLabel.textContent = dateStr;
+      if (dlLink) {
+        dlLink.href = fullUrl;
+        dlLink.download = filename;
+      }
+
+      modal.classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeMediaLightbox() {
+      document.getElementById('patient-media-lightbox')?.classList.add('hidden');
+      const img = document.getElementById('lightbox-img');
+      if (img) img.src = '';
+    }
+
+    function lightboxZoom(delta) {
+      lightboxScale = Math.max(0.25, Math.min(5, lightboxScale + delta));
+      updateLightboxTransform();
+    }
+
+    function lightboxRotate() {
+      lightboxRotation = (lightboxRotation + 90) % 360;
+      updateLightboxTransform();
+    }
+
+    function lightboxToggleInvert() {
+      lightboxInverted = !lightboxInverted;
+      updateLightboxTransform();
+    }
+
+    function updateLightboxTransform() {
+      const img = document.getElementById('lightbox-img');
+      if (!img) return;
+      img.style.transform = `scale(${lightboxScale}) rotate(${lightboxRotation}deg)`;
+      img.style.filter = lightboxInverted ? 'invert(100%) hue-rotate(180deg)' : 'none';
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeMediaLightbox();
+    });
 
     function resetPatientAppointmentsState() {
       patientAppointmentsRequest += 1;
@@ -19311,7 +20023,7 @@
         : viewName === 'patient-appointments' ? canViewPatientAppointments()
         : viewName === 'patient-prescriptions' ? canViewPatientPrescriptions()
         : viewName === 'loyalty' ? canViewPatientLoyalty()
-        : hasPageAccess(['payments', 'patient-profile'].includes(viewName) ? 'patients' : viewName);
+        : hasPageAccess(['payments', 'patient-profile', 'patient-media'].includes(viewName) ? 'patients' : viewName);
       if (!canOpenRequestedView) {
         const fallbackView = firstAuthorizedView();
         if (fallbackView && fallbackView !== viewName) await switchView(fallbackView);
@@ -19319,7 +20031,7 @@
       }
 
       // Synchronously update navigation rail & mobile bottom bar highlights immediately (zero delay)
-      const primaryNavTarget = ['invoices', 'patient-profile', 'payments', 'loyalty', 'patient-appointments', 'patient-prescriptions'].includes(viewName)
+      const primaryNavTarget = ['invoices', 'patient-profile', 'payments', 'loyalty', 'patient-appointments', 'patient-prescriptions', 'patient-media'].includes(viewName)
         ? 'patients'
         : viewName;
       const activeNavClass = 'flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition bg-white text-blue-700 shadow-xs';
@@ -19351,7 +20063,7 @@
         await ensureAppointmentsLoaded();
       } else if (viewName === 'patients') {
         await ensurePatientDirectoryPageLoaded();
-      } else if (['patient-profile', 'invoices', 'payments', 'loyalty', 'patient-appointments'].includes(viewName) || viewName === 'patient-prescriptions') {
+      } else if (['patient-profile', 'invoices', 'payments', 'loyalty', 'patient-appointments', 'patient-media'].includes(viewName) || viewName === 'patient-prescriptions') {
         await ensurePatientsLoaded();
       } else if (viewName === 'chart') {
         if (!chartStructureInitialized) {
@@ -19390,12 +20102,13 @@
       viewAnalytics.classList.add('hidden');
       viewHr.classList.add('hidden');
       viewImplants?.classList.add('hidden');
-      patientWorkspaceHeader.classList.toggle('hidden', !['patient-profile', 'chart', 'invoices', 'payments', 'loyalty', 'patient-appointments', 'patient-prescriptions'].includes(viewName));
+      patientWorkspaceHeader.classList.toggle('hidden', !['patient-profile', 'chart', 'invoices', 'payments', 'loyalty', 'patient-appointments', 'patient-prescriptions', 'patient-media'].includes(viewName));
       document.getElementById('view-patient-appointments').classList.add('hidden');
       if (viewName !== 'patient-appointments') resetPatientAppointmentsState();
       viewPrescriptions.classList.add('hidden');
       if (viewName !== 'patient-prescriptions') resetPatientPrescriptionsState();
       document.getElementById('view-loyalty').classList.add('hidden');
+      document.getElementById('view-patient-media')?.classList.add('hidden');
       viewPatientProfile.classList.add('hidden');
       viewInvoices.classList.add('hidden');
       viewPayments.classList.add('hidden');
@@ -19443,6 +20156,12 @@
       } else if (viewName === 'patient-prescriptions') {
         viewPrescriptions.classList.remove('hidden');
         await renderPatientPrescriptions();
+      } else if (viewName === 'patient-media') {
+        const viewMedia = document.getElementById('view-patient-media');
+        if (viewMedia) {
+          viewMedia.classList.remove('hidden');
+          await renderPatientMedia();
+        }
       } else if (viewName === 'chart') {
         viewChart.classList.remove('hidden');
         loadActivePatientChart();
@@ -19466,6 +20185,7 @@
         viewSettings.classList.remove('hidden');
         void refreshUiThemePreference();
         await loadGoogleCalendarSettings();
+        populateStorageServerSettingsInputs();
       }
       lucide.createIcons();
     }
