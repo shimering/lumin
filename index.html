@@ -1587,6 +1587,47 @@
     html[dir="rtl"] #implant-search-input { padding-right: 2.5rem; padding-left: 0.75rem; }
     html[dir="rtl"] #tracked-procedures-search-icon { right: 0.875rem; left: auto; }
     html[dir="rtl"] #tracked-procedures-search { padding-right: 2.5rem; padding-left: 0.75rem; }
+    #prices-search-icon-wrap {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0.875rem;
+      right: auto;
+      display: flex;
+      align-items: center;
+      pointer-events: none;
+      color: #94a3b8;
+    }
+    #prices-search-clear {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      right: 0.75rem;
+      left: auto;
+      display: flex;
+      align-items: center;
+      color: #94a3b8;
+    }
+    #prices-search-input {
+      padding-left: 2.75rem !important;
+      padding-right: 2.5rem !important;
+    }
+    #view-prices[dir="rtl"] #prices-search-icon-wrap,
+    html[dir="rtl"] #view-prices:not([dir="ltr"]) #prices-search-icon-wrap {
+      right: 0.875rem !important;
+      left: auto !important;
+    }
+    #view-prices[dir="rtl"] #prices-search-clear,
+    html[dir="rtl"] #view-prices:not([dir="ltr"]) #prices-search-clear {
+      left: 0.75rem !important;
+      right: auto !important;
+    }
+    #view-prices[dir="rtl"] #prices-search-input,
+    html[dir="rtl"] #view-prices:not([dir="ltr"]) #prices-search-input {
+      padding-right: 2.75rem !important;
+      padding-left: 2.5rem !important;
+      text-align: right;
+    }
     #modal-new-patient.is-over-appointment { z-index: 80 !important; }
     #modal-appointment.is-behind-patient-modal > div {
       pointer-events: none;
@@ -4349,13 +4390,13 @@
       <!-- Search, Sort & Category Tabs Filter Card -->
       <div class="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <!-- Real-time Search Input with Logical Start/End Position -->
+          <!-- Real-time Search Input -->
           <div class="relative flex-1">
-            <span class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3.5 text-slate-400">
+            <span id="prices-search-icon-wrap">
               <i data-lucide="search" class="h-4 w-4"></i>
             </span>
-            <input id="prices-search-input" type="text" oninput="handlePricesSearch(this.value)" placeholder="Search procedures, codes, or specialties..." class="w-full rounded-xl border border-slate-200 bg-slate-50/60 py-2.5 ps-10 pe-10 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20" />
-            <button id="prices-search-clear" type="button" onclick="clearPricesSearch()" class="hidden absolute inset-y-0 end-0 flex items-center pe-3.5 text-slate-400 hover:text-slate-600" aria-label="Clear search">
+            <input id="prices-search-input" type="text" oninput="handlePricesSearch(this.value)" placeholder="Search procedures, codes, or specialties..." class="w-full rounded-xl border border-slate-200 bg-slate-50/60 py-2.5 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20" />
+            <button id="prices-search-clear" type="button" onclick="clearPricesSearch()" class="hidden text-slate-400 hover:text-slate-600" aria-label="Clear search">
               <i data-lucide="x" class="h-4 w-4"></i>
             </button>
           </div>
@@ -4393,9 +4434,7 @@
               <tr>
                 <th scope="col" class="w-14 px-4 py-3.5 text-center">#</th>
                 <th scope="col" id="th-procedure-name" class="px-4 py-3.5">الإجراء الطبي</th>
-                <th scope="col" id="th-procedure-category" class="px-4 py-3.5">التخصص / القسم</th>
-                <th scope="col" id="th-procedure-scope" class="px-4 py-3.5">النطاق</th>
-                <th scope="col" id="th-procedure-price" class="px-4 py-3.5 text-right font-black">السعر</th>
+                <th scope="col" id="th-procedure-price" class="w-36 px-4 py-3.5 text-right font-black">السعر</th>
               </tr>
             </thead>
             <tbody id="prices-table-body" class="divide-y divide-slate-100 font-medium">
@@ -18755,20 +18794,10 @@
         thName.textContent = isAr ? 'الإجراء الطبي' : 'Procedure';
         thName.className = isAr ? 'px-4 py-3.5 text-right' : 'px-4 py-3.5 text-left';
       }
-      const thCat = document.getElementById('th-procedure-category');
-      if (thCat) {
-        thCat.textContent = isAr ? 'التخصص / القسم' : 'Category';
-        thCat.className = isAr ? 'px-4 py-3.5 text-right' : 'px-4 py-3.5 text-left';
-      }
-      const thScope = document.getElementById('th-procedure-scope');
-      if (thScope) {
-        thScope.textContent = isAr ? 'النطاق' : 'Scope';
-        thScope.className = 'px-4 py-3.5 text-center';
-      }
       const thPrice = document.getElementById('th-procedure-price');
       if (thPrice) {
         thPrice.textContent = isAr ? 'السعر' : 'Price';
-        thPrice.className = isAr ? 'px-4 py-3.5 text-left font-black' : 'px-4 py-3.5 text-right font-black';
+        thPrice.className = isAr ? 'w-36 px-4 py-3.5 text-left font-black' : 'w-36 px-4 py-3.5 text-right font-black';
       }
 
       const adminLinkText = document.getElementById('prices-admin-link-text');
@@ -18936,40 +18965,20 @@
 
       if (emptyState) emptyState.classList.add('hidden');
 
-      const specialtyMap = new Map(dentalSpecialties.map(s => [s.id, s]));
-
       tbody.innerHTML = ops.map((op, idx) => {
-        const specialty = specialtyMap.get(op.specialtyId);
-        const specName = specialty ? specialty.name : 'General';
-        const specNameTranslated = dentalTranslate(specName);
-        const specAccent = normaliseSpecialtyAccentColor(specialty?.accentColor || '#2563eb');
-        const specDef = specialty ? specialtyIconDefinition(specialty.iconName) : specialtyIconDefinition('dental-general');
-        const specDetailIcon = specDef.detailIcon || 'circle-dot';
         const primaryName = dentalTranslate(op.name);
         const secondaryName = isAr && primaryName !== op.name ? op.name : '';
-        const scopeBadge = formatPricesScope(op.actionScope);
         const formattedPrice = formatPricesMoney(op.price);
 
         return `
           <tr class="transition hover:bg-slate-50/80">
-            <td class="px-4 py-3.5 text-center text-xs font-mono font-bold text-slate-400">${idx + 1}</td>
+            <td class="w-14 px-4 py-3.5 text-center text-xs font-mono font-bold text-slate-400">${idx + 1}</td>
             <td class="px-4 py-3.5 ${isAr ? 'text-right' : 'text-left'}">
               <div class="font-bold text-slate-800 text-sm leading-snug">${escapeHtml(primaryName)}</div>
               ${secondaryName ? `<div class="mt-0.5 font-mono text-[11px] font-semibold text-slate-400">${escapeHtml(secondaryName)}</div>` : `<div class="mt-0.5 font-mono text-[10px] text-slate-400">${escapeHtml(op.code)}</div>`}
             </td>
-            <td class="px-4 py-3.5 ${isAr ? 'text-right' : 'text-left'}">
-              <span class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 shadow-2xs">
-                <span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-md" style="background:${specAccent}1a;color:${specAccent}">
-                  <i data-lucide="${escapeHtml(specDetailIcon)}" class="h-3 w-3"></i>
-                </span>
-                <span>${escapeHtml(specNameTranslated)}</span>
-              </span>
-            </td>
-            <td class="px-4 py-3.5 text-center">
-              <span class="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">${escapeHtml(scopeBadge)}</span>
-            </td>
-            <td class="px-4 py-3.5 ${isAr ? 'text-left' : 'text-right'} font-black text-sm text-slate-900">
-              <span class="inline-block rounded-lg ${op.price > 0 ? 'bg-violet-50 text-violet-700' : 'bg-slate-100 text-slate-500'} px-2.5 py-1 font-mono text-xs font-black">
+            <td class="w-36 px-4 py-3.5 ${isAr ? 'text-left' : 'text-right'} font-black text-sm text-slate-900 whitespace-nowrap">
+              <span class="inline-block rounded-lg ${op.price > 0 ? 'bg-violet-50 text-violet-700' : 'bg-slate-100 text-slate-500'} px-3 py-1 font-mono text-xs font-black">
                 ${escapeHtml(formattedPrice)}
               </span>
             </td>
