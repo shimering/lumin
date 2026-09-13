@@ -2598,6 +2598,15 @@
         white-space: nowrap;
       }
     }
+
+    /* Media Lightbox and Modals - Translucent Frosted Glass Backdrop */
+    #patient-media-lightbox,
+    #patient-media-move-modal,
+    #patient-media-upload-modal {
+      background-color: rgba(15, 23, 42, 0.45) !important;
+      -webkit-backdrop-filter: blur(8px) !important;
+      backdrop-filter: blur(8px) !important;
+    }
   </style>
   <link rel="stylesheet" href="lumin-theme.css?v=7" />
 </head>
@@ -4866,7 +4875,7 @@
 
   <!-- ================= PATIENT MEDIA MODALS ================= -->
   <!-- Upload Modal -->
-  <div id="patient-media-upload-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm" style="-webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); transform: translate3d(0, 0, 0); -webkit-transform: translate3d(0, 0, 0);">
+  <div id="patient-media-upload-modal" role="dialog" aria-modal="true" class="fixed inset-0 z-50 hidden items-center justify-center p-4" style="background-color: rgba(15, 23, 42, 0.45) !important; -webkit-backdrop-filter: blur(8px) !important; backdrop-filter: blur(8px) !important;">
     <div class="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
       <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
         <div class="flex items-center gap-2.5">
@@ -4935,7 +4944,7 @@
   </div>
 
   <!-- Modal: Change Media Category / Move Photo -->
-  <div id="patient-media-move-modal" role="dialog" aria-modal="true" class="fixed inset-0 z-[95] hidden items-center justify-center p-4 overflow-y-auto bg-slate-900/40 backdrop-blur-sm" style="-webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); transform: translate3d(0, 0, 0); -webkit-transform: translate3d(0, 0, 0);" onclick="if (event.target === this) closePatientMediaMoveModal()">
+  <div id="patient-media-move-modal" role="dialog" aria-modal="true" class="fixed inset-0 z-[95] hidden items-center justify-center p-4" style="background-color: rgba(15, 23, 42, 0.45) !important; -webkit-backdrop-filter: blur(8px) !important; backdrop-filter: blur(8px) !important;" onclick="if (event.target === this) closePatientMediaMoveModal()">
     <div class="relative w-full max-w-sm rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150 my-auto">
       <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
         <div class="flex items-center gap-2.5">
@@ -4985,7 +4994,7 @@
   </div>
 
   <!-- Diagnostic Lightbox Viewer Modal -->
-  <div id="patient-media-lightbox" role="dialog" aria-modal="true" onclick="if (event.target === this) closeMediaLightbox()" class="fixed inset-0 z-[85] hidden items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto bg-slate-900/40 backdrop-blur-sm" style="-webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); transform: translate3d(0, 0, 0); -webkit-transform: translate3d(0, 0, 0);">
+  <div id="patient-media-lightbox" role="dialog" aria-modal="true" onclick="if (event.target === this) closeMediaLightbox()" class="fixed inset-0 z-[85] hidden items-center justify-center p-3 sm:p-4 md:p-6" style="background-color: rgba(15, 23, 42, 0.45) !important; -webkit-backdrop-filter: blur(8px) !important; backdrop-filter: blur(8px) !important;">
     <div class="relative flex flex-col w-full max-w-2xl h-[70vh] max-h-[520px] min-h-[320px] bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150">
       <!-- Lightbox Header / Controls -->
       <div class="flex items-center justify-between border-b border-slate-200/80 bg-slate-50/90 px-3.5 py-2.5 sm:px-4 gap-2 shrink-0 z-20 flex-nowrap backdrop-blur-xs">
@@ -19075,13 +19084,21 @@
       if (error) error.classList.add('hidden');
       if (progress) progress.classList.add('hidden');
       resetMediaDropzonePreview();
+      modal.style.setProperty('background-color', 'rgba(15, 23, 42, 0.45)', 'important');
+      modal.style.setProperty('-webkit-backdrop-filter', 'blur(8px)', 'important');
+      modal.style.setProperty('backdrop-filter', 'blur(8px)', 'important');
       modal.classList.remove('hidden');
+      modal.classList.add('flex');
       setupMediaDropzoneEvents();
       lucide.createIcons();
     }
 
     function closePatientMediaUploadModal() {
-      document.getElementById('patient-media-upload-modal')?.classList.add('hidden');
+      const modal = document.getElementById('patient-media-upload-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
     }
 
     function setupMediaDropzoneEvents() {
@@ -19391,6 +19408,9 @@
         dlLink.download = filename;
       }
 
+      modal.style.setProperty('background-color', 'rgba(15, 23, 42, 0.45)', 'important');
+      modal.style.setProperty('-webkit-backdrop-filter', 'blur(8px)', 'important');
+      modal.style.setProperty('backdrop-filter', 'blur(8px)', 'important');
       modal.classList.remove('hidden');
       modal.classList.add('flex');
       lucide.createIcons();
@@ -19447,6 +19467,9 @@
       if (catSelect) catSelect.value = currentCategory;
       if (errorEl) errorEl.classList.add('hidden');
 
+      modal.style.setProperty('background-color', 'rgba(15, 23, 42, 0.45)', 'important');
+      modal.style.setProperty('-webkit-backdrop-filter', 'blur(8px)', 'important');
+      modal.style.setProperty('backdrop-filter', 'blur(8px)', 'important');
       modal.classList.remove('hidden');
       modal.classList.add('flex');
     }
