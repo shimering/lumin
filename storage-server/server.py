@@ -12,6 +12,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 import urllib.request
+from PIL import Image, ImageOps
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 
@@ -104,6 +105,41 @@ except Exception as e:
 
 logger.info(f"Root patient storage directory: {STORAGE_ROOT}")
 
+THUMBNAIL_ROOT = STORAGE_ROOT / ".thumbnails"
+try:
+    THUMBNAIL_ROOT.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
+
+def generate_thumbnail(original_file_path: Path):
+    """Generate a lightweight WebP thumbnail (max 480x480) for instant preview loading."""
+    try:
+        rel = original_file_path.relative_to(STORAGE_ROOT)
+        thumb_path = (THUMBNAIL_ROOT / rel).with_suffix(".webp")
+        thumb_path.parent.mkdir(parents=True, exist_ok=True)
+
+        if thumb_path.exists() and thumb_path.stat().st_mtime >= original_file_path.stat().st_mtime:
+            return thumb_path
+
+        ext = original_file_path.suffix.lower().lstrip(".")
+        if ext not in ["jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff"]:
+            return None
+
+        with Image.open(original_file_path) as im:
+            im = ImageOps.exif_transpose(im)
+            if im.mode in ("RGBA", "LA") or (im.mode == "P" and "transparency" in im.info):
+                pass
+            elif im.mode != "RGB":
+                im = im.convert("RGB")
+            im.thumbnail((480, 480), Image.Resampling.LANCZOS)
+            im.save(thumb_path, "WEBP", quality=80)
+
+        logger.info(f"Generated thumbnail for {rel}: {thumb_path.stat().st_size / 1024:.1f} KB")
+        return thumb_path
+    except Exception as e:
+        logger.warning(f"Failed to generate thumbnail for {original_file_path}: {e}")
+        return None
+
 # Initialize Flask app
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -181,6 +217,7 @@ def upload_file():
 
     file_path = target_dir / saved_filename
     uploaded_file.save(str(file_path))
+    generate_thumbnail(file_path)
 
     relative_path = str(file_path.relative_to(STORAGE_ROOT)).replace("\\", "/")
     file_size = file_path.stat().st_size
@@ -268,16 +305,52 @@ def delete_file():
 
     try:
         target_path.unlink()
+        thumb_candidate = (THUMBNAIL_ROOT / clean_rel_path).with_suffix(".webp")
+        if thumb_candidate.exists():
+            try:
+                thumb_candidate.unlink()
+            except Exception:
+                pass
         logger.info(f"Deleted: {clean_rel_path}")
         return jsonify({"success": True, "message": "File deleted successfully", "deletedPath": clean_rel_path})
     except Exception as e:
         logger.error(f"Failed to delete {clean_rel_path}: {e}")
         return jsonify({"error": f"Failed to delete file: {e}"}), 500
 
+@app.route("/api/thumbnail/<path:filename>", methods=["GET"])
+def get_thumbnail(filename):
+    """Serve a lightweight, compressed WebP thumbnail (max 480x480) for instant preview loading."""
+    try:
+        clean_filename = Path(filename.replace("\\", "/")).as_posix().lstrip("/")
+        requested = (STORAGE_ROOT / clean_filename).resolve()
+        if not str(requested).startswith(str(STORAGE_ROOT)):
+            return jsonify({"error": "Access denied."}), 403
+
+        if not requested.exists() or not requested.is_file():
+            return jsonify({"error": "File not found."}), 404
+
+        thumb_path = generate_thumbnail(requested)
+        if thumb_path and thumb_path.exists():
+            rel_thumb = thumb_path.relative_to(THUMBNAIL_ROOT)
+            resp = send_from_directory(THUMBNAIL_ROOT, str(rel_thumb).replace("\\", "/"))
+            resp.headers["Cache-Control"] = "public, max-age=604800, immutable"
+            return resp
+
+        # Fallback to original if not an image
+        resp = send_from_directory(STORAGE_ROOT, clean_filename)
+        resp.headers["Cache-Control"] = "public, max-age=86400"
+        return resp
+    except Exception as e:
+        logger.error(f"Error serving thumbnail {filename}: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/files/<path:filename>", methods=["GET"])
 def serve_file(filename):
-    """Stream or serve the raw image / file to the browser."""
-    return send_from_directory(STORAGE_ROOT, filename)
+    """Stream or serve the raw full-resolution image / file to the browser."""
+    clean_filename = Path(filename.replace("\\", "/")).as_posix().lstrip("/")
+    resp = send_from_directory(STORAGE_ROOT, clean_filename)
+    resp.headers["Cache-Control"] = "public, max-age=86400"
+    return resp
 
 if __name__ == "__main__":
     port = int(config.get("port", 5000))
