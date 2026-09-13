@@ -1667,6 +1667,15 @@
     #prices-category-tabs::-webkit-scrollbar-thumb:hover {
       background-color: #94a3b8;
     }
+    #prices-category-tabs.is-reordering {
+      scroll-snap-type: none !important;
+      touch-action: none !important;
+      user-select: none !important;
+      -webkit-user-select: none !important;
+    }
+    #prices-category-tabs.is-reordering .prices-category-tab {
+      touch-action: none !important;
+    }
     .prices-category-tab {
       border: none !important;
       outline: none !important;
@@ -1684,8 +1693,8 @@
       transform: translateY(-1.5px);
     }
     .prices-category-tab.is-selected {
-      background: #edf2f7 !important;
-      box-shadow: inset 2.5px 2.5px 5px rgba(148, 163, 184, 0.4), inset -2.5px -2.5px 5px rgba(255, 255, 255, 0.95), 0 0 0 2px var(--tab-accent, #2563eb) !important;
+      background: #f8fafc !important;
+      box-shadow: 0 0 16px var(--tab-glow, rgba(37, 99, 235, 0.45)), 0 0 6px var(--tab-glow, rgba(37, 99, 235, 0.35)), inset 2px 2px 4px rgba(160, 175, 200, 0.25), inset -2px -2px 4px rgba(255, 255, 255, 0.95) !important;
       transform: translateY(0) !important;
     }
     .prices-category-tab.is-pressing {
@@ -1693,13 +1702,12 @@
       box-shadow: inset 2px 2px 4px rgba(160, 175, 200, 0.3), inset -2px -2px 4px rgba(255, 255, 255, 0.9) !important;
     }
     .prices-category-tab.is-dragging {
-      z-index: 50 !important;
-      transform: scale(1.08) translateY(-4px) !important;
+      z-index: 60 !important;
       background: #ffffff !important;
-      box-shadow: 0 14px 28px rgba(37, 99, 235, 0.28), 0 6px 12px rgba(0, 0, 0, 0.12), 0 0 0 2.5px var(--tab-accent, #2563eb) !important;
-      opacity: 0.96;
+      box-shadow: 0 16px 32px rgba(37, 99, 235, 0.28), 0 6px 14px rgba(0, 0, 0, 0.12), 0 0 20px var(--tab-glow, rgba(37, 99, 235, 0.5)) !important;
+      opacity: 0.98;
       cursor: grabbing !important;
-      transition: transform 0.12s ease, box-shadow 0.12s ease !important;
+      transition: box-shadow 0.15s ease !important;
     }
     .prices-category-icon-box {
       border: none !important;
@@ -7065,16 +7073,12 @@
           || currentUserAccess.permissions.has('analytics')
           || currentUserAccess.permissions.has('hr')
           || currentUserAccess.permissions.has('implants')
-          || currentUserAccess.permissions.has('chart')
-          || currentUserAccess.permissions.has('patients')
         );
       }
       if (pageKey === 'implants') {
         return Boolean(
           currentUserAccess.isAdmin
           || currentUserAccess.permissions.has('implants')
-          || currentUserAccess.permissions.has('chart')
-          || currentUserAccess.permissions.has('patients')
         );
       }
       return Boolean(currentUserAccess.isAdmin || currentUserAccess.permissions.has(pageKey));
@@ -18973,15 +18977,16 @@
           pricesDidDrag = true;
           pricesActiveDragCard.classList.remove('is-pressing');
           pricesActiveDragCard.classList.add('is-dragging');
+          container.classList.add('is-reordering');
 
           try {
-            if (navigator.vibrate) navigator.vibrate(50);
+            if (navigator.vibrate) navigator.vibrate(40);
           } catch (_) {}
 
           try {
             pricesActiveDragCard.setPointerCapture(pricesActivePointerId);
           } catch (_) {}
-        }, 500); // 0.5 sec long-press
+        }, 500); // 0.5 sec long-press to activate drag
       });
 
       container.addEventListener('pointermove', (e) => {
@@ -18989,7 +18994,8 @@
 
         if (!pricesIsDragging) {
           const dist = Math.hypot(e.clientX - pricesDragStartX, e.clientY - pricesDragStartY);
-          if (dist > 8) {
+          // Allow natural finger jitter up to 25px without cancelling long-press
+          if (dist > 25) {
             clearTimeout(pricesLongPressTimer);
             pricesActiveDragCard.classList.remove('is-pressing');
             pricesActiveDragCard = null;
@@ -18998,34 +19004,39 @@
         }
 
         e.preventDefault();
+        e.stopPropagation();
 
         // Edge auto-scrolling
         const containerRect = container.getBoundingClientRect();
-        if (e.clientX < containerRect.left + 50) {
-          container.scrollLeft -= 8;
-        } else if (e.clientX > containerRect.right - 50) {
-          container.scrollLeft += 8;
+        if (e.clientX < containerRect.left + 60) {
+          container.scrollLeft -= 10;
+        } else if (e.clientX > containerRect.right - 60) {
+          container.scrollLeft += 10;
         }
+
+        // Apply smooth hardware-accelerated translation to dragged card
+        const dx = e.clientX - pricesDragStartX;
+        pricesActiveDragCard.style.transform = `translate3d(${dx}px, -4px, 0) scale(1.08)`;
 
         // Reorder specialty cards in real-time
         const cards = Array.from(container.querySelectorAll('.prices-category-tab:not([data-specialty-id="all"])'));
-        const target = cards.find(c => {
-          if (c === pricesActiveDragCard) return false;
-          const r = c.getBoundingClientRect();
-          return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top - 30 && e.clientY <= r.bottom + 30;
-        });
-
-        if (target) {
-          const targetRect = target.getBoundingClientRect();
-          const isAfter = e.clientX > (targetRect.left + targetRect.width / 2);
-          if (isAfter) {
-            if (target.nextSibling !== pricesActiveDragCard) {
-              container.insertBefore(pricesActiveDragCard, target.nextSibling);
+        for (const target of cards) {
+          if (target === pricesActiveDragCard) continue;
+          const r = target.getBoundingClientRect();
+          if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top - 40 && e.clientY <= r.bottom + 40) {
+            const isAfter = e.clientX > (r.left + r.width / 2);
+            if (isAfter) {
+              if (target.nextSibling !== pricesActiveDragCard) {
+                container.insertBefore(pricesActiveDragCard, target.nextSibling);
+                pricesDragStartX = e.clientX;
+              }
+            } else {
+              if (target !== pricesActiveDragCard.nextSibling) {
+                container.insertBefore(pricesActiveDragCard, target);
+                pricesDragStartX = e.clientX;
+              }
             }
-          } else {
-            if (target !== pricesActiveDragCard.nextSibling) {
-              container.insertBefore(pricesActiveDragCard, target);
-            }
+            break;
           }
         }
       });
@@ -19039,6 +19050,10 @@
         if (pricesIsDragging) {
           const card = pricesActiveDragCard;
           card.classList.remove('is-dragging');
+          card.style.transform = '';
+          card.style.zIndex = '';
+          container.classList.remove('is-reordering');
+
           try {
             if (card.hasPointerCapture && card.hasPointerCapture(pricesActivePointerId)) {
               card.releasePointerCapture(pricesActivePointerId);
@@ -19077,7 +19092,7 @@
 
           setTimeout(() => {
             pricesDidDrag = false;
-          }, 200);
+          }, 250);
         } else {
           pricesActiveDragCard = null;
           pricesActivePointerId = null;
@@ -19108,7 +19123,7 @@
       const allSelected = selectedPricesCategory === 'all';
 
       let html = `
-        <button type="button" role="tab" aria-selected="${allSelected}" data-specialty-id="all" onclick="selectPricesCategory('all')" class="prices-category-tab group relative flex shrink-0 snap-start items-center gap-2.5 px-3.5 py-2.5 ${allSelected ? 'is-selected' : ''}" style="--tab-accent:#2563eb">
+        <button type="button" role="tab" aria-selected="${allSelected}" data-specialty-id="all" onclick="selectPricesCategory('all')" class="prices-category-tab group relative flex shrink-0 snap-start items-center gap-2.5 px-3.5 py-2.5 ${allSelected ? 'is-selected' : ''}" style="--tab-accent:#2563eb;--tab-glow:rgba(37,99,235,0.45)">
           <span class="prices-category-icon-box flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition ${allSelected ? 'bg-blue-600 text-white shadow-xs' : 'bg-blue-50 text-blue-600'}">
             <i data-lucide="layers" class="h-4 w-4"></i>
           </span>
@@ -19116,7 +19131,7 @@
             <span class="text-xs font-black ${allSelected ? 'text-blue-950' : 'text-slate-800'}">${escapeHtml(dentalTranslate('All'))}</span>
             <span class="text-[9px] font-bold text-slate-400">${activeOps.length} ${isAr ? 'إجراء' : (activeOps.length === 1 ? 'procedure' : 'procedures')}</span>
           </div>
-          <span class="absolute inset-x-2.5 bottom-0 h-0.5 rounded-full transition" style="background:#2563eb;opacity:${allSelected ? '1' : '0.2'}"></span>
+          <span class="absolute inset-x-2.5 bottom-0 h-0.5 rounded-full transition" style="background:#2563eb;box-shadow:0 0 6px #2563eb;opacity:${allSelected ? '1' : '0.2'}"></span>
         </button>
       `;
 
@@ -19126,9 +19141,10 @@
         const count = activeOps.filter(op => op.specialtyId === specialty.id).length;
         const isSelected = selectedPricesCategory === specialty.id;
         const accent = normaliseSpecialtyAccentColor(specialty.accentColor);
+        const glow = accent.length === 7 ? `${accent}70` : `${accent}`;
 
         html += `
-          <button type="button" role="tab" aria-selected="${isSelected}" data-specialty-id="${specialty.id}" onclick="selectPricesCategory('${specialty.id}')" title="${escapeHtml(specialty.description || specialty.name)}" class="prices-category-tab group relative flex shrink-0 snap-start items-center gap-2.5 px-3 py-2.5 ${isSelected ? 'is-selected' : ''}" style="--tab-accent:${accent}">
+          <button type="button" role="tab" aria-selected="${isSelected}" data-specialty-id="${specialty.id}" onclick="selectPricesCategory('${specialty.id}')" title="${escapeHtml(specialty.description || specialty.name)}" class="prices-category-tab group relative flex shrink-0 snap-start items-center gap-2.5 px-3 py-2.5 ${isSelected ? 'is-selected' : ''}" style="--tab-accent:${accent};--tab-glow:${glow}">
             <span class="prices-category-icon-box flex h-8 w-9 shrink-0 items-center justify-center rounded-xl transition" style="background:${accent}15;color:${accent}">
               ${specialtyIconMarkup(specialty.iconName, accent, 'compact')}
             </span>
@@ -19136,7 +19152,7 @@
               <span class="truncate max-w-[8.5rem] text-xs font-black ${isSelected ? 'text-slate-900' : 'text-slate-700'}">${escapeHtml(dentalTranslate(specialty.name))}</span>
               <span class="text-[9px] font-bold text-slate-400">${count} ${isAr ? 'إجراء' : (count === 1 ? 'procedure' : 'procedures')}</span>
             </div>
-            <span class="absolute inset-x-2.5 bottom-0 h-0.5 rounded-full transition" style="background:${accent};opacity:${isSelected ? '1' : '0.25'}"></span>
+            <span class="absolute inset-x-2.5 bottom-0 h-0.5 rounded-full transition" style="background:${accent};box-shadow:0 0 6px ${accent};opacity:${isSelected ? '1' : '0.25'}"></span>
           </button>
         `;
       }
