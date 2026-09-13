@@ -120,11 +120,12 @@ def upload_file():
         return jsonify({"error": "Uploaded file is empty."}), 400
 
     patient_id = sanitize_name(request.form.get("patientId") or request.form.get("patient_id") or "General")
-    patient_name = sanitize_name(request.form.get("patientName") or request.form.get("patient_name") or "Patient")
+    raw_name = request.form.get("patientName") or request.form.get("patient_name") or ""
+    patient_name = sanitize_name(raw_name) if raw_name else ""
     category = sanitize_name(request.form.get("category") or "General")
 
-    # Folder format: {patient_id}_{patient_name}/{category}
-    patient_folder_name = f"{patient_id}_{patient_name}"
+    # Folder format: Use clean patient name only (e.g. يحيى_سيد_أبو_غالي)
+    patient_folder_name = patient_name if (patient_name and patient_name != "Patient") else patient_id
     target_dir = STORAGE_ROOT / patient_folder_name / category
     target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -160,10 +161,31 @@ def upload_file():
 
 @app.route("/api/patient/<patient_id>/files", methods=["GET"])
 def list_patient_files(patient_id):
-    """List all media files for a specific patient."""
+    """List all media files for a specific patient by ID or name."""
     safe_patient_id = sanitize_name(patient_id)
-    # Search for any folder starting with patient_id_
-    matched_dirs = [d for d in STORAGE_ROOT.iterdir() if d.is_dir() and (d.name == safe_patient_id or d.name.startswith(f"{safe_patient_id}_"))]
+    raw_name = request.args.get("name") or request.args.get("patientName") or ""
+    safe_patient_name = sanitize_name(raw_name) if raw_name else ""
+
+    matched_dirs = []
+
+    # 1. Primary: match clean patient name folder
+    if safe_patient_name and safe_patient_name != "Patient":
+        name_dir = STORAGE_ROOT / safe_patient_name
+        if name_dir.is_dir():
+            matched_dirs.append(name_dir)
+
+    # 2. Match exact patient_id folder
+    id_dir = STORAGE_ROOT / safe_patient_id
+    if id_dir.is_dir() and id_dir not in matched_dirs:
+        matched_dirs.append(id_dir)
+
+    # 3. Match legacy folders starting with patient_id_ or ending with _patient_name
+    for d in STORAGE_ROOT.iterdir():
+        if d.is_dir() and d not in matched_dirs:
+            if d.name.startswith(f"{safe_patient_id}_"):
+                matched_dirs.append(d)
+            elif safe_patient_name and d.name.endswith(f"_{safe_patient_name}"):
+                matched_dirs.append(d)
 
     files_list = []
     for patient_dir in matched_dirs:
