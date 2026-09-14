@@ -1923,7 +1923,13 @@
       }
       #btn-logout:hover { border-color: #fecdd3; background: #fff1f2; color: #be123c; }
       #btn-logout > svg { width: 1.2rem; height: 1.2rem; }
-      main { width: 100%; }
+      #app-main {
+        box-sizing: border-box;
+        width: 100%;
+        max-width: none;
+        margin-inline: 0;
+        padding-inline: 0.75rem;
+      }
     }
 
     @media (max-width: 1023px) {
@@ -2859,7 +2865,7 @@
   </header>
 
   <!-- Main Work Area -->
-  <main class="max-w-[1560px] mx-auto p-4 sm:p-6">
+  <main id="app-main" class="w-full p-4 sm:p-6">
 
     <!-- ================= DASHBOARD: MY DAILY PATIENTS ================= -->
     <section id="view-dashboard">
