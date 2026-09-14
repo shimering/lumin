@@ -2804,12 +2804,17 @@
       border-bottom-right-radius: 4px;
     }
     #whatsapp-reply-input {
-      max-height: 150px;
-      min-height: 44px;
+      max-height: 140px;
+      min-height: 38px;
+      line-height: 1.4;
     }
     @media (max-width: 767px) {
       #view-whatsapp {
         height: calc(100dvh - 7rem);
+      }
+      .whatsapp-chat-shell {
+        height: calc(100dvh - 10.5rem) !important;
+        min-height: 0 !important;
       }
       .whatsapp-mobile-chat-open #whatsapp-sidebar {
         display: none !important;
@@ -2822,6 +2827,57 @@
       }
       body:not(.whatsapp-mobile-chat-open) #whatsapp-sidebar {
         display: flex !important;
+      }
+
+      /* Full-bleed native mobile chat experience */
+      body.whatsapp-mobile-chat-open {
+        overflow: hidden !important;
+      }
+      body.whatsapp-mobile-chat-open #app-header {
+        display: none !important;
+      }
+      body.whatsapp-mobile-chat-open #app-main {
+        padding: 0 !important;
+        margin: 0 !important;
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        overflow: hidden !important;
+      }
+      body.whatsapp-mobile-chat-open #view-whatsapp {
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        gap: 0 !important;
+        overflow: hidden !important;
+      }
+      body.whatsapp-mobile-chat-open #view-whatsapp > .app-page-bar {
+        display: none !important;
+      }
+      body.whatsapp-mobile-chat-open .whatsapp-chat-shell {
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        min-height: 0 !important;
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+      }
+      body.whatsapp-mobile-chat-open #whatsapp-main-chat,
+      body.whatsapp-mobile-chat-open #whatsapp-chat-active {
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        min-height: 0 !important;
+        border-radius: 0 !important;
+      }
+      #whatsapp-reply-panel {
+        padding: 0.5rem 0.625rem max(0.5rem, env(safe-area-inset-bottom, 0px)) 0.625rem !important;
+      }
+      #whatsapp-reply-input {
+        font-size: 14px !important;
+        min-height: 38px !important;
+      }
+      #whatsapp-messages-container {
+        padding: 0.75rem !important;
       }
     }
   </style>
@@ -5144,19 +5200,19 @@
           <!-- Active Chat Container -->
           <div id="whatsapp-chat-active" class="hidden flex-col h-full min-h-0 overflow-hidden">
             <!-- Chat Header -->
-            <div class="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-2.5 shadow-xs z-10">
-              <div class="flex items-center gap-3 min-w-0">
-                <button type="button" onclick="closeActiveWhatsAppChatOnMobile()" class="md:hidden flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100">
+            <div class="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-3 sm:px-4 py-2 sm:py-2.5 shadow-xs z-10">
+              <div class="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                <button type="button" onclick="closeActiveWhatsAppChatOnMobile()" class="md:hidden flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 -ml-1" aria-label="Back to conversations">
                   <i data-lucide="arrow-left" class="h-4 w-4"></i>
                 </button>
-                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800 font-black text-xs" id="whatsapp-chat-avatar">
+                <div class="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800 font-black text-xs" id="whatsapp-chat-avatar">
                   PA
                 </div>
-                <div class="min-w-0">
-                  <div class="flex items-center gap-2">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-1.5">
                     <h4 id="whatsapp-chat-patient-name" class="truncate text-xs font-black text-slate-900">Patient Name</h4>
-                    <button type="button" id="whatsapp-chat-patient-file-btn" onclick="openActiveChatPatientFile()" class="inline-flex items-center gap-1 rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 hover:bg-blue-100 transition" title="Open patient chart">
-                      <i data-lucide="user" class="h-2.5 w-2.5"></i> File
+                    <button type="button" id="whatsapp-chat-patient-file-btn" onclick="openActiveChatPatientFile()" class="shrink-0 inline-flex items-center gap-0.5 rounded-md bg-blue-50 px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold text-blue-700 hover:bg-blue-100 transition" title="Open patient chart">
+                      <i data-lucide="user" class="h-2.5 w-2.5"></i> <span>File</span>
                     </button>
                   </div>
                   <p id="whatsapp-chat-patient-phone" class="truncate text-[10px] font-semibold text-slate-400" dir="ltr">+964 770 000 0000</p>
@@ -5164,8 +5220,9 @@
               </div>
 
               <!-- AI Auto-Reply Toggle Switch -->
-              <div class="flex items-center gap-2">
-                <div class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 shadow-xs" title="Toggle AI Auto-Reply for this patient">
+              <div class="flex items-center gap-2 shrink-0">
+                <!-- Desktop Full Pill -->
+                <div class="hidden sm:flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 shadow-xs" title="Toggle AI Auto-Reply for this patient">
                   <span class="flex h-2 w-2 rounded-full bg-emerald-500" id="whatsapp-ai-status-dot"></span>
                   <span class="text-[11px] font-black text-slate-700" id="whatsapp-ai-toggle-label">AI Auto-Reply</span>
                   <label class="relative inline-flex cursor-pointer items-center ml-1">
@@ -5174,43 +5231,52 @@
                     <span class="pointer-events-none absolute left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition peer-checked:translate-x-4"></span>
                   </label>
                 </div>
+                <!-- Mobile Compact AI Toggle Pill -->
+                <label class="sm:hidden flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 cursor-pointer shadow-2xs" title="Toggle AI Auto-Reply">
+                  <span class="flex h-1.5 w-1.5 rounded-full bg-violet-500" id="whatsapp-ai-status-dot-mobile"></span>
+                  <span class="text-[10px] font-black text-slate-700" id="whatsapp-ai-toggle-label-mobile">AI</span>
+                  <input id="whatsapp-ai-toggle-mobile" type="checkbox" onchange="toggleActiveChatAi(this.checked)" class="peer sr-only" />
+                  <span class="relative inline-flex h-4 w-7 shrink-0 rounded-full bg-slate-300 transition peer-checked:bg-violet-600">
+                    <span class="pointer-events-none absolute left-0.5 top-0.5 h-3 w-3 rounded-full bg-white shadow-xs transition peer-checked:translate-x-3"></span>
+                  </span>
+                </label>
               </div>
             </div>
 
             <!-- Messages Thread -->
-            <div id="whatsapp-messages-container" class="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+            <div id="whatsapp-messages-container" class="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-2.5 sm:space-y-3">
               <!-- Messages rendered here -->
             </div>
 
             <!-- Dedicated Manual Chat & Quick Replies Area Below -->
-            <div id="whatsapp-reply-panel" class="shrink-0 border-t border-slate-200 bg-white p-3 shadow-[0_-2px_10px_rgba(0,0,0,0.03)] z-10 space-y-2.5">
+            <div id="whatsapp-reply-panel" class="shrink-0 border-t border-slate-200 bg-white p-2 sm:p-3 shadow-[0_-2px_10px_rgba(0,0,0,0.03)] z-10 space-y-1.5 sm:space-y-2.5">
               <!-- Quick Action & Suggestion Bar -->
-              <div class="flex items-center justify-between gap-2 overflow-x-auto pb-1 text-[11px] no-scrollbar">
+              <div class="flex items-center justify-between gap-1.5 sm:gap-2 overflow-x-auto pb-0.5 text-[11px] no-scrollbar">
                 <!-- Quick Chips -->
-                <div class="flex items-center gap-1.5 shrink-0" id="whatsapp-quick-chips">
-                  <span class="text-[10px] font-black uppercase text-slate-400 tracking-wider flex items-center gap-1">
-                    <i data-lucide="zap" class="h-3 w-3 text-amber-500"></i> Quick:
+                <div class="flex items-center gap-1 sm:gap-1.5 shrink-0" id="whatsapp-quick-chips">
+                  <span class="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 tracking-wider flex items-center gap-0.5 sm:gap-1 shrink-0">
+                    <i data-lucide="zap" class="h-3 w-3 text-amber-500"></i> <span class="hidden xs:inline">Quick:</span>
                   </span>
-                  <button type="button" onclick="insertWhatsAppQuickReply('تم تأكيد موعدك بنجاح، ننتظر تشريفك لنا في العيادة 🦷✨')" class="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 transition">
+                  <button type="button" onclick="insertWhatsAppQuickReply('تم تأكيد موعدك بنجاح، ننتظر تشريفك لنا في العيادة 🦷✨')" class="rounded-lg border border-slate-200 bg-slate-50 px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-[11px] font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 transition shrink-0 whitespace-nowrap">
                     تم تأكيد الموعد 🦷
                   </button>
-                  <button type="button" onclick="insertWhatsAppQuickReply('أهلاً بك في عيادة لومين، كيف يمكننا مساعدتك اليوم؟')" class="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 transition">
+                  <button type="button" onclick="insertWhatsAppQuickReply('أهلاً بك في عيادة لومين، كيف يمكننا مساعدتك اليوم؟')" class="rounded-lg border border-slate-200 bg-slate-50 px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-[11px] font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 transition shrink-0 whitespace-nowrap">
                     ترحيب 👋
                   </button>
-                  <button type="button" onclick="insertWhatsAppQuickReply('يرجى الحضور إلى العيادة قبل موعدك بـ 15 دقيقة لإتمام إجراءات الكشف.')" class="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 transition">
+                  <button type="button" onclick="insertWhatsAppQuickReply('يرجى الحضور إلى العيادة قبل موعدك بـ 15 دقيقة لإتمام إجراءات الكشف.')" class="rounded-lg border border-slate-200 bg-slate-50 px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-[11px] font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 transition shrink-0 whitespace-nowrap">
                     الحضور مبكراً ⏱️
                   </button>
-                  <button type="button" onclick="insertWhatsAppQuickReply('نعتذر منك، الطبيب غير متاح في هذا التوقيت. هل يناسبك موعد آخر؟')" class="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 transition">
+                  <button type="button" onclick="insertWhatsAppQuickReply('نعتذر منك، الطبيب غير متاح في هذا التوقيت. هل يناسبك موعد آخر؟')" class="rounded-lg border border-slate-200 bg-slate-50 px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-[11px] font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 transition shrink-0 whitespace-nowrap">
                     الموعد غير متاح ❌
                   </button>
-                  <button type="button" onclick="insertWhatsAppQuickReply('سيتم التواصل معك هاتفياً من قبل إدارة العيادة لمتابعة استفسارك.')" class="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 transition">
+                  <button type="button" onclick="insertWhatsAppQuickReply('سيتم التواصل معك هاتفياً من قبل إدارة العيادة لمتابعة استفسارك.')" class="rounded-lg border border-slate-200 bg-slate-50 px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-[11px] font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 transition shrink-0 whitespace-nowrap">
                     متابعة هاتفية 📞
                   </button>
                 </div>
 
                 <!-- Template & Takeover Controls -->
                 <div class="flex items-center gap-1.5 shrink-0 ml-auto">
-                  <button type="button" id="whatsapp-takeover-btn" onclick="toggleActiveChatAiFromBar()" class="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-800 hover:bg-violet-100 transition" title="Switch between AI handling and Staff manual handling">
+                  <button type="button" id="whatsapp-takeover-btn" onclick="toggleActiveChatAiFromBar()" class="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 sm:px-2.5 py-0.5 text-[9px] sm:text-[10px] font-bold text-violet-800 hover:bg-violet-100 transition whitespace-nowrap" title="Switch between AI handling and Staff manual handling">
                     <span class="h-1.5 w-1.5 rounded-full bg-violet-500"></span>
                     <span id="whatsapp-takeover-btn-text">Take Over Chat</span>
                   </button>
@@ -5218,25 +5284,25 @@
               </div>
 
               <!-- Manual Message Form -->
-              <form id="whatsapp-reply-form" onsubmit="sendWhatsAppManualReply(event)" class="relative flex items-end gap-2">
+              <form id="whatsapp-reply-form" onsubmit="sendWhatsAppManualReply(event)" class="relative flex items-end gap-1.5 sm:gap-2">
                 <!-- Template Picker Button -->
-                <button type="button" onclick="openWhatsAppChatTemplatePicker(this)" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition mb-0.5" title="Saved Templates">
+                <button type="button" onclick="openWhatsAppChatTemplatePicker(this)" class="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition mb-0.5" title="Saved Templates">
                   <i data-lucide="bookmark" class="h-4 w-4"></i>
                 </button>
 
                 <!-- Expanding Textarea -->
-                <div class="relative flex-1">
-                  <textarea id="whatsapp-reply-input" rows="2" dir="auto" oninput="autoResizeWhatsAppInput(this)" onkeydown="handleWhatsAppInputKeydown(event)" placeholder="Type a message to send to patient on WhatsApp... (Enter to send, Shift+Enter for new line)" class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs leading-relaxed outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition"></textarea>
-                  <div class="flex items-center justify-between px-1 text-[10px] text-slate-400">
+                <div class="relative flex-1 min-w-0">
+                  <textarea id="whatsapp-reply-input" rows="1" dir="auto" oninput="autoResizeWhatsAppInput(this)" onkeydown="handleWhatsAppInputKeydown(event)" placeholder="Type a message to send to patient on WhatsApp..." class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 sm:px-3.5 sm:py-2.5 text-xs sm:text-sm leading-relaxed outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition"></textarea>
+                  <div class="hidden sm:flex items-center justify-between px-1 text-[10px] text-slate-400 mt-0.5">
                     <span id="whatsapp-replying-to-hint" class="truncate font-semibold">Replying directly via WhatsApp Cloud API</span>
-                    <span class="hidden sm:inline opacity-70">Enter ↵ to send</span>
+                    <span class="opacity-70">Enter ↵ to send</span>
                   </div>
                 </div>
 
                 <!-- Send Button -->
-                <button type="submit" id="whatsapp-reply-submit" class="flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 text-xs font-black text-white hover:from-emerald-700 hover:to-teal-700 shadow-xs transition disabled:opacity-50 disabled:cursor-not-allowed mb-0.5">
-                  <i data-lucide="send" class="h-3.5 w-3.5"></i>
-                  <span id="whatsapp-reply-submit-text">Send</span>
+                <button type="submit" id="whatsapp-reply-submit" class="flex h-9 w-9 sm:h-10 sm:w-auto shrink-0 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-0 sm:px-4 text-xs font-black text-white hover:from-emerald-700 hover:to-teal-700 shadow-xs transition disabled:opacity-50 disabled:cursor-not-allowed mb-0.5">
+                  <i data-lucide="send" class="h-3.5 w-3.5 sm:h-3.5 sm:w-3.5"></i>
+                  <span id="whatsapp-reply-submit-text" class="hidden sm:inline">Send</span>
                 </button>
               </form>
             </div>
@@ -27578,11 +27644,17 @@
         document.getElementById('whatsapp-chat-patient-phone').textContent = '+' + activeWhatsAppConversation.phone;
 
         const aiToggle = document.getElementById('whatsapp-ai-toggle');
+        const aiToggleMobile = document.getElementById('whatsapp-ai-toggle-mobile');
         const aiDot = document.getElementById('whatsapp-ai-status-dot');
+        const aiDotMobile = document.getElementById('whatsapp-ai-status-dot-mobile');
         const aiLabel = document.getElementById('whatsapp-ai-toggle-label');
+        const aiLabelMobile = document.getElementById('whatsapp-ai-toggle-label-mobile');
         if (aiToggle) aiToggle.checked = Boolean(activeWhatsAppConversation.ai_enabled);
+        if (aiToggleMobile) aiToggleMobile.checked = Boolean(activeWhatsAppConversation.ai_enabled);
         if (aiDot) aiDot.className = activeWhatsAppConversation.ai_enabled ? 'flex h-2 w-2 rounded-full bg-violet-500' : 'flex h-2 w-2 rounded-full bg-slate-300';
+        if (aiDotMobile) aiDotMobile.className = activeWhatsAppConversation.ai_enabled ? 'flex h-1.5 w-1.5 rounded-full bg-violet-500' : 'flex h-1.5 w-1.5 rounded-full bg-slate-300';
         if (aiLabel) aiLabel.textContent = activeWhatsAppConversation.ai_enabled ? 'AI Auto-Reply' : 'Human Mode';
+        if (aiLabelMobile) aiLabelMobile.textContent = activeWhatsAppConversation.ai_enabled ? 'AI' : 'Staff';
 
         if ((activeWhatsAppConversation.unread_count || 0) > 0) {
           activeWhatsAppConversation.unread_count = 0;
@@ -27596,7 +27668,9 @@
       lucide.createIcons();
       setTimeout(() => {
         const input = document.getElementById('whatsapp-reply-input');
-        input?.focus();
+        if (window.innerWidth >= 768) {
+          input?.focus();
+        }
       }, 100);
     }
 
@@ -27699,10 +27773,10 @@
 
         return `
           <div class="flex ${alignClass}">
-            <div class="max-w-lg rounded-2xl p-3.5 shadow-xs ${bubbleClass}">
+            <div class="max-w-[85%] sm:max-w-lg rounded-2xl p-3 sm:p-3.5 shadow-xs ${bubbleClass}">
               ${senderTag}
               ${mediaHtml}
-              <p class="text-xs leading-relaxed whitespace-pre-wrap select-text" dir="auto">${escapeHtml(msg.content || '')}</p>
+              <p class="text-xs sm:text-[13px] leading-relaxed whitespace-pre-wrap select-text" dir="auto">${escapeHtml(msg.content || '')}</p>
               <div class="flex items-center justify-end gap-1 mt-1">
                 <span class="text-[9px] font-semibold opacity-60">${timeStr}</span>
                 ${isStaff || isAi ? `
@@ -27782,10 +27856,19 @@
       activeWhatsAppConversation.ai_enabled = Boolean(enabled);
       activeWhatsAppConversation.status = enabled ? 'active' : 'human_needed';
 
+      const aiToggle = document.getElementById('whatsapp-ai-toggle');
+      const aiToggleMobile = document.getElementById('whatsapp-ai-toggle-mobile');
+      if (aiToggle) aiToggle.checked = Boolean(enabled);
+      if (aiToggleMobile) aiToggleMobile.checked = Boolean(enabled);
+
       const aiDot = document.getElementById('whatsapp-ai-status-dot');
+      const aiDotMobile = document.getElementById('whatsapp-ai-status-dot-mobile');
       const aiLabel = document.getElementById('whatsapp-ai-toggle-label');
+      const aiLabelMobile = document.getElementById('whatsapp-ai-toggle-label-mobile');
       if (aiDot) aiDot.className = enabled ? 'flex h-2 w-2 rounded-full bg-violet-500' : 'flex h-2 w-2 rounded-full bg-slate-300';
+      if (aiDotMobile) aiDotMobile.className = enabled ? 'flex h-1.5 w-1.5 rounded-full bg-violet-500' : 'flex h-1.5 w-1.5 rounded-full bg-slate-300';
       if (aiLabel) aiLabel.textContent = enabled ? 'AI Auto-Reply' : 'Human Mode';
+      if (aiLabelMobile) aiLabelMobile.textContent = enabled ? 'AI' : 'Staff';
 
       updateWhatsAppBarTakeoverState();
       renderWhatsAppConversationsList();
@@ -27803,13 +27886,15 @@
     function autoResizeWhatsAppInput(textarea) {
       if (!textarea) return;
       textarea.style.height = 'auto';
-      textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px';
+      textarea.style.height = Math.max(38, Math.min(textarea.scrollHeight, 140)) + 'px';
     }
 
     function handleWhatsAppInputKeydown(event) {
       if (event.key === 'Enter' && !event.shiftKey) {
-        event.preventDefault();
-        void sendWhatsAppManualReply(event);
+        if (window.innerWidth >= 768) {
+          event.preventDefault();
+          void sendWhatsAppManualReply(event);
+        }
       }
     }
 
@@ -27825,7 +27910,9 @@
       if (!activeWhatsAppConversation) return;
       const newEnabled = !activeWhatsAppConversation.ai_enabled;
       const aiToggle = document.getElementById('whatsapp-ai-toggle');
+      const aiToggleMobile = document.getElementById('whatsapp-ai-toggle-mobile');
       if (aiToggle) aiToggle.checked = newEnabled;
+      if (aiToggleMobile) aiToggleMobile.checked = newEnabled;
       await toggleActiveChatAi(newEnabled);
     }
 
@@ -27839,12 +27926,12 @@
       if (takeoverBtn && takeoverText) {
         const dot = takeoverBtn.querySelector('span');
         if (isAi) {
-          takeoverBtn.className = 'inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-0.5 text-[10px] font-bold text-violet-800 hover:bg-violet-100 transition';
-          takeoverText.textContent = currentUiLanguage === 'ar' ? 'استلام المحادثة يدويّاً' : 'Take Over Chat';
+          takeoverBtn.className = 'inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 sm:px-2.5 py-0.5 text-[9px] sm:text-[10px] font-bold text-violet-800 hover:bg-violet-100 transition whitespace-nowrap';
+          takeoverText.textContent = currentUiLanguage === 'ar' ? 'استلام يدوي' : 'Take Over';
           if (dot) dot.className = 'h-1.5 w-1.5 rounded-full bg-violet-500';
         } else {
-          takeoverBtn.className = 'inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 hover:bg-emerald-100 transition';
-          takeoverText.textContent = currentUiLanguage === 'ar' ? 'تفعيل الذكاء الاصطناعي' : 'Resume AI';
+          takeoverBtn.className = 'inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 sm:px-2.5 py-0.5 text-[9px] sm:text-[10px] font-bold text-emerald-800 hover:bg-emerald-100 transition whitespace-nowrap';
+          takeoverText.textContent = currentUiLanguage === 'ar' ? 'تفعيل الذكاء' : 'Resume AI';
           if (dot) dot.className = 'h-1.5 w-1.5 rounded-full bg-emerald-500';
         }
       }
