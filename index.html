@@ -1102,6 +1102,16 @@
         font-size: clamp(11px, calc(8cqh + 8.5px), 24px);
       }
     }
+    .appointment-day-doctor-row {
+      display: block;
+      min-width: 0;
+    }
+    .appointment-day-doctor-row .appointment-day-doctor {
+      min-width: 0;
+    }
+    .appointment-day-doctor-row .appointment-day-doctor:empty {
+      display: none;
+    }
     .appointment-current-time-line {
       position: absolute;
       z-index: 28;
@@ -2718,9 +2728,31 @@
       html.is-laptop-device #view-dashboard .dashboard-flat-time:last-of-type {
         font-size: calc(0.75rem - var(--dashboard-card-font-reduction, 0pt));
       }
+      html.is-laptop-device #appointments-day-timeline .appointment-day-doctor-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        column-gap: 0.45rem;
+        row-gap: 0.125rem;
+        min-width: 0;
+      }
+      html.is-laptop-device #appointments-day-timeline .appointment-day-doctor-row .appointment-day-doctor {
+        flex: 0 0 auto;
+        max-width: 100%;
+        min-width: 0;
+      }
+      html.is-laptop-device #appointments-day-timeline .appointment-day-doctor-row .appointment-day-visit-type-wrap {
+        margin-top: 0 !important;
+        flex: 0 0 auto;
+        max-width: 100%;
+        min-width: 0;
+      }
+      html.is-laptop-device #appointments-day-timeline .appointment-day-doctor-row .appointment-visit-type-badge {
+        max-width: 100% !important;
+      }
     }
   </style>
-  <link rel="stylesheet" href="lumin-theme.css?v=9" />
+  <link rel="stylesheet" href="lumin-theme.css?v=10" />
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 font-sans antialiased selection:bg-blue-100">
 
@@ -24725,8 +24757,10 @@
         return `
           <button type="button" data-timeline-appointment-id="${entry.id}" data-day-start-minutes="${start}" data-day-duration-minutes="${entry.duration}" data-appointment-status="${canonicalAppointmentStatus(entry.status)}" aria-label="${escapeAppointmentText(entry.patient)}, ${escapeAppointmentText(entry.doctor)}, ${appointmentTimeRange(entry)}, ${appointmentDurationLabel(entry.duration)}, ${escapeAppointmentText(canonicalAppointmentStatus(entry.status))}" aria-haspopup="dialog" aria-expanded="${appointmentCardPopoverId === entry.id}" class="appointment-day-event appointment-status-glow absolute overflow-hidden rounded-lg border border-l-4 px-2 py-1 text-left cursor-${editable ? 'grab' : 'pointer'} ${appointmentCardPopoverId === entry.id ? 'is-popover-anchor' : ''} ${selected ? 'ring-2 ring-blue-500 ring-offset-1' : 'shadow-sm'}" style="top:${top}px;height:${height}px;--appointment-card-height:${height}px;left:calc(${left}% + 2px);width:calc(${width}% - 4px);${appointmentStatusVisualStyle(entry)}">
             <p class="appointment-day-patient-name truncate font-black" dir="auto">${escapeAppointmentText(entry.patient)}</p>
-            <p class="truncate text-[10px] font-bold opacity-80">${escapeAppointmentText(entry.doctor)}</p>
-            <span class="mt-0.5 flex">${appointmentVisitTypeBadgeMarkup(entry, true)}</span>
+            <div class="appointment-day-doctor-row">
+              <p class="appointment-day-doctor truncate text-[10px] font-bold opacity-80" dir="auto">${escapeAppointmentText(entry.doctor)}</p>
+              <span class="appointment-day-visit-type-wrap mt-0.5 flex shrink-0">${appointmentVisitTypeBadgeMarkup(entry, true)}</span>
+            </div>
             <p data-drag-time class="truncate text-[10px] font-bold opacity-70">${appointmentTimeRange(entry)} · ${appointmentDurationLabel(entry.duration)}</p>
             ${editable ? `<span data-appointment-resize-handle="${entry.id}" class="appointment-resize-handle" title="Drag to change appointment duration" aria-hidden="true"></span>` : ''}
           </button>

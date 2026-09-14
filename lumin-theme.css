@@ -494,6 +494,28 @@ body.lumin-raised #app-header button:active:not(:disabled) { box-shadow: var(--l
       html.is-laptop-device body.lumin-raised #view-dashboard .dashboard-time-tile > p:last-of-type {
         font-size: calc(0.75rem - var(--dashboard-card-font-reduction, 0pt));
       }
+      html.is-laptop-device body.lumin-raised #appointments-day-timeline .appointment-day-doctor-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        column-gap: 0.45rem;
+        row-gap: 0.125rem;
+        min-width: 0;
+      }
+      html.is-laptop-device body.lumin-raised #appointments-day-timeline .appointment-day-doctor-row .appointment-day-doctor {
+        flex: 0 0 auto;
+        max-width: 100%;
+        min-width: 0;
+      }
+      html.is-laptop-device body.lumin-raised #appointments-day-timeline .appointment-day-doctor-row .appointment-day-visit-type-wrap {
+        margin-top: 0 !important;
+        flex: 0 0 auto;
+        max-width: 100%;
+        min-width: 0;
+      }
+      html.is-laptop-device body.lumin-raised #appointments-day-timeline .appointment-day-doctor-row .appointment-visit-type-badge {
+        max-width: 100% !important;
+      }
     }
     @media (max-width: 1023px) {
       body.lumin-raised #app-primary-nav { gap: 0.5rem; background: var(--lumin-face); box-shadow: 0 -5px 18px hsl(var(--lumin-hue) calc(28.2% * var(--lumin-chroma)) 84.7%); }
