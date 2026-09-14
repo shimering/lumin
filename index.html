@@ -12,29 +12,6 @@
   <link rel="icon" type="image/png" sizes="32x32" href="icons/dental-icon-v1-32.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="icons/dental-icon-v1-180.png" />
   <title>Lumin Dental Clinic - Clinical Odontogram</title>
-  <script>
-    (function initDeviceDisplayZoom() {
-      try {
-        const stored = localStorage.getItem('lumin-laptop-zoom');
-        if (stored === 'false' || stored === '100') {
-          document.documentElement.classList.remove('is-laptop-browser');
-          return;
-        }
-        if (stored === 'true' || stored === '110') {
-          document.documentElement.classList.add('is-laptop-browser');
-          return;
-        }
-        const ua = navigator.userAgent || '';
-        const platform = navigator.platform || '';
-        const maxTouchPoints = navigator.maxTouchPoints || 0;
-        if (/iPad|iPhone|iPod|Android|Mobile|Tablet|Silk|Kindle|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua)) return;
-        const isApple = /Macintosh|MacIntel|MacPPC|Mac68K/i.test(ua) || /MacIntel/i.test(platform);
-        if (isApple && maxTouchPoints > 1) return;
-        if (window.innerWidth < 1024) return;
-        document.documentElement.classList.add('is-laptop-browser');
-      } catch (_) {}
-    })();
-  </script>
   <!-- Precompiled utilities avoid compiling Tailwind in every browser session. -->
   <link rel="stylesheet" href="lumin-app.css" />
   <script src="vendor/lucide.min.js"></script>
@@ -2623,20 +2600,13 @@
         white-space: nowrap;
       }
     }
-    /* Laptop / Desktop browser 10% comfortable zoom (110%) */
-    @media screen and (min-width: 1024px) {
-      html.is-laptop-browser {
-        zoom: 1.1;
-      }
-      html.is-laptop-browser body {
-        min-height: calc(100vh / 1.1);
-      }
-      html.is-laptop-browser #view-dashboard:not(.hidden) {
-        height: var(--dashboard-viewport-height, calc((100dvh - 7rem) / 1.1));
-      }
-      html.is-laptop-browser #view-patients:not(.hidden) {
-        height: var(--patient-query-viewport-height, calc((100dvh - 7rem) / 1.1));
-      }
+    html.lumin-app-scaled { zoom: var(--lumin-app-scale, 1); }
+    html.lumin-app-scaled body { min-height: var(--lumin-app-viewport-height, 100vh); }
+    html.lumin-app-scaled #view-dashboard:not(.hidden) {
+      height: var(--dashboard-viewport-height, calc(var(--lumin-app-viewport-height, 100dvh) - 7rem));
+    }
+    html.lumin-app-scaled #view-patients:not(.hidden) {
+      height: var(--patient-query-viewport-height, calc(var(--lumin-app-viewport-height, 100dvh) - 7rem));
     }
   </style>
   <link rel="stylesheet" href="lumin-theme.css?v=8" />
@@ -4742,17 +4712,21 @@
             <option value="blue">Blue</option><option value="violet">Violet</option><option value="teal">Teal</option><option value="green">Green</option><option value="rose">Rose</option><option value="amber">Amber</option><option value="slate">Slate</option>
           </select>
           <p id="settings-tint-description" class="text-xs text-slate-500">Applies when the raised theme is on. Clinical and payment status colors keep their meaning.</p>
-          <label class="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <span>
-              <span class="block text-sm font-black text-slate-700">Laptop browser zoom (+10%)</span>
-              <span id="settings-laptop-zoom-description" class="mt-1 block text-xs text-slate-500">Increases scale by 10% on laptop screens for easier reading and comfortable viewing. Automatically off on iPads, tablets, and phones.</span>
-            </span>
-            <span class="relative inline-flex shrink-0 items-center" dir="ltr">
-              <input id="settings-laptop-zoom-toggle" type="checkbox" role="switch" onchange="handleLaptopZoomToggle(this.checked)" class="peer sr-only" aria-label="Laptop browser zoom" aria-describedby="settings-laptop-zoom-description" />
-              <span class="h-7 w-12 rounded-full bg-slate-300 transition peer-checked:bg-blue-600 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2 peer-disabled:opacity-50"></span>
-              <span class="pointer-events-none absolute left-1 h-5 w-5 rounded-full bg-white shadow-sm transition peer-checked:translate-x-5"></span>
-            </span>
-          </label>
+          <div class="space-y-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <div class="flex items-start justify-between gap-4">
+              <span>
+                <label for="settings-app-scale" class="block text-sm font-black text-slate-700">App scale</label>
+                <span id="settings-app-scale-description" class="mt-1 block text-xs text-slate-500">Make the whole app smaller or larger. Saved for your account across devices.</span>
+              </span>
+              <output id="settings-app-scale-value" for="settings-app-scale" class="shrink-0 rounded-lg bg-blue-100 px-2.5 py-1 text-sm font-black text-blue-700">100%</output>
+            </div>
+            <div class="flex items-center gap-3" dir="ltr">
+              <button id="settings-app-scale-decrease" type="button" onclick="stepUiScale(-5)" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-xl font-black text-slate-700 shadow-xs transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Decrease app scale">−</button>
+              <input id="settings-app-scale" type="range" min="80" max="125" step="5" value="100" oninput="previewUiScale(this.value)" onchange="handleUiScaleChange(this.value)" aria-describedby="settings-app-scale-description settings-app-scale-value" class="h-10 w-full cursor-pointer disabled:cursor-not-allowed disabled:opacity-50" style="accent-color:#2563eb" />
+              <button id="settings-app-scale-increase" type="button" onclick="stepUiScale(5)" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-xl font-black text-slate-700 shadow-xs transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Increase app scale">+</button>
+            </div>
+            <div class="flex justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400" aria-hidden="true"><span>Smaller</span><span>Default</span><span>Larger</span></div>
+          </div>
           <p id="settings-theme-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="status"></p>
         </div>
 
@@ -6094,8 +6068,7 @@
     const APPOINTMENT_WEEK_HOUR_HEIGHT_MIN = 40;
     const APPOINTMENT_WEEK_HOUR_HEIGHT_MAX = 136;
     const APPOINTMENT_WEEK_ZOOM_STORAGE_KEY = 'lumin-appointment-week-hour-height-v1';
-    const APPOINTMENT_WEEK_TOUCH_DRAG_DELAY = 500;
-    const APPOINTMENT_DAY_TOUCH_DRAG_DELAY = 500;
+    const APPOINTMENT_CARD_DRAG_DELAY = 500;
     const APPOINTMENT_WEEK_EDGE_HOLD_DELAY = 1000;
     const APPOINTMENT_WEEK_EDGE_ZONE = 48;
     const APPOINTMENT_DAY_HOUR_HEIGHT_DEFAULT = 96;
@@ -6300,6 +6273,11 @@
     let currentUiLanguage = 'en';
     let currentUiTheme = 'flat';
     let currentUiTint = 'blue';
+    const UI_SCALE_MIN = 80;
+    const UI_SCALE_MAX = 125;
+    const UI_SCALE_STEP = 5;
+    const UI_SCALE_DEFAULT = 100;
+    let currentUiScale = UI_SCALE_DEFAULT;
     let themeSaveRequest = null;
     let uiThemeRevision = 0;
     let uiTranslationObserver = null;
@@ -6780,10 +6758,13 @@
       'Raised 3D theme is on.': 'المظهر البارز ثلاثي الأبعاد مفعّل.',
       'Original flat appearance restored.': 'تمت استعادة المظهر المسطح الأصلي.',
       'Could not save the appearance preference. Please try again.': 'تعذر حفظ تفضيل المظهر. حاول مرة أخرى.',
-      'Laptop browser zoom (+10%)': 'تكبير شاشات اللابتوب (+10%)',
-      'Increases scale by 10% on laptop screens for easier reading and comfortable viewing. Automatically off on iPads, tablets, and phones.': 'تكبير واجهة التطبيق بنسبة 10% على شاشات اللابتوب لتسهيل القراءة وتوضيح التفاصيل الطبية. يُعطّل تلقائيًا على الآيباد والأجهزة اللوحية والهواتف.',
-      'Laptop zoom (+10%) is on.': 'تكبير شاشات اللابتوب (+10%) مفعّل.',
-      'Standard 100% zoom restored.': 'تمت استعادة التكبير القياسي 100%.',
+      'App scale': 'حجم التطبيق',
+      'Make the whole app smaller or larger. Saved for your account across devices.': 'صغّر واجهة التطبيق بالكامل أو كبّرها. يُحفظ الإعداد لحسابك على جميع الأجهزة.',
+      'Decrease app scale': 'تصغير حجم التطبيق',
+      'Increase app scale': 'تكبير حجم التطبيق',
+      'Smaller': 'أصغر',
+      'Default': 'افتراضي',
+      'Larger': 'أكبر',
       'Choose the language used throughout the app. Dental Chart and Admin remain in English.': 'اختر لغة الواجهة. يبقى مخطط الأسنان وصفحة الإدارة باللغة الإنجليزية.',
       'English': 'الإنجليزية',
       'Arabic': 'العربية',
@@ -8348,6 +8329,17 @@
       return ['blue', 'violet', 'teal', 'green', 'rose', 'amber', 'slate'].includes(tint) ? tint : 'blue';
     }
 
+    function normaliseUiScale(scale) {
+      const numericScale = Number(scale);
+      if (!Number.isFinite(numericScale)) return UI_SCALE_DEFAULT;
+      const steppedScale = Math.round(numericScale / UI_SCALE_STEP) * UI_SCALE_STEP;
+      return Math.max(UI_SCALE_MIN, Math.min(UI_SCALE_MAX, steppedScale));
+    }
+
+    function userUiScale(user) {
+      return normaliseUiScale(user?.user_metadata?.lumin_ui_scale);
+    }
+
     function syncUiThemeToggle() {
       const toggle = document.getElementById('settings-theme-toggle');
       if (!toggle) return;
@@ -8355,50 +8347,58 @@
       toggle.disabled = Boolean(themeSaveRequest);
       const tint = document.getElementById('settings-theme-tint');
       if (tint) { tint.value = currentUiTint; tint.disabled = Boolean(themeSaveRequest); }
-      syncLaptopZoomToggle();
+      syncUiScaleControl();
     }
 
-    function isCurrentDeviceLaptop() {
-      try {
-        const ua = navigator.userAgent || '';
-        const platform = navigator.platform || '';
-        const maxTouchPoints = navigator.maxTouchPoints || 0;
-        if (/iPad|iPhone|iPod|Android|Mobile|Tablet|Silk|Kindle|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua)) return false;
-        const isApple = /Macintosh|MacIntel|MacPPC|Mac68K/i.test(ua) || /MacIntel/i.test(platform);
-        if (isApple && maxTouchPoints > 1) return false;
-        return true;
-      } catch (_) {
-        return false;
+    function syncUiScaleControl() {
+      const control = document.getElementById('settings-app-scale');
+      const output = document.getElementById('settings-app-scale-value');
+      const decrease = document.getElementById('settings-app-scale-decrease');
+      const increase = document.getElementById('settings-app-scale-increase');
+      const saving = Boolean(themeSaveRequest);
+      if (control) {
+        control.value = String(currentUiScale);
+        control.disabled = saving;
+        control.setAttribute('aria-valuetext', `${currentUiScale}%`);
       }
+      if (output) output.textContent = `${currentUiScale}%`;
+      if (decrease) decrease.disabled = saving || currentUiScale <= UI_SCALE_MIN;
+      if (increase) increase.disabled = saving || currentUiScale >= UI_SCALE_MAX;
     }
 
-    function syncLaptopZoomToggle() {
-      const toggle = document.getElementById('settings-laptop-zoom-toggle');
-      if (!toggle) return;
-      const stored = localStorage.getItem('lumin-laptop-zoom');
-      const active = stored === 'false' || stored === '100' ? false : (stored === 'true' || stored === '110' ? true : (isCurrentDeviceLaptop() && window.innerWidth >= 1024));
-      toggle.checked = active;
+    function previewUiScale(scale) {
+      const previewScale = normaliseUiScale(scale);
+      const control = document.getElementById('settings-app-scale');
+      const output = document.getElementById('settings-app-scale-value');
+      if (control) control.setAttribute('aria-valuetext', `${previewScale}%`);
+      if (output) output.textContent = `${previewScale}%`;
     }
 
-    function handleLaptopZoomToggle(enabled) {
-      try {
-        localStorage.setItem('lumin-laptop-zoom', enabled ? 'true' : 'false');
-      } catch (_) {}
-      document.documentElement.classList.toggle('is-laptop-browser', enabled);
-      syncLaptopZoomToggle();
-      setAdminMessage('settings-theme-message', enabled ? (currentUiLanguage === 'ar' ? 'تكبير شاشات اللابتوب (+10%) مفعّل.' : 'Laptop zoom (+10%) is on.') : (currentUiLanguage === 'ar' ? 'تمت استعادة التكبير القياسي 100%.' : 'Standard 100% zoom restored.'));
-      if (typeof scheduleDashboardViewportUpdate === 'function') scheduleDashboardViewportUpdate();
-      if (typeof schedulePatientQueryViewportUpdate === 'function') schedulePatientQueryViewportUpdate();
-      if (typeof scheduleAppointmentCalendarViewportUpdate === 'function') scheduleAppointmentCalendarViewportUpdate();
+    function handleUiScaleChange(scale) {
+      return saveUiAppearance(currentUiTheme, currentUiTint, normaliseUiScale(scale));
     }
 
-    function applyUiTheme(theme, tint = 'blue') {
+    function stepUiScale(delta) {
+      if (themeSaveRequest) return;
+      return handleUiScaleChange(currentUiScale + Number(delta || 0));
+    }
+
+    function applyUiTheme(theme, tint = 'blue', scale = UI_SCALE_DEFAULT) {
       const nextTheme = theme === 'raised' ? 'raised' : 'flat';
-      const changed = currentUiTheme !== nextTheme;
+      const nextTint = normaliseUiTint(tint);
+      const nextScale = normaliseUiScale(scale);
+      const changed = currentUiTheme !== nextTheme || currentUiTint !== nextTint || currentUiScale !== nextScale;
       currentUiTheme = nextTheme;
-      currentUiTint = normaliseUiTint(tint);
+      currentUiTint = nextTint;
+      currentUiScale = nextScale;
+      const root = document.documentElement;
+      const scaleFactor = nextScale / 100;
+      root.style.setProperty('--lumin-app-scale', String(scaleFactor));
+      root.style.setProperty('--lumin-app-viewport-height', `${100 / scaleFactor}dvh`);
+      root.classList.toggle('lumin-app-scaled', nextScale !== UI_SCALE_DEFAULT);
       document.body.classList.toggle('lumin-raised', nextTheme === 'raised');
       document.body.dataset.uiTint = currentUiTint;
+      document.body.dataset.uiScale = String(currentUiScale);
       syncUiThemeToggle();
       if (changed) {
         scheduleDashboardViewportUpdate();
@@ -8410,7 +8410,7 @@
     function resetUiTheme() {
       themeSaveRequest = null;
       uiThemeRevision += 1;
-      applyUiTheme('flat', 'blue');
+      applyUiTheme('flat', 'blue', UI_SCALE_DEFAULT);
       const message = document.getElementById('settings-theme-message');
       if (message) { message.textContent = ''; message.classList.add('hidden'); }
     }
@@ -8419,7 +8419,7 @@
       if (themeSaveRequest && themeSaveRequest.userId === session?.user?.id) return;
       themeSaveRequest = null;
       uiThemeRevision += 1;
-      applyUiTheme(session?.user ? userUiTheme(session.user) : 'flat', session?.user?.user_metadata?.lumin_ui_tint);
+      applyUiTheme(session?.user ? userUiTheme(session.user) : 'flat', session?.user?.user_metadata?.lumin_ui_tint, session?.user ? userUiScale(session.user) : UI_SCALE_DEFAULT);
     }
 
     async function refreshUiThemePreference() {
@@ -8431,32 +8431,36 @@
         if (error || !data?.user || data.user.id !== userId) return;
         if (currentSession?.user?.id !== userId || revision !== uiThemeRevision || themeSaveRequest) return;
         currentSession = { ...currentSession, user: data.user };
-        applyUiTheme(userUiTheme(data.user), data.user.user_metadata?.lumin_ui_tint);
+        applyUiTheme(userUiTheme(data.user), data.user.user_metadata?.lumin_ui_tint, userUiScale(data.user));
       } catch (_) { /* Keep the cached account preference while offline. */ }
     }
 
     async function handleThemeToggle(enabled) {
-      return saveUiAppearance(enabled ? 'raised' : 'flat', currentUiTint);
+      return saveUiAppearance(enabled ? 'raised' : 'flat', currentUiTint, currentUiScale);
     }
 
     async function handleThemeTintChange(tint) {
-      return saveUiAppearance(currentUiTheme, normaliseUiTint(tint));
+      return saveUiAppearance(currentUiTheme, normaliseUiTint(tint), currentUiScale);
     }
 
-    async function saveUiAppearance(nextTheme, nextTint) {
+    async function saveUiAppearance(nextTheme, nextTint, nextScale = currentUiScale) {
       const userId = currentSession?.user?.id;
       if (!userId || !currentUserAccess || !hasPageAccess('settings') || themeSaveRequest) {
         syncUiThemeToggle();
         return;
       }
-      if (nextTheme === currentUiTheme && nextTint === currentUiTint) return;
+      nextTheme = nextTheme === 'raised' ? 'raised' : 'flat';
+      nextTint = normaliseUiTint(nextTint);
+      nextScale = normaliseUiScale(nextScale);
+      if (nextTheme === currentUiTheme && nextTint === currentUiTint && nextScale === currentUiScale) return;
       const metadata = {};
       if (nextTheme !== currentUiTheme) metadata.lumin_ui_theme = nextTheme;
       if (nextTint !== currentUiTint) metadata.lumin_ui_tint = nextTint;
-      const request = { userId, previousTheme: currentUiTheme, previousTint: currentUiTint };
+      if (nextScale !== currentUiScale) metadata.lumin_ui_scale = nextScale;
+      const request = { userId, previousTheme: currentUiTheme, previousTint: currentUiTint, previousScale: currentUiScale };
       themeSaveRequest = request;
       uiThemeRevision += 1;
-      applyUiTheme(nextTheme, nextTint);
+      applyUiTheme(nextTheme, nextTint, nextScale);
       setAdminMessage('settings-theme-message', 'Saving appearance preference...');
       try {
         const { data, error } = await db.auth.updateUser({ data: metadata });
@@ -8465,11 +8469,16 @@
           throw new Error('Could not save the appearance preference. Please try again.');
         }
         currentSession = { ...currentSession, user: data.user };
-        applyUiTheme(userUiTheme(data.user), data.user.user_metadata?.lumin_ui_tint);
-        setAdminMessage('settings-theme-message', metadata.lumin_ui_theme ? (nextTheme === 'raised' ? 'Raised 3D theme is on.' : 'Original flat appearance restored.') : 'Color tint saved.');
+        applyUiTheme(userUiTheme(data.user), data.user.user_metadata?.lumin_ui_tint, userUiScale(data.user));
+        const successMessage = Object.hasOwn(metadata, 'lumin_ui_scale')
+          ? (currentUiLanguage === 'ar' ? `تم ضبط حجم التطبيق على ${nextScale}٪.` : `App scale set to ${nextScale}%.`)
+          : metadata.lumin_ui_theme
+            ? (nextTheme === 'raised' ? 'Raised 3D theme is on.' : 'Original flat appearance restored.')
+            : 'Color tint saved.';
+        setAdminMessage('settings-theme-message', successMessage);
       } catch (_) {
         if (themeSaveRequest !== request || currentSession?.user?.id !== userId) return;
-        applyUiTheme(request.previousTheme, request.previousTint);
+        applyUiTheme(request.previousTheme, request.previousTint, request.previousScale);
         setAdminMessage('settings-theme-message', 'Could not save the appearance preference. Please try again.', 'error');
       } finally {
         if (themeSaveRequest === request) {
@@ -24263,8 +24272,8 @@
 
     function updateAppointmentMonthDrag(gesture, clientX, clientY) {
       if (gesture.ghost) {
-        gesture.ghost.style.left = `${clientX - gesture.pointerOffsetX}px`;
-        gesture.ghost.style.top = `${clientY - gesture.pointerOffsetY}px`;
+        gesture.ghost.style.left = `${(clientX - gesture.pointerOffsetX) / gesture.rootZoom}px`;
+        gesture.ghost.style.top = `${(clientY - gesture.pointerOffsetY) / gesture.rootZoom}px`;
       }
       const cell = appointmentMonthDropCellAt(clientX, clientY);
       gesture.targetCell = cell;
@@ -24284,8 +24293,8 @@
       ghost.removeAttribute('data-month-appointment-id');
       ghost.classList.remove('is-drag-source');
       ghost.classList.add('appointment-month-drag-ghost');
-      ghost.style.width = `${gesture.cardBounds.width}px`;
-      ghost.style.height = `${gesture.cardBounds.height}px`;
+      ghost.style.width = `${gesture.cardBounds.width / gesture.rootZoom}px`;
+      ghost.style.height = `${gesture.cardBounds.height / gesture.rootZoom}px`;
       document.body.appendChild(ghost);
       gesture.ghost = ghost;
       navigator.vibrate?.(20);
@@ -24327,6 +24336,7 @@
         entry,
         card,
         cardBounds,
+        rootZoom: appointmentRootZoomScale(),
         startX: event.clientX,
         startY: event.clientY,
         pointerOffsetX: event.clientX - cardBounds.left,
@@ -24639,6 +24649,13 @@
       return Math.max(0, Math.min(1440 - APPOINTMENT_TIME_STEP, Math.round(rawMinutes / APPOINTMENT_TIME_STEP) * APPOINTMENT_TIME_STEP));
     }
 
+    function appointmentRootZoomScale() {
+      const effectiveZoom = Number(document.body?.currentCSSZoom);
+      if (Number.isFinite(effectiveZoom) && effectiveZoom > 0) return effectiveZoom;
+      const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom);
+      return Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+    }
+
     function appointmentWeekDayIndexAtClientX(surface, clientX) {
       const bounds = surface.getBoundingClientRect();
       if (!bounds.width) return 0;
@@ -24812,9 +24829,11 @@
       if (!gesture?.ghost || !gesture.surface) return;
       const surfaceBounds = gesture.surface.getBoundingClientRect();
       const dayWidth = surfaceBounds.width / 7;
-      gesture.ghost.style.top = `${surfaceBounds.top + gesture.nextStart / 60 * appointmentWeekHourHeight}px`;
-      gesture.ghost.style.left = `${surfaceBounds.left + gesture.nextDayIndex * dayWidth + 2}px`;
-      gesture.ghost.style.width = `${Math.max(24, dayWidth - 4)}px`;
+      const renderedMinuteHeight = surfaceBounds.height / 1440;
+      const rootZoom = gesture.rootZoom || 1;
+      gesture.ghost.style.top = `${(surfaceBounds.top + gesture.nextStart * renderedMinuteHeight) / rootZoom}px`;
+      gesture.ghost.style.left = `${(surfaceBounds.left + gesture.nextDayIndex * dayWidth) / rootZoom + 2}px`;
+      gesture.ghost.style.width = `${Math.max(24, dayWidth / rootZoom - 4)}px`;
       const end = Math.min(1440, gesture.nextStart + gesture.entry.duration);
       const label = gesture.ghost.querySelector('[data-drag-time]');
       if (label) label.textContent = `${appointmentWeekdayFormatter.format(gesture.targetDate)} · ${appointmentTimeFromMinutes(gesture.nextStart)}–${appointmentTimeFromMinutes(end)}`;
@@ -24826,8 +24845,10 @@
       const surfaceBounds = gesture.surface.getBoundingClientRect();
       const relativeX = Math.max(0, Math.min(surfaceBounds.width - 1, clientX - surfaceBounds.left));
       gesture.nextDayIndex = Math.max(0, Math.min(6, Math.floor(relativeX / Math.max(surfaceBounds.width, 1) * 7)));
-      const pointerMinutes = (clientY - surfaceBounds.top) / appointmentWeekHourHeight * 60;
-      const snappedStart = Math.round((pointerMinutes - gesture.pointerOffsetMinutes) / APPOINTMENT_TIME_STEP) * APPOINTMENT_TIME_STEP;
+      const renderedMinuteHeight = surfaceBounds.height / 1440;
+      if (!renderedMinuteHeight) return;
+      const pointerStartMinutes = (clientY - surfaceBounds.top - gesture.pointerOffsetY) / renderedMinuteHeight;
+      const snappedStart = Math.round(pointerStartMinutes / APPOINTMENT_TIME_STEP) * APPOINTMENT_TIME_STEP;
       gesture.nextStart = Math.max(0, Math.min(1440 - gesture.entry.duration, snappedStart));
       gesture.targetDate = new Date(gesture.weekDates[gesture.nextDayIndex]);
       gesture.moved = appointmentDateKey(gesture.targetDate) !== gesture.originalDateKey || gesture.nextStart !== gesture.originalStart;
@@ -24917,7 +24938,7 @@
       const originalDateKey = appointmentDateKey(originalDate);
       const originalStart = appointmentMinuteOfDay(entry);
       const blockBounds = block.getBoundingClientRect();
-      const pointerOffsetMinutes = Math.max(0, Math.min(entry.duration, (event.clientY - blockBounds.top) / appointmentWeekHourHeight * 60));
+      const pointerOffsetY = Math.max(0, Math.min(blockBounds.height, event.clientY - blockBounds.top));
       const originalDayIndex = Math.max(0, weekDates.findIndex(date => sameAppointmentDate(date, originalDate)));
       const gesture = {
         pointerId: event.pointerId,
@@ -24930,7 +24951,8 @@
         originalDateKey,
         originalStart,
         originalSelectedDate: new Date(appointmentSelectedDate),
-        pointerOffsetMinutes,
+        pointerOffsetY,
+        rootZoom: appointmentRootZoomScale(),
         startX: event.clientX,
         startY: event.clientY,
         lastX: event.clientX,
@@ -24963,10 +24985,10 @@
         ghost.tabIndex = -1;
         ghost.classList.remove('is-popover-anchor', 'is-drag-source');
         ghost.classList.add('appointment-week-drag-ghost', 'is-dragging');
-        ghost.style.top = `${blockBounds.top}px`;
-        ghost.style.left = `${blockBounds.left}px`;
-        ghost.style.width = `${blockBounds.width}px`;
-        ghost.style.height = `${blockBounds.height}px`;
+        ghost.style.top = `${blockBounds.top / gesture.rootZoom}px`;
+        ghost.style.left = `${blockBounds.left / gesture.rootZoom}px`;
+        ghost.style.width = `${blockBounds.width / gesture.rootZoom}px`;
+        ghost.style.height = `${blockBounds.height / gesture.rootZoom}px`;
         document.body.appendChild(ghost);
         gesture.ghost = ghost;
         navigator.vibrate?.(20);
@@ -24979,15 +25001,11 @@
         gesture.lastY = moveEvent.clientY;
         const distance = Math.hypot(moveEvent.clientX - gesture.startX, moveEvent.clientY - gesture.startY);
         if (!gesture.active) {
-          if (gesture.pointerType !== 'mouse') {
-            if (distance > APPOINTMENT_RANGE_MOVE_TOLERANCE) cleanup();
-            return;
-          }
-          if (distance < 4) return;
+          if (distance > APPOINTMENT_RANGE_MOVE_TOLERANCE) cleanup();
+          return;
         }
         moveEvent.preventDefault();
         moveEvent.stopPropagation();
-        activate(moveEvent.clientX, moveEvent.clientY);
         autoScrollAppointmentWeek(gesture.scroll, moveEvent.clientX, moveEvent.clientY);
         updateAppointmentWeekDragPosition(gesture, moveEvent.clientX, moveEvent.clientY);
         scheduleAppointmentWeekEdgeHold(gesture, moveEvent.clientX);
@@ -25049,10 +25067,10 @@
       };
 
       appointmentWeekDragGesture = gesture;
+      gesture.activationTimer = window.setTimeout(() => {
+        if (appointmentWeekDragGesture === gesture) activate(gesture.lastX, gesture.lastY);
+      }, APPOINTMENT_CARD_DRAG_DELAY);
       if (gesture.pointerType !== 'mouse') {
-        gesture.activationTimer = window.setTimeout(() => {
-          if (appointmentWeekDragGesture === gesture) activate(gesture.lastX, gesture.lastY);
-        }, APPOINTMENT_WEEK_TOUCH_DRAG_DELAY);
         window.addEventListener('touchmove', preventActiveTouchScroll, { passive: false, capture: true });
       }
       window.addEventListener('pointermove', onMove, { passive: false });
@@ -25083,7 +25101,7 @@
       }
       const originalStart = appointmentMinuteOfDay(entry);
       const blockBounds = block.getBoundingClientRect();
-      const pointerOffsetMinutes = Math.max(0, Math.min(entry.duration, (event.clientY - blockBounds.top) / appointmentDayHourHeight * 60));
+      const pointerOffsetY = Math.max(0, Math.min(blockBounds.height, event.clientY - blockBounds.top));
       const gesture = {
         pointerId: event.pointerId,
         pointerType: event.pointerType,
@@ -25091,7 +25109,8 @@
         block,
         surface,
         scroll,
-        pointerOffsetMinutes,
+        pointerOffsetY,
+        rootZoom: appointmentRootZoomScale(),
         startX: event.clientX,
         startY: event.clientY,
         lastX: event.clientX,
@@ -25107,11 +25126,13 @@
       const updatePosition = clientY => {
         if (!gesture.ghost) return;
         const surfaceBounds = gesture.surface.getBoundingClientRect();
-        const pointerMinutes = (clientY - surfaceBounds.top) / appointmentDayHourHeight * 60;
-        const snappedStart = Math.round((pointerMinutes - gesture.pointerOffsetMinutes) / APPOINTMENT_TIME_STEP) * APPOINTMENT_TIME_STEP;
+        const renderedMinuteHeight = surfaceBounds.height / 1440;
+        if (!renderedMinuteHeight) return;
+        const pointerStartMinutes = (clientY - surfaceBounds.top - gesture.pointerOffsetY) / renderedMinuteHeight;
+        const snappedStart = Math.round(pointerStartMinutes / APPOINTMENT_TIME_STEP) * APPOINTMENT_TIME_STEP;
         gesture.nextStart = Math.max(0, Math.min(1440 - entry.duration, snappedStart));
         gesture.moved = gesture.nextStart !== originalStart;
-        gesture.ghost.style.top = `${surfaceBounds.top + gesture.nextStart / 60 * appointmentDayHourHeight}px`;
+        gesture.ghost.style.top = `${(surfaceBounds.top + gesture.nextStart * renderedMinuteHeight) / gesture.rootZoom}px`;
         const end = Math.min(1440, gesture.nextStart + entry.duration);
         const label = gesture.ghost.querySelector('[data-drag-time]');
         if (label) label.textContent = `${appointmentTimeFromMinutes(gesture.nextStart)}–${appointmentTimeFromMinutes(end)} · ${appointmentDurationLabel(entry.duration)}`;
@@ -25135,10 +25156,10 @@
         ghost.querySelector('[data-appointment-resize-handle]')?.remove();
         ghost.classList.remove('is-popover-anchor', 'is-drag-source');
         ghost.classList.add('appointment-day-drag-ghost', 'is-dragging');
-        ghost.style.top = `${blockBounds.top}px`;
-        ghost.style.left = `${blockBounds.left}px`;
-        ghost.style.width = `${blockBounds.width}px`;
-        ghost.style.height = `${blockBounds.height}px`;
+        ghost.style.top = `${blockBounds.top / gesture.rootZoom}px`;
+        ghost.style.left = `${blockBounds.left / gesture.rootZoom}px`;
+        ghost.style.width = `${blockBounds.width / gesture.rootZoom}px`;
+        ghost.style.height = `${blockBounds.height / gesture.rootZoom}px`;
         document.body.appendChild(ghost);
         gesture.ghost = ghost;
         navigator.vibrate?.(20);
@@ -25151,15 +25172,11 @@
         gesture.lastY = moveEvent.clientY;
         const distance = Math.hypot(moveEvent.clientX - gesture.startX, moveEvent.clientY - gesture.startY);
         if (!gesture.active) {
-          if (gesture.pointerType !== 'mouse') {
-            if (distance > APPOINTMENT_RANGE_MOVE_TOLERANCE) cleanup();
-            return;
-          }
-          if (distance < 4) return;
+          if (distance > APPOINTMENT_RANGE_MOVE_TOLERANCE) cleanup();
+          return;
         }
         moveEvent.preventDefault();
         moveEvent.stopPropagation();
-        activate(moveEvent.clientY);
         autoScrollAppointmentWeek(gesture.scroll, moveEvent.clientX, moveEvent.clientY);
         updatePosition(moveEvent.clientY);
       };
@@ -25212,10 +25229,10 @@
       };
 
       appointmentDayDragGesture = gesture;
+      gesture.activationTimer = window.setTimeout(() => {
+        if (appointmentDayDragGesture === gesture) activate(gesture.lastY);
+      }, APPOINTMENT_CARD_DRAG_DELAY);
       if (gesture.pointerType !== 'mouse') {
-        gesture.activationTimer = window.setTimeout(() => {
-          if (appointmentDayDragGesture === gesture) activate(gesture.lastY);
-        }, APPOINTMENT_DAY_TOUCH_DRAG_DELAY);
         window.addEventListener('touchmove', preventActiveTouchScroll, { passive: false, capture: true });
       }
       window.addEventListener('pointermove', onMove, { passive: false });
@@ -25236,6 +25253,8 @@
       const originalDuration = entry.duration;
       const maximumDuration = Math.max(1, 1440 - originalStart);
       const minimumDuration = Math.min(APPOINTMENT_MIN_DURATION, maximumDuration);
+      const surface = block.closest('[data-appointment-slot-surface]');
+      const renderedMinuteHeight = (surface?.getBoundingClientRect().height || 0) / 1440;
       const startY = event.clientY;
       let nextDuration = Math.min(originalDuration, maximumDuration);
       let resized = false;
@@ -25244,7 +25263,9 @@
       block.classList.add('is-resizing');
 
       const onMove = moveEvent => {
-        const deltaMinutes = (moveEvent.clientY - startY) / appointmentDayHourHeight * 60;
+        const deltaMinutes = renderedMinuteHeight
+          ? (moveEvent.clientY - startY) / renderedMinuteHeight
+          : (moveEvent.clientY - startY) / appointmentDayHourHeight * 60;
         const snappedDuration = Math.round((originalDuration + deltaMinutes) / APPOINTMENT_TIME_STEP) * APPOINTMENT_TIME_STEP;
         nextDuration = Math.max(minimumDuration, Math.min(maximumDuration, snappedDuration));
         resized = resized || nextDuration !== originalDuration;
@@ -26909,12 +26930,6 @@
       }, true);
       window.addEventListener('resize', () => {
         if (whatsappTemplatePickerAnchor) refreshWhatsAppTemplatePickerAnchor();
-        if (isCurrentDeviceLaptop()) {
-          const stored = localStorage.getItem('lumin-laptop-zoom');
-          if (stored !== 'false' && stored !== '100') {
-            document.documentElement.classList.toggle('is-laptop-browser', window.innerWidth >= 1024);
-          }
-        }
       });
       db.auth.onAuthStateChange((event, session) => {
         if (event === 'INITIAL_SESSION') return;
@@ -26923,7 +26938,7 @@
           else if (session) void queueAuthSessionApplication(session);
         }, 0);
       });
-      syncLaptopZoomToggle();
+      syncUiScaleControl();
       lucide.createIcons();
       await requestAuthSessionRecovery({ force: true, showProgress: true });
     });
