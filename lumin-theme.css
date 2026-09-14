@@ -423,6 +423,39 @@ body.lumin-raised #app-header button:focus-visible { outline: 3px solid hsl(var(
     body.lumin-raised #view-dashboard :is(button, a):active:not(:disabled),
 body.lumin-raised #app-header button:active:not(:disabled) { box-shadow: var(--lumin-pressed); }
     body.lumin-raised #view-dashboard :is(button, select):disabled { box-shadow: var(--lumin-pressed); }
+    body.lumin-raised #appointments-day-timeline .appointment-day-patient-name {
+      margin-bottom: clamp(3px, calc(var(--appointment-card-height, 40px) * 0.025 + 1.5px), 7px);
+    }
+    body.lumin-raised #appointments-day-timeline .appointment-day-doctor-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      column-gap: 0.45rem;
+      row-gap: 0.125rem;
+      min-width: 0;
+    }
+    body.lumin-raised #appointments-day-timeline .appointment-day-doctor-row .appointment-day-doctor {
+      flex: 0 0 auto;
+      max-width: 100%;
+      min-width: 0;
+    }
+    body.lumin-raised #appointments-day-timeline .appointment-day-doctor-row .appointment-day-doctor:empty {
+      display: none;
+    }
+    body.lumin-raised #appointments-day-timeline .appointment-day-doctor-row .appointment-day-visit-type-wrap {
+      margin-top: 0 !important;
+      display: inline-flex;
+      align-items: center;
+      flex: 0 0 auto;
+      max-width: 100%;
+      min-width: 0;
+    }
+    body.lumin-raised #appointments-day-timeline .appointment-day-doctor-row .appointment-visit-type-badge {
+      max-width: 100% !important;
+    }
+    body.lumin-raised .appointment-week-event > p:first-child {
+      margin-bottom: 0.2rem;
+    }
     @media (min-width: 1024px) {
       body.lumin-raised #app-header {
         inset-block: 0.5rem;
@@ -493,28 +526,6 @@ body.lumin-raised #app-header button:active:not(:disabled) { box-shadow: var(--l
       }
       html.is-laptop-device body.lumin-raised #view-dashboard .dashboard-time-tile > p:last-of-type {
         font-size: calc(0.75rem - var(--dashboard-card-font-reduction, 0pt));
-      }
-      html.is-laptop-device body.lumin-raised #appointments-day-timeline .appointment-day-doctor-row {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        column-gap: 0.45rem;
-        row-gap: 0.125rem;
-        min-width: 0;
-      }
-      html.is-laptop-device body.lumin-raised #appointments-day-timeline .appointment-day-doctor-row .appointment-day-doctor {
-        flex: 0 0 auto;
-        max-width: 100%;
-        min-width: 0;
-      }
-      html.is-laptop-device body.lumin-raised #appointments-day-timeline .appointment-day-doctor-row .appointment-day-visit-type-wrap {
-        margin-top: 0 !important;
-        flex: 0 0 auto;
-        max-width: 100%;
-        min-width: 0;
-      }
-      html.is-laptop-device body.lumin-raised #appointments-day-timeline .appointment-day-doctor-row .appointment-visit-type-badge {
-        max-width: 100% !important;
       }
     }
     @media (max-width: 1023px) {

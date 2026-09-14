@@ -1093,6 +1093,7 @@
     .appointment-day-patient-name {
       font-size: clamp(11px, calc(var(--appointment-card-height, 40px) * 0.08 + 8.5px), 24px);
       line-height: 1.25;
+      margin-bottom: clamp(3px, calc(var(--appointment-card-height, 40px) * 0.025 + 1.5px), 7px);
     }
     @supports (font-size: 1cqh) {
       .appointment-day-event {
@@ -1100,17 +1101,38 @@
       }
       .appointment-day-event .appointment-day-patient-name {
         font-size: clamp(11px, calc(8cqh + 8.5px), 24px);
+        margin-bottom: clamp(3px, calc(2.5cqh + 1.5px), 7px);
       }
     }
     .appointment-day-doctor-row {
-      display: block;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      column-gap: 0.45rem;
+      row-gap: 0.125rem;
       min-width: 0;
     }
     .appointment-day-doctor-row .appointment-day-doctor {
+      flex: 0 0 auto;
+      max-width: 100%;
       min-width: 0;
     }
     .appointment-day-doctor-row .appointment-day-doctor:empty {
       display: none;
+    }
+    .appointment-day-doctor-row .appointment-day-visit-type-wrap {
+      margin-top: 0 !important;
+      display: inline-flex;
+      align-items: center;
+      flex: 0 0 auto;
+      max-width: 100%;
+      min-width: 0;
+    }
+    .appointment-day-doctor-row .appointment-visit-type-badge {
+      max-width: 100% !important;
+    }
+    .appointment-week-event > p:first-child {
+      margin-bottom: 0.2rem;
     }
     .appointment-current-time-line {
       position: absolute;
@@ -2240,10 +2262,12 @@
       #appointments-day-timeline .appointment-day-event .appointment-day-patient-name {
         font-size: clamp(10px, calc(var(--appointment-card-height, 40px) * 0.07 + 7.5px), 20px);
         line-height: 1.25;
+        margin-bottom: clamp(2.5px, calc(var(--appointment-card-height, 40px) * 0.02 + 1.5px), 6px);
       }
       @supports (font-size: 1cqh) {
         #appointments-day-timeline .appointment-day-event .appointment-day-patient-name {
           font-size: clamp(10px, calc(7cqh + 7.5px), 20px);
+          margin-bottom: clamp(2.5px, calc(2cqh + 1.5px), 6px);
         }
       }
       #appointments-day-timeline .appointment-resize-handle { height: 20px; }
@@ -2728,31 +2752,9 @@
       html.is-laptop-device #view-dashboard .dashboard-flat-time:last-of-type {
         font-size: calc(0.75rem - var(--dashboard-card-font-reduction, 0pt));
       }
-      html.is-laptop-device #appointments-day-timeline .appointment-day-doctor-row {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        column-gap: 0.45rem;
-        row-gap: 0.125rem;
-        min-width: 0;
-      }
-      html.is-laptop-device #appointments-day-timeline .appointment-day-doctor-row .appointment-day-doctor {
-        flex: 0 0 auto;
-        max-width: 100%;
-        min-width: 0;
-      }
-      html.is-laptop-device #appointments-day-timeline .appointment-day-doctor-row .appointment-day-visit-type-wrap {
-        margin-top: 0 !important;
-        flex: 0 0 auto;
-        max-width: 100%;
-        min-width: 0;
-      }
-      html.is-laptop-device #appointments-day-timeline .appointment-day-doctor-row .appointment-visit-type-badge {
-        max-width: 100% !important;
-      }
     }
   </style>
-  <link rel="stylesheet" href="lumin-theme.css?v=10" />
+  <link rel="stylesheet" href="lumin-theme.css?v=11" />
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 font-sans antialiased selection:bg-blue-100">
 
@@ -24664,7 +24666,7 @@
         const editable = canModifyAppointments();
         return `
           <button type="button" data-week-appointment-id="${entry.id}" data-week-start-minutes="${start}" data-week-duration-minutes="${entry.duration}" data-appointment-status="${canonicalAppointmentStatus(entry.status)}" aria-label="${escapeAppointmentText(entry.patient)}, ${escapeAppointmentText(entry.doctor)}, ${appointmentTimeRange(entry)}, ${appointmentDurationLabel(entry.duration)}, ${escapeAppointmentText(canonicalAppointmentStatus(entry.status))}" aria-haspopup="dialog" aria-expanded="${appointmentCardPopoverId === entry.id}" class="appointment-week-event appointment-status-glow absolute z-10 overflow-hidden rounded-lg border px-1.5 py-1 text-left cursor-${editable ? 'grab' : 'pointer'} ${appointmentCardPopoverId === entry.id ? 'is-popover-anchor' : ''} ${selected ? 'ring-2 ring-blue-500 ring-offset-1' : 'shadow-sm'}" style="top:${top}px;height:${height}px;left:calc(${left}% + 2px);width:calc(${width}% - 4px);border-left-width:3px;${appointmentStatusVisualStyle(entry)}">
-            <p class="truncate text-[10px] font-black leading-3.5">${escapeAppointmentText(entry.patient)}</p>
+            <p class="appointment-week-patient-name truncate text-[10px] font-black leading-3.5 mb-0.5" dir="auto">${escapeAppointmentText(entry.patient)}</p>
             <p data-drag-time class="truncate text-[9px] font-bold leading-3 opacity-80">${escapeAppointmentText(entry.time)} · ${appointmentDurationLabel(entry.duration)}</p>
             <span class="mt-0.5 flex">${appointmentVisitTypeBadgeMarkup(entry, true)}</span>
             <p class="truncate text-[9px] font-semibold leading-3 opacity-65">${escapeAppointmentText(entry.doctor)}</p>
@@ -24759,7 +24761,7 @@
             <p class="appointment-day-patient-name truncate font-black" dir="auto">${escapeAppointmentText(entry.patient)}</p>
             <div class="appointment-day-doctor-row">
               <p class="appointment-day-doctor truncate text-[10px] font-bold opacity-80" dir="auto">${escapeAppointmentText(entry.doctor)}</p>
-              <span class="appointment-day-visit-type-wrap mt-0.5 flex shrink-0">${appointmentVisitTypeBadgeMarkup(entry, true)}</span>
+              <span class="appointment-day-visit-type-wrap flex shrink-0">${appointmentVisitTypeBadgeMarkup(entry, true)}</span>
             </div>
             <p data-drag-time class="truncate text-[10px] font-bold opacity-70">${appointmentTimeRange(entry)} · ${appointmentDurationLabel(entry.duration)}</p>
             ${editable ? `<span data-appointment-resize-handle="${entry.id}" class="appointment-resize-handle" title="Drag to change appointment duration" aria-hidden="true"></span>` : ''}
