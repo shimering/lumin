@@ -12,6 +12,28 @@
   <link rel="icon" type="image/png" sizes="32x32" href="icons/dental-icon-v1-32.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="icons/dental-icon-v1-180.png" />
   <title>Lumin Dental Clinic - Clinical Odontogram</title>
+  <script>
+    (function initLaptopDeviceDetection() {
+      function isLaptopDevice() {
+        try {
+          const ua = navigator.userAgent || '';
+          const platform = navigator.platform || '';
+          const maxTouchPoints = navigator.maxTouchPoints || 0;
+          const uadPlatform = navigator.userAgentData?.platform || '';
+          if (/Android/i.test(ua) || /Android/i.test(platform) || /Android/i.test(uadPlatform)) return false;
+          if (/iPad|iPhone|iPod/i.test(ua) || /iPad|iPhone|iPod/i.test(platform)) return false;
+          const isApple = /Macintosh|MacIntel|MacPPC|Mac68K/i.test(ua) || /MacIntel/i.test(platform);
+          if (isApple && maxTouchPoints > 1) return false;
+          if (/Mobile|Tablet|Silk|Kindle|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua)) return false;
+          return window.innerWidth >= 1024;
+        } catch (_) {
+          return false;
+        }
+      }
+      window.isLuminLaptopDevice = isLaptopDevice;
+      document.documentElement.classList.toggle('is-laptop-device', isLaptopDevice());
+    })();
+  </script>
   <!-- Precompiled utilities avoid compiling Tailwind in every browser session. -->
   <link rel="stylesheet" href="lumin-app.css" />
   <script src="vendor/lucide.min.js"></script>
@@ -2614,8 +2636,70 @@
     html.lumin-app-scaled #view-patients:not(.hidden) {
       height: var(--patient-query-viewport-height, calc(var(--lumin-app-viewport-height, 100dvh) - 7rem));
     }
+    /* Laptop / Desktop only: Enlarged appointment status, patient name, and info on dashboard */
+    @media screen and (min-width: 1024px) {
+      html.is-laptop-device #dashboard-appointments-list {
+        --dashboard-card-font-reduction: 0pt;
+      }
+      html.is-laptop-device #view-dashboard .dashboard-patient-name,
+      html.is-laptop-device #view-dashboard .dashboard-patient-link,
+      html.is-laptop-device #view-dashboard [data-dashboard-appointment-heading-row] h4 {
+        font-size: calc(1.375rem - var(--dashboard-card-font-reduction, 0pt)) !important;
+        line-height: 1.35;
+      }
+      html.is-laptop-device #view-dashboard .dashboard-patient-name svg {
+        width: 1.25rem;
+        height: 1.25rem;
+      }
+      html.is-laptop-device #view-dashboard [data-dashboard-appointment-status] select {
+        font-size: calc(1.0625rem - var(--dashboard-card-font-reduction, 0pt)) !important;
+        font-weight: 800;
+        min-height: 2.85rem;
+        padding-inline: 0.95rem;
+      }
+      html.is-laptop-device #view-dashboard [data-dashboard-appointment-status] [data-appointment-wait] {
+        font-size: calc(0.8125rem - var(--dashboard-card-font-reduction, 0pt)) !important;
+        padding: 0.25rem 0.6rem;
+      }
+      html.is-laptop-device #view-dashboard [data-dashboard-patient-age] {
+        font-size: calc(0.9375rem - var(--dashboard-card-font-reduction, 0pt)) !important;
+        padding: 0.25rem 0.65rem;
+      }
+      html.is-laptop-device #view-dashboard [data-dashboard-patient-phone] {
+        font-size: calc(1rem - var(--dashboard-card-font-reduction, 0pt)) !important;
+      }
+      html.is-laptop-device #view-dashboard [data-dashboard-patient-phone] svg {
+        width: 1.05rem;
+        height: 1.05rem;
+      }
+      html.is-laptop-device #view-dashboard [data-dashboard-appointment-card] > div:last-child > div.mt-3 > span,
+      html.is-laptop-device #view-dashboard [data-dashboard-appointment-card] .appointment-visit-type-badge {
+        font-size: calc(0.875rem - var(--dashboard-card-font-reduction, 0pt)) !important;
+        padding: 0.35rem 0.75rem;
+      }
+      html.is-laptop-device #view-dashboard [data-dashboard-appointment-card] > div:last-child > div.mt-3 > span svg,
+      html.is-laptop-device #view-dashboard [data-dashboard-appointment-card] .appointment-visit-type-badge svg {
+        width: 1rem;
+        height: 1rem;
+      }
+      html.is-laptop-device #view-dashboard [data-dashboard-appointment-card] > div:last-child > p {
+        font-size: calc(0.9375rem - var(--dashboard-card-font-reduction, 0pt)) !important;
+        line-height: 1.55;
+      }
+      html.is-laptop-device #view-dashboard [data-dashboard-appointment-card] > div:first-child {
+        width: 5rem;
+      }
+      html.is-laptop-device #view-dashboard .dashboard-time-tile > p:first-of-type,
+      html.is-laptop-device #view-dashboard .dashboard-flat-time:first-of-type {
+        font-size: calc(1rem - var(--dashboard-card-font-reduction, 0pt));
+      }
+      html.is-laptop-device #view-dashboard .dashboard-time-tile > p:last-of-type,
+      html.is-laptop-device #view-dashboard .dashboard-flat-time:last-of-type {
+        font-size: calc(0.75rem - var(--dashboard-card-font-reduction, 0pt));
+      }
+    }
   </style>
-  <link rel="stylesheet" href="lumin-theme.css?v=8" />
+  <link rel="stylesheet" href="lumin-theme.css?v=9" />
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 font-sans antialiased selection:bg-blue-100">
 
@@ -26936,6 +27020,9 @@
       }, true);
       window.addEventListener('resize', () => {
         if (whatsappTemplatePickerAnchor) refreshWhatsAppTemplatePickerAnchor();
+        if (typeof window.isLuminLaptopDevice === 'function') {
+          document.documentElement.classList.toggle('is-laptop-device', window.isLuminLaptopDevice());
+        }
       });
       db.auth.onAuthStateChange((event, session) => {
         if (event === 'INITIAL_SESSION') return;
