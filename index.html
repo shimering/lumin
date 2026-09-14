@@ -2756,11 +2756,27 @@
 
     /* WhatsApp Center Styles */
     #view-whatsapp {
-      height: calc(100dvh - 9rem);
-      min-height: 35rem;
+      height: calc(100dvh - 8.5rem);
+      min-height: 32rem;
+      display: flex;
+      flex-direction: column;
     }
     #view-whatsapp.hidden {
       display: none !important;
+    }
+    .whatsapp-chat-shell {
+      flex: 1 1 0%;
+      min-height: 0;
+      height: 100% !important;
+    }
+    #whatsapp-sidebar,
+    #whatsapp-main-chat,
+    #whatsapp-chat-active {
+      min-height: 0 !important;
+    }
+    #whatsapp-messages-container {
+      min-height: 0 !important;
+      flex: 1 1 0% !important;
     }
     .whatsapp-conv-item {
       transition: background-color 150ms ease;
@@ -2787,7 +2803,14 @@
       color: #064e3b;
       border-bottom-right-radius: 4px;
     }
+    #whatsapp-reply-input {
+      max-height: 150px;
+      min-height: 44px;
+    }
     @media (max-width: 767px) {
+      #view-whatsapp {
+        height: calc(100dvh - 7rem);
+      }
       .whatsapp-mobile-chat-open #whatsapp-sidebar {
         display: none !important;
       }
@@ -5081,9 +5104,15 @@
         <div id="whatsapp-sidebar" class="md:col-span-4 lg:col-span-4 border-r border-slate-200 flex flex-col h-full bg-slate-50/50">
           <!-- Search & Filter Header -->
           <div class="p-3 border-b border-slate-200 bg-white space-y-2">
-            <div class="relative">
-              <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400"></i>
-              <input id="whatsapp-search-input" oninput="filterWhatsAppConversations(this.value)" placeholder="Search conversations..." class="w-full rounded-xl border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-3 text-xs outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20" />
+            <div class="flex items-center gap-2">
+              <div class="relative flex-1">
+                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400"></i>
+                <input id="whatsapp-search-input" oninput="filterWhatsAppConversations(this.value)" placeholder="Search conversations..." class="w-full rounded-xl border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-3 text-xs outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20" />
+              </div>
+              <button type="button" onclick="promptNewWhatsAppChat()" class="flex h-8 shrink-0 items-center gap-1 rounded-xl bg-emerald-50 border border-emerald-200 px-2.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition shadow-2xs" title="Start new WhatsApp chat with phone number">
+                <i data-lucide="plus" class="h-3.5 w-3.5"></i>
+                <span class="hidden sm:inline">New</span>
+              </button>
             </div>
             <div class="flex items-center gap-1">
               <button type="button" onclick="setWhatsAppFilter('all')" data-whatsapp-filter="all" class="flex-1 rounded-lg py-1 text-[11px] font-bold bg-emerald-100 text-emerald-800 transition">All</button>
@@ -5102,7 +5131,7 @@
         </div>
 
         <!-- Right Column: Active Conversation -->
-        <div id="whatsapp-main-chat" class="md:col-span-8 lg:col-span-8 flex flex-col h-full bg-slate-100/60 relative">
+        <div id="whatsapp-main-chat" class="md:col-span-8 lg:col-span-8 flex flex-col h-full min-h-0 overflow-hidden bg-slate-100/60 relative">
           <!-- Empty State -->
           <div id="whatsapp-chat-empty" class="flex flex-col items-center justify-center h-full p-8 text-center">
             <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 mb-3 shadow-xs ring-1 ring-emerald-100">
@@ -5113,9 +5142,9 @@
           </div>
 
           <!-- Active Chat Container -->
-          <div id="whatsapp-chat-active" class="hidden flex-col h-full">
+          <div id="whatsapp-chat-active" class="hidden flex-col h-full min-h-0 overflow-hidden">
             <!-- Chat Header -->
-            <div class="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 shadow-xs">
+            <div class="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-2.5 shadow-xs z-10">
               <div class="flex items-center gap-3 min-w-0">
                 <button type="button" onclick="closeActiveWhatsAppChatOnMobile()" class="md:hidden flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100">
                   <i data-lucide="arrow-left" class="h-4 w-4"></i>
@@ -5149,20 +5178,65 @@
             </div>
 
             <!-- Messages Thread -->
-            <div id="whatsapp-messages-container" class="flex-1 overflow-y-auto p-4 space-y-3">
+            <div id="whatsapp-messages-container" class="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
               <!-- Messages rendered here -->
             </div>
 
-            <!-- Input / Reply Bar -->
-            <div class="border-t border-slate-200 bg-white p-3">
-              <form id="whatsapp-reply-form" onsubmit="sendWhatsAppManualReply(event)" class="flex items-center gap-2">
-                <button type="button" onclick="openWhatsAppChatTemplatePicker(this)" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition" title="Templates">
+            <!-- Dedicated Manual Chat & Quick Replies Area Below -->
+            <div id="whatsapp-reply-panel" class="shrink-0 border-t border-slate-200 bg-white p-3 shadow-[0_-2px_10px_rgba(0,0,0,0.03)] z-10 space-y-2.5">
+              <!-- Quick Action & Suggestion Bar -->
+              <div class="flex items-center justify-between gap-2 overflow-x-auto pb-1 text-[11px] no-scrollbar">
+                <!-- Quick Chips -->
+                <div class="flex items-center gap-1.5 shrink-0" id="whatsapp-quick-chips">
+                  <span class="text-[10px] font-black uppercase text-slate-400 tracking-wider flex items-center gap-1">
+                    <i data-lucide="zap" class="h-3 w-3 text-amber-500"></i> Quick:
+                  </span>
+                  <button type="button" onclick="insertWhatsAppQuickReply('تم تأكيد موعدك بنجاح، ننتظر تشريفك لنا في العيادة 🦷✨')" class="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 transition">
+                    تم تأكيد الموعد 🦷
+                  </button>
+                  <button type="button" onclick="insertWhatsAppQuickReply('أهلاً بك في عيادة لومين، كيف يمكننا مساعدتك اليوم؟')" class="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 transition">
+                    ترحيب 👋
+                  </button>
+                  <button type="button" onclick="insertWhatsAppQuickReply('يرجى الحضور إلى العيادة قبل موعدك بـ 15 دقيقة لإتمام إجراءات الكشف.')" class="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 transition">
+                    الحضور مبكراً ⏱️
+                  </button>
+                  <button type="button" onclick="insertWhatsAppQuickReply('نعتذر منك، الطبيب غير متاح في هذا التوقيت. هل يناسبك موعد آخر؟')" class="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 transition">
+                    الموعد غير متاح ❌
+                  </button>
+                  <button type="button" onclick="insertWhatsAppQuickReply('سيتم التواصل معك هاتفياً من قبل إدارة العيادة لمتابعة استفسارك.')" class="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 transition">
+                    متابعة هاتفية 📞
+                  </button>
+                </div>
+
+                <!-- Template & Takeover Controls -->
+                <div class="flex items-center gap-1.5 shrink-0 ml-auto">
+                  <button type="button" id="whatsapp-takeover-btn" onclick="toggleActiveChatAiFromBar()" class="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-800 hover:bg-violet-100 transition" title="Switch between AI handling and Staff manual handling">
+                    <span class="h-1.5 w-1.5 rounded-full bg-violet-500"></span>
+                    <span id="whatsapp-takeover-btn-text">Take Over Chat</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Manual Message Form -->
+              <form id="whatsapp-reply-form" onsubmit="sendWhatsAppManualReply(event)" class="relative flex items-end gap-2">
+                <!-- Template Picker Button -->
+                <button type="button" onclick="openWhatsAppChatTemplatePicker(this)" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition mb-0.5" title="Saved Templates">
                   <i data-lucide="bookmark" class="h-4 w-4"></i>
                 </button>
-                <input id="whatsapp-reply-input" autocomplete="off" placeholder="Type a message (patient will receive it on WhatsApp)..." class="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20" />
-                <button type="submit" id="whatsapp-reply-submit" class="flex h-9 items-center gap-1.5 rounded-xl bg-emerald-600 px-4 text-xs font-black text-white hover:bg-emerald-700 shadow-xs transition">
+
+                <!-- Expanding Textarea -->
+                <div class="relative flex-1">
+                  <textarea id="whatsapp-reply-input" rows="2" dir="auto" oninput="autoResizeWhatsAppInput(this)" onkeydown="handleWhatsAppInputKeydown(event)" placeholder="Type a message to send to patient on WhatsApp... (Enter to send, Shift+Enter for new line)" class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs leading-relaxed outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition"></textarea>
+                  <div class="flex items-center justify-between px-1 text-[10px] text-slate-400">
+                    <span id="whatsapp-replying-to-hint" class="truncate font-semibold">Replying directly via WhatsApp Cloud API</span>
+                    <span class="hidden sm:inline opacity-70">Enter ↵ to send</span>
+                  </div>
+                </div>
+
+                <!-- Send Button -->
+                <button type="submit" id="whatsapp-reply-submit" class="flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 text-xs font-black text-white hover:from-emerald-700 hover:to-teal-700 shadow-xs transition disabled:opacity-50 disabled:cursor-not-allowed mb-0.5">
                   <i data-lucide="send" class="h-3.5 w-3.5"></i>
-                  <span>Send</span>
+                  <span id="whatsapp-reply-submit-text">Send</span>
                 </button>
               </form>
             </div>
@@ -27388,7 +27462,7 @@
       renderWhatsAppConversationsList();
       if (activeWhatsAppConversationId) {
         await selectWhatsAppConversation(activeWhatsAppConversationId);
-      } else if (window.innerWidth >= 768 && whatsappConversations.length > 0) {
+      } else if (whatsappConversations.length > 0) {
         await selectWhatsAppConversation(whatsappConversations[0].id);
       } else {
         document.getElementById('whatsapp-chat-empty')?.classList.remove('hidden');
@@ -27515,10 +27589,15 @@
           updateWhatsAppNavBadge();
           void db.from('whatsapp_conversations').update({ unread_count: 0 }).eq('id', convId);
         }
+        updateWhatsAppBarTakeoverState();
       }
 
       await loadWhatsAppMessages(convId, true);
       lucide.createIcons();
+      setTimeout(() => {
+        const input = document.getElementById('whatsapp-reply-input');
+        input?.focus();
+      }, 100);
     }
 
     function closeActiveWhatsAppChatOnMobile() {
@@ -27648,11 +27727,17 @@
 
       const input = document.getElementById('whatsapp-reply-input');
       const submitBtn = document.getElementById('whatsapp-reply-submit');
+      const submitText = document.getElementById('whatsapp-reply-submit-text');
       const content = String(input?.value || '').trim();
       if (!content) return;
 
       input.value = '';
-      if (submitBtn) submitBtn.disabled = true;
+      autoResizeWhatsAppInput(input);
+
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        if (submitText) submitText.textContent = currentUiLanguage === 'ar' ? 'جارٍ الإرسال...' : 'Sending...';
+      }
 
       try {
         const { data, error } = await db.functions.invoke('whatsapp-webhook', {
@@ -27681,8 +27766,12 @@
         console.error('Failed to send reply:', err);
         alert(currentUiLanguage === 'ar' ? 'فشل إرسال الرسالة: ' + (err.message || 'خطأ غير معروف') : 'Failed to send message: ' + (err.message || 'Unknown error'));
         input.value = content;
+        autoResizeWhatsAppInput(input);
       } finally {
-        if (submitBtn) submitBtn.disabled = false;
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          if (submitText) submitText.textContent = currentUiLanguage === 'ar' ? 'إرسال' : 'Send';
+        }
         input?.focus();
       }
     }
@@ -27698,6 +27787,7 @@
       if (aiDot) aiDot.className = enabled ? 'flex h-2 w-2 rounded-full bg-violet-500' : 'flex h-2 w-2 rounded-full bg-slate-300';
       if (aiLabel) aiLabel.textContent = enabled ? 'AI Auto-Reply' : 'Human Mode';
 
+      updateWhatsAppBarTakeoverState();
       renderWhatsAppConversationsList();
 
       try {
@@ -27708,6 +27798,97 @@
       } catch (err) {
         console.error('Failed to update AI toggle:', err);
       }
+    }
+
+    function autoResizeWhatsAppInput(textarea) {
+      if (!textarea) return;
+      textarea.style.height = 'auto';
+      textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px';
+    }
+
+    function handleWhatsAppInputKeydown(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        void sendWhatsAppManualReply(event);
+      }
+    }
+
+    function insertWhatsAppQuickReply(text) {
+      const input = document.getElementById('whatsapp-reply-input');
+      if (!input) return;
+      input.value = text;
+      autoResizeWhatsAppInput(input);
+      input.focus();
+    }
+
+    async function toggleActiveChatAiFromBar() {
+      if (!activeWhatsAppConversation) return;
+      const newEnabled = !activeWhatsAppConversation.ai_enabled;
+      const aiToggle = document.getElementById('whatsapp-ai-toggle');
+      if (aiToggle) aiToggle.checked = newEnabled;
+      await toggleActiveChatAi(newEnabled);
+    }
+
+    function updateWhatsAppBarTakeoverState() {
+      const takeoverBtn = document.getElementById('whatsapp-takeover-btn');
+      const takeoverText = document.getElementById('whatsapp-takeover-btn-text');
+      const hint = document.getElementById('whatsapp-replying-to-hint');
+      if (!activeWhatsAppConversation) return;
+
+      const isAi = Boolean(activeWhatsAppConversation.ai_enabled);
+      if (takeoverBtn && takeoverText) {
+        const dot = takeoverBtn.querySelector('span');
+        if (isAi) {
+          takeoverBtn.className = 'inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-0.5 text-[10px] font-bold text-violet-800 hover:bg-violet-100 transition';
+          takeoverText.textContent = currentUiLanguage === 'ar' ? 'استلام المحادثة يدويّاً' : 'Take Over Chat';
+          if (dot) dot.className = 'h-1.5 w-1.5 rounded-full bg-violet-500';
+        } else {
+          takeoverBtn.className = 'inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 hover:bg-emerald-100 transition';
+          takeoverText.textContent = currentUiLanguage === 'ar' ? 'تفعيل الذكاء الاصطناعي' : 'Resume AI';
+          if (dot) dot.className = 'h-1.5 w-1.5 rounded-full bg-emerald-500';
+        }
+      }
+
+      if (hint) {
+        const patientName = activeWhatsAppConversation.patient_name || activeWhatsAppConversation.phone;
+        hint.textContent = currentUiLanguage === 'ar'
+          ? `الرد المباشر على ${patientName} (+${activeWhatsAppConversation.phone}) عبر السحابة`
+          : `Replying directly to ${patientName} (+${activeWhatsAppConversation.phone}) via WhatsApp`;
+      }
+    }
+
+    async function promptNewWhatsAppChat() {
+      const phoneInput = prompt(currentUiLanguage === 'ar' ? 'أدخل رقم هاتف المريض مع رمز الدولة (مثال: 201001537371 أو 9647701234567):' : 'Enter patient phone number with country code (e.g. 201001537371):');
+      if (!phoneInput) return;
+      const clean = String(phoneInput).replace(/[^\d]/g, '');
+      if (clean.length < 8) {
+        alert(currentUiLanguage === 'ar' ? 'رقم الهاتف غير صالح' : 'Invalid phone number');
+        return;
+      }
+
+      let conv = (whatsappConversations || []).find(c => String(c.phone).replace(/[^\d]/g, '') === clean);
+      if (!conv) {
+        const patientName = prompt(currentUiLanguage === 'ar' ? 'اسم المريض (اختياري):' : 'Patient name (optional):') || ('+' + clean);
+        try {
+          const { data, error } = await db.from('whatsapp_conversations').insert({
+            phone: clean,
+            patient_name: patientName,
+            ai_enabled: false,
+            status: 'human_needed',
+            last_message: 'Manual conversation initiated by clinic',
+            last_message_at: new Date().toISOString()
+          }).select().single();
+          if (error) throw error;
+          conv = data;
+          whatsappConversations.unshift(conv);
+          renderWhatsAppConversationsList();
+        } catch (err) {
+          alert('Failed to start conversation: ' + err.message);
+          return;
+        }
+      }
+
+      await selectWhatsAppConversation(conv.id);
     }
 
     async function openActiveChatPatientFile() {
