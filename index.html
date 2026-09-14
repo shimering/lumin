@@ -5375,6 +5375,17 @@
         </div>
 
         <label>
+          <span class="mb-1.5 flex items-center justify-between text-xs font-black text-slate-700">
+            <span>Gemini AI Model</span>
+            <span class="text-[10px] font-medium text-slate-400">Low-latency thinking + auto fallback</span>
+          </span>
+          <select id="setting-whatsapp-model" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20">
+            <option value="gemini-3.8-flash">Gemini 3.8 Flash (Latest • Deep Reasoning & Complex Scheduling)</option>
+            <option value="gemini-3.6-flash">Gemini 3.6 Flash (Ultra Fast ~1s • High Stability - Recommended)</option>
+          </select>
+        </label>
+
+        <label>
           <span class="mb-1.5 block text-xs font-black text-slate-700">Meta Access Token</span>
           <textarea id="setting-whatsapp-access-token" rows="2" placeholder="EAAG..." class="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs font-mono outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"></textarea>
         </label>
@@ -28047,7 +28058,7 @@
 
       try {
         const { data } = await db.from('clinic_settings').select(
-          'whatsapp_enabled, whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token, gemini_api_key, whatsapp_ai_instructions'
+          'whatsapp_enabled, whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token, gemini_api_key, whatsapp_ai_instructions, whatsapp_ai_model'
         ).eq('id', 1).maybeSingle();
 
         if (data) {
@@ -28057,6 +28068,8 @@
           document.getElementById('setting-whatsapp-waba-id').value = data.whatsapp_business_account_id || '';
           document.getElementById('setting-whatsapp-verify-token').value = data.whatsapp_verify_token || 'lumin_secret_token';
           document.getElementById('setting-whatsapp-gemini-key').value = data.gemini_api_key || '';
+          const modelSelect = document.getElementById('setting-whatsapp-model');
+          if (modelSelect) modelSelect.value = data.whatsapp_ai_model || 'gemini-3.8-flash';
           document.getElementById('setting-whatsapp-access-token').value = data.whatsapp_access_token || '';
           document.getElementById('setting-whatsapp-ai-prompt').value = data.whatsapp_ai_instructions || '';
         }
@@ -28084,6 +28097,7 @@
         whatsapp_business_account_id: String(document.getElementById('setting-whatsapp-waba-id')?.value || '').trim(),
         whatsapp_verify_token: String(document.getElementById('setting-whatsapp-verify-token')?.value || '').trim(),
         gemini_api_key: String(document.getElementById('setting-whatsapp-gemini-key')?.value || '').trim(),
+        whatsapp_ai_model: String(document.getElementById('setting-whatsapp-model')?.value || 'gemini-3.8-flash').trim(),
         whatsapp_access_token: String(document.getElementById('setting-whatsapp-access-token')?.value || '').trim(),
         whatsapp_ai_instructions: String(document.getElementById('setting-whatsapp-ai-prompt')?.value || '').trim(),
         updated_at: new Date().toISOString()
