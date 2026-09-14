@@ -1087,7 +1087,20 @@
     .appointment-day-event {
       touch-action: pan-x pan-y;
       user-select: none;
+      container-type: size;
       transition: box-shadow 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
+    }
+    .appointment-day-patient-name {
+      font-size: clamp(11px, calc(var(--appointment-card-height, 40px) * 0.08 + 8.5px), 24px);
+      line-height: 1.25;
+    }
+    @supports (font-size: 1cqh) {
+      .appointment-day-event {
+        container-type: size;
+      }
+      .appointment-day-event .appointment-day-patient-name {
+        font-size: clamp(11px, calc(8cqh + 8.5px), 24px);
+      }
     }
     .appointment-current-time-line {
       position: absolute;
@@ -2213,8 +2226,16 @@
       #appointments-day-view > div:first-child { padding: 0.75rem 1rem; }
       #appointments-day-timeline-scroll { height: 30rem; }
       #appointments-day-timeline > div:last-child { right: 0.35rem !important; left: 3.35rem !important; }
-      #appointments-day-timeline .appointment-day-event { padding-inline: 0.35rem; }
-      #appointments-day-timeline .appointment-day-event p { font-size: 0.58rem; line-height: 0.78rem; }
+      #appointments-day-timeline .appointment-day-event p:not(.appointment-day-patient-name) { font-size: 0.58rem; line-height: 0.78rem; }
+      #appointments-day-timeline .appointment-day-event .appointment-day-patient-name {
+        font-size: clamp(10px, calc(var(--appointment-card-height, 40px) * 0.07 + 7.5px), 20px);
+        line-height: 1.25;
+      }
+      @supports (font-size: 1cqh) {
+        #appointments-day-timeline .appointment-day-event .appointment-day-patient-name {
+          font-size: clamp(10px, calc(7cqh + 7.5px), 20px);
+        }
+      }
       #appointments-day-timeline .appointment-resize-handle { height: 20px; }
       #appointments-day-timeline .appointment-resize-handle::before { bottom: 5px; height: 4px; }
       #appointments-week-scroll { height: 30rem; }
@@ -24689,8 +24710,8 @@
         const selected = entry.id === selectedAppointmentId;
         const editable = canModifyAppointments();
         return `
-          <button type="button" data-timeline-appointment-id="${entry.id}" data-day-start-minutes="${start}" data-day-duration-minutes="${entry.duration}" data-appointment-status="${canonicalAppointmentStatus(entry.status)}" aria-label="${escapeAppointmentText(entry.patient)}, ${escapeAppointmentText(entry.doctor)}, ${appointmentTimeRange(entry)}, ${appointmentDurationLabel(entry.duration)}, ${escapeAppointmentText(canonicalAppointmentStatus(entry.status))}" aria-haspopup="dialog" aria-expanded="${appointmentCardPopoverId === entry.id}" class="appointment-day-event appointment-status-glow absolute overflow-hidden rounded-lg border border-l-4 px-2 py-1 text-left cursor-${editable ? 'grab' : 'pointer'} ${appointmentCardPopoverId === entry.id ? 'is-popover-anchor' : ''} ${selected ? 'ring-2 ring-blue-500 ring-offset-1' : 'shadow-sm'}" style="top:${top}px;height:${height}px;left:calc(${left}% + 2px);width:calc(${width}% - 4px);${appointmentStatusVisualStyle(entry)}">
-            <p class="truncate text-[11px] font-black leading-4">${escapeAppointmentText(entry.patient)}</p>
+          <button type="button" data-timeline-appointment-id="${entry.id}" data-day-start-minutes="${start}" data-day-duration-minutes="${entry.duration}" data-appointment-status="${canonicalAppointmentStatus(entry.status)}" aria-label="${escapeAppointmentText(entry.patient)}, ${escapeAppointmentText(entry.doctor)}, ${appointmentTimeRange(entry)}, ${appointmentDurationLabel(entry.duration)}, ${escapeAppointmentText(canonicalAppointmentStatus(entry.status))}" aria-haspopup="dialog" aria-expanded="${appointmentCardPopoverId === entry.id}" class="appointment-day-event appointment-status-glow absolute overflow-hidden rounded-lg border border-l-4 px-2 py-1 text-left cursor-${editable ? 'grab' : 'pointer'} ${appointmentCardPopoverId === entry.id ? 'is-popover-anchor' : ''} ${selected ? 'ring-2 ring-blue-500 ring-offset-1' : 'shadow-sm'}" style="top:${top}px;height:${height}px;--appointment-card-height:${height}px;left:calc(${left}% + 2px);width:calc(${width}% - 4px);${appointmentStatusVisualStyle(entry)}">
+            <p class="appointment-day-patient-name truncate font-black" dir="auto">${escapeAppointmentText(entry.patient)}</p>
             <p class="truncate text-[10px] font-bold opacity-80">${escapeAppointmentText(entry.doctor)}</p>
             <span class="mt-0.5 flex">${appointmentVisitTypeBadgeMarkup(entry, true)}</span>
             <p data-drag-time class="truncate text-[10px] font-bold opacity-70">${appointmentTimeRange(entry)} · ${appointmentDurationLabel(entry.duration)}</p>
@@ -25360,7 +25381,9 @@
         nextDuration = Math.max(minimumDuration, Math.min(maximumDuration, snappedDuration));
         resized = resized || nextDuration !== originalDuration;
 
-        block.style.height = `${Math.max(nextDuration / 60 * appointmentDayHourHeight, 24)}px`;
+        const currentHeight = Math.max(nextDuration / 60 * appointmentDayHourHeight, 24);
+        block.style.height = `${currentHeight}px`;
+        block.style.setProperty('--appointment-card-height', `${currentHeight}px`);
         const end = Math.min(1440, originalStart + nextDuration);
         const range = `${appointmentTimeFromMinutes(originalStart)}–${appointmentTimeFromMinutes(end)}`;
         const label = block.querySelector('[data-drag-time]');
@@ -25899,7 +25922,9 @@
         const durationMinutes = Number(block.dataset.dayDurationMinutes);
         if (!Number.isFinite(startMinutes) || !Number.isFinite(durationMinutes)) return;
         block.style.top = `${startMinutes / 60 * appointmentDayHourHeight}px`;
-        block.style.height = `${Math.max(durationMinutes / 60 * appointmentDayHourHeight, 24)}px`;
+        const currentHeight = Math.max(durationMinutes / 60 * appointmentDayHourHeight, 24);
+        block.style.height = `${currentHeight}px`;
+        block.style.setProperty('--appointment-card-height', `${currentHeight}px`);
       });
       scroll.scrollTop = anchoredMinutes / 60 * appointmentDayHourHeight - viewportOffset;
       showAppointmentDayZoomIndicator();
