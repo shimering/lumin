@@ -7372,6 +7372,15 @@
                 }
               } catch (_) {}
             });
+            OneSignal.Notifications.addEventListener('click', event => {
+              try {
+                const additionalData = event?.notification?.additionalData;
+                const view = additionalData?.view;
+                if (view && typeof switchView === 'function' && hasPageAccess(view)) {
+                  void switchView(view);
+                }
+              } catch (_) {}
+            });
           }
 
           if (currentUserAccess) {
@@ -8932,6 +8941,7 @@
         appointment_id: appointmentId,
         change_type: changeType,
         idempotency_key: idempotencyKey,
+        app_url: window.location.origin,
         ...(details && typeof details === 'object' ? details : {})
       };
       let lastError = null;
@@ -15427,7 +15437,10 @@
       if (!currentSession || !attendanceSessionId) return false;
       try {
         const { data, error } = await db.functions.invoke('hr-attendance-push', {
-          body: { attendance_session_id: attendanceSessionId }
+          body: {
+            attendance_session_id: attendanceSessionId,
+            app_url: window.location.origin
+          }
         });
         if (error) throw error;
         if (!data?.sent) console.warn('HR check-in notification was skipped:', data?.reason || data);
