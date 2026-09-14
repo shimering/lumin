@@ -3614,7 +3614,7 @@
           <div role="tablist" aria-label="HR team sections" class="inline-flex rounded-xl bg-slate-100 p-1"><button id="hr-tab-staff" type="button" onclick="switchHrTeamTab('staff')" class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-white px-4 py-2 text-xs font-black text-rose-700 shadow-xs"><i data-lucide="users-round" class="h-4 w-4"></i> Staff</button><button id="hr-tab-doctors" type="button" onclick="switchHrTeamTab('doctors')" class="inline-flex min-h-10 items-center gap-2 rounded-lg px-4 py-2 text-xs font-black text-slate-500"><i data-lucide="stethoscope" class="h-4 w-4"></i> Doctors</button></div>
           <div id="hr-period-actions" class="flex flex-wrap items-center gap-2"><button id="hr-review-period-button" type="button" onclick="setHrPayrollPeriodStatus('reviewed')" class="rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2.5 text-[11px] font-black text-blue-700 hover:bg-blue-100">Review month</button><button id="hr-lock-period-button" type="button" onclick="setHrPayrollPeriodStatus('locked')" class="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[11px] font-black text-amber-700 hover:bg-amber-100">Lock payroll</button><button id="hr-pay-all-button" type="button" onclick="payAllHrSalaries()" class="rounded-xl bg-emerald-600 px-3.5 py-2.5 text-[11px] font-black text-white hover:bg-emerald-700">Pay all salaries</button></div>
         </div>
-        <div class="grid grid-cols-2 gap-3 border-b border-slate-100 p-4 lg:grid-cols-4 sm:p-5"><div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4"><span class="text-[10px] font-black uppercase tracking-wider text-slate-400">Team shown</span><p id="hr-team-total" class="mt-2 text-xl font-black text-slate-900">0</p></div><div class="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4"><span class="text-[10px] font-black uppercase tracking-wider text-emerald-600">Attended shifts</span><p id="hr-attended-total" class="mt-2 text-xl font-black text-emerald-800">0</p></div><div class="rounded-2xl border border-amber-200 bg-amber-50/60 p-4"><span class="text-[10px] font-black uppercase tracking-wider text-amber-600">Late arrivals</span><p id="hr-late-total" class="mt-2 text-xl font-black text-amber-800">0</p></div><div class="rounded-2xl border border-violet-200 bg-violet-50/60 p-4"><span class="text-[10px] font-black uppercase tracking-wider text-violet-600">Salary total</span><p id="hr-salary-total" class="mt-2 text-xl font-black text-violet-800">EGP 0</p></div></div>
+        <div class="grid grid-cols-2 gap-3 border-b border-slate-100 p-4 lg:grid-cols-4 sm:p-5"><div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4"><span class="text-[10px] font-black uppercase tracking-wider text-slate-400">Team shown</span><p id="hr-team-total" class="mt-2 text-xl font-black text-slate-900">0</p></div><div class="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4"><span class="text-[10px] font-black uppercase tracking-wider text-emerald-600">Attended shifts</span><p id="hr-attended-total" class="mt-2 text-xl font-black text-emerald-800">0</p></div><div class="rounded-2xl border border-amber-200 bg-amber-50/60 p-4"><span class="text-[10px] font-black uppercase tracking-wider text-amber-600">Late arrivals</span><p id="hr-late-total" class="mt-2 text-xl font-black text-amber-800">0</p></div><div class="rounded-2xl border border-violet-200 bg-violet-50/60 p-4"><span id="hr-salary-total-label" class="text-[10px] font-black uppercase tracking-wider text-violet-600">Salary total</span><p id="hr-salary-total" class="mt-2 text-xl font-black text-violet-800">EGP 0</p></div></div>
         <div class="space-y-3 border-b border-slate-100 p-4 sm:p-5"><div class="grid gap-3 md:grid-cols-[minmax(220px,1fr)_auto]"><label class="relative block"><i data-lucide="search" class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i><input id="hr-team-search" type="search" oninput="renderHrDirectory()" placeholder="Search by name or user type" class="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-rose-400 focus:bg-white" /></label><button type="button" onclick="setHrRoleFilter('all')" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-600">All user types</button></div><div id="hr-role-filters" class="flex gap-2 overflow-x-auto pb-1"></div></div>
         <div class="mobile-scroll-region overflow-x-auto"><table id="hr-team-table" class="w-full min-w-[1120px] text-left text-xs"><thead class="border-b border-slate-200 bg-white text-[10px] font-black uppercase tracking-wider text-slate-400"><tr><th class="px-5 py-3.5">Team member</th><th class="px-5 py-3.5">Schedule</th><th class="px-5 py-3.5">Attendance</th><th class="px-5 py-3.5">Performance</th><th class="px-5 py-3.5">Salary calculation</th><th class="px-5 py-3.5">Payment</th><th class="px-5 py-3.5 text-right">Actions</th></tr></thead><tbody id="hr-team-table-body" class="divide-y divide-slate-100 font-medium text-slate-700"><tr><td colspan="7" class="px-5 py-12 text-center text-sm font-bold text-slate-400">Loading monthly HR records...</td></tr></tbody></table></div>
         <p id="hr-directory-error" class="hidden border-t border-red-100 bg-red-50 px-5 py-3 text-xs font-bold text-red-700" role="alert"></p>
@@ -3648,6 +3648,38 @@
         <div class="grid gap-5 xl:grid-cols-2">
           <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs"><div class="flex items-center justify-between gap-3 border-b border-slate-100 p-4 sm:p-5"><div><h3 class="text-sm font-black text-slate-800">Extra shifts</h3><p class="mt-1 text-[11px] font-bold text-slate-400">Separate dates, rates, reasons, and calculated amounts.</p></div><span id="hr-staff-extra-total" class="rounded-full bg-amber-100 px-3 py-1.5 text-[10px] font-black text-amber-700"></span></div><div class="overflow-x-auto"><table class="w-full min-w-[560px] text-left text-xs"><thead class="border-b border-slate-100 bg-slate-50/70 text-[9px] font-black uppercase tracking-wider text-slate-400"><tr><th class="px-4 py-3">Date</th><th class="px-4 py-3">Shifts</th><th class="px-4 py-3">Rate</th><th class="px-4 py-3">Amount</th><th class="px-4 py-3">Reason</th><th class="w-10 px-3 py-3 text-right"></th></tr></thead><tbody id="hr-staff-extra-table" class="divide-y divide-slate-100 font-semibold text-slate-600"></tbody></table></div></div>
           <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs"><div class="flex items-center justify-between gap-3 border-b border-slate-100 p-4 sm:p-5"><div><h3 class="text-sm font-black text-slate-800">Performance entries</h3><p class="mt-1 text-[11px] font-bold text-slate-400">Bonuses and deductions remain separate from attendance.</p></div><span id="hr-staff-performance-total" class="rounded-full bg-violet-100 px-3 py-1.5 text-[10px] font-black text-violet-700"></span></div><div class="overflow-x-auto"><table class="w-full min-w-[560px] text-left text-xs"><thead class="border-b border-slate-100 bg-slate-50/70 text-[9px] font-black uppercase tracking-wider text-slate-400"><tr><th class="px-4 py-3">Date</th><th class="px-4 py-3">Type</th><th class="px-4 py-3">Amount</th><th class="px-4 py-3">Score</th><th class="px-4 py-3">Reason</th><th class="w-10 px-3 py-3 text-right"></th></tr></thead><tbody id="hr-staff-performance-table" class="divide-y divide-slate-100 font-semibold text-slate-600"></tbody></table></div></div>
+        </div>
+      </div>
+
+      <div id="hr-doctor-detail-view" class="hidden space-y-5">
+        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+          <div class="app-page-bar app-page-bar-embedded">
+            <div class="app-page-heading"><span class="app-page-icon" aria-hidden="true"><i data-lucide="stethoscope"></i></span><h2 id="hr-doctor-detail-name" class="app-page-title">Doctor details</h2></div>
+            <button type="button" onclick="closeHrDoctorDetails()" aria-label="Back to doctors directory" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 shadow-xs transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700"><i data-lucide="arrow-left" class="h-4 w-4"></i></button>
+          </div>
+          <div class="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+            <div class="flex min-w-0 items-center gap-3"><span id="hr-doctor-detail-avatar" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-100 text-xs font-black text-cyan-700">--</span><div class="min-w-0"><p id="hr-doctor-detail-role" class="truncate text-xs font-black text-slate-700"></p><p class="mt-1 text-[10px] font-bold text-slate-400">Working schedule and procedure compensation</p></div></div>
+            <button id="hr-doctor-detail-save" type="button" onclick="saveHrDoctorDetails()" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-black text-white shadow-sm hover:bg-rose-700 disabled:cursor-wait disabled:opacity-60"><i data-lucide="save" class="h-4 w-4"></i> Save doctor details</button>
+          </div>
+          <div class="px-4 pb-4"><p id="hr-doctor-detail-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="status"></p></div>
+        </div>
+
+        <div id="hr-doctor-detail-kpis" class="grid grid-cols-2 gap-3 lg:grid-cols-4"></div>
+
+        <div class="grid gap-5 xl:grid-cols-2">
+          <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+            <div class="border-b border-slate-100 p-4 sm:p-5"><h3 class="flex items-center gap-2 text-sm font-black text-slate-800"><i data-lucide="calendar-clock" class="h-4 w-4 text-rose-600"></i> Working hours and days</h3><p class="mt-1 text-[11px] font-bold text-slate-400">Choose every regular working day and set its individual start and end time.</p></div>
+            <div id="hr-doctor-weekdays" class="space-y-2 p-4 sm:p-5"></div>
+          </section>
+
+          <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+            <div class="border-b border-slate-100 p-4 sm:p-5"><h3 class="flex items-center gap-2 text-sm font-black text-slate-800"><i data-lucide="badge-dollar-sign" class="h-4 w-4 text-violet-600"></i> Salary by dental procedure</h3><p class="mt-1 text-[11px] font-bold text-slate-400">Select procedures and pay this doctor either a percentage of the procedure price or a fixed EGP amount.</p></div>
+            <div id="hr-doctor-compensation-builder" class="space-y-3 border-b border-slate-100 bg-slate-50/60 p-4 sm:p-5">
+              <div class="grid gap-3 sm:grid-cols-2"><label><span class="mb-1.5 block text-xs font-bold text-slate-600">Dental procedure</span><select id="hr-doctor-procedure-select" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20"><option value="">Loading procedures...</option></select></label><label><span class="mb-1.5 block text-xs font-bold text-slate-600">Salary method</span><select id="hr-doctor-compensation-type" onchange="updateHrDoctorCompensationBuilder()" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20"><option value="percentage">Percentage of procedure price</option><option value="fixed">Fixed amount per procedure</option></select></label></div>
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-end"><label class="min-w-0 flex-1"><span id="hr-doctor-compensation-value-label" class="mb-1.5 block text-xs font-bold text-slate-600">Percentage (%)</span><input id="hr-doctor-compensation-value" type="number" min="0.01" max="100" step="0.01" inputmode="decimal" placeholder="e.g. 30" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-black text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20" /></label><button id="hr-doctor-add-compensation" type="button" onclick="addHrDoctorCompensationRule()" class="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-black text-white hover:bg-violet-700"><i data-lucide="plus" class="h-4 w-4"></i> Add procedure</button></div>
+            </div>
+            <div id="hr-doctor-compensation-rules" class="space-y-3 p-4 sm:p-5"></div>
+          </section>
         </div>
       </div>
     </section>
@@ -6474,6 +6506,8 @@
     let implantPage = 1;
     let implantPageSize = 20;
     let activeHrStaffDetailsId = null;
+    let activeHrDoctorDetailsId = null;
+    let hrDoctorDetailDraft = null;
     let activeHrDayDate = '';
     let clinicAttendanceSettings = {
       enabled: false,
@@ -8617,6 +8651,10 @@
         hrLoadedMonth = '';
         activeHrTeamTab = 'staff';
         hrRoleFilter = 'all';
+        activeHrStaffDetailsId = null;
+        activeHrDoctorDetailsId = null;
+        hrDoctorDetailDraft = null;
+        activeHrDayDate = '';
         myHrStaffSettings = null;
         myOpenAttendanceSession = null;
         attendanceStateLoadPromise = null;
@@ -8746,6 +8784,10 @@
         hrDirectoryUsers = [];
         hrDirectoryLoaded = false;
         hrDirectoryLoadPromise = null;
+        activeHrStaffDetailsId = null;
+        activeHrDoctorDetailsId = null;
+        hrDoctorDetailDraft = null;
+        activeHrDayDate = '';
         attendanceStateLoadPromise = null;
         attendanceStateLoadedAt = 0;
         editingExpenseId = null;
@@ -10371,7 +10413,7 @@
     }
 
     async function fetchDentalCustomization() {
-      if (!currentSession || (!hasPageAccess('chart') && !hasPageAccess('prices') && !hasPageAccess('implants') && !hasPageAccess('admin'))) {
+      if (!currentSession || (!hasPageAccess('chart') && !hasPageAccess('prices') && !hasPageAccess('implants') && !hasPageAccess('admin') && !hasPageAccess('hr'))) {
         dentalSpecialties = [];
         dentalOperations = [];
         dentalCustomizationLoaded = false;
@@ -10392,6 +10434,7 @@
       renderClinicalActionSelectors();
       if (hasPageAccess('admin')) renderAdminDentalCustomization();
       if (hasPageAccess('prices') && !document.getElementById('view-prices')?.classList.contains('hidden')) renderPricesPage();
+      if (activeHrDoctorDetailsId && !document.getElementById('hr-doctor-detail-view')?.classList.contains('hidden')) renderHrDoctorDetails();
       if (activePatientId) {
         document.querySelectorAll('[data-tooth-card]').forEach(card => renderToothVisuals(card.dataset.toothCard));
         renderFindingsList();
@@ -10401,7 +10444,7 @@
 
     async function ensureDentalCustomizationLoaded() {
       if (dentalCustomizationLoaded) return true;
-      if (!currentSession || (!hasPageAccess('chart') && !hasPageAccess('prices') && !hasPageAccess('implants') && !hasPageAccess('admin'))) return false;
+      if (!currentSession || (!hasPageAccess('chart') && !hasPageAccess('prices') && !hasPageAccess('implants') && !hasPageAccess('admin') && !hasPageAccess('hr'))) return false;
       if (!dentalCustomizationLoadPromise) {
         dentalCustomizationLoadPromise = fetchDentalCustomization()
           .finally(() => { dentalCustomizationLoadPromise = null; });
@@ -12554,6 +12597,26 @@
       return /^([01]\d|2[0-3]):[0-5]\d$/.test(time) ? time : fallback;
     }
 
+    function normaliseHrDoctorCompensation(value) {
+      const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+      const seen = new Set();
+      const rules = (Array.isArray(source.rules) ? source.rules : []).map(rule => {
+        const procedureId = String(rule?.procedureId || rule?.procedure_id || '').trim();
+        const type = rule?.type === 'fixed' ? 'fixed' : 'percentage';
+        const amount = Number(rule?.amount ?? rule?.value);
+        if (!procedureId || seen.has(procedureId) || !Number.isFinite(amount) || amount <= 0 || (type === 'percentage' && amount > 100)) return null;
+        seen.add(procedureId);
+        return {
+          procedureId,
+          procedureCode: String(rule?.procedureCode || rule?.procedure_code || '').trim(),
+          procedureName: String(rule?.procedureName || rule?.procedure_name || '').trim(),
+          type,
+          amount: Math.round(amount * 100) / 100
+        };
+      }).filter(Boolean);
+      return { rules };
+    }
+
     function normaliseHrSchedule(value) {
       const schedule = value && typeof value === 'object' ? value : {};
       const days = Array.isArray(schedule.days) ? [...new Set(schedule.days.map(Number).filter(day => Number.isInteger(day) && day >= 0 && day <= 6))].sort() : [0, 1, 2, 3, 4];
@@ -12569,7 +12632,13 @@
         };
       });
       const firstDay = daily[String(days[0])] || { start: legacyStart, end: legacyEnd };
-      return { days, start: firstDay.start, end: firstDay.end, daily };
+      return {
+        days,
+        start: firstDay.start,
+        end: firstDay.end,
+        daily,
+        doctorCompensation: normaliseHrDoctorCompensation(schedule.doctorCompensation || schedule.doctor_compensation)
+      };
     }
 
     function hrScheduleLabel(value) {
@@ -12662,6 +12731,7 @@
       const invalidDay = days.find(day => !normaliseHrScheduleTime(daily[String(day)].start, '') || !normaliseHrScheduleTime(daily[String(day)].end, '') || daily[String(day)].start === daily[String(day)].end);
       if (invalidDay != null) return setAdminMessage('hr-staff-settings-message', `Choose different valid start and end times for ${HR_WEEKDAYS[invalidDay].long}.`, 'error');
       const fallback = daily[String(days[0])];
+      const existingSchedule = normaliseHrSchedule(hrSettingsForUser(userId).weekly_schedule);
       const button = document.getElementById('hr-staff-settings-save');
       button.disabled = true;
       try {
@@ -12670,7 +12740,13 @@
           p_attendance_enabled: document.getElementById('hr-staff-attendance-enabled').checked,
           p_regular_shift_rate: Number(document.getElementById('hr-staff-regular-rate').value || 0),
           p_extra_shift_rate: user?.is_doctor ? 0 : Number(document.getElementById('hr-staff-extra-rate').value || 0),
-          p_weekly_schedule: { days, start: fallback.start, end: fallback.end, daily }
+          p_weekly_schedule: {
+            days,
+            start: fallback.start,
+            end: fallback.end,
+            daily,
+            doctorCompensation: user?.is_doctor ? existingSchedule.doctorCompensation : undefined
+          }
         });
         if (error) throw error;
         const { data, error: reloadError } = await db.from('hr_staff_settings').select('user_id, attendance_enabled, regular_shift_rate, extra_shift_rate, weekly_schedule, updated_at');
@@ -14124,7 +14200,7 @@
           await fetchWhatsAppTemplates();
         }
         const dentalCustomizationChanged = [...changedTables].some(table => REALTIME_DENTAL_CUSTOMIZATION_TABLES.has(table));
-        if ((refreshLoadedResourcesForAccess || dentalCustomizationChanged) && dentalCustomizationLoaded && hasPageAccess('chart')) {
+        if ((refreshLoadedResourcesForAccess || dentalCustomizationChanged) && dentalCustomizationLoaded && (hasPageAccess('chart') || hasPageAccess('hr'))) {
           await fetchDentalCustomization();
         }
         const invoicesChanged = [...changedTables].some(table => REALTIME_INVOICE_TABLES.has(table));
@@ -15065,9 +15141,10 @@
 
     function hrUserSettings(userId) {
       const row = hrStaffSettings.find(item => (item.user_id || item.userId) === userId);
+      const schedule = normaliseHrSchedule(row?.weekly_schedule);
       return row ? {
-        attendanceEnabled: Boolean(row.attendance_enabled), regularRate: Number(row.regular_shift_rate || 0), extraRate: Number(row.extra_shift_rate || 0), schedule: normaliseHrSchedule(row.weekly_schedule)
-      } : { attendanceEnabled: false, regularRate: 0, extraRate: 0, schedule: normaliseHrSchedule(null) };
+        attendanceEnabled: Boolean(row.attendance_enabled), regularRate: Number(row.regular_shift_rate || 0), extraRate: Number(row.extra_shift_rate || 0), schedule, doctorCompensation: schedule.doctorCompensation
+      } : { attendanceEnabled: false, regularRate: 0, extraRate: 0, schedule, doctorCompensation: schedule.doctorCompensation };
     }
 
     function hrExpectedShiftCount(schedule, bounds = hrMonthBounds()) {
@@ -15191,12 +15268,286 @@
       openHrStaffDetails(userId);
     }
 
+    function hrWeeklyScheduleMinutes(value) {
+      const schedule = normaliseHrSchedule(value);
+      return schedule.days.reduce((total, day) => {
+        const times = schedule.daily[String(day)] || { start: schedule.start, end: schedule.end };
+        const toMinutes = time => {
+          const [hours, minutes] = String(time).split(':').map(Number);
+          return hours * 60 + minutes;
+        };
+        const start = toMinutes(times.start);
+        let end = toMinutes(times.end);
+        if (end <= start) end += 24 * 60;
+        return total + Math.max(0, end - start);
+      }, 0);
+    }
+
+    function hrDoctorCompensationSummary(userId) {
+      const rules = hrUserSettings(userId).doctorCompensation.rules;
+      if (!rules.length) return 'No salary rules';
+      const percentageCount = rules.filter(rule => rule.type === 'percentage').length;
+      const fixedCount = rules.length - percentageCount;
+      return `${rules.length} procedure${rules.length === 1 ? '' : 's'} · ${[percentageCount ? `${percentageCount} percentage` : '', fixedCount ? `${fixedCount} fixed` : ''].filter(Boolean).join(' · ')}`;
+    }
+
+    function handleHrDoctorCardKeydown(event, userId) {
+      if (event.target.closest('button') || !['Enter', ' '].includes(event.key)) return;
+      event.preventDefault();
+      void openHrDoctorDetails(userId);
+    }
+
+    function toggleHrDoctorScheduleDay(input) {
+      const row = input.closest('[data-hr-doctor-schedule-day]');
+      if (!row || !canModifyHr()) return;
+      row.classList.toggle('border-rose-200', input.checked);
+      row.classList.toggle('bg-rose-50/60', input.checked);
+      row.classList.toggle('border-slate-200', !input.checked);
+      row.classList.toggle('bg-slate-50/60', !input.checked);
+      row.querySelectorAll('input[type="time"]').forEach(timeInput => {
+        timeInput.disabled = !input.checked;
+        timeInput.required = input.checked;
+      });
+    }
+
+    function renderHrDoctorScheduleEditor(value) {
+      const container = document.getElementById('hr-doctor-weekdays');
+      if (!container) return;
+      const schedule = normaliseHrSchedule(value);
+      const editable = canModifyHr();
+      container.innerHTML = HR_WEEKDAYS.map(day => {
+        const enabled = schedule.days.includes(day.value);
+        const daySchedule = schedule.daily[String(day.value)] || { start: schedule.start, end: schedule.end };
+        return `<div data-hr-doctor-schedule-day="${day.value}" class="grid grid-cols-[minmax(6.5rem,1fr)_minmax(0,1fr)_minmax(0,1fr)] items-end gap-2 rounded-xl border ${enabled ? 'border-rose-200 bg-rose-50/60' : 'border-slate-200 bg-slate-50/60'} p-3"><label class="flex min-h-10 items-center gap-2 text-xs font-black text-slate-700 ${editable ? 'cursor-pointer' : 'cursor-default'}"><input type="checkbox" value="${day.value}" ${enabled ? 'checked' : ''} ${editable ? '' : 'disabled'} onchange="toggleHrDoctorScheduleDay(this)" class="h-4 w-4 accent-rose-600" /><span>${day.long}</span></label><label><span class="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-400">Starts</span><input data-hr-doctor-schedule-time="start" type="time" value="${escapeHtml(daySchedule.start)}" ${enabled && editable ? 'required' : 'disabled'} aria-label="${day.long} working hours start" class="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold disabled:bg-slate-100 disabled:text-slate-400" /></label><label><span class="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-400">Ends</span><input data-hr-doctor-schedule-time="end" type="time" value="${escapeHtml(daySchedule.end)}" ${enabled && editable ? 'required' : 'disabled'} aria-label="${day.long} working hours end" class="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold disabled:bg-slate-100 disabled:text-slate-400" /></label></div>`;
+      }).join('');
+    }
+
+    function hrDoctorRuleOperation(rule) {
+      return dentalOperations.find(operation => operation.id === rule.procedureId) || null;
+    }
+
+    function renderHrDoctorProcedureOptions() {
+      const select = document.getElementById('hr-doctor-procedure-select');
+      if (!select || !hrDoctorDetailDraft) return;
+      const selectedIds = new Set(hrDoctorDetailDraft.compensation.rules.map(rule => rule.procedureId));
+      const available = dentalOperations.filter(operation => operation.active && !selectedIds.has(operation.id));
+      const specialties = [...dentalSpecialties].sort((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name));
+      const groups = specialties.map(specialty => {
+        const operations = available.filter(operation => operation.specialtyId === specialty.id).sort((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name));
+        if (!operations.length) return '';
+        return `<optgroup label="${escapeHtml(specialty.name)}">${operations.map(operation => `<option value="${escapeHtml(operation.id)}">${escapeHtml(operation.name)}${operation.code ? ` (${escapeHtml(operation.code)})` : ''} · ${escapeHtml(formatInvoiceMoney(operation.price))}</option>`).join('')}</optgroup>`;
+      }).join('');
+      const uncategorized = available.filter(operation => !specialties.some(specialty => specialty.id === operation.specialtyId));
+      const fallback = uncategorized.length ? `<optgroup label="Other">${uncategorized.map(operation => `<option value="${escapeHtml(operation.id)}">${escapeHtml(operation.name)} · ${escapeHtml(formatInvoiceMoney(operation.price))}</option>`).join('')}</optgroup>` : '';
+      select.innerHTML = groups || fallback ? `<option value="">Select a procedure</option>${groups}${fallback}` : `<option value="">${dentalCustomizationLoaded ? 'All active procedures are configured' : 'Procedure catalog is unavailable'}</option>`;
+      select.disabled = !canModifyHr() || !available.length;
+    }
+
+    function updateHrDoctorCompensationBuilder() {
+      const type = document.getElementById('hr-doctor-compensation-type')?.value === 'fixed' ? 'fixed' : 'percentage';
+      const label = document.getElementById('hr-doctor-compensation-value-label');
+      const input = document.getElementById('hr-doctor-compensation-value');
+      if (label) label.textContent = type === 'fixed' ? 'Fixed amount (EGP)' : 'Percentage (%)';
+      if (input) {
+        input.max = type === 'fixed' ? '' : '100';
+        input.placeholder = type === 'fixed' ? 'e.g. 500' : 'e.g. 30';
+      }
+    }
+
+    function updateHrDoctorCompensationRule(index, field, value) {
+      const rule = hrDoctorDetailDraft?.compensation?.rules?.[Number(index)];
+      if (!rule || !canModifyHr()) return;
+      if (field === 'type') {
+        rule.type = value === 'fixed' ? 'fixed' : 'percentage';
+        if (rule.type === 'percentage' && Number(rule.amount) > 100) rule.amount = 100;
+        renderHrDoctorCompensationRules();
+      } else if (field === 'amount') {
+        rule.amount = Number(value);
+      }
+    }
+
+    function renderHrDoctorCompensationRules() {
+      const container = document.getElementById('hr-doctor-compensation-rules');
+      if (!container || !hrDoctorDetailDraft) return;
+      const editable = canModifyHr();
+      const rules = hrDoctorDetailDraft.compensation.rules;
+      container.innerHTML = rules.map((rule, index) => {
+        const operation = hrDoctorRuleOperation(rule);
+        const name = operation?.name || rule.procedureName || rule.procedureCode || 'Unavailable procedure';
+        const code = operation?.code || rule.procedureCode;
+        const price = Number(operation?.price || 0);
+        const estimate = rule.type === 'percentage' && price > 0 ? price * Number(rule.amount || 0) / 100 : Number(rule.amount || 0);
+        return `<article class="rounded-2xl border border-violet-100 bg-gradient-to-br from-white to-violet-50/50 p-4"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><h4 class="truncate text-sm font-black text-slate-800">${escapeHtml(name)}</h4><p class="mt-1 text-[10px] font-bold text-slate-400">${code ? `${escapeHtml(code)} · ` : ''}Catalog price ${escapeHtml(formatInvoiceMoney(price))}</p></div>${editable ? `<button type="button" onclick="removeHrDoctorCompensationRule(${index})" aria-label="Remove ${escapeHtml(name)} salary rule" class="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"><i data-lucide="trash-2" class="h-4 w-4"></i></button>` : ''}</div><div class="mt-3 grid grid-cols-2 gap-3"><label><span class="mb-1 block text-[9px] font-black uppercase tracking-wider text-slate-400">Method</span><select onchange="updateHrDoctorCompensationRule(${index},'type',this.value)" ${editable ? '' : 'disabled'} class="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold disabled:bg-slate-100"><option value="percentage" ${rule.type === 'percentage' ? 'selected' : ''}>Percentage</option><option value="fixed" ${rule.type === 'fixed' ? 'selected' : ''}>Fixed EGP</option></select></label><label><span class="mb-1 block text-[9px] font-black uppercase tracking-wider text-slate-400">${rule.type === 'fixed' ? 'Amount (EGP)' : 'Percentage (%)'}</span><input type="number" min="0.01" ${rule.type === 'percentage' ? 'max="100"' : ''} step="0.01" value="${escapeHtml(rule.amount)}" oninput="updateHrDoctorCompensationRule(${index},'amount',this.value)" ${editable ? '' : 'disabled'} class="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-black disabled:bg-slate-100" /></label></div><p class="mt-3 rounded-lg bg-white/80 px-3 py-2 text-[10px] font-bold text-violet-700">${rule.type === 'percentage' ? `${escapeHtml(rule.amount)}% of this procedure${price ? ` ≈ ${escapeHtml(formatInvoiceMoney(estimate))} at the current catalog price` : ''}` : `${escapeHtml(formatInvoiceMoney(rule.amount))} per completed procedure`}</p></article>`;
+      }).join('') || '<div class="rounded-2xl border border-dashed border-slate-200 px-4 py-10 text-center"><span class="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-50 text-violet-400"><i data-lucide="badge-dollar-sign" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-700">No procedure salary rules yet.</p><p class="mt-1 text-xs font-bold text-slate-400">Add a procedure above and choose percentage or fixed compensation.</p></div>';
+      renderHrDoctorProcedureOptions();
+      lucide.createIcons();
+    }
+
+    function addHrDoctorCompensationRule() {
+      if (!canModifyHr() || !hrDoctorDetailDraft) return;
+      const procedureId = document.getElementById('hr-doctor-procedure-select')?.value || '';
+      const type = document.getElementById('hr-doctor-compensation-type')?.value === 'fixed' ? 'fixed' : 'percentage';
+      const amount = Number(document.getElementById('hr-doctor-compensation-value')?.value);
+      const operation = dentalOperations.find(item => item.id === procedureId && item.active);
+      if (!operation) return setAdminMessage('hr-doctor-detail-message', 'Select an active dental procedure.', 'error');
+      if (!Number.isFinite(amount) || amount <= 0 || (type === 'percentage' && amount > 100)) return setAdminMessage('hr-doctor-detail-message', type === 'percentage' ? 'Enter a percentage greater than 0 and no more than 100.' : 'Enter a fixed amount greater than 0.', 'error');
+      if (hrDoctorDetailDraft.compensation.rules.some(rule => rule.procedureId === procedureId)) return setAdminMessage('hr-doctor-detail-message', 'This procedure already has a salary rule.', 'error');
+      hrDoctorDetailDraft.compensation.rules.push({ procedureId, procedureCode: operation.code || '', procedureName: operation.name || '', type, amount: Math.round(amount * 100) / 100 });
+      document.getElementById('hr-doctor-compensation-value').value = '';
+      setAdminMessage('hr-doctor-detail-message', 'Procedure added. Save doctor details to apply the change.');
+      renderHrDoctorCompensationRules();
+      renderHrDoctorDetailKpis();
+    }
+
+    function removeHrDoctorCompensationRule(index) {
+      if (!canModifyHr() || !hrDoctorDetailDraft) return;
+      hrDoctorDetailDraft.compensation.rules.splice(Number(index), 1);
+      setAdminMessage('hr-doctor-detail-message', 'Procedure removed. Save doctor details to apply the change.');
+      renderHrDoctorCompensationRules();
+      renderHrDoctorDetailKpis();
+    }
+
+    function renderHrDoctorDetailKpis() {
+      const container = document.getElementById('hr-doctor-detail-kpis');
+      if (!container || !hrDoctorDetailDraft) return;
+      const schedule = normaliseHrSchedule(hrDoctorDetailDraft.schedule);
+      const rules = hrDoctorDetailDraft.compensation.rules;
+      const percentageCount = rules.filter(rule => rule.type === 'percentage').length;
+      const fixedCount = rules.length - percentageCount;
+      const minutes = hrWeeklyScheduleMinutes(schedule);
+      const weeklyHours = `${Math.floor(minutes / 60)}h${minutes % 60 ? ` ${minutes % 60}m` : ''}`;
+      const kpis = [
+        ['Working days', schedule.days.length, 'border-rose-200 bg-rose-50/70 text-rose-800'],
+        ['Weekly hours', weeklyHours, 'border-blue-200 bg-blue-50/70 text-blue-800'],
+        ['Salary procedures', rules.length, 'border-violet-200 bg-violet-50/70 text-violet-800'],
+        ['Salary methods', rules.length ? `${percentageCount} % · ${fixedCount} fixed` : 'Not configured', 'border-slate-200 bg-white text-slate-900']
+      ];
+      container.innerHTML = kpis.map(([label, value, classes]) => `<div class="rounded-2xl border p-3.5 shadow-xs ${classes}"><span class="text-[9px] font-black uppercase tracking-wider opacity-70">${escapeHtml(label)}</span><p class="mt-2 text-lg font-black">${escapeHtml(String(value))}</p></div>`).join('');
+    }
+
+    function renderHrDoctorDetails() {
+      if (!activeHrDoctorDetailsId) return;
+      const user = hrDirectoryUsers.find(item => item.userId === activeHrDoctorDetailsId && item.active && item.isDoctor);
+      if (!user) return closeHrDoctorDetails();
+      const settings = hrUserSettings(user.userId);
+      if (!hrDoctorDetailDraft || hrDoctorDetailDraft.userId !== user.userId) {
+        hrDoctorDetailDraft = {
+          userId: user.userId,
+          schedule: normaliseHrSchedule(settings.schedule),
+          compensation: normaliseHrDoctorCompensation(settings.doctorCompensation)
+        };
+      }
+      const initials = user.fullName.split(/\s+/).filter(Boolean).map(part => part[0]).join('').substring(0, 2).toUpperCase() || '—';
+      document.getElementById('hr-doctor-detail-avatar').textContent = initials;
+      document.getElementById('hr-doctor-detail-name').textContent = user.fullName;
+      document.getElementById('hr-doctor-detail-role').textContent = user.roleName;
+      document.getElementById('hr-doctor-detail-save').classList.toggle('hidden', !canModifyHr());
+      document.getElementById('hr-doctor-compensation-builder').classList.toggle('hidden', !canModifyHr());
+      renderHrDoctorScheduleEditor(hrDoctorDetailDraft.schedule);
+      renderHrDoctorDetailKpis();
+      renderHrDoctorCompensationRules();
+      updateHrDoctorCompensationBuilder();
+      lucide.createIcons();
+    }
+
+    async function openHrDoctorDetails(userId) {
+      const user = hrDirectoryUsers.find(item => item.userId === userId && item.active && item.isDoctor);
+      if (!user) return;
+      activeHrDoctorDetailsId = userId;
+      activeHrStaffDetailsId = null;
+      activeHrDayDate = '';
+      hrDoctorDetailDraft = null;
+      document.getElementById('hr-directory-view')?.classList.add('hidden');
+      document.getElementById('hr-staff-detail-view')?.classList.add('hidden');
+      document.getElementById('hr-doctor-detail-view')?.classList.remove('hidden');
+      renderHrDoctorDetails();
+      document.getElementById('view-hr')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      try {
+        await ensureDentalCustomizationLoaded();
+        if (activeHrDoctorDetailsId === userId) renderHrDoctorDetails();
+      } catch (error) {
+        setAdminMessage('hr-doctor-detail-message', error?.message || 'Could not load the dental procedure catalog.', 'error');
+      }
+    }
+
+    function closeHrDoctorDetails() {
+      activeHrDoctorDetailsId = null;
+      hrDoctorDetailDraft = null;
+      document.getElementById('hr-doctor-detail-view')?.classList.add('hidden');
+      document.getElementById('hr-directory-view')?.classList.remove('hidden');
+      setAdminMessage('hr-doctor-detail-message', '');
+      lucide.createIcons();
+    }
+
+    function readHrDoctorScheduleEditor() {
+      const days = [];
+      const daily = {};
+      document.querySelectorAll('#hr-doctor-weekdays [data-hr-doctor-schedule-day]').forEach(row => {
+        const checkbox = row.querySelector('input[type="checkbox"]');
+        if (!checkbox?.checked) return;
+        const day = Number(row.dataset.hrDoctorScheduleDay);
+        const start = row.querySelector('[data-hr-doctor-schedule-time="start"]')?.value || '';
+        const end = row.querySelector('[data-hr-doctor-schedule-time="end"]')?.value || '';
+        days.push(day);
+        daily[String(day)] = { start, end };
+      });
+      if (!days.length) throw new Error('Select at least one regular working day.');
+      const invalidDay = days.find(day => !normaliseHrScheduleTime(daily[String(day)].start, '') || !normaliseHrScheduleTime(daily[String(day)].end, '') || daily[String(day)].start === daily[String(day)].end);
+      if (invalidDay != null) throw new Error(`Choose different valid start and end times for ${HR_WEEKDAYS[invalidDay].long}.`);
+      const fallback = daily[String(days[0])];
+      return { days, start: fallback.start, end: fallback.end, daily };
+    }
+
+    async function saveHrDoctorDetails() {
+      if (!canModifyHr() || !activeHrDoctorDetailsId || !hrDoctorDetailDraft) return;
+      const user = hrDirectoryUsers.find(item => item.userId === activeHrDoctorDetailsId && item.active && item.isDoctor);
+      if (!user) return;
+      let schedule;
+      let compensation;
+      try {
+        schedule = readHrDoctorScheduleEditor();
+        compensation = normaliseHrDoctorCompensation(hrDoctorDetailDraft.compensation);
+        if (compensation.rules.length !== hrDoctorDetailDraft.compensation.rules.length) throw new Error('Every salary rule needs a valid amount. Percentages must be between 0 and 100.');
+      } catch (error) {
+        return setAdminMessage('hr-doctor-detail-message', error.message, 'error');
+      }
+      const existing = hrUserSettings(user.userId);
+      const button = document.getElementById('hr-doctor-detail-save');
+      button.disabled = true;
+      setAdminMessage('hr-doctor-detail-message', 'Saving doctor details...');
+      try {
+        const { error } = await db.rpc('save_hr_staff_settings', {
+          p_user_id: user.userId,
+          p_attendance_enabled: existing.attendanceEnabled,
+          p_regular_shift_rate: existing.regularRate,
+          p_extra_shift_rate: existing.extraRate,
+          p_weekly_schedule: { ...schedule, doctorCompensation: compensation }
+        });
+        if (error) throw error;
+        const { data, error: reloadError } = await db.from('hr_staff_settings').select('user_id, attendance_enabled, regular_shift_rate, extra_shift_rate, weekly_schedule, updated_at');
+        if (reloadError) throw reloadError;
+        hrStaffSettings = data || [];
+        const saved = hrUserSettings(user.userId);
+        hrDoctorDetailDraft = { userId: user.userId, schedule: normaliseHrSchedule(saved.schedule), compensation: normaliseHrDoctorCompensation(saved.doctorCompensation) };
+        renderHrDoctorDetails();
+        setAdminMessage('hr-doctor-detail-message', 'Doctor working hours and salary rules saved.');
+        showAppointmentNotificationToast('Doctor details saved', `${user.fullName}'s schedule and procedure compensation were updated.`);
+      } catch (error) {
+        setAdminMessage('hr-doctor-detail-message', error?.message || 'Could not save doctor details.', 'error');
+      } finally {
+        button.disabled = false;
+      }
+    }
+
     function openHrStaffDetails(userId) {
       const user = hrDirectoryUsers.find(item => item.userId === userId && item.active && !item.isDoctor);
       if (!user) return;
       activeHrStaffDetailsId = userId;
+      activeHrDoctorDetailsId = null;
+      hrDoctorDetailDraft = null;
       activeHrDayDate = '';
       document.getElementById('hr-directory-view')?.classList.add('hidden');
+      document.getElementById('hr-doctor-detail-view')?.classList.add('hidden');
       document.getElementById('hr-staff-detail-view')?.classList.remove('hidden');
       renderHrStaffDetails();
       document.getElementById('view-hr')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -15401,6 +15752,7 @@
 
     function switchHrTeamTab(tabName) {
       if (activeHrStaffDetailsId) closeHrStaffDetails();
+      if (activeHrDoctorDetailsId) closeHrDoctorDetails();
       activeHrTeamTab = tabName === 'doctors' ? 'doctors' : 'staff';
       const staff = document.getElementById('hr-tab-staff');
       const doctors = document.getElementById('hr-tab-doctors');
@@ -15423,19 +15775,27 @@
       document.getElementById('hr-team-total').textContent = String(users.length);
       document.getElementById('hr-attended-total').textContent = String(metrics.reduce((sum, item) => sum + item.attended, 0));
       document.getElementById('hr-late-total').textContent = String(metrics.reduce((sum, item) => sum + item.late, 0));
-      document.getElementById('hr-salary-total').textContent = activeHrTeamTab === 'doctors' ? 'Separate workflow' : formatInvoiceMoney(metrics.reduce((sum, item) => sum + item.salary, 0));
+      const configuredDoctors = users.filter(user => user.isDoctor && hrUserSettings(user.userId).doctorCompensation.rules.length).length;
+      document.getElementById('hr-salary-total-label').textContent = activeHrTeamTab === 'doctors' ? 'Salary settings' : 'Salary total';
+      document.getElementById('hr-salary-total').textContent = activeHrTeamTab === 'doctors' ? `${configuredDoctors} / ${users.length} configured` : formatInvoiceMoney(metrics.reduce((sum, item) => sum + item.salary, 0));
       renderHrPeriodControls();
       const periodLocked = ['locked', 'paid'].includes(hrPayrollPeriod?.status);
       tbody.innerHTML = metrics.map(item => {
         const { user, settings } = item;
         const initials = user.fullName.split(/\s+/).filter(Boolean).map(part => part[0]).join('').substring(0, 2).toUpperCase() || '—';
         const attendanceClass = item.attended >= item.expected ? 'text-emerald-700' : 'text-amber-700';
-        const paymentMarkup = user.isDoctor ? '<span class="text-[11px] font-bold text-slate-400">Doctor compensation is separate</span>' : item.paid ? `<span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700"><i data-lucide="circle-check" class="h-3.5 w-3.5"></i>Paid ${escapeHtml(formatInvoiceMoney(item.paid.total_amount))}</span>` : `<span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-500">Unpaid</span>`;
-        const actionMarkup = !canModifyHr() ? '<span class="text-[10px] font-bold text-slate-400">Read only</span>' : `<div class="flex flex-wrap justify-end gap-1.5">${user.isDoctor ? '' : `<button type="button" ${periodLocked ? 'disabled' : ''} onclick="event.stopPropagation(); openHrManualShiftModal('${user.userId}')" class="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-[10px] font-black text-rose-700 disabled:opacity-40">Add shift</button><button type="button" ${periodLocked ? 'disabled' : ''} onclick="event.stopPropagation(); openHrAdjustmentModal('extra','${user.userId}')" class="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] font-black text-amber-700 disabled:opacity-40">Extra shift</button>`}<button type="button" ${periodLocked ? 'disabled' : ''} onclick="event.stopPropagation(); openHrAdjustmentModal('performance','${user.userId}')" class="rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-2 text-[10px] font-black text-violet-700 disabled:opacity-40">Performance</button>${!user.isDoctor && hrPayrollPeriod?.status === 'locked' && !item.paid ? `<button type="button" onclick="event.stopPropagation(); payHrSalary('${user.userId}')" class="rounded-lg bg-emerald-600 px-2.5 py-2 text-[10px] font-black text-white">Pay salary</button>` : ''}</div>`;
-        const staffCardAttributes = user.isDoctor ? '' : ` tabindex="0" role="button" aria-label="Open ${escapeHtml(user.fullName)} staff details" onclick="openHrStaffDetails('${user.userId}')" onkeydown="handleHrStaffCardKeydown(event,'${user.userId}')" class="cursor-pointer transition hover:bg-rose-50/40 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-rose-400"`;
-        return `<tr${staffCardAttributes}><td data-label="Team member" class="px-5 py-4"><div class="flex min-w-0 items-center gap-3"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-[11px] font-black text-rose-700">${escapeHtml(initials)}</span><div class="min-w-0"><p class="truncate font-black text-slate-800">${escapeHtml(user.fullName)}</p><p class="mt-1 text-[10px] font-bold text-slate-400">${escapeHtml(user.roleName)}${user.isDoctor ? '' : ' · Open details'}</p></div></div></td><td data-label="Schedule" class="px-5 py-4"><p class="text-[11px] font-bold text-slate-600">${escapeHtml(hrScheduleLabel(settings.schedule))}</p><p class="mt-1 text-[10px] font-bold ${settings.attendanceEnabled ? 'text-rose-600' : 'text-slate-400'}">${settings.attendanceEnabled ? 'Mobile attendance enabled' : 'Attendance not configured'}</p></td><td data-label="Attendance" class="px-5 py-4"><p class="font-black ${attendanceClass}">${item.attended} / ${item.expected} shifts</p><p class="mt-1 text-[10px] font-bold ${item.late ? 'text-amber-600' : 'text-slate-400'}">${item.late} late · ${Math.max(0, item.expected - item.attended)} absent</p></td><td data-label="Performance" class="px-5 py-4"><p class="font-black ${item.performanceAmount >= 0 ? 'text-emerald-700' : 'text-red-600'}">${item.performanceAmount >= 0 ? '+' : '−'}${escapeHtml(formatInvoiceMoney(Math.abs(item.performanceAmount)))}</p><p class="mt-1 text-[10px] font-bold text-slate-400">${item.performanceScore == null ? 'No score' : `${item.performanceScore.toFixed(1)}% score`} · ${item.performanceRows.length} entries</p></td><td data-label="Salary calculation" class="px-5 py-4"><p class="font-black text-slate-900">${user.isDoctor ? '—' : escapeHtml(formatInvoiceMoney(item.salary))}</p><p class="mt-1 text-[10px] font-bold text-slate-400">${user.isDoctor ? 'Doctors tab record' : `${formatInvoiceMoney(item.regularAmount)} regular · ${formatInvoiceMoney(item.extraAmount)} extra`}</p></td><td data-label="Payment" class="px-5 py-4">${paymentMarkup}</td><td data-label="Actions" class="px-5 py-4 text-right">${actionMarkup}</td></tr>`;
+        const paymentMarkup = user.isDoctor ? '<span class="text-[11px] font-bold text-slate-400">Managed on doctor details page</span>' : item.paid ? `<span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700"><i data-lucide="circle-check" class="h-3.5 w-3.5"></i>Paid ${escapeHtml(formatInvoiceMoney(item.paid.total_amount))}</span>` : `<span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-500">Unpaid</span>`;
+        const actionMarkup = user.isDoctor
+          ? `<button type="button" onclick="event.stopPropagation(); void openHrDoctorDetails('${user.userId}')" class="inline-flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-[10px] font-black text-cyan-700 hover:bg-cyan-100"><i data-lucide="external-link" class="h-3.5 w-3.5"></i>Open details</button>`
+          : !canModifyHr() ? '<span class="text-[10px] font-bold text-slate-400">Read only</span>' : `<div class="flex flex-wrap justify-end gap-1.5"><button type="button" ${periodLocked ? 'disabled' : ''} onclick="event.stopPropagation(); openHrManualShiftModal('${user.userId}')" class="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-[10px] font-black text-rose-700 disabled:opacity-40">Add shift</button><button type="button" ${periodLocked ? 'disabled' : ''} onclick="event.stopPropagation(); openHrAdjustmentModal('extra','${user.userId}')" class="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] font-black text-amber-700 disabled:opacity-40">Extra shift</button><button type="button" ${periodLocked ? 'disabled' : ''} onclick="event.stopPropagation(); openHrAdjustmentModal('performance','${user.userId}')" class="rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-2 text-[10px] font-black text-violet-700 disabled:opacity-40">Performance</button>${hrPayrollPeriod?.status === 'locked' && !item.paid ? `<button type="button" onclick="event.stopPropagation(); payHrSalary('${user.userId}')" class="rounded-lg bg-emerald-600 px-2.5 py-2 text-[10px] font-black text-white">Pay salary</button>` : ''}</div>`;
+        const cardAttributes = user.isDoctor
+          ? ` tabindex="0" role="button" aria-label="Open ${escapeHtml(user.fullName)} doctor details" onclick="void openHrDoctorDetails('${user.userId}')" onkeydown="handleHrDoctorCardKeydown(event,'${user.userId}')" class="cursor-pointer transition hover:bg-cyan-50/40 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-cyan-400"`
+          : ` tabindex="0" role="button" aria-label="Open ${escapeHtml(user.fullName)} staff details" onclick="openHrStaffDetails('${user.userId}')" onkeydown="handleHrStaffCardKeydown(event,'${user.userId}')" class="cursor-pointer transition hover:bg-rose-50/40 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-rose-400"`;
+        const doctorRules = user.isDoctor ? settings.doctorCompensation.rules : [];
+        return `<tr${cardAttributes}><td data-label="Team member" class="px-5 py-4"><div class="flex min-w-0 items-center gap-3"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${user.isDoctor ? 'bg-cyan-50 text-cyan-700' : 'bg-rose-50 text-rose-700'} text-[11px] font-black">${escapeHtml(initials)}</span><div class="min-w-0"><p class="truncate font-black text-slate-800">${escapeHtml(user.fullName)}</p><p class="mt-1 text-[10px] font-bold text-slate-400">${escapeHtml(user.roleName)} · Open details</p></div></div></td><td data-label="Schedule" class="px-5 py-4"><p class="text-[11px] font-bold text-slate-600">${escapeHtml(hrScheduleLabel(settings.schedule))}</p><p class="mt-1 text-[10px] font-bold ${settings.attendanceEnabled ? 'text-rose-600' : 'text-slate-400'}">${settings.attendanceEnabled ? 'Mobile attendance enabled' : 'Attendance not configured'}</p></td><td data-label="Attendance" class="px-5 py-4"><p class="font-black ${attendanceClass}">${item.attended} / ${item.expected} shifts</p><p class="mt-1 text-[10px] font-bold ${item.late ? 'text-amber-600' : 'text-slate-400'}">${item.late} late · ${Math.max(0, item.expected - item.attended)} absent</p></td><td data-label="Performance" class="px-5 py-4"><p class="font-black ${item.performanceAmount >= 0 ? 'text-emerald-700' : 'text-red-600'}">${item.performanceAmount >= 0 ? '+' : '−'}${escapeHtml(formatInvoiceMoney(Math.abs(item.performanceAmount)))}</p><p class="mt-1 text-[10px] font-bold text-slate-400">${item.performanceScore == null ? 'No score' : `${item.performanceScore.toFixed(1)}% score`} · ${item.performanceRows.length} entries</p></td><td data-label="Salary calculation" class="px-5 py-4"><p class="font-black text-slate-900">${user.isDoctor ? `${doctorRules.length} procedure${doctorRules.length === 1 ? '' : 's'}` : escapeHtml(formatInvoiceMoney(item.salary))}</p><p class="mt-1 text-[10px] font-bold text-slate-400">${user.isDoctor ? escapeHtml(hrDoctorCompensationSummary(user.userId)) : `${formatInvoiceMoney(item.regularAmount)} regular · ${formatInvoiceMoney(item.extraAmount)} extra`}</p></td><td data-label="Payment" class="px-5 py-4">${paymentMarkup}</td><td data-label="Actions" class="px-5 py-4 text-right">${actionMarkup}</td></tr>`;
       }).join('') || '<tr><td colspan="7" class="px-5 py-12 text-center text-sm font-bold text-slate-400">No team members match this view.</td></tr>';
       if (activeHrStaffDetailsId) renderHrStaffDetails();
+      if (activeHrDoctorDetailsId) renderHrDoctorDetails();
       lucide.createIcons();
     }
 
@@ -20431,7 +20791,7 @@
         await switchFinanceTab(activeFinanceTab);
       }
       else if (authorizedTab === 'analytics') await refreshIncomeStatement();
-      else if (authorizedTab === 'hr') await refreshHrDirectory();
+      else if (authorizedTab === 'hr') await Promise.allSettled([refreshHrDirectory(), ensureDentalCustomizationLoaded()]);
       else if (authorizedTab === 'implants') await refreshImplantProgress();
       if (updateHash) window.location.hash = 'clinic-management';
       lucide.createIcons();
