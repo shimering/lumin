@@ -5494,7 +5494,7 @@
             </div>
 
             <!-- Messages Thread -->
-            <div id="whatsapp-messages-container" class="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-2.5 sm:space-y-3">
+            <div id="whatsapp-messages-container" onscroll="handleWhatsAppMessagesScroll(this)" class="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-2.5 sm:space-y-3">
               <!-- Messages rendered here -->
             </div>
 
@@ -14919,7 +14919,9 @@
         }
         const whatsappChanged = [...changedTables].some(table => REALTIME_WHATSAPP_TABLES.has(table));
         if ((refreshLoadedResourcesForAccess || whatsappChanged) && hasPageAccess('whatsapp')) {
-          await refreshWhatsAppRealtime();
+          await refreshWhatsAppRealtime({
+            messagesChanged: refreshLoadedResourcesForAccess || changedTables.has('whatsapp_messages')
+          });
         }
         realtimeRefreshRetryCount = 0;
         if (realtimeHasSubscribed) setRealtimeIndicator('connected');
@@ -29290,6 +29292,16 @@
     let whatsappSearchQuery = '';
     let whatsappLoaded = false;
     let whatsappLoading = false;
+    const WHATSAPP_MESSAGE_PAGE_SIZE = 10;
+    const WHATSAPP_MESSAGE_SYNC_PAGE_SIZE = 100;
+    const WHATSAPP_MESSAGE_COLUMNS = 'id,conversation_id,sender,sender_name,content,message_type,media_url,status,created_at';
+    const WHATSAPP_CONVERSATION_COLUMNS = 'id,phone,patient_id,patient_name,ai_enabled,last_message,last_message_at,unread_count,status';
+    let whatsappMessagesConversationId = null;
+    let whatsappMessagesHasOlder = false;
+    let whatsappMessagesLoadingInitial = false;
+    let whatsappMessagesLoadingOlder = false;
+    let whatsappMessagesSyncing = false;
+    let whatsappMessagesRequestToken = 0;
 
     async function ensureWhatsAppLoaded() {
       if (whatsappLoaded) return;
@@ -29301,7 +29313,7 @@
         whatsappLoading = true;
         const { data, error } = await db
           .from('whatsapp_conversations')
-          .select('*')
+          .select(WHATSAPP_CONVERSATION_COLUMNS)
           .order('last_message_at', { ascending: false });
 
         if (error) throw error;
@@ -29370,7 +29382,7 @@
 
         await fetchWhatsAppConversations();
         if (retryOnConflict && activeWhatsAppConversationId === conversationId && isActiveWhatsAppChatVisible()) {
-          await loadWhatsAppMessages(conversationId, false);
+          await syncNewWhatsAppMessages(conversationId);
           return markWhatsAppConversationRead(activeWhatsAppConversation, false);
         }
       } catch (err) {
@@ -29380,10 +29392,10 @@
       return false;
     }
 
-    async function refreshWhatsAppRealtime() {
+    async function refreshWhatsAppRealtime({ messagesChanged = false } = {}) {
       await fetchWhatsAppConversations();
-      if (activeWhatsAppConversationId) {
-        await loadWhatsAppMessages(activeWhatsAppConversationId, false);
+      if (activeWhatsAppConversationId && isActiveWhatsAppChatVisible()) {
+        if (messagesChanged) await syncNewWhatsAppMessages(activeWhatsAppConversationId);
         if (isActiveWhatsAppChatVisible()) await markWhatsAppConversationRead();
       }
     }
@@ -29393,8 +29405,8 @@
       const refreshIcon = refreshBtn?.querySelector('i');
       refreshIcon?.classList.add('animate-spin');
       await fetchWhatsAppConversations();
-      if (activeWhatsAppConversationId) {
-        await loadWhatsAppMessages(activeWhatsAppConversationId, false);
+      if (activeWhatsAppConversationId && isActiveWhatsAppChatVisible()) {
+        await syncNewWhatsAppMessages(activeWhatsAppConversationId);
         if (isActiveWhatsAppChatVisible()) await markWhatsAppConversationRead();
       }
       setTimeout(() => refreshIcon?.classList.remove('animate-spin'), 500);
@@ -29560,26 +29572,171 @@
       document.body.classList.remove('whatsapp-mobile-chat-open');
     }
 
+    function compareWhatsAppMessages(a, b) {
+      const timeDifference = new Date(a?.created_at || 0).getTime() - new Date(b?.created_at || 0).getTime();
+      if (timeDifference !== 0) return timeDifference;
+      return String(a?.id || '').localeCompare(String(b?.id || ''));
+    }
+
+    function mergeWhatsAppMessages(...messageGroups) {
+      const byId = new Map();
+      messageGroups.flat().forEach(message => {
+        if (!message?.id) return;
+        byId.set(message.id, { ...(byId.get(message.id) || {}), ...message });
+      });
+      return [...byId.values()].sort(compareWhatsAppMessages);
+    }
+
+    function getWhatsAppMessageCursorFilter(message, operator) {
+      return `created_at.${operator}.${message.created_at},and(created_at.eq.${message.created_at},id.${operator}.${message.id})`;
+    }
+
     async function loadWhatsAppMessages(convId, scrollToBottom = true) {
       if (!convId) return;
+      const requestToken = ++whatsappMessagesRequestToken;
+      whatsappMessagesConversationId = convId;
+      whatsappMessages = [];
+      whatsappMessagesHasOlder = false;
+      whatsappMessagesLoadingInitial = true;
+      renderWhatsAppMessages(false);
+
       try {
         const { data, error } = await db
           .from('whatsapp_messages')
-          .select('*')
+          .select(WHATSAPP_MESSAGE_COLUMNS)
           .eq('conversation_id', convId)
-          .order('created_at', { ascending: true });
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false })
+          .limit(WHATSAPP_MESSAGE_PAGE_SIZE);
 
         if (error) throw error;
-        whatsappMessages = data || [];
+        if (requestToken !== whatsappMessagesRequestToken || activeWhatsAppConversationId !== convId) return;
+        whatsappMessages = (data || []).slice().sort(compareWhatsAppMessages);
+        whatsappMessagesHasOlder = (data || []).length === WHATSAPP_MESSAGE_PAGE_SIZE;
         renderWhatsAppMessages(scrollToBottom);
       } catch (err) {
         console.error('Failed to load WhatsApp messages:', err);
+      } finally {
+        if (requestToken === whatsappMessagesRequestToken) {
+          whatsappMessagesLoadingInitial = false;
+          renderWhatsAppMessages(scrollToBottom);
+        }
+      }
+    }
+
+    async function loadOlderWhatsAppMessages() {
+      const convId = activeWhatsAppConversationId;
+      const oldestMessage = whatsappMessages[0];
+      if (!convId || whatsappMessagesConversationId !== convId || !oldestMessage || !whatsappMessagesHasOlder || whatsappMessagesLoadingOlder) return;
+
+      const container = document.getElementById('whatsapp-messages-container');
+      const previousScrollHeight = container?.scrollHeight || 0;
+      const previousScrollTop = container?.scrollTop || 0;
+      whatsappMessagesLoadingOlder = true;
+      renderWhatsAppMessages(false);
+
+      try {
+        const { data, error } = await db
+          .from('whatsapp_messages')
+          .select(WHATSAPP_MESSAGE_COLUMNS)
+          .eq('conversation_id', convId)
+          .or(getWhatsAppMessageCursorFilter(oldestMessage, 'lt'))
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false })
+          .limit(WHATSAPP_MESSAGE_PAGE_SIZE);
+
+        if (error) throw error;
+        if (activeWhatsAppConversationId !== convId || whatsappMessagesConversationId !== convId) return;
+        whatsappMessages = mergeWhatsAppMessages(data || [], whatsappMessages);
+        whatsappMessagesHasOlder = (data || []).length === WHATSAPP_MESSAGE_PAGE_SIZE;
+        renderWhatsAppMessages(false);
+        requestAnimationFrame(() => {
+          const currentContainer = document.getElementById('whatsapp-messages-container');
+          if (currentContainer) currentContainer.scrollTop = currentContainer.scrollHeight - previousScrollHeight + previousScrollTop;
+        });
+      } catch (err) {
+        console.error('Failed to load older WhatsApp messages:', err);
+      } finally {
+        whatsappMessagesLoadingOlder = false;
+        if (activeWhatsAppConversationId === convId) renderWhatsAppMessages(false);
+      }
+    }
+
+    function handleWhatsAppMessagesScroll(container) {
+      if (!container || container.scrollHeight <= container.clientHeight) return;
+      if (container.scrollTop <= 64) loadOlderWhatsAppMessages();
+    }
+
+    async function syncNewWhatsAppMessages(convId = activeWhatsAppConversationId, scrollToBottom = false) {
+      if (!convId || !isActiveWhatsAppChatVisible() || whatsappMessagesSyncing) return;
+      if (whatsappMessagesConversationId !== convId || !whatsappMessages.length) {
+        await loadWhatsAppMessages(convId, true);
+        return;
+      }
+
+      const container = document.getElementById('whatsapp-messages-container');
+      const wasNearBottom = !container || container.scrollHeight - container.scrollTop - container.clientHeight < 96;
+      whatsappMessagesSyncing = true;
+
+      try {
+        let cursor = whatsappMessages[whatsappMessages.length - 1];
+        let fetchedCount = 0;
+
+        do {
+          const { data, error } = await db
+            .from('whatsapp_messages')
+            .select(WHATSAPP_MESSAGE_COLUMNS)
+            .eq('conversation_id', convId)
+            .or(getWhatsAppMessageCursorFilter(cursor, 'gt'))
+            .order('created_at', { ascending: true })
+            .order('id', { ascending: true })
+            .limit(WHATSAPP_MESSAGE_SYNC_PAGE_SIZE);
+
+          if (error) throw error;
+          if (activeWhatsAppConversationId !== convId || whatsappMessagesConversationId !== convId) return;
+          const batch = data || [];
+          fetchedCount = batch.length;
+          if (batch.length) {
+            whatsappMessages = mergeWhatsAppMessages(whatsappMessages, batch);
+            cursor = batch[batch.length - 1];
+          }
+        } while (fetchedCount === WHATSAPP_MESSAGE_SYNC_PAGE_SIZE);
+
+        const outgoingIds = whatsappMessages
+          .filter(message => message.sender === 'ai' || message.sender === 'staff')
+          .slice(-WHATSAPP_MESSAGE_SYNC_PAGE_SIZE)
+          .map(message => message.id);
+
+        if (outgoingIds.length) {
+          const { data: statuses, error: statusError } = await db
+            .from('whatsapp_messages')
+            .select('id,status')
+            .in('id', outgoingIds);
+          if (statusError) throw statusError;
+          whatsappMessages = mergeWhatsAppMessages(whatsappMessages, statuses || []);
+        }
+
+        renderWhatsAppMessages(scrollToBottom || wasNearBottom);
+      } catch (err) {
+        console.error('Failed to sync new WhatsApp messages:', err);
+      } finally {
+        whatsappMessagesSyncing = false;
       }
     }
 
     function renderWhatsAppMessages(scrollToBottom = true) {
       const container = document.getElementById('whatsapp-messages-container');
       if (!container) return;
+
+      if (whatsappMessagesLoadingInitial) {
+        container.innerHTML = `
+          <div class="flex h-full items-center justify-center p-8 text-slate-400">
+            <i data-lucide="loader-2" class="h-6 w-6 animate-spin"></i>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
 
       if (!whatsappMessages.length) {
         container.innerHTML = `
@@ -29592,7 +29749,16 @@
         return;
       }
 
-      container.innerHTML = whatsappMessages.map(msg => {
+      const olderMessagesControl = whatsappMessagesHasOlder ? `
+        <div class="flex justify-center py-1">
+          <button id="whatsapp-load-older" type="button" onclick="loadOlderWhatsAppMessages()" ${whatsappMessagesLoadingOlder ? 'disabled' : ''} class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-[10px] font-bold text-slate-500 shadow-sm transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60">
+            <i data-lucide="${whatsappMessagesLoadingOlder ? 'loader-2' : 'arrow-up'}" class="h-3 w-3 ${whatsappMessagesLoadingOlder ? 'animate-spin' : ''}"></i>
+            <span>${whatsappMessagesLoadingOlder ? 'Loading earlier messages...' : 'Scroll up or tap to load 10 earlier messages'}</span>
+          </button>
+        </div>
+      ` : '';
+
+      container.innerHTML = olderMessagesControl + whatsappMessages.map(msg => {
         const isAi = msg.sender === 'ai';
         const isStaff = msg.sender === 'staff';
         const timeStr = formatWhatsAppTime(msg.created_at);
@@ -29633,14 +29799,14 @@
             mediaHtml = `
               <div class="mb-2 overflow-hidden rounded-xl border border-slate-200/80 bg-slate-100">
                 <a href="${escapeHtml(msg.media_url)}" target="_blank" rel="noopener noreferrer">
-                  <img src="${escapeHtml(msg.media_url)}" alt="Attachment" class="max-h-64 w-auto object-cover hover:opacity-90 transition" loading="lazy" />
+                  <img src="${escapeHtml(msg.media_url)}" alt="Attachment" class="max-h-64 w-auto object-cover hover:opacity-90 transition" loading="lazy" decoding="async" fetchpriority="low" />
                 </a>
               </div>
             `;
           } else if (msg.message_type === 'audio') {
             mediaHtml = `
               <div class="mb-2">
-                <audio controls src="${escapeHtml(msg.media_url)}" class="max-w-xs h-8"></audio>
+                <audio controls preload="none" src="${escapeHtml(msg.media_url)}" class="max-w-xs h-8"></audio>
               </div>
             `;
           } else {
@@ -29707,10 +29873,10 @@
         if (error) throw error;
 
         if (data?.message) {
-          whatsappMessages.push(data.message);
+          whatsappMessages = mergeWhatsAppMessages(whatsappMessages, data.message);
           renderWhatsAppMessages(true);
         } else {
-          await loadWhatsAppMessages(activeWhatsAppConversationId, true);
+          await syncNewWhatsAppMessages(activeWhatsAppConversationId, true);
         }
 
         if (activeWhatsAppConversation) {
