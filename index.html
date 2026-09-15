@@ -3684,12 +3684,21 @@
         <div id="hr-doctor-detail-kpis" class="grid grid-cols-2 gap-3 lg:grid-cols-4"></div>
 
         <section class="overflow-hidden rounded-2xl border border-cyan-200 bg-white shadow-xs">
-          <div class="flex flex-col gap-3 border-b border-cyan-100 bg-cyan-50/55 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-            <div><h3 class="flex items-center gap-2 text-sm font-black text-slate-800"><i data-lucide="calculator" class="h-4 w-4 text-cyan-700"></i> Monthly procedure salary</h3><p id="hr-doctor-payroll-month-label" class="mt-1 text-[11px] font-bold text-slate-500">Completed procedures assigned to this doctor.</p></div>
-            <div class="flex flex-wrap items-center gap-2"><span id="hr-doctor-payment-status" class="rounded-full bg-slate-100 px-3 py-1.5 text-[10px] font-black text-slate-600">Unpaid</span><button id="hr-doctor-pay-salary" type="button" onclick="payHrDoctorSalary()" class="hidden min-h-10 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-sm hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60"><i data-lucide="wallet-cards" class="h-4 w-4"></i> Pay salary</button></div>
+          <div class="border-b border-cyan-100 bg-cyan-50/55 p-4 sm:p-5">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div><h3 class="flex items-center gap-2 text-sm font-black text-slate-800"><i data-lucide="calculator" class="h-4 w-4 text-cyan-700"></i> Procedure salary review</h3><p id="hr-doctor-payroll-month-label" class="mt-1 text-[11px] font-bold text-slate-500">Review and settle completed cases without locking monthly payroll.</p></div>
+              <div class="flex flex-wrap items-center gap-2"><span id="hr-doctor-payment-status" class="rounded-full bg-slate-100 px-3 py-1.5 text-[10px] font-black text-slate-600">Loading cases</span><button id="hr-doctor-pay-salary" type="button" onclick="payHrDoctorSalary()" class="hidden min-h-10 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-sm hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60"><i data-lucide="wallet-cards" class="h-4 w-4"></i> Pay selection</button></div>
+            </div>
+            <div class="mt-4 grid gap-3 sm:grid-cols-[minmax(9rem,0.7fr)_minmax(10rem,1fr)_auto] sm:items-end">
+              <label><span class="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-cyan-700">Settlement</span><select id="hr-doctor-payroll-scope" onchange="hrDoctorSettlementScopeChanged()" class="w-full rounded-xl border border-cyan-200 bg-white px-3.5 py-2.5 text-xs font-black text-slate-700 outline-none focus:border-cyan-500"><option value="month">Whole month</option><option value="day">Single day</option><option value="cases">Individual cases</option></select></label>
+              <label id="hr-doctor-payroll-month-control"><span class="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-cyan-700">Cases completed in</span><input id="hr-doctor-payroll-month" type="month" onchange="loadHrDoctorSettlementCases({ refresh: true })" class="w-full rounded-xl border border-cyan-200 bg-white px-3.5 py-2.5 text-xs font-black text-slate-700 outline-none focus:border-cyan-500" /></label>
+              <label id="hr-doctor-payroll-day-control" class="hidden"><span class="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-cyan-700">Completion date</span><input id="hr-doctor-payroll-day" type="date" onchange="loadHrDoctorSettlementCases({ refresh: true })" class="w-full rounded-xl border border-cyan-200 bg-white px-3.5 py-2.5 text-xs font-black text-slate-700 outline-none focus:border-cyan-500" /></label>
+              <button type="button" onclick="loadHrDoctorSettlementCases({ refresh: true })" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-cyan-200 bg-white px-3.5 py-2.5 text-xs font-black text-cyan-700 hover:bg-cyan-100"><i data-lucide="refresh-cw" class="h-4 w-4"></i> Refresh cases</button>
+            </div>
           </div>
-          <div class="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-3 sm:p-5"><div class="rounded-xl bg-slate-50 p-3"><span class="text-[9px] font-black uppercase tracking-wider text-slate-400">Completed quantity</span><p id="hr-doctor-procedure-count" class="mt-1.5 text-lg font-black text-slate-900">0</p></div><div class="rounded-xl bg-blue-50 p-3"><span class="text-[9px] font-black uppercase tracking-wider text-blue-500">Procedure value</span><p id="hr-doctor-procedure-value" class="mt-1.5 text-lg font-black text-blue-800">EGP 0</p></div><div class="rounded-xl bg-emerald-50 p-3"><span class="text-[9px] font-black uppercase tracking-wider text-emerald-600">Calculated salary</span><p id="hr-doctor-calculated-salary" class="mt-1.5 text-lg font-black text-emerald-800">EGP 0</p></div></div>
-          <div class="mobile-scroll-region overflow-x-auto"><table class="w-full min-w-[720px] text-left text-xs"><thead class="border-b border-slate-100 bg-slate-50/70 text-[9px] font-black uppercase tracking-wider text-slate-400"><tr><th class="px-4 py-3">Procedure</th><th class="px-4 py-3">Completed</th><th class="px-4 py-3">Procedure value</th><th class="px-4 py-3">Rule</th><th class="px-4 py-3 text-right">Doctor salary</th></tr></thead><tbody id="hr-doctor-payroll-lines" class="divide-y divide-slate-100 font-semibold text-slate-600"></tbody></table></div>
+          <div class="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-3 sm:p-5"><div class="rounded-xl bg-slate-50 p-3"><span class="text-[9px] font-black uppercase tracking-wider text-slate-400">Cases in review</span><p id="hr-doctor-procedure-count" class="mt-1.5 text-lg font-black text-slate-900">0</p></div><div class="rounded-xl bg-blue-50 p-3"><span class="text-[9px] font-black uppercase tracking-wider text-blue-500">Procedure value</span><p id="hr-doctor-procedure-value" class="mt-1.5 text-lg font-black text-blue-800">EGP 0</p></div><div class="rounded-xl bg-emerald-50 p-3"><span class="text-[9px] font-black uppercase tracking-wider text-emerald-600">Salary to pay</span><p id="hr-doctor-calculated-salary" class="mt-1.5 text-lg font-black text-emerald-800">EGP 0</p></div></div>
+          <div class="mobile-scroll-region overflow-x-auto"><table class="w-full min-w-[980px] text-left text-xs"><thead class="border-b border-slate-100 bg-slate-50/70 text-[9px] font-black uppercase tracking-wider text-slate-400"><tr><th class="w-12 px-4 py-3"><span class="sr-only">Select</span></th><th class="px-4 py-3">Completed</th><th class="px-4 py-3">Patient</th><th class="px-4 py-3">Procedure</th><th class="px-4 py-3">Procedure value</th><th class="px-4 py-3">Rule</th><th class="px-4 py-3 text-right">Doctor salary</th><th class="px-4 py-3">Status</th></tr></thead><tbody id="hr-doctor-payroll-lines" class="divide-y divide-slate-100 font-semibold text-slate-600"><tr><td colspan="8" class="px-5 py-10 text-center text-xs font-bold text-slate-400">Loading completed cases...</td></tr></tbody></table></div>
+          <p class="border-t border-cyan-100 bg-cyan-50/40 px-4 py-3 text-[10px] font-bold leading-5 text-cyan-800 sm:px-5">Each payment creates one linked Salary expense. Delete that expense in Finances to undo the settlement and release its cases for review again.</p>
         </section>
 
         <div class="grid gap-5 xl:grid-cols-2">
@@ -6538,6 +6547,11 @@
     let hrPerformanceAdjustments = [];
     let hrSalaryPayments = [];
     let hrDoctorPayrollLines = [];
+    let hrDoctorSettlementCases = [];
+    let hrDoctorSettlementRangeKey = '';
+    let hrDoctorSettlementLoading = false;
+    let hrDoctorSettlementRequestToken = 0;
+    let hrDoctorSelectedCaseIds = new Set();
     let hrPayrollPeriod = null;
     let activeHrTeamTab = 'staff';
     let hrRoleFilter = 'all';
@@ -8700,6 +8714,11 @@
         hrPerformanceAdjustments = [];
         hrSalaryPayments = [];
         hrDoctorPayrollLines = [];
+        hrDoctorSettlementCases = [];
+        hrDoctorSettlementRangeKey = '';
+        hrDoctorSettlementLoading = false;
+        hrDoctorSettlementRequestToken = 0;
+        hrDoctorSelectedCaseIds = new Set();
         hrPayrollPeriod = null;
         hrLoadedMonth = '';
         activeHrTeamTab = 'staff';
@@ -8847,6 +8866,11 @@
         hrPerformanceAdjustments = [];
         hrSalaryPayments = [];
         hrDoctorPayrollLines = [];
+        hrDoctorSettlementCases = [];
+        hrDoctorSettlementRangeKey = '';
+        hrDoctorSettlementLoading = false;
+        hrDoctorSettlementRequestToken = 0;
+        hrDoctorSelectedCaseIds = new Set();
         hrPayrollPeriod = null;
         hrLoadedMonth = '';
         activeHrStaffDetailsId = null;
@@ -14626,6 +14650,10 @@
         if ((accessChanged || hrChanged || changedTables.has('patients')) && hasPageAccess('hr') && !document.getElementById('view-hr').classList.contains('hidden')) {
           hrDirectoryLoaded = false;
           await refreshHrDirectory({ refresh: true });
+          if (activeHrDoctorDetailsId) {
+            hrDoctorSettlementRangeKey = '';
+            await loadHrDoctorSettlementCases({ refresh: true });
+          }
         }
         if (hrChanged && hasPageAccess('admin') && !document.getElementById('view-admin').classList.contains('hidden') && adminActiveTab === 'attendance') {
           await loadAdminData();
@@ -15591,7 +15619,9 @@
       const procedureCount = payrollLines.reduce((sum, line) => sum + Number(line.procedure_count || 0), 0);
       const grossAmount = payrollLines.reduce((sum, line) => sum + Number(line.gross_amount || 0), 0);
       const salary = payrollLines.reduce((sum, line) => sum + Number(line.salary_amount || 0), 0);
-      const paid = hrSalaryPayments.find(item => item.user_id === user.userId);
+      const payments = hrSalaryPayments.filter(item => item.user_id === user.userId && String(item.payment_kind || '').startsWith('doctor_'));
+      const paidTotal = payments.reduce((sum, item) => sum + Number(item.total_amount || 0), 0);
+      const paid = payments[0] || null;
       return {
         settings,
         payrollLines,
@@ -15607,7 +15637,9 @@
         performanceScore: null,
         regularAmount: salary,
         salary,
-        paid
+        paid,
+        payments,
+        paidTotal
       };
     }
 
@@ -15616,52 +15648,180 @@
       return Number.isInteger(quantity) ? String(quantity) : quantity.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
     }
 
+    function hrDoctorSettlementRange() {
+      const scope = document.getElementById('hr-doctor-payroll-scope')?.value || 'month';
+      if (scope === 'day') {
+        const day = document.getElementById('hr-doctor-payroll-day')?.value || hrClinicDateValue();
+        return { scope, start: day, end: day };
+      }
+      const month = document.getElementById('hr-doctor-payroll-month')?.value || currentHrMonth();
+      const match = /^(\d{4})-(\d{2})$/.exec(month);
+      if (!match) return { scope, start: '', end: '' };
+      const year = Number(match[1]);
+      const monthNumber = Number(match[2]);
+      const lastDay = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+      return { scope, start: `${month}-01`, end: `${month}-${String(lastDay).padStart(2, '0')}` };
+    }
+
+    function hrDoctorSettlementMetrics() {
+      const scope = document.getElementById('hr-doctor-payroll-scope')?.value || 'month';
+      const paidCases = hrDoctorSettlementCases.filter(item => item.payment_id);
+      const unpaidCases = hrDoctorSettlementCases.filter(item => !item.payment_id);
+      const payableCases = scope === 'cases'
+        ? unpaidCases.filter(item => hrDoctorSelectedCaseIds.has(item.finding_id))
+        : unpaidCases;
+      return {
+        scope,
+        paidCases,
+        unpaidCases,
+        payableCases,
+        grossAmount: hrDoctorSettlementCases.reduce((sum, item) => sum + Number(item.gross_amount || 0), 0),
+        paidAmount: paidCases.reduce((sum, item) => sum + Number(item.salary_amount || 0), 0),
+        payableAmount: payableCases.reduce((sum, item) => sum + Number(item.salary_amount || 0), 0)
+      };
+    }
+
+    function formatHrDoctorCaseCompletion(value) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '—';
+      return new Intl.DateTimeFormat(currentUiLanguage === 'ar' ? 'ar-EG' : 'en-GB', {
+        timeZone: clinicAttendanceSettings.timezone,
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: useTwelveHourTime
+      }).format(date);
+    }
+
     function renderHrDoctorPayroll(user) {
       const table = document.getElementById('hr-doctor-payroll-lines');
       if (!table) return;
-      const metrics = hrDoctorMetrics(user);
-      const monthStart = hrMonthBounds().start;
-      const monthLabel = new Intl.DateTimeFormat(currentUiLanguage === 'ar' ? 'ar-EG' : 'en-GB', { month: 'long', year: 'numeric' }).format(new Date(`${monthStart}T12:00:00`));
-      document.getElementById('hr-doctor-payroll-month-label').textContent = `${monthLabel} · completed procedures assigned to this doctor.`;
-      document.getElementById('hr-doctor-procedure-count').textContent = hrProcedureQuantityLabel(metrics.procedureCount);
+      const range = hrDoctorSettlementRange();
+      const metrics = hrDoctorSettlementMetrics();
+      const rangeLabel = range.scope === 'day'
+        ? formatInvoiceDate(range.start)
+        : new Intl.DateTimeFormat(currentUiLanguage === 'ar' ? 'ar-EG' : 'en-GB', { month: 'long', year: 'numeric' }).format(new Date(`${range.start}T12:00:00`));
+      document.getElementById('hr-doctor-payroll-month-label').textContent = range.scope === 'cases'
+        ? `${rangeLabel} · select any unpaid completed cases to settle together.`
+        : `${rangeLabel} · all unpaid completed cases can be settled now.`;
+      document.getElementById('hr-doctor-procedure-count').textContent = String(hrDoctorSettlementCases.length);
       document.getElementById('hr-doctor-procedure-value').textContent = formatInvoiceMoney(metrics.grossAmount);
-      document.getElementById('hr-doctor-calculated-salary').textContent = formatInvoiceMoney(metrics.salary);
+      document.getElementById('hr-doctor-calculated-salary').textContent = formatInvoiceMoney(metrics.payableAmount);
 
       const status = document.getElementById('hr-doctor-payment-status');
       const payButton = document.getElementById('hr-doctor-pay-salary');
-      if (metrics.paid) {
-        status.textContent = `Paid ${formatInvoiceMoney(metrics.paid.total_amount)}`;
+      if (hrDoctorSettlementLoading) {
+        status.textContent = 'Loading cases';
+        status.className = 'rounded-full bg-blue-100 px-3 py-1.5 text-[10px] font-black text-blue-700';
+      } else if (metrics.unpaidCases.length === 0 && metrics.paidCases.length > 0) {
+        status.textContent = `All paid · ${formatInvoiceMoney(metrics.paidAmount)}`;
         status.className = 'rounded-full bg-emerald-100 px-3 py-1.5 text-[10px] font-black text-emerald-700';
-      } else if (metrics.salary <= 0) {
-        status.textContent = 'No payable procedures';
+      } else if (!hrDoctorSettlementCases.length) {
+        status.textContent = 'No payable cases';
         status.className = 'rounded-full bg-slate-100 px-3 py-1.5 text-[10px] font-black text-slate-500';
-      } else if (hrPayrollPeriod?.status === 'locked') {
-        status.textContent = 'Ready to pay';
+      } else if (metrics.paidCases.length) {
+        status.textContent = `${metrics.unpaidCases.length} unpaid · ${formatInvoiceMoney(metrics.paidAmount)} paid`;
         status.className = 'rounded-full bg-amber-100 px-3 py-1.5 text-[10px] font-black text-amber-700';
       } else {
-        status.textContent = hrPayrollPeriod?.status === 'paid' ? 'Payroll closed' : 'Lock payroll to pay';
-        status.className = 'rounded-full bg-blue-100 px-3 py-1.5 text-[10px] font-black text-blue-700';
+        status.textContent = `${metrics.unpaidCases.length} unpaid`;
+        status.className = 'rounded-full bg-amber-100 px-3 py-1.5 text-[10px] font-black text-amber-700';
       }
-      const canPay = canModifyHr() && hrPayrollPeriod?.status === 'locked' && !metrics.paid && metrics.salary > 0;
+      const canPay = canModifyHr() && !hrDoctorSettlementLoading && metrics.payableCases.length > 0 && metrics.payableAmount > 0;
       payButton.classList.toggle('hidden', !canPay);
       payButton.classList.toggle('inline-flex', canPay);
+      payButton.innerHTML = `<i data-lucide="wallet-cards" class="h-4 w-4"></i> ${metrics.scope === 'month' ? 'Pay month' : metrics.scope === 'day' ? 'Pay day' : `Pay selected (${metrics.payableCases.length})`}`;
 
-      table.innerHTML = metrics.payrollLines.length ? metrics.payrollLines.map(line => {
+      if (hrDoctorSettlementLoading) {
+        table.innerHTML = '<tr><td colspan="8" class="px-5 py-10 text-center text-xs font-bold text-slate-400"><span class="inline-flex items-center gap-2"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Loading completed cases...</span></td></tr>';
+        lucide.createIcons();
+        return;
+      }
+
+      table.innerHTML = hrDoctorSettlementCases.length ? hrDoctorSettlementCases.map(line => {
         const method = line.compensation_type === 'fixed'
           ? `${formatInvoiceMoney(line.compensation_rate)} fixed`
           : `${hrProcedureQuantityLabel(line.compensation_rate)}%`;
-        return `<tr><td class="px-4 py-3"><p class="font-black text-slate-800">${escapeHtml(line.operation_name || line.operation_code || 'Procedure')}</p><p class="mt-1 text-[10px] font-bold text-slate-400">${escapeHtml(line.operation_code || '')}</p></td><td class="px-4 py-3 font-black text-slate-700">${escapeHtml(hrProcedureQuantityLabel(line.procedure_count))}</td><td class="px-4 py-3 font-black text-blue-700">${escapeHtml(formatInvoiceMoney(line.gross_amount))}</td><td class="px-4 py-3"><span class="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-black text-violet-700">${escapeHtml(method)}</span></td><td class="px-4 py-3 text-right font-black text-emerald-700">${escapeHtml(formatInvoiceMoney(line.salary_amount))}</td></tr>`;
-      }).join('') : '<tr><td colspan="5" class="px-5 py-10 text-center text-xs font-bold text-slate-400">No completed assigned procedures with a salary rule in this month.</td></tr>';
+        const isPaid = Boolean(line.payment_id);
+        const canSelect = metrics.scope === 'cases' && !isPaid;
+        const selection = canSelect
+          ? `<input type="checkbox" ${hrDoctorSelectedCaseIds.has(line.finding_id) ? 'checked' : ''} onchange="toggleHrDoctorSettlementCase('${escapeHtml(line.finding_id)}', this.checked)" aria-label="Select ${escapeHtml(line.operation_name || 'case')} for payment" class="h-4 w-4 rounded border-slate-300 accent-emerald-600" />`
+          : `<i data-lucide="${isPaid ? 'circle-check' : 'circle'}" class="h-4 w-4 ${isPaid ? 'text-emerald-500' : 'text-slate-300'}"></i>`;
+        const paymentStatus = isPaid
+          ? `<span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700"><i data-lucide="circle-check" class="h-3.5 w-3.5"></i>Paid</span>`
+          : '<span class="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black text-amber-700">Ready</span>';
+        return `<tr class="${isPaid ? 'bg-emerald-50/20' : ''}"><td class="px-4 py-3 text-center">${selection}</td><td class="whitespace-nowrap px-4 py-3 text-[11px] font-bold text-slate-600">${escapeHtml(formatHrDoctorCaseCompletion(line.completed_at))}</td><td class="px-4 py-3"><p class="font-black text-slate-800">${escapeHtml(line.patient_name || 'Patient')}</p></td><td class="px-4 py-3"><p class="font-black text-slate-800">${escapeHtml(line.operation_name || line.operation_code || 'Procedure')}</p><p class="mt-1 text-[10px] font-bold text-slate-400">${escapeHtml(line.operation_code || '')}</p></td><td class="px-4 py-3 font-black text-blue-700">${escapeHtml(formatInvoiceMoney(line.gross_amount))}</td><td class="px-4 py-3"><span class="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-black text-violet-700">${escapeHtml(method)}</span></td><td class="px-4 py-3 text-right font-black text-emerald-700">${escapeHtml(formatInvoiceMoney(line.salary_amount))}</td><td class="px-4 py-3">${paymentStatus}</td></tr>`;
+      }).join('') : '<tr><td colspan="8" class="px-5 py-10 text-center text-xs font-bold text-slate-400">No completed assigned cases with a salary rule in this date selection.</td></tr>';
+      lucide.createIcons();
+    }
+
+    function toggleHrDoctorSettlementCase(findingId, checked) {
+      if (checked) hrDoctorSelectedCaseIds.add(String(findingId));
+      else hrDoctorSelectedCaseIds.delete(String(findingId));
+      const user = hrDirectoryUsers.find(item => item.userId === activeHrDoctorDetailsId && item.active && item.isDoctor);
+      if (user) renderHrDoctorPayroll(user);
+    }
+
+    function hrDoctorSettlementScopeChanged() {
+      const scope = document.getElementById('hr-doctor-payroll-scope')?.value || 'month';
+      document.getElementById('hr-doctor-payroll-month-control')?.classList.toggle('hidden', scope === 'day');
+      document.getElementById('hr-doctor-payroll-day-control')?.classList.toggle('hidden', scope !== 'day');
+      hrDoctorSelectedCaseIds = new Set();
+      void loadHrDoctorSettlementCases({ refresh: true });
+    }
+
+    async function loadHrDoctorSettlementCases(options = {}) {
+      const userId = activeHrDoctorDetailsId;
+      if (!userId) return false;
+      const range = hrDoctorSettlementRange();
+      if (!range.start || !range.end) return false;
+      const rangeKey = `${userId}:${range.start}:${range.end}`;
+      if (!options.refresh && hrDoctorSettlementRangeKey === rangeKey) return true;
+      const requestToken = ++hrDoctorSettlementRequestToken;
+      hrDoctorSettlementLoading = true;
+      const user = hrDirectoryUsers.find(item => item.userId === userId && item.active && item.isDoctor);
+      if (user) renderHrDoctorPayroll(user);
+      try {
+        const { data, error } = await db.rpc('get_hr_doctor_payroll_cases', {
+          p_start_date: range.start,
+          p_end_date: range.end,
+          p_user_id: userId
+        });
+        if (error) throw error;
+        if (activeHrDoctorDetailsId !== userId || requestToken !== hrDoctorSettlementRequestToken) return false;
+        hrDoctorSettlementCases = data || [];
+        hrDoctorSettlementRangeKey = rangeKey;
+        const unpaidIds = new Set(hrDoctorSettlementCases.filter(item => !item.payment_id).map(item => item.finding_id));
+        hrDoctorSelectedCaseIds = new Set([...hrDoctorSelectedCaseIds].filter(id => unpaidIds.has(id)));
+        return true;
+      } catch (error) {
+        if (activeHrDoctorDetailsId === userId && requestToken === hrDoctorSettlementRequestToken) {
+          hrDoctorSettlementCases = [];
+          hrDoctorSettlementRangeKey = '';
+          setAdminMessage('hr-doctor-detail-message', error?.message || 'Could not load doctor salary cases.', 'error');
+        }
+        return false;
+      } finally {
+        if (activeHrDoctorDetailsId === userId && requestToken === hrDoctorSettlementRequestToken) {
+          hrDoctorSettlementLoading = false;
+          const currentUser = hrDirectoryUsers.find(item => item.userId === userId && item.active && item.isDoctor);
+          if (currentUser) {
+            renderHrDoctorPayroll(currentUser);
+            renderHrDoctorDetailKpis(currentUser);
+          }
+        }
+      }
     }
 
     function renderHrPeriodControls() {
       const status = hrPayrollPeriod?.status || 'draft';
       const badge = document.getElementById('hr-payroll-status');
       const styles = { draft: 'bg-slate-100 text-slate-600', reviewed: 'bg-blue-100 text-blue-700', locked: 'bg-amber-100 text-amber-700', paid: 'bg-emerald-100 text-emerald-700' };
-      badge.textContent = status;
-      badge.className = `rounded-full px-3 py-2 text-[10px] font-black uppercase tracking-wider ${styles[status]}`;
+      badge.textContent = activeHrTeamTab === 'doctors' ? 'Flexible settlements' : status;
+      badge.className = `rounded-full px-3 py-2 text-[10px] font-black uppercase tracking-wider ${activeHrTeamTab === 'doctors' ? 'bg-cyan-100 text-cyan-700' : styles[status]}`;
       const actions = document.getElementById('hr-period-actions');
-      actions.classList.toggle('hidden', !canModifyHr());
+      actions.classList.toggle('hidden', !canModifyHr() || activeHrTeamTab === 'doctors');
       const review = document.getElementById('hr-review-period-button');
       const lock = document.getElementById('hr-lock-period-button');
       const pay = document.getElementById('hr-pay-all-button');
@@ -15883,11 +16043,14 @@
       const fixedCount = rules.length - percentageCount;
       const minutes = hrWeeklyScheduleMinutes(schedule);
       const weeklyHours = `${Math.floor(minutes / 60)}h${minutes % 60 ? ` ${minutes % 60}m` : ''}`;
+      const settlementSalary = activeHrDoctorDetailsId === doctor?.userId && hrDoctorSettlementRangeKey
+        ? hrDoctorSettlementMetrics().payableAmount
+        : payroll.salary;
       const kpis = [
         ['Working days', schedule.days.length, 'border-rose-200 bg-rose-50/70 text-rose-800'],
         ['Weekly hours', weeklyHours, 'border-blue-200 bg-blue-50/70 text-blue-800'],
         ['Salary procedures', rules.length, 'border-violet-200 bg-violet-50/70 text-violet-800'],
-        ['Month salary', formatInvoiceMoney(payroll.salary), 'border-emerald-200 bg-emerald-50/70 text-emerald-800']
+        ['Selected salary', formatInvoiceMoney(settlementSalary), 'border-emerald-200 bg-emerald-50/70 text-emerald-800']
       ];
       container.innerHTML = kpis.map(([label, value, classes]) => `<div class="rounded-2xl border p-3.5 shadow-xs ${classes}"><span class="text-[9px] font-black uppercase tracking-wider opacity-70">${escapeHtml(label)}</span><p class="mt-2 text-lg font-black">${escapeHtml(String(value))}</p></div>`).join('');
     }
@@ -15925,11 +16088,24 @@
       activeHrStaffDetailsId = null;
       activeHrDayDate = '';
       hrDoctorDetailDraft = null;
+      hrDoctorSettlementCases = [];
+      hrDoctorSettlementRangeKey = '';
+      hrDoctorSettlementRequestToken += 1;
+      hrDoctorSelectedCaseIds = new Set();
       document.getElementById('hr-directory-view')?.classList.add('hidden');
       document.getElementById('hr-staff-detail-view')?.classList.add('hidden');
       document.getElementById('hr-doctor-detail-view')?.classList.remove('hidden');
+      const settlementMonth = document.getElementById('hr-doctor-payroll-month');
+      const settlementDay = document.getElementById('hr-doctor-payroll-day');
+      const settlementScope = document.getElementById('hr-doctor-payroll-scope');
+      if (settlementMonth) settlementMonth.value = currentHrMonth();
+      if (settlementDay) settlementDay.value = hrClinicDateValue();
+      if (settlementScope) settlementScope.value = 'month';
+      document.getElementById('hr-doctor-payroll-month-control')?.classList.remove('hidden');
+      document.getElementById('hr-doctor-payroll-day-control')?.classList.add('hidden');
       renderHrDoctorDetails();
       document.getElementById('view-hr')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      void loadHrDoctorSettlementCases({ refresh: true });
       try {
         await ensureDentalCustomizationLoaded();
         if (activeHrDoctorDetailsId === userId) renderHrDoctorDetails();
@@ -15941,6 +16117,11 @@
     function closeHrDoctorDetails() {
       activeHrDoctorDetailsId = null;
       hrDoctorDetailDraft = null;
+      hrDoctorSettlementCases = [];
+      hrDoctorSettlementRangeKey = '';
+      hrDoctorSettlementLoading = false;
+      hrDoctorSettlementRequestToken += 1;
+      hrDoctorSelectedCaseIds = new Set();
       document.getElementById('hr-doctor-detail-view')?.classList.add('hidden');
       document.getElementById('hr-directory-view')?.classList.remove('hidden');
       setAdminMessage('hr-doctor-detail-message', '');
@@ -16000,6 +16181,8 @@
         hrDoctorPayrollLines = payrollData || [];
         const saved = hrUserSettings(user.userId);
         hrDoctorDetailDraft = { userId: user.userId, schedule: normaliseHrSchedule(saved.schedule), compensation: normaliseHrDoctorCompensation(saved.doctorCompensation) };
+        hrDoctorSettlementRangeKey = '';
+        await loadHrDoctorSettlementCases({ refresh: true });
         renderHrDoctorDetails();
         setAdminMessage('hr-doctor-detail-message', 'Doctor working hours and salary rules saved.');
         showAppointmentNotificationToast('Doctor details saved', `${user.fullName}'s schedule and procedure compensation were updated.`);
@@ -16256,8 +16439,10 @@
         const { user, settings } = item;
         const initials = user.fullName.split(/\s+/).filter(Boolean).map(part => part[0]).join('').substring(0, 2).toUpperCase() || '—';
         const attendanceClass = item.attended >= item.expected ? 'text-emerald-700' : 'text-amber-700';
-        const paymentMarkup = item.paid
-          ? `<span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700"><i data-lucide="circle-check" class="h-3.5 w-3.5"></i>Paid ${escapeHtml(formatInvoiceMoney(item.paid.total_amount))}</span>`
+        const paymentMarkup = user.isDoctor && item.payments?.length
+          ? `<span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700"><i data-lucide="circle-check" class="h-3.5 w-3.5"></i>${item.payments.length} settlement${item.payments.length === 1 ? '' : 's'} · ${escapeHtml(formatInvoiceMoney(item.paidTotal))}</span>`
+          : item.paid
+            ? `<span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700"><i data-lucide="circle-check" class="h-3.5 w-3.5"></i>Paid ${escapeHtml(formatInvoiceMoney(item.paid.total_amount))}</span>`
           : user.isDoctor && item.salary <= 0
             ? '<span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-500">No payable procedures</span>'
             : `<span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-500">Unpaid</span>`;
@@ -16592,31 +16777,39 @@
     }
 
     async function payHrDoctorSalary(userId = activeHrDoctorDetailsId) {
-      if (!canModifyHr() || !userId || hrPayrollPeriod?.status !== 'locked') return false;
+      if (!canModifyHr() || !userId || hrDoctorSettlementLoading) return false;
       const user = hrDirectoryUsers.find(item => item.userId === userId && item.active && item.isDoctor);
       if (!user) return false;
-      const metrics = hrDoctorMetrics(user);
-      if (metrics.paid || metrics.salary <= 0) return false;
-      if (!confirm(`Pay ${formatInvoiceMoney(metrics.salary)} to ${user.fullName} and add it to Finance expenses as Salary?`)) return false;
+      const range = hrDoctorSettlementRange();
+      const metrics = hrDoctorSettlementMetrics();
+      if (!metrics.payableCases.length || metrics.payableAmount <= 0) return false;
+      const findingIds = metrics.scope === 'cases' ? metrics.payableCases.map(item => item.finding_id) : null;
+      const scopeLabel = metrics.scope === 'month' ? 'this month' : metrics.scope === 'day' ? 'this day' : `${metrics.payableCases.length} selected case${metrics.payableCases.length === 1 ? '' : 's'}`;
+      if (!confirm(`Pay ${formatInvoiceMoney(metrics.payableAmount)} to ${user.fullName} for ${scopeLabel} and add one linked Salary expense?`)) return false;
       const button = document.getElementById('hr-doctor-pay-salary');
       if (button) button.disabled = true;
       try {
-        const { error } = await db.rpc('hr_pay_doctor_salary', { p_user_id: userId, p_pay_month: hrMonthBounds().start });
+        const { error } = await db.rpc('hr_pay_doctor_procedures', {
+          p_user_id: userId,
+          p_scope: metrics.scope,
+          p_start_date: range.start,
+          p_end_date: range.end,
+          p_finding_ids: findingIds
+        });
         if (error) throw error;
         financeExpensesLoaded = false;
         financeOverviewLoaded = false;
         incomeStatementLoadedRange = '';
         hrDirectoryLoaded = false;
         await refreshHrDirectory({ refresh: true });
-        try {
-          const { data, error: finalizeError } = await db.rpc('hr_finalize_payroll_period', { p_pay_month: hrMonthBounds().start });
-          if (!finalizeError) hrPayrollPeriod = Array.isArray(data) ? data[0] : data;
-        } catch (_) {}
-        renderHrDirectory();
-        showAppointmentNotificationToast('Doctor salary paid', `A Salary expense for ${user.fullName} was added to Finances.`);
+        hrDoctorSelectedCaseIds = new Set();
+        hrDoctorSettlementRangeKey = '';
+        await loadHrDoctorSettlementCases({ refresh: true });
+        if (activeHrDoctorDetailsId === userId) renderHrDoctorDetails();
+        showAppointmentNotificationToast('Doctor cases paid', `${metrics.payableCases.length} case${metrics.payableCases.length === 1 ? '' : 's'} settled for ${user.fullName}.`);
         return true;
       } catch (error) {
-        alert('Could not pay doctor salary: ' + (error?.message || 'Unknown error'));
+        alert('Could not settle doctor cases: ' + (error?.message || 'Unknown error'));
         return false;
       } finally {
         if (button?.isConnected) button.disabled = false;
@@ -18984,6 +19177,7 @@
 
     function normaliseExpenseRecord(record) {
       const relatedType = Array.isArray(record.expense_types) ? record.expense_types[0] : record.expense_types;
+      const relatedSalaryPayment = Array.isArray(record.salary_payment) ? record.salary_payment[0] : record.salary_payment;
       const total = Math.max(0, Number(record.total) || 0);
       const legacyPaidAmount = record.paid === true ? total : 0;
       const paidAmount = Math.min(total, Math.max(0, Number(record.paid_amount ?? legacyPaidAmount) || 0));
@@ -19000,7 +19194,9 @@
         paid: total > 0 && paidAmount >= total - 0.005,
         createdAt: record.created_at,
         updatedAt: record.updated_at,
-        type: relatedType ? normaliseExpenseType(relatedType) : null
+        type: relatedType ? normaliseExpenseType(relatedType) : null,
+        salaryPayment: relatedSalaryPayment || null,
+        linkedDoctorSalary: Boolean(relatedSalaryPayment && String(relatedSalaryPayment.payment_kind || '').startsWith('doctor_'))
       };
     }
 
@@ -19016,7 +19212,13 @@
         if (batch.length < batchSize) break;
         offset += batchSize;
       }
-      return records.map(normaliseExpenseRecord);
+      let doctorSalaryByExpenseId = new Map();
+      if (canModifyHr()) {
+        const { data, error } = await db.from('hr_salary_payments').select('id, expense_id, user_id, payment_kind, scope_start, scope_end, case_count').in('payment_kind', ['doctor_month', 'doctor_day', 'doctor_cases']);
+        if (error) throw error;
+        doctorSalaryByExpenseId = new Map((data || []).map(payment => [String(payment.expense_id), payment]));
+      }
+      return records.map(record => normaliseExpenseRecord({ ...record, salary_payment: doctorSalaryByExpenseId.get(String(record.id)) || null }));
     }
 
     function clearFinanceExpenseFilters() {
@@ -19072,6 +19274,11 @@
       const payButton = remaining > 0.005
         ? '<button type="button" onclick="openExpensePaymentModal(\'' + escapeHtml(expense.id) + '\')" class="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[10px] font-black text-white shadow-sm transition hover:bg-emerald-700"><i data-lucide="badge-dollar-sign" class="h-3.5 w-3.5"></i> Pay</button>'
         : '<span class="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-[10px] font-black text-emerald-700"><i data-lucide="circle-check" class="h-3.5 w-3.5"></i> Paid</span>';
+      const actionButton = expense.linkedDoctorSalary
+        ? canModifyHr()
+          ? `<button type="button" onclick="deleteDoctorSalaryExpense('${escapeHtml(expense.id)}')" class="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-black text-red-700 transition hover:bg-red-100"><i data-lucide="unlock" class="h-3.5 w-3.5"></i> Delete & reopen</button>`
+          : '<span class="text-[10px] font-bold text-slate-400">Linked salary</span>'
+        : `<button type="button" onclick="openExpenseModal('${escapeHtml(expense.id)}')" class="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[10px] font-black text-blue-700 transition hover:bg-blue-100"><i data-lucide="pencil" class="h-3.5 w-3.5"></i> Edit</button>`;
       return `
         <tr class="transition hover:bg-emerald-50/25">
           <td data-label="Expense" class="px-5 py-4"><span class="block font-black text-slate-800">${escapeHtml(expense.name)}</span><span class="mt-1 block font-mono text-[9px] font-bold uppercase tracking-wider text-slate-400">${escapeHtml(String(expense.id).slice(0, 8))} · Qty ${escapeHtml(quantityLabel)}</span></td>
@@ -19083,9 +19290,32 @@
           <td data-label="Payment" class="px-5 py-4"><span class="inline-flex items-center gap-2">${expensePaymentIndicatorMarkup(expense)}${payButton}</span></td>
           <td data-label="Confirmed" class="px-5 py-4"><span class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-black ${expense.confirmed ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'}"><i data-lucide="${expense.confirmed ? 'badge-check' : 'circle-dashed'}" class="h-3.5 w-3.5"></i>${expense.confirmed ? 'Confirmed' : 'Not confirmed'}</span></td>
           <td data-label="Description" class="max-w-[260px] px-5 py-4 text-[11px] font-semibold leading-5 text-slate-500">${expense.description ? escapeHtml(expense.description) : '<span class="text-slate-300">—</span>'}</td>
-          <td data-label="Actions" class="px-5 py-4 text-right"><button type="button" onclick="openExpenseModal('${escapeHtml(expense.id)}')" class="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[10px] font-black text-blue-700 transition hover:bg-blue-100"><i data-lucide="pencil" class="h-3.5 w-3.5"></i> Edit</button></td>
+          <td data-label="Actions" class="px-5 py-4 text-right">${actionButton}</td>
         </tr>
       `;
+    }
+
+    async function deleteDoctorSalaryExpense(expenseId) {
+      if (!hasPageAccess('finances') || !canModifyHr()) return false;
+      const expense = financeExpenses.find(item => String(item.id) === String(expenseId));
+      if (!expense?.linkedDoctorSalary) return false;
+      const caseCount = Number(expense.salaryPayment?.case_count || 0);
+      if (!confirm(`Delete ${expense.name} (${formatInvoiceMoney(expense.total)})? This will undo the doctor payment and reopen ${caseCount} case${caseCount === 1 ? '' : 's'} for salary review.`)) return false;
+      try {
+        const { data, error } = await db.rpc('delete_doctor_salary_expense', { p_expense_id: expense.id });
+        if (error) throw error;
+        const result = Array.isArray(data) ? data[0] : data;
+        financeExpensesLoaded = false;
+        financeOverviewLoaded = false;
+        incomeStatementLoadedRange = '';
+        hrDirectoryLoaded = false;
+        await Promise.all([renderFinanceOverview({ refresh: true }), renderFinanceExpenses({ refresh: true })]);
+        showAppointmentNotificationToast('Doctor salary reopened', `${Number(result?.released_case_count || caseCount)} case${Number(result?.released_case_count || caseCount) === 1 ? '' : 's'} released for review.`);
+        return true;
+      } catch (error) {
+        alert('Could not delete the doctor salary expense: ' + (error?.message || 'Unknown error'));
+        return false;
+      }
     }
 
     function renderFinanceExpenseRows() {
