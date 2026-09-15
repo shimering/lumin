@@ -3712,8 +3712,10 @@
             </section>
 
             <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-              <div class="border-b border-slate-100 p-4 sm:p-5"><h3 class="flex items-center gap-2 text-sm font-black text-slate-800"><i data-lucide="badge-dollar-sign" class="h-4 w-4 text-violet-600"></i> Salary by dental procedure</h3><p class="mt-1 text-[11px] font-bold text-slate-400">Select procedures and pay this doctor either a percentage of the procedure price or a fixed EGP amount.</p></div>
+              <div class="border-b border-slate-100 p-4 sm:p-5"><h3 class="flex items-center gap-2 text-sm font-black text-slate-800"><i data-lucide="badge-dollar-sign" class="h-4 w-4 text-violet-600"></i> Salary by dental procedure</h3><p class="mt-1 text-[11px] font-bold text-slate-400">Set a universal fallback for unlisted procedures, then add any procedure-specific exceptions.</p></div>
+              <div id="hr-doctor-universal-compensation" class="border-b border-violet-100 bg-violet-50/40 p-4 sm:p-5"></div>
               <div id="hr-doctor-compensation-builder" class="space-y-3 border-b border-slate-100 bg-slate-50/60 p-4 sm:p-5">
+                <div><h4 class="text-xs font-black text-slate-700">Procedure-specific rules</h4><p class="mt-1 text-[10px] font-bold text-slate-400">A listed procedure always overrides the universal payment method.</p></div>
                 <div class="grid gap-3 sm:grid-cols-2"><label><span class="mb-1.5 block text-xs font-bold text-slate-600">Dental procedure</span><select id="hr-doctor-procedure-select" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20"><option value="">Loading procedures...</option></select></label><label><span class="mb-1.5 block text-xs font-bold text-slate-600">Salary method</span><select id="hr-doctor-compensation-type" onchange="updateHrDoctorCompensationBuilder()" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20"><option value="percentage">Percentage of procedure price</option><option value="fixed">Fixed amount per procedure</option></select></label></div>
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-end"><label class="min-w-0 flex-1"><span id="hr-doctor-compensation-value-label" class="mb-1.5 block text-xs font-bold text-slate-600">Percentage (%)</span><input id="hr-doctor-compensation-value" type="number" min="0.01" max="100" step="0.01" inputmode="decimal" placeholder="e.g. 30" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-black text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20" /></label><button id="hr-doctor-add-compensation" type="button" onclick="addHrDoctorCompensationRule()" class="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-black text-white hover:bg-violet-700"><i data-lucide="plus" class="h-4 w-4"></i> Add procedure</button></div>
               </div>
@@ -13002,6 +13004,12 @@
 
     function normaliseHrDoctorCompensation(value) {
       const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+      const universalSource = source.universal && typeof source.universal === 'object' && !Array.isArray(source.universal)
+        ? source.universal
+        : source.fallback && typeof source.fallback === 'object' && !Array.isArray(source.fallback)
+          ? source.fallback
+          : {};
+      const universalAmount = Number(universalSource.amount ?? universalSource.value);
       const seen = new Set();
       const rules = (Array.isArray(source.rules) ? source.rules : []).map(rule => {
         const procedureId = String(rule?.procedureId || rule?.procedure_id || '').trim();
@@ -13017,7 +13025,14 @@
           amount: Math.round(amount * 100) / 100
         };
       }).filter(Boolean);
-      return { rules };
+      return {
+        rules,
+        universal: {
+          enabled: universalSource.enabled === true,
+          type: universalSource.type === 'fixed' ? 'fixed' : 'percentage',
+          amount: Number.isFinite(universalAmount) && universalAmount > 0 ? Math.round(universalAmount * 100) / 100 : 0
+        }
+      };
     }
 
     function normaliseHrSchedule(value) {
@@ -15919,11 +15934,14 @@
     }
 
     function hrDoctorCompensationSummary(userId) {
-      const rules = hrUserSettings(userId).doctorCompensation.rules;
-      if (!rules.length) return 'No salary rules';
+      const compensation = hrUserSettings(userId).doctorCompensation;
+      const rules = compensation.rules;
+      if (!rules.length && !compensation.universal.enabled) return 'No salary rules';
       const percentageCount = rules.filter(rule => rule.type === 'percentage').length;
       const fixedCount = rules.length - percentageCount;
-      return `${rules.length} procedure${rules.length === 1 ? '' : 's'} · ${[percentageCount ? `${percentageCount} percentage` : '', fixedCount ? `${fixedCount} fixed` : ''].filter(Boolean).join(' · ')}`;
+      const specificSummary = rules.length ? `${rules.length} procedure${rules.length === 1 ? '' : 's'} · ${[percentageCount ? `${percentageCount} percentage` : '', fixedCount ? `${fixedCount} fixed` : ''].filter(Boolean).join(' · ')}` : 'No procedure exceptions';
+      const universalSummary = compensation.universal.enabled ? `Universal ${compensation.universal.type === 'fixed' ? 'fixed' : 'percentage'}` : 'No universal rule';
+      return `${specificSummary} · ${universalSummary}`;
     }
 
     function handleHrDoctorCardKeydown(event, userId) {
@@ -15989,6 +16007,39 @@
       }
     }
 
+    function updateHrDoctorUniversalCompensation(field, value) {
+      const universal = hrDoctorDetailDraft?.compensation?.universal;
+      if (!universal || !canModifyHr()) return;
+      if (field === 'enabled') {
+        universal.enabled = Boolean(value);
+      } else if (field === 'type') {
+        universal.type = value === 'fixed' ? 'fixed' : 'percentage';
+        if (universal.type === 'percentage' && Number(universal.amount) > 100) universal.amount = 100;
+      } else if (field === 'amount') {
+        universal.amount = Number(value);
+        return;
+      }
+      renderHrDoctorUniversalCompensation();
+      renderHrDoctorDetailKpis();
+    }
+
+    function renderHrDoctorUniversalCompensation() {
+      const container = document.getElementById('hr-doctor-universal-compensation');
+      const universal = hrDoctorDetailDraft?.compensation?.universal;
+      if (!container || !universal) return;
+      const editable = canModifyHr();
+      const enabled = Boolean(universal.enabled);
+      const type = universal.type === 'fixed' ? 'fixed' : 'percentage';
+      const amount = Number(universal.amount || 0);
+      const explanation = enabled
+        ? type === 'fixed'
+          ? `${formatInvoiceMoney(amount)} per completed procedure that has no specific rule.`
+          : `${amount || 0}% of every completed procedure that has no specific rule.`
+        : 'Only procedures listed below will generate procedure-based salary.';
+      container.innerHTML = `<article class="rounded-2xl border ${enabled ? 'border-violet-300 bg-white shadow-xs' : 'border-slate-200 bg-white/70'} p-4"><div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><div class="flex items-center gap-2"><span class="flex h-8 w-8 items-center justify-center rounded-xl ${enabled ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-400'}"><i data-lucide="globe-2" class="h-4 w-4"></i></span><div><h4 class="text-xs font-black text-slate-800">Universal payment method</h4><p class="mt-0.5 text-[10px] font-bold text-slate-400">Fallback for procedures not added to the list.</p></div></div></div><label class="inline-flex items-center gap-2 text-xs font-black ${editable ? 'cursor-pointer' : 'cursor-default'} ${enabled ? 'text-violet-700' : 'text-slate-500'}"><input type="checkbox" ${enabled ? 'checked' : ''} ${editable ? '' : 'disabled'} onchange="updateHrDoctorUniversalCompensation('enabled',this.checked)" class="h-4 w-4 accent-violet-600" /> Enable universal rule</label></div><div class="mt-4 grid gap-3 sm:grid-cols-2 ${enabled ? '' : 'opacity-55'}"><label><span class="mb-1 block text-[9px] font-black uppercase tracking-wider text-slate-400">Method</span><select onchange="updateHrDoctorUniversalCompensation('type',this.value)" ${enabled && editable ? '' : 'disabled'} class="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold disabled:bg-slate-100"><option value="percentage" ${type === 'percentage' ? 'selected' : ''}>Percentage of procedure price</option><option value="fixed" ${type === 'fixed' ? 'selected' : ''}>Fixed EGP per procedure</option></select></label><label><span class="mb-1 block text-[9px] font-black uppercase tracking-wider text-slate-400">${type === 'fixed' ? 'Amount (EGP)' : 'Percentage (%)'}</span><input type="number" min="0.01" ${type === 'percentage' ? 'max="100"' : ''} step="0.01" value="${escapeHtml(amount || '')}" placeholder="${type === 'fixed' ? 'e.g. 500' : 'e.g. 30'}" oninput="updateHrDoctorUniversalCompensation('amount',this.value)" ${enabled && editable ? '' : 'disabled'} class="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-black disabled:bg-slate-100" /></label></div><p class="mt-3 rounded-lg ${enabled ? 'bg-violet-50 text-violet-700' : 'bg-slate-50 text-slate-500'} px-3 py-2 text-[10px] font-bold">${escapeHtml(explanation)} Specific procedure rules always take priority.</p></article>`;
+      lucide.createIcons();
+    }
+
     function updateHrDoctorCompensationRule(index, field, value) {
       const rule = hrDoctorDetailDraft?.compensation?.rules?.[Number(index)];
       if (!rule || !canModifyHr()) return;
@@ -16049,6 +16100,7 @@
       const payroll = doctor ? hrDoctorMetrics(doctor) : { salary: 0 };
       const schedule = normaliseHrSchedule(hrDoctorDetailDraft.schedule);
       const rules = hrDoctorDetailDraft.compensation.rules;
+      const universal = hrDoctorDetailDraft.compensation.universal;
       const percentageCount = rules.filter(rule => rule.type === 'percentage').length;
       const fixedCount = rules.length - percentageCount;
       const minutes = hrWeeklyScheduleMinutes(schedule);
@@ -16059,7 +16111,7 @@
       const kpis = [
         ['Working days', schedule.days.length, 'border-rose-200 bg-rose-50/70 text-rose-800'],
         ['Weekly hours', weeklyHours, 'border-blue-200 bg-blue-50/70 text-blue-800'],
-        ['Salary procedures', rules.length, 'border-violet-200 bg-violet-50/70 text-violet-800'],
+        ['Salary rules', rules.length + (universal.enabled ? 1 : 0), 'border-violet-200 bg-violet-50/70 text-violet-800'],
         ['Selected salary', formatInvoiceMoney(settlementSalary), 'border-emerald-200 bg-emerald-50/70 text-emerald-800']
       ];
       container.innerHTML = kpis.map(([label, value, classes]) => `<div class="rounded-2xl border p-3.5 shadow-xs ${classes}"><span class="text-[9px] font-black uppercase tracking-wider opacity-70">${escapeHtml(label)}</span><p class="mt-2 text-lg font-black">${escapeHtml(String(value))}</p></div>`).join('');
@@ -16111,6 +16163,7 @@
       renderHrDoctorScheduleEditor(hrDoctorDetailDraft.schedule);
       renderHrDoctorDetailKpis(user);
       renderHrDoctorPayroll(user);
+      renderHrDoctorUniversalCompensation();
       renderHrDoctorCompensationRules();
       updateHrDoctorCompensationBuilder();
       renderHrDoctorDetailTabs();
@@ -16193,6 +16246,10 @@
       let compensation;
       try {
         schedule = readHrDoctorScheduleEditor();
+        const universal = hrDoctorDetailDraft.compensation.universal;
+        if (universal.enabled && (!Number.isFinite(Number(universal.amount)) || Number(universal.amount) <= 0 || (universal.type === 'percentage' && Number(universal.amount) > 100))) {
+          throw new Error(universal.type === 'percentage' ? 'Enter a universal percentage greater than 0 and no more than 100.' : 'Enter a universal fixed amount greater than 0.');
+        }
         compensation = normaliseHrDoctorCompensation(hrDoctorDetailDraft.compensation);
         if (compensation.rules.length !== hrDoctorDetailDraft.compensation.rules.length) throw new Error('Every salary rule needs a valid amount. Percentages must be between 0 and 100.');
       } catch (error) {
