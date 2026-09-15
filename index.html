@@ -3676,14 +3676,15 @@
           </div>
           <div class="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
             <div class="flex min-w-0 items-center gap-3"><span id="hr-doctor-detail-avatar" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-100 text-xs font-black text-cyan-700">--</span><div class="min-w-0"><p id="hr-doctor-detail-role" class="truncate text-xs font-black text-slate-700"></p><p class="mt-1 text-[10px] font-bold text-slate-400">Working schedule and procedure compensation</p></div></div>
-            <button id="hr-doctor-detail-save" type="button" onclick="saveHrDoctorDetails()" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-black text-white shadow-sm hover:bg-rose-700 disabled:cursor-wait disabled:opacity-60"><i data-lucide="save" class="h-4 w-4"></i> Save doctor details</button>
           </div>
+          <div class="border-t border-slate-100 px-3 pt-3 sm:px-4"><div role="tablist" aria-label="Doctor detail sections" class="inline-flex rounded-xl bg-slate-100 p-1"><button id="hr-doctor-detail-tab-salary" type="button" role="tab" aria-controls="hr-doctor-salary-tab-panel" aria-selected="true" onclick="switchHrDoctorDetailTab('salary')" class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-white px-4 py-2 text-xs font-black text-cyan-700 shadow-xs"><i data-lucide="wallet-cards" class="h-4 w-4"></i> Salary</button><button id="hr-doctor-detail-tab-configure" type="button" role="tab" aria-controls="hr-doctor-configure-tab-panel" aria-selected="false" onclick="switchHrDoctorDetailTab('configure')" class="inline-flex min-h-10 items-center gap-2 rounded-lg px-4 py-2 text-xs font-black text-slate-500"><i data-lucide="sliders-horizontal" class="h-4 w-4"></i> Configure</button></div></div>
           <div class="px-4 pb-4"><p id="hr-doctor-detail-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="status"></p></div>
         </div>
 
-        <div id="hr-doctor-detail-kpis" class="grid grid-cols-2 gap-3 lg:grid-cols-4"></div>
+        <div id="hr-doctor-salary-tab-panel" role="tabpanel" aria-labelledby="hr-doctor-detail-tab-salary" class="space-y-5">
+          <div id="hr-doctor-detail-kpis" class="grid grid-cols-2 gap-3 lg:grid-cols-4"></div>
 
-        <section class="overflow-hidden rounded-2xl border border-cyan-200 bg-white shadow-xs">
+          <section class="overflow-hidden rounded-2xl border border-cyan-200 bg-white shadow-xs">
           <div class="border-b border-cyan-100 bg-cyan-50/55 p-4 sm:p-5">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div><h3 class="flex items-center gap-2 text-sm font-black text-slate-800"><i data-lucide="calculator" class="h-4 w-4 text-cyan-700"></i> Procedure salary review</h3><p id="hr-doctor-payroll-month-label" class="mt-1 text-[11px] font-bold text-slate-500">Review and settle completed cases without locking monthly payroll.</p></div>
@@ -3699,22 +3700,26 @@
           <div class="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-3 sm:p-5"><div class="rounded-xl bg-slate-50 p-3"><span class="text-[9px] font-black uppercase tracking-wider text-slate-400">Cases in review</span><p id="hr-doctor-procedure-count" class="mt-1.5 text-lg font-black text-slate-900">0</p></div><div class="rounded-xl bg-blue-50 p-3"><span class="text-[9px] font-black uppercase tracking-wider text-blue-500">Procedure value</span><p id="hr-doctor-procedure-value" class="mt-1.5 text-lg font-black text-blue-800">EGP 0</p></div><div class="rounded-xl bg-emerald-50 p-3"><span class="text-[9px] font-black uppercase tracking-wider text-emerald-600">Salary to pay</span><p id="hr-doctor-calculated-salary" class="mt-1.5 text-lg font-black text-emerald-800">EGP 0</p></div></div>
           <div class="mobile-scroll-region overflow-x-auto"><table class="w-full min-w-[980px] text-left text-xs"><thead class="border-b border-slate-100 bg-slate-50/70 text-[9px] font-black uppercase tracking-wider text-slate-400"><tr><th class="w-12 px-4 py-3"><span class="sr-only">Select</span></th><th class="px-4 py-3">Completed</th><th class="px-4 py-3">Patient</th><th class="px-4 py-3">Procedure</th><th class="px-4 py-3">Procedure value</th><th class="px-4 py-3">Rule</th><th class="px-4 py-3 text-right">Doctor salary</th><th class="px-4 py-3">Status</th></tr></thead><tbody id="hr-doctor-payroll-lines" class="divide-y divide-slate-100 font-semibold text-slate-600"><tr><td colspan="8" class="px-5 py-10 text-center text-xs font-bold text-slate-400">Loading completed cases...</td></tr></tbody></table></div>
           <p class="border-t border-cyan-100 bg-cyan-50/40 px-4 py-3 text-[10px] font-bold leading-5 text-cyan-800 sm:px-5">Each payment creates one linked Salary expense. Delete that expense in Finances to undo the settlement and release its cases for review again.</p>
-        </section>
-
-        <div class="grid gap-5 xl:grid-cols-2">
-          <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-            <div class="border-b border-slate-100 p-4 sm:p-5"><h3 class="flex items-center gap-2 text-sm font-black text-slate-800"><i data-lucide="calendar-clock" class="h-4 w-4 text-rose-600"></i> Working hours and days</h3><p class="mt-1 text-[11px] font-bold text-slate-400">Choose every regular working day and set its individual start and end time.</p></div>
-            <div id="hr-doctor-weekdays" class="space-y-2 p-4 sm:p-5"></div>
           </section>
+        </div>
 
-          <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-            <div class="border-b border-slate-100 p-4 sm:p-5"><h3 class="flex items-center gap-2 text-sm font-black text-slate-800"><i data-lucide="badge-dollar-sign" class="h-4 w-4 text-violet-600"></i> Salary by dental procedure</h3><p class="mt-1 text-[11px] font-bold text-slate-400">Select procedures and pay this doctor either a percentage of the procedure price or a fixed EGP amount.</p></div>
-            <div id="hr-doctor-compensation-builder" class="space-y-3 border-b border-slate-100 bg-slate-50/60 p-4 sm:p-5">
-              <div class="grid gap-3 sm:grid-cols-2"><label><span class="mb-1.5 block text-xs font-bold text-slate-600">Dental procedure</span><select id="hr-doctor-procedure-select" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20"><option value="">Loading procedures...</option></select></label><label><span class="mb-1.5 block text-xs font-bold text-slate-600">Salary method</span><select id="hr-doctor-compensation-type" onchange="updateHrDoctorCompensationBuilder()" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20"><option value="percentage">Percentage of procedure price</option><option value="fixed">Fixed amount per procedure</option></select></label></div>
-              <div class="flex flex-col gap-3 sm:flex-row sm:items-end"><label class="min-w-0 flex-1"><span id="hr-doctor-compensation-value-label" class="mb-1.5 block text-xs font-bold text-slate-600">Percentage (%)</span><input id="hr-doctor-compensation-value" type="number" min="0.01" max="100" step="0.01" inputmode="decimal" placeholder="e.g. 30" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-black text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20" /></label><button id="hr-doctor-add-compensation" type="button" onclick="addHrDoctorCompensationRule()" class="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-black text-white hover:bg-violet-700"><i data-lucide="plus" class="h-4 w-4"></i> Add procedure</button></div>
-            </div>
-            <div id="hr-doctor-compensation-rules" class="space-y-3 p-4 sm:p-5"></div>
-          </section>
+        <div id="hr-doctor-configure-tab-panel" role="tabpanel" aria-labelledby="hr-doctor-detail-tab-configure" class="hidden space-y-5">
+          <div class="flex flex-col gap-3 rounded-2xl border border-rose-200 bg-white p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between sm:p-5"><div><h3 class="flex items-center gap-2 text-sm font-black text-slate-800"><i data-lucide="settings-2" class="h-4 w-4 text-rose-600"></i> Configure doctor details</h3><p class="mt-1 text-[11px] font-bold text-slate-400">Update this doctor's working schedule and procedure compensation rules.</p></div><button id="hr-doctor-detail-save" type="button" onclick="saveHrDoctorDetails()" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-black text-white shadow-sm hover:bg-rose-700 disabled:cursor-wait disabled:opacity-60"><i data-lucide="save" class="h-4 w-4"></i> Save doctor details</button></div>
+          <div class="grid gap-5 xl:grid-cols-2">
+            <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+              <div class="border-b border-slate-100 p-4 sm:p-5"><h3 class="flex items-center gap-2 text-sm font-black text-slate-800"><i data-lucide="calendar-clock" class="h-4 w-4 text-rose-600"></i> Working hours and days</h3><p class="mt-1 text-[11px] font-bold text-slate-400">Choose every regular working day and set its individual start and end time.</p></div>
+              <div id="hr-doctor-weekdays" class="space-y-2 p-4 sm:p-5"></div>
+            </section>
+
+            <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+              <div class="border-b border-slate-100 p-4 sm:p-5"><h3 class="flex items-center gap-2 text-sm font-black text-slate-800"><i data-lucide="badge-dollar-sign" class="h-4 w-4 text-violet-600"></i> Salary by dental procedure</h3><p class="mt-1 text-[11px] font-bold text-slate-400">Select procedures and pay this doctor either a percentage of the procedure price or a fixed EGP amount.</p></div>
+              <div id="hr-doctor-compensation-builder" class="space-y-3 border-b border-slate-100 bg-slate-50/60 p-4 sm:p-5">
+                <div class="grid gap-3 sm:grid-cols-2"><label><span class="mb-1.5 block text-xs font-bold text-slate-600">Dental procedure</span><select id="hr-doctor-procedure-select" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20"><option value="">Loading procedures...</option></select></label><label><span class="mb-1.5 block text-xs font-bold text-slate-600">Salary method</span><select id="hr-doctor-compensation-type" onchange="updateHrDoctorCompensationBuilder()" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20"><option value="percentage">Percentage of procedure price</option><option value="fixed">Fixed amount per procedure</option></select></label></div>
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-end"><label class="min-w-0 flex-1"><span id="hr-doctor-compensation-value-label" class="mb-1.5 block text-xs font-bold text-slate-600">Percentage (%)</span><input id="hr-doctor-compensation-value" type="number" min="0.01" max="100" step="0.01" inputmode="decimal" placeholder="e.g. 30" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-black text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20" /></label><button id="hr-doctor-add-compensation" type="button" onclick="addHrDoctorCompensationRule()" class="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-black text-white hover:bg-violet-700"><i data-lucide="plus" class="h-4 w-4"></i> Add procedure</button></div>
+              </div>
+              <div id="hr-doctor-compensation-rules" class="space-y-3 p-4 sm:p-5"></div>
+            </section>
+          </div>
         </div>
       </div>
     </section>
@@ -6566,6 +6571,7 @@
     let implantPageSize = 20;
     let activeHrStaffDetailsId = null;
     let activeHrDoctorDetailsId = null;
+    let activeHrDoctorDetailTab = 'salary';
     let hrDoctorDetailDraft = null;
     let activeHrDayDate = '';
     let clinicAttendanceSettings = {
@@ -8725,6 +8731,7 @@
         hrRoleFilter = 'all';
         activeHrStaffDetailsId = null;
         activeHrDoctorDetailsId = null;
+        activeHrDoctorDetailTab = 'salary';
         hrDoctorDetailDraft = null;
         activeHrDayDate = '';
         myHrStaffSettings = null;
@@ -8875,6 +8882,7 @@
         hrLoadedMonth = '';
         activeHrStaffDetailsId = null;
         activeHrDoctorDetailsId = null;
+        activeHrDoctorDetailTab = 'salary';
         hrDoctorDetailDraft = null;
         activeHrDayDate = '';
         attendanceStateLoadPromise = null;
@@ -16055,6 +16063,31 @@
       container.innerHTML = kpis.map(([label, value, classes]) => `<div class="rounded-2xl border p-3.5 shadow-xs ${classes}"><span class="text-[9px] font-black uppercase tracking-wider opacity-70">${escapeHtml(label)}</span><p class="mt-2 text-lg font-black">${escapeHtml(String(value))}</p></div>`).join('');
     }
 
+    function renderHrDoctorDetailTabs() {
+      const salaryActive = activeHrDoctorDetailTab !== 'configure';
+      const salaryTab = document.getElementById('hr-doctor-detail-tab-salary');
+      const configureTab = document.getElementById('hr-doctor-detail-tab-configure');
+      const baseClass = 'inline-flex min-h-10 items-center gap-2 rounded-lg px-4 py-2 text-xs font-black';
+      if (salaryTab) {
+        salaryTab.className = `${baseClass} ${salaryActive ? 'bg-white text-cyan-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`;
+        salaryTab.setAttribute('aria-selected', String(salaryActive));
+        salaryTab.tabIndex = salaryActive ? 0 : -1;
+      }
+      if (configureTab) {
+        configureTab.className = `${baseClass} ${salaryActive ? 'text-slate-500 hover:text-slate-800' : 'bg-white text-rose-700 shadow-xs'}`;
+        configureTab.setAttribute('aria-selected', String(!salaryActive));
+        configureTab.tabIndex = salaryActive ? -1 : 0;
+      }
+      document.getElementById('hr-doctor-salary-tab-panel')?.classList.toggle('hidden', !salaryActive);
+      document.getElementById('hr-doctor-configure-tab-panel')?.classList.toggle('hidden', salaryActive);
+    }
+
+    function switchHrDoctorDetailTab(tabName) {
+      activeHrDoctorDetailTab = tabName === 'configure' ? 'configure' : 'salary';
+      renderHrDoctorDetailTabs();
+      lucide.createIcons();
+    }
+
     function renderHrDoctorDetails() {
       if (!activeHrDoctorDetailsId) return;
       const user = hrDirectoryUsers.find(item => item.userId === activeHrDoctorDetailsId && item.active && item.isDoctor);
@@ -16078,6 +16111,7 @@
       renderHrDoctorPayroll(user);
       renderHrDoctorCompensationRules();
       updateHrDoctorCompensationBuilder();
+      renderHrDoctorDetailTabs();
       lucide.createIcons();
     }
 
@@ -16087,6 +16121,7 @@
       activeHrDoctorDetailsId = userId;
       activeHrStaffDetailsId = null;
       activeHrDayDate = '';
+      activeHrDoctorDetailTab = 'salary';
       hrDoctorDetailDraft = null;
       hrDoctorSettlementCases = [];
       hrDoctorSettlementRangeKey = '';
@@ -16116,6 +16151,7 @@
 
     function closeHrDoctorDetails() {
       activeHrDoctorDetailsId = null;
+      activeHrDoctorDetailTab = 'salary';
       hrDoctorDetailDraft = null;
       hrDoctorSettlementCases = [];
       hrDoctorSettlementRangeKey = '';
