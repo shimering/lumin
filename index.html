@@ -4375,8 +4375,8 @@
         <button id="admin-tab-access" type="button" role="tab" aria-selected="true" aria-controls="admin-panel-access" onclick="switchAdminTab('access')" class="inline-flex shrink-0 items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white transition">
           <i data-lucide="users-round" class="h-4 w-4"></i> Users &amp; access
         </button>
-        <button id="admin-tab-templates" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-templates" onclick="switchAdminTab('templates')" class="inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black text-slate-500 transition hover:bg-slate-100 hover:text-slate-800">
-          <i data-lucide="message-square-text" class="h-4 w-4"></i> Templates
+        <button id="admin-tab-whatsapp" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-templates" onclick="switchAdminTab('whatsapp')" class="inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black text-slate-500 transition hover:bg-slate-100 hover:text-slate-800">
+          <i data-lucide="message-circle" class="h-4 w-4"></i> WhatsApp
         </button>
         <button id="admin-tab-print-forms" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-print-forms" onclick="switchAdminTab('print-forms')" class="inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black text-slate-500 transition hover:bg-slate-100 hover:text-slate-800">
           <i data-lucide="printer-check" class="h-4 w-4"></i> Print forms
@@ -4655,7 +4655,79 @@
         </section>
       </div>
 
-      <div id="admin-panel-templates" role="tabpanel" aria-labelledby="admin-tab-templates" class="hidden space-y-6">
+      <div id="admin-panel-templates" role="tabpanel" aria-labelledby="admin-tab-whatsapp" class="hidden space-y-6">
+        <!-- ================= WHATSAPP DISPATCH & CLOUD API CARD ================= -->
+        <div class="rounded-2xl border border-emerald-200 bg-gradient-to-br from-white via-white to-emerald-50/50 p-5 sm:p-6 shadow-xs space-y-5">
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-emerald-100/80 pb-5">
+            <div class="flex items-start gap-3.5">
+              <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-sm shadow-emerald-600/20">
+                <i data-lucide="message-circle" class="h-5 w-5"></i>
+              </span>
+              <div>
+                <div class="flex flex-wrap items-center gap-2.5">
+                  <h3 class="text-base sm:text-lg font-black text-slate-900">WhatsApp Dispatch Mode</h3>
+                  <span id="admin-whatsapp-dispatch-status-badge" class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-black text-emerald-800">
+                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Internal (Cloud API Active)
+                  </span>
+                </div>
+                <p class="mt-1 text-xs leading-relaxed text-slate-500 max-w-2xl">
+                  Choose how WhatsApp buttons on appointment cards and patient actions operate across the clinic. You can send messages directly via Meta Cloud API or open the external WhatsApp application.
+                </p>
+              </div>
+            </div>
+            <div class="flex shrink-0 items-center gap-2">
+              <button type="button" onclick="openWhatsAppSettingsModal()" class="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3.5 py-2.5 text-xs font-black text-emerald-800 shadow-xs transition hover:bg-emerald-50 hover:border-emerald-300">
+                <i data-lucide="bot" class="h-4 w-4 text-emerald-600"></i>
+                <span>API &amp; AI Setup</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Dispatch Mode Selection Cards -->
+          <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+            <!-- Option 1: Internal (Cloud API & In-App Chat) -->
+            <label id="admin-whatsapp-mode-internal" onclick="setAdminWhatsAppDispatchMode('cloud_api')" class="group relative flex cursor-pointer flex-col justify-between rounded-xl border-2 border-emerald-500 bg-emerald-50/70 p-4 transition hover:shadow-xs">
+              <div class="flex items-start justify-between gap-3">
+                <div class="flex items-center gap-3">
+                  <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-xs">
+                    <i data-lucide="zap" class="h-4 w-4"></i>
+                  </span>
+                  <div>
+                    <span class="inline-flex items-center gap-1.5 text-sm font-black text-slate-900">
+                      Internal (Cloud API &amp; In-App Chat)
+                      <span class="rounded bg-emerald-200/80 px-1.5 py-0.2 text-[10px] font-black text-emerald-900 uppercase">Recommended</span>
+                    </span>
+                    <span class="block text-[11px] font-medium text-slate-500 mt-0.5">Automated direct delivery</span>
+                  </div>
+                </div>
+                <input type="radio" name="admin_whatsapp_dispatch_mode" id="whatsapp-dispatch-radio-cloud" value="cloud_api" checked class="h-4 w-4 text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer" />
+              </div>
+              <p class="mt-3 text-xs leading-relaxed text-slate-600">
+                Templates are delivered instantly from the clinic's official number via Meta Cloud API with immediate toast delivery status. Blank messages open directly in the integrated in-app WhatsApp chat.
+              </p>
+            </label>
+
+            <!-- Option 2: External (WhatsApp Web / App) -->
+            <label id="admin-whatsapp-mode-external" onclick="setAdminWhatsAppDispatchMode('external')" class="group relative flex cursor-pointer flex-col justify-between rounded-xl border-2 border-slate-200 bg-white p-4 transition hover:shadow-xs hover:border-slate-300">
+              <div class="flex items-start justify-between gap-3">
+                <div class="flex items-center gap-3">
+                  <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                    <i data-lucide="external-link" class="h-4 w-4"></i>
+                  </span>
+                  <div>
+                    <span class="text-sm font-black text-slate-900">External (WhatsApp Web / App)</span>
+                    <span class="block text-[11px] font-medium text-slate-500 mt-0.5">Launches external WhatsApp</span>
+                  </div>
+                </div>
+                <input type="radio" name="admin_whatsapp_dispatch_mode" id="whatsapp-dispatch-radio-external" value="external" class="h-4 w-4 text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer" />
+              </div>
+              <p class="mt-3 text-xs leading-relaxed text-slate-600">
+                Opens the standard <code class="text-[11px] bg-slate-100 px-1 py-0.5 rounded">api.whatsapp.com</code> link in browser tabs or your installed WhatsApp desktop/mobile app to send manually.
+              </p>
+            </label>
+          </div>
+        </div>
+
         <div class="rounded-2xl border border-emerald-200 bg-gradient-to-br from-white to-emerald-50/60 p-5 shadow-xs">
           <div class="flex items-start gap-3">
             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700"><i data-lucide="message-circle-more" class="h-5 w-5"></i></span>
@@ -5476,6 +5548,17 @@
             <span class="h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-emerald-600 peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-500"></span>
             <span class="pointer-events-none absolute left-1 h-4 w-4 rounded-full bg-white shadow-sm transition peer-checked:translate-x-5"></span>
           </span>
+        </label>
+
+        <label class="block rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+          <div class="mb-2 flex items-center justify-between">
+            <span class="text-xs font-black text-slate-800">WhatsApp Dispatch Mode</span>
+            <span class="text-[10px] font-bold text-slate-400">Controls appointment cards &amp; quick actions</span>
+          </div>
+          <select id="setting-whatsapp-dispatch-mode" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20">
+            <option value="cloud_api">Internal: Send directly via Cloud API &amp; In-App Chat (Recommended)</option>
+            <option value="external">External: Open WhatsApp Web / App links</option>
+          </select>
         </label>
 
         <div class="rounded-2xl border border-blue-200 bg-blue-50/60 p-4 space-y-2">
@@ -6526,6 +6609,7 @@
     let financeDeptWhatsAppPressGesture = null;
     let financeDeptWhatsAppSuppressClickUntil = 0;
     let adminActiveTab = 'access';
+    let clinicWhatsAppDispatchMode = 'cloud_api';
     let useTwelveHourTime = false;
     let defaultDiagnosisFee = 0;
     let activeDiagnosisAppointmentId = null;
@@ -8287,6 +8371,64 @@
         if (field.type === 'checkbox') field.checked = Boolean(value);
         else field.value = value;
       });
+      renderAdminWhatsAppDispatchMode();
+    }
+
+    function renderAdminWhatsAppDispatchMode() {
+      const isCloud = (clinicWhatsAppDispatchMode || 'cloud_api') === 'cloud_api';
+      const internalCard = document.getElementById('admin-whatsapp-mode-internal');
+      const externalCard = document.getElementById('admin-whatsapp-mode-external');
+      const statusBadge = document.getElementById('admin-whatsapp-dispatch-status-badge');
+      const radioInternal = document.getElementById('whatsapp-dispatch-radio-cloud');
+      const radioExternal = document.getElementById('whatsapp-dispatch-radio-external');
+      const modalSelect = document.getElementById('setting-whatsapp-dispatch-mode');
+
+      if (internalCard && externalCard) {
+        if (isCloud) {
+          internalCard.className = 'group relative flex cursor-pointer flex-col justify-between rounded-xl border-2 border-emerald-500 bg-emerald-50/70 p-4 transition shadow-xs';
+          externalCard.className = 'group relative flex cursor-pointer flex-col justify-between rounded-xl border-2 border-slate-200 bg-white p-4 transition hover:border-slate-300';
+        } else {
+          internalCard.className = 'group relative flex cursor-pointer flex-col justify-between rounded-xl border-2 border-slate-200 bg-white p-4 transition hover:border-slate-300';
+          externalCard.className = 'group relative flex cursor-pointer flex-col justify-between rounded-xl border-2 border-emerald-500 bg-emerald-50/70 p-4 transition shadow-xs';
+        }
+      }
+
+      if (radioInternal) radioInternal.checked = isCloud;
+      if (radioExternal) radioExternal.checked = !isCloud;
+      if (modalSelect) modalSelect.value = isCloud ? 'cloud_api' : 'external';
+
+      if (statusBadge) {
+        statusBadge.className = isCloud
+          ? 'inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-black text-emerald-800'
+          : 'inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-black text-slate-700';
+        statusBadge.innerHTML = isCloud
+          ? '<span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Internal (Cloud API Active)'
+          : '<span class="h-1.5 w-1.5 rounded-full bg-slate-400"></span> External (Web / App Active)';
+      }
+    }
+
+    async function setAdminWhatsAppDispatchMode(mode) {
+      if (!hasPageAccess('admin')) return;
+      const targetMode = mode === 'external' ? 'external' : 'cloud_api';
+      clinicWhatsAppDispatchMode = targetMode;
+      renderAdminWhatsAppDispatchMode();
+
+      try {
+        const { error } = await db
+          .from('clinic_settings')
+          .update({ whatsapp_dispatch_mode: targetMode, updated_at: new Date().toISOString() })
+          .eq('id', 1);
+        if (error) throw error;
+        showAppointmentNotificationToast(
+          'WhatsApp Settings',
+          targetMode === 'cloud_api'
+            ? 'Internal WhatsApp mode activated (Cloud API & In-App Chat)'
+            : 'External WhatsApp mode activated (WhatsApp Web / App)'
+        );
+      } catch (err) {
+        console.error('Failed to save whatsapp_dispatch_mode:', err);
+        alert('Failed to save WhatsApp dispatch mode: ' + (err.message || err));
+      }
     }
 
     function appointmentStatusColorInputId(status) {
@@ -8530,7 +8672,7 @@
     }
 
     async function fetchClinicSettings(refreshViews = false) {
-      const { data, error } = await db.from('clinic_settings').select('use_12_hour_time, diagnosis_fee_default, appointment_status_colors, attendance_enabled, attendance_latitude, attendance_longitude, attendance_radius_m, attendance_max_accuracy_m, attendance_timezone, attendance_late_grace_minutes, storage_server_url, storage_secret_key').eq('id', 1).maybeSingle();
+      const { data, error } = await db.from('clinic_settings').select('use_12_hour_time, diagnosis_fee_default, appointment_status_colors, attendance_enabled, attendance_latitude, attendance_longitude, attendance_radius_m, attendance_max_accuracy_m, attendance_timezone, attendance_late_grace_minutes, storage_server_url, storage_secret_key, whatsapp_dispatch_mode').eq('id', 1).maybeSingle();
       if (error) {
         console.warn('Could not load clinic settings:', error.message);
         return false;
@@ -8546,6 +8688,7 @@
       if (typeof populateStorageServerSettingsInputs === 'function') {
         populateStorageServerSettingsInputs();
       }
+      clinicWhatsAppDispatchMode = String(data?.whatsapp_dispatch_mode || 'cloud_api').trim() === 'external' ? 'external' : 'cloud_api';
       const timeFormatChanged = useTwelveHourTime !== Boolean(data?.use_12_hour_time);
       applyClinicTimeFormat(Boolean(data?.use_12_hour_time), false);
       defaultDiagnosisFee = Math.max(0, Number(data?.diagnosis_fee_default) || 0);
@@ -12450,6 +12593,7 @@
 
     function switchAdminTab(tabName) {
       if (!hasPageAccess('admin')) return;
+      if (tabName === 'whatsapp') tabName = 'templates';
       adminActiveTab = ['access', 'templates', 'print-forms', 'payments', 'expense-types', 'attendance', 'customization', 'loyalty', 'storage'].includes(tabName) ? tabName : 'access';
       const showTemplates = adminActiveTab === 'templates';
       const showPrintForms = adminActiveTab === 'print-forms';
@@ -12459,7 +12603,7 @@
       const showCustomization = adminActiveTab === 'customization';
       const showStorage = adminActiveTab === 'storage';
       const accessTab = document.getElementById('admin-tab-access');
-      const templatesTab = document.getElementById('admin-tab-templates');
+      const templatesTab = document.getElementById('admin-tab-whatsapp') || document.getElementById('admin-tab-templates');
       const printFormsTab = document.getElementById('admin-tab-print-forms');
       const paymentsTab = document.getElementById('admin-tab-payments');
       const expenseTypesTab = document.getElementById('admin-tab-expense-types');
@@ -12495,14 +12639,14 @@
       }
 
       accessTab.className = adminActiveTab === 'access' ? activeClass : inactiveClass;
-      templatesTab.className = showTemplates ? activeClass : inactiveClass;
+      if (templatesTab) templatesTab.className = showTemplates ? activeClass : inactiveClass;
       printFormsTab.className = showPrintForms ? activeClass : inactiveClass;
       paymentsTab.className = showPayments ? activeClass : inactiveClass;
       expenseTypesTab.className = showExpenseTypes ? activeClass : inactiveClass;
       attendanceTab.className = showAttendance ? activeClass : inactiveClass;
       customizationTab.className = showCustomization ? activeClass : inactiveClass;
       accessTab.setAttribute('aria-selected', String(adminActiveTab === 'access'));
-      templatesTab.setAttribute('aria-selected', String(showTemplates));
+      if (templatesTab) templatesTab.setAttribute('aria-selected', String(showTemplates));
       printFormsTab.setAttribute('aria-selected', String(showPrintForms));
       paymentsTab.setAttribute('aria-selected', String(showPayments));
       expenseTypesTab.setAttribute('aria-selected', String(showExpenseTypes));
@@ -12518,6 +12662,7 @@
       if (showTemplates) {
         renderAdminWhatsAppTemplates();
         renderWhatsAppTemplatePreview();
+        renderAdminWhatsAppDispatchMode();
       }
       if (showPrintForms) {
         if (prescriptionPrintSettingsLoaded && medicationCatalogLoaded && prescriptionTemplatesLoaded) {
@@ -18937,6 +19082,12 @@
       const phone = normaliseWhatsAppPhone(group?.patientPhone);
       if (!group || !phone) return;
       closeWhatsAppTemplatePicker();
+
+      if (clinicWhatsAppDispatchMode === 'cloud_api') {
+        openWhatsAppPatientConversation(phone, group.patientName, '');
+        return;
+      }
+
       openWhatsAppLink(`https://api.whatsapp.com/send?phone=${phone}`);
     }
 
@@ -19014,7 +19165,7 @@
       requestAnimationFrame(positionWhatsAppTemplateDropdown);
     }
 
-    function sendFinanceDeptWhatsAppTemplate(patientId, templateId) {
+    async function sendFinanceDeptWhatsAppTemplate(patientId, templateId) {
       const group = financeDeptGroupForPatient(patientId);
       const context = financeWhatsAppTemplateContext?.patientId === patientId ? financeWhatsAppTemplateContext : null;
       const phone = context?.phone || normaliseWhatsAppPhone(group?.patientPhone);
@@ -19023,6 +19174,43 @@
       const patientName = context?.patientName || group?.patientName || '';
       const message = resolveWhatsAppMessageTemplate(template.body, { patient: patientName });
       closeWhatsAppTemplatePicker();
+
+      if (clinicWhatsAppDispatchMode === 'cloud_api') {
+        try {
+          showAppointmentNotificationToast(
+            currentUiLanguage === 'ar' ? 'واتساب العيادة' : 'Clinic WhatsApp',
+            currentUiLanguage === 'ar' ? `جارٍ إرسال الرسالة إلى ${patientName}...` : `Sending message to ${patientName}...`
+          );
+          const { data, error } = await db.functions.invoke('whatsapp-webhook', {
+            body: {
+              action: 'send_manual_message',
+              phone: phone,
+              patient_name: patientName,
+              patient_id: patientId || null,
+              content: message
+            }
+          });
+          if (error || !data?.success) {
+            throw new Error(error?.message || data?.error || 'Failed to dispatch WhatsApp message via Cloud API');
+          }
+          showAppointmentNotificationToast(
+            currentUiLanguage === 'ar' ? 'تم الإرسال بنجاح' : 'Sent Successfully',
+            currentUiLanguage === 'ar' ? `تم إرسال رسالة الواتساب إلى ${patientName}` : `WhatsApp message delivered to ${patientName}`
+          );
+        } catch (err) {
+          console.error('Direct WhatsApp Cloud API send failed:', err);
+          const tryExternal = confirm(
+            currentUiLanguage === 'ar'
+              ? `تعذر الإرسال المباشر عبر Cloud API:\n${err.message}\n\nهل ترغب في فتح واتساب الخارجي بدلاً من ذلك؟`
+              : `Direct dispatch via Cloud API failed:\n${err.message}\n\nWould you like to open external WhatsApp instead?`
+          );
+          if (tryExternal) {
+            openWhatsAppLink(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`, message);
+          }
+        }
+        return;
+      }
+
       openWhatsAppLink(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`, message);
     }
 
@@ -25327,17 +25515,74 @@
         </span>`;
     }
 
+    async function openWhatsAppPatientConversation(phone, patientName = '', initialMessage = '') {
+      if (!phone) return;
+      const clean = normaliseWhatsAppPhone(phone) || String(phone).replace(/[^\d]/g, '');
+      if (!clean) return;
+
+      if (hasPageAccess('whatsapp')) {
+        await switchView('whatsapp');
+        if (!whatsappConversations || whatsappConversations.length === 0) {
+          await loadWhatsAppConversations();
+        }
+        let conv = (whatsappConversations || []).find(c => String(c.phone).replace(/[^\d]/g, '') === clean);
+        if (!conv) {
+          try {
+            const { data, error } = await db.from('whatsapp_conversations').insert({
+              phone: clean,
+              patient_name: patientName || ('+' + clean),
+              ai_enabled: false,
+              status: 'human_needed',
+              last_message: initialMessage || 'Conversation opened from appointment card',
+              last_message_at: new Date().toISOString()
+            }).select().single();
+            if (!error && data) {
+              conv = data;
+              whatsappConversations.unshift(conv);
+              renderWhatsAppConversationsList();
+            }
+          } catch (err) {
+            console.warn('Could not auto-create conversation:', err);
+          }
+        }
+        if (conv?.id) {
+          await selectWhatsAppConversation(conv.id);
+          if (initialMessage) {
+            const input = document.getElementById('whatsapp-reply-input');
+            if (input) {
+              input.value = initialMessage;
+              autoResizeWhatsAppInput(input);
+              input.focus();
+            }
+          }
+        }
+      } else {
+        openWhatsAppLink(`https://api.whatsapp.com/send?phone=${clean}&text=${encodeURIComponent(initialMessage || '')}`, initialMessage);
+      }
+    }
+
     function openWhatsAppCustomMessage(appointmentId) {
       if (!hasPageAccess('appointments')) return;
       const entry = appointments.find(appointment => String(appointment.id) === String(appointmentId));
       if (!entry) return;
       const phone = appointmentWhatsAppPhone(entry);
+      const cleanPhone = normaliseWhatsAppPhone(phone);
+      if (!cleanPhone) {
+        alert(currentUiLanguage === 'ar' ? 'لا يوجد رقم واتساب صالح لهذا المريض.' : 'This patient does not have a valid WhatsApp number.');
+        return;
+      }
+      closeWhatsAppTemplatePicker();
+
+      if (clinicWhatsAppDispatchMode === 'cloud_api') {
+        openWhatsAppPatientConversation(cleanPhone, entry.patient, '');
+        return;
+      }
+
       const url = dashboardWhatsAppUrl(entry, phone, null);
       if (!url) {
         alert(currentUiLanguage === 'ar' ? 'لا يوجد رقم واتساب صالح لهذا المريض.' : 'This patient does not have a valid WhatsApp number.');
         return;
       }
-      closeWhatsAppTemplatePicker();
       openWhatsAppLink(url);
     }
 
@@ -25472,7 +25717,7 @@
       if (restoreFocus && anchor?.isConnected) anchor.focus({ preventScroll: true });
     }
 
-    function sendWhatsAppTemplate(appointmentId, templateId) {
+    async function sendWhatsAppTemplate(appointmentId, templateId) {
       const entry = appointments.find(appointment => String(appointment.id) === String(appointmentId));
       if (!entry) return;
       const phone = appointmentWhatsAppPhone(entry);
@@ -25483,9 +25728,65 @@
       const template = availableWhatsAppTemplates('appointment').find(item => String(item.id) === String(templateId));
       if (!template) return;
       const message = resolveWhatsAppMessageTemplate(template.body, entry);
+      closeWhatsAppTemplatePicker();
+
+      if (clinicWhatsAppDispatchMode === 'cloud_api') {
+        const cleanPhone = normaliseWhatsAppPhone(phone);
+        if (!cleanPhone) {
+          alert(currentUiLanguage === 'ar' ? 'لا يوجد رقم واتساب صالح لهذا المريض.' : 'This patient does not have a valid WhatsApp number.');
+          return;
+        }
+
+        try {
+          showAppointmentNotificationToast(
+            currentUiLanguage === 'ar' ? 'واتساب العيادة' : 'Clinic WhatsApp',
+            currentUiLanguage === 'ar' ? `جارٍ إرسال الرسالة إلى ${entry.patient}...` : `Sending message to ${entry.patient}...`
+          );
+
+          const { data, error } = await db.functions.invoke('whatsapp-webhook', {
+            body: {
+              action: 'send_manual_message',
+              phone: cleanPhone,
+              patient_name: entry.patient,
+              patient_id: entry.patientId || null,
+              content: message
+            }
+          });
+
+          if (error || !data?.success) {
+            throw new Error(error?.message || data?.error || 'Failed to dispatch WhatsApp message via Cloud API');
+          }
+
+          showAppointmentNotificationToast(
+            currentUiLanguage === 'ar' ? 'تم الإرسال بنجاح' : 'Sent Successfully',
+            currentUiLanguage === 'ar' ? `تم إرسال رسالة الواتساب إلى ${entry.patient}` : `WhatsApp message delivered to ${entry.patient}`
+          );
+
+          if (data?.conversation?.id && Array.isArray(whatsappConversations)) {
+            const existingConv = whatsappConversations.find(c => c.id === data.conversation.id);
+            if (existingConv) {
+              existingConv.last_message = message;
+              existingConv.last_message_at = new Date().toISOString();
+              if (typeof renderWhatsAppConversationsList === 'function') renderWhatsAppConversationsList();
+            }
+          }
+        } catch (err) {
+          console.error('Direct WhatsApp Cloud API send failed:', err);
+          const tryExternal = confirm(
+            (currentUiLanguage === 'ar'
+              ? `تعذر الإرسال المباشر عبر Cloud API:\n${err.message}\n\nهل ترغب في فتح واتساب الخارجي بدلاً من ذلك؟`
+              : `Direct dispatch via Cloud API failed:\n${err.message}\n\nWould you like to open external WhatsApp instead?`)
+          );
+          if (tryExternal) {
+            const url = dashboardWhatsAppUrl(entry, phone, template.body);
+            if (url) openWhatsAppLink(url, message);
+          }
+        }
+        return;
+      }
+
       const url = dashboardWhatsAppUrl(entry, phone, template.body);
       if (!url) return;
-      closeWhatsAppTemplatePicker();
       openWhatsAppLink(url, message);
     }
 
@@ -29587,12 +29888,14 @@
 
       try {
         const { data } = await db.from('clinic_settings').select(
-          'whatsapp_enabled, whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token, gemini_api_key, whatsapp_ai_instructions, whatsapp_ai_model'
+          'whatsapp_enabled, whatsapp_dispatch_mode, whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token, gemini_api_key, whatsapp_ai_instructions, whatsapp_ai_model'
         ).eq('id', 1).maybeSingle();
 
         if (data) {
           const enabledCheckbox = document.getElementById('setting-whatsapp-enabled');
           if (enabledCheckbox) enabledCheckbox.checked = Boolean(data.whatsapp_enabled ?? true);
+          const dispatchSelect = document.getElementById('setting-whatsapp-dispatch-mode');
+          if (dispatchSelect) dispatchSelect.value = data.whatsapp_dispatch_mode || clinicWhatsAppDispatchMode || 'cloud_api';
           document.getElementById('setting-whatsapp-phone-id').value = data.whatsapp_phone_number_id || '';
           document.getElementById('setting-whatsapp-waba-id').value = data.whatsapp_business_account_id || '';
           document.getElementById('setting-whatsapp-verify-token').value = data.whatsapp_verify_token || 'lumin_secret_token';
@@ -29620,8 +29923,10 @@
       const saveBtn = document.getElementById('btn-save-whatsapp-settings');
       if (saveBtn) saveBtn.disabled = true;
 
+      const chosenMode = document.getElementById('setting-whatsapp-dispatch-mode')?.value || clinicWhatsAppDispatchMode || 'cloud_api';
       const payload = {
         whatsapp_enabled: Boolean(document.getElementById('setting-whatsapp-enabled')?.checked),
+        whatsapp_dispatch_mode: chosenMode,
         whatsapp_phone_number_id: String(document.getElementById('setting-whatsapp-phone-id')?.value || '').trim(),
         whatsapp_business_account_id: String(document.getElementById('setting-whatsapp-waba-id')?.value || '').trim(),
         whatsapp_verify_token: String(document.getElementById('setting-whatsapp-verify-token')?.value || '').trim(),
@@ -29635,6 +29940,8 @@
       try {
         const { error } = await db.from('clinic_settings').update(payload).eq('id', 1);
         if (error) throw error;
+        clinicWhatsAppDispatchMode = chosenMode;
+        renderAdminWhatsAppDispatchMode();
         closeWhatsAppSettingsModal();
         showAppointmentNotificationToast('WhatsApp Settings', currentUiLanguage === 'ar' ? 'تم حفظ الإعدادات بنجاح' : 'Settings saved successfully');
       } catch (err) {
