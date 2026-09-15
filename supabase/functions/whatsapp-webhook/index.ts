@@ -1,0 +1,1327 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.95.0";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+};
+
+const jsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Cache-Control": "no-store", "Content-Type": "application/json" },
+  });
+
+function getSupabaseClient() {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  return createClient(supabaseUrl, supabaseKey);
+}
+
+// Clean phone numbers to standard international format (digits only, e.g. 9647701234567)
+function cleanPhone(raw: string): string {
+  return String(raw || "").replace(/[^\d]/g, "");
+}
+
+// Format phone for local matching (extract last 9-10 digits)
+function getPhoneTail(phone: string): string {
+  const cleaned = cleanPhone(phone);
+  return cleaned.length > 9 ? cleaned.slice(-9) : cleaned;
+}
+
+// Fetch WhatsApp and Gemini credentials from clinic_settings or environment
+async function getClinicWhatsAppSettings(supabase: any) {
+  const { data } = await supabase
+    .from("clinic_settings")
+    .select(
+      "whatsapp_enabled, whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token, gemini_api_key, whatsapp_ai_instructions, whatsapp_ai_model"
+    )
+    .eq("id", 1)
+    .maybeSingle();
+
+  return {
+    enabled: Boolean(data?.whatsapp_enabled ?? true),
+    phoneId: String(data?.whatsapp_phone_number_id || Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") || "").trim(),
+    wabaId: String(data?.whatsapp_business_account_id || Deno.env.get("WHATSAPP_BUSINESS_ACCOUNT_ID") || "").trim(),
+    accessToken: String(data?.whatsapp_access_token || Deno.env.get("WHATSAPP_ACCESS_TOKEN") || "").trim(),
+    verifyToken: String(data?.whatsapp_verify_token || Deno.env.get("WHATSAPP_VERIFY_TOKEN") || "lumin_secret_token").trim(),
+    geminiApiKey: String(data?.gemini_api_key || Deno.env.get("GEMINI_API_KEY") || "").trim(),
+    aiInstructions: String(data?.whatsapp_ai_instructions || "").trim(),
+    aiModel: String(data?.whatsapp_ai_model || "gemini-3.5-flash-lite").trim(),
+  };
+}
+
+// Send a WhatsApp text message via Meta Graph API
+async function sendMetaWhatsAppMessage(phoneId: string, accessToken: string, toPhone: string, text: string) {
+  if (!phoneId || !accessToken || !toPhone || !text) {
+    console.warn("sendMetaWhatsAppMessage: missing required parameter", { phoneId: Boolean(phoneId), accessToken: Boolean(accessToken), toPhone: Boolean(toPhone) });
+    return null;
+  }
+
+  const url = `https://graph.facebook.com/v21.0/${phoneId}/messages`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: cleanPhone(toPhone),
+      type: "text",
+      text: { body: text },
+    }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    console.error("Meta Graph API error:", data);
+    throw new Error(data?.error?.message || "Failed to send WhatsApp message via Meta API");
+  }
+  return data;
+}
+
+// Send a WhatsApp audio message via Meta Graph API
+async function sendMetaWhatsAppAudioMessage(
+  phoneId: string,
+  accessToken: string,
+  toPhone: string,
+  audioUrl: string
+) {
+  if (!phoneId || !accessToken || !toPhone || !audioUrl) {
+    console.warn("sendMetaWhatsAppAudioMessage: missing required parameter", {
+      phoneId: Boolean(phoneId),
+      accessToken: Boolean(accessToken),
+      toPhone: Boolean(toPhone),
+      audioUrl: Boolean(audioUrl),
+    });
+    return null;
+  }
+
+  const url = `https://graph.facebook.com/v21.0/${phoneId}/messages`;
+  const isOgg = audioUrl.toLowerCase().includes(".ogg");
+  const audioPayload: any = { link: audioUrl };
+  if (isOgg) {
+    audioPayload.voice = true;
+  }
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: cleanPhone(toPhone),
+      type: "audio",
+      audio: audioPayload,
+    }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    console.error("Meta Graph API audio error:", data);
+    throw new Error(data?.error?.message || "Failed to send WhatsApp audio message via Meta API");
+  }
+  return data;
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 8192;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, chunk as any);
+  }
+  return btoa(binary);
+}
+
+function base64ToUint8Array(base64: string): Uint8Array {
+  const clean = base64.replace(/^data:[a-zA-Z0-9_\-\.\/]+;base64,/, "");
+  const binary = atob(clean);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+interface ProcessedMediaResult {
+  publicUrl: string | null;
+  mimeType?: string;
+  base64?: string;
+}
+
+// Download media from Meta Graph API and upload to Supabase Storage whatsapp-media bucket
+async function processIncomingMedia(
+  supabase: any,
+  mediaId: string,
+  accessToken: string,
+  conversationId: string,
+  suggestedFilename: string,
+  includeBase64 = false
+): Promise<ProcessedMediaResult> {
+  try {
+    if (!mediaId || !accessToken) return { publicUrl: null };
+
+    // 1. Get media URL
+    const metaMediaRes = await fetch(`https://graph.facebook.com/v21.0/${mediaId}`, {
+      headers: { "Authorization": `Bearer ${accessToken}` },
+    });
+    if (!metaMediaRes.ok) return { publicUrl: null };
+    const mediaMeta = await metaMediaRes.json();
+    const directUrl = mediaMeta?.url;
+    if (!directUrl) return { publicUrl: null };
+
+    // 2. Download media binary
+    const fileRes = await fetch(directUrl, {
+      headers: { "Authorization": `Bearer ${accessToken}` },
+    });
+    if (!fileRes.ok) return { publicUrl: null };
+    const arrayBuffer = await fileRes.arrayBuffer();
+
+    // 3. Upload to Supabase Storage
+    const ext = suggestedFilename.includes(".") ? suggestedFilename.split(".").pop() : "jpg";
+    const storagePath = `conv_${conversationId}/${Date.now()}_${mediaId}.${ext}`;
+
+    const contentType = mediaMeta.mime_type || (ext === "ogg" ? "audio/ogg" : "image/jpeg");
+
+    const { error: uploadError } = await supabase.storage
+      .from("whatsapp-media")
+      .upload(storagePath, arrayBuffer, {
+        contentType,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.warn("Storage upload error:", uploadError);
+      return { publicUrl: null };
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from("whatsapp-media")
+      .getPublicUrl(storagePath);
+
+    const publicUrl = publicUrlData?.publicUrl || null;
+    const base64 = includeBase64 ? arrayBufferToBase64(arrayBuffer) : undefined;
+
+    return { publicUrl, mimeType: contentType, base64 };
+  } catch (err) {
+    console.error("processIncomingMedia error:", err);
+    return { publicUrl: null };
+  }
+}
+
+const WEEKDAY_NAMES_EN = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const WEEKDAY_NAMES_AR = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+
+function formatDoctorScheduleForPrompt(fullName: string, sched: any): string {
+  const days: number[] = Array.isArray(sched?.days)
+    ? sched.days.map(Number).filter((d: number) => d >= 0 && d <= 6).sort()
+    : [0, 1, 2, 3, 4];
+  if (!days.length) return `- Dr. ${fullName}: No scheduled clinic shifts`;
+
+  const legacyStart = sched?.start || "09:00";
+  const legacyEnd = sched?.end || "17:00";
+  const daily = (sched?.daily && typeof sched.daily === "object") ? sched.daily : {};
+
+  const shifts = days.map((d: number) => {
+    const daySched = daily[String(d)] || { start: legacyStart, end: legacyEnd };
+    return `${WEEKDAY_NAMES_AR[d]} / ${WEEKDAY_NAMES_EN[d]} (${daySched.start} - ${daySched.end})`;
+  });
+
+  return `- Dr. ${fullName}:\n  * ` + shifts.join("\n  * ");
+}
+
+// Gemini Tools Schema Builder (Dynamically populated with active clinic doctors and services)
+function buildGeminiTools(doctorNames: string[] = [], visitTypeNames: string[] = []) {
+  const docExamples = doctorNames.length > 0 ? doctorNames.slice(0, 5).join(", ") : "Mohamed Gazzar, Salma, Mariam";
+  const vtExamples = visitTypeNames.length > 0 ? visitTypeNames.slice(0, 8).join(", ") : "Check-up, Cleaning, Consultation, Extraction";
+
+  return [
+    {
+      functionDeclarations: [
+        {
+          name: "check_available_slots",
+          description: "Check available appointment slots for a given date according to doctors' actual working days and shift hours.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              date: {
+                type: "STRING",
+                description: "Date in YYYY-MM-DD format (e.g. 2026-09-20)",
+              },
+              doctor_name: {
+                type: "STRING",
+                description: `Optional preferred doctor name (e.g. ${docExamples})`,
+              },
+            },
+            required: ["date"],
+          },
+        },
+        {
+          name: "book_appointment",
+          description: "Book an appointment for a patient in the clinic calendar.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              patient_name: {
+                type: "STRING",
+                description: "Full name of the patient",
+              },
+              date: {
+                type: "STRING",
+                description: "Date in YYYY-MM-DD format",
+              },
+              time: {
+                type: "STRING",
+                description: "Time in 24-hour HH:mm format (e.g. 11:00, 16:30)",
+              },
+              doctor_name: {
+                type: "STRING",
+                description: `Doctor name if specified by patient (e.g. ${docExamples})`,
+              },
+              visit_type: {
+                type: "STRING",
+                description: `Type of visit / service (e.g. ${vtExamples})`,
+              },
+              notes: {
+                type: "STRING",
+                description: "Any extra notes or symptoms provided by the patient",
+              },
+            },
+            required: ["patient_name", "date", "time"],
+          },
+        },
+        {
+          name: "request_human_support",
+          description: "Call this when the patient has a complex medical question, complains about an emergency, or explicitly requests to speak with a human receptionist/doctor.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              reason: {
+                type: "STRING",
+                description: "Short reason why human intervention is required",
+              },
+            },
+            required: ["reason"],
+          },
+        },
+      ],
+    },
+  ];
+}
+
+// Execute tool calls against Supabase DB
+async function handleGeminiToolCall(
+  supabase: any,
+  call: { name: string; args: any },
+  conversation: any
+): Promise<any> {
+  const { name, args } = call;
+
+  if (name === "check_available_slots") {
+    const targetDate = args.date;
+    const startOfDay = `${targetDate}T00:00:00Z`;
+    const endOfDay = `${targetDate}T23:59:59Z`;
+
+    // Target day of week: 0 = Sun, 1 = Mon, ..., 6 = Sat
+    const targetDayOfWeek = new Date(targetDate + "T12:00:00Z").getUTCDay();
+    const dayEn = WEEKDAY_NAMES_EN[targetDayOfWeek];
+    const dayAr = WEEKDAY_NAMES_AR[targetDayOfWeek];
+
+    // Fetch active doctors and their HR staff settings (weekly_schedule) in parallel
+    const [{ data: activeDoctors }, { data: staffSettings }] = await Promise.all([
+      supabase
+        .from("user_profiles")
+        .select("user_id, full_name")
+        .eq("is_doctor", true)
+        .eq("active", true),
+      supabase
+        .from("hr_staff_settings")
+        .select("user_id, weekly_schedule"),
+    ]);
+
+    const settingsMap = new Map((staffSettings || []).map((s: any) => [s.user_id, s.weekly_schedule]));
+
+    const doctorList = (activeDoctors || []).map((doc: any) => {
+      const sched = settingsMap.get(doc.user_id) || {};
+      const days: number[] = Array.isArray(sched.days)
+        ? sched.days.map(Number).filter((d: number) => d >= 0 && d <= 6).sort()
+        : [0, 1, 2, 3, 4];
+      const daily = (sched.daily && typeof sched.daily === "object") ? sched.daily : {};
+      return {
+        userId: doc.user_id,
+        fullName: doc.full_name,
+        days,
+        daily,
+        start: sched.start || "09:00",
+        end: sched.end || "17:00",
+      };
+    });
+
+    let selectedDoctor: any = null;
+    if (args.doctor_name) {
+      const search = String(args.doctor_name).toLowerCase().replace(/^dr\.?\s*/i, "").trim();
+      selectedDoctor = doctorList.find((d: any) => d.fullName.toLowerCase().includes(search));
+
+      if (selectedDoctor) {
+        // If doctor is not scheduled to work on requested day
+        if (!selectedDoctor.days.includes(targetDayOfWeek)) {
+          const workingDaysAr = selectedDoctor.days.map((d: number) => WEEKDAY_NAMES_AR[d]).join(" و ");
+          const workingDaysEn = selectedDoctor.days.map((d: number) => WEEKDAY_NAMES_EN[d]).join(", ");
+          return {
+            available: false,
+            date: targetDate,
+            day: `${dayAr} / ${dayEn}`,
+            doctor: `Dr. ${selectedDoctor.fullName}`,
+            message: `د. ${selectedDoctor.fullName} لا يعمل يوم ${dayAr} (${dayEn}). مواعيد عمله في العيادة هي: ${workingDaysAr} (${workingDaysEn}). هل ترغب بالحجز في أحد هذه الأيام، أو الحجز مع طبيب آخر متاح في العيادة يوم ${dayAr}؟`,
+            working_days: workingDaysAr,
+            slots: [],
+          };
+        }
+      }
+    }
+
+    // Doctors working on target day
+    const workingDoctors = selectedDoctor
+      ? [selectedDoctor]
+      : doctorList.filter((d: any) => d.days.includes(targetDayOfWeek));
+
+    if (workingDoctors.length === 0) {
+      return {
+        available: false,
+        date: targetDate,
+        day: `${dayAr} / ${dayEn}`,
+        message: `العيادة لا يتوفر بها أطباء مناوبون يوم ${dayAr} (${dayEn}). يرجى اختيار يوم آخر من أيام العمل المتاحة.`,
+        slots: [],
+      };
+    }
+
+    // Generate candidate 30-min slots from working doctors
+    const candidateSlotsSet = new Set<string>();
+    for (const doc of workingDoctors) {
+      const daySched = doc.daily[String(targetDayOfWeek)] || { start: doc.start, end: doc.end };
+      const [sh, sm] = (daySched.start || "09:00").split(":").map(Number);
+      const [eh, em] = (daySched.end || "17:00").split(":").map(Number);
+      let m = sh * 60 + sm;
+      const endM = eh * 60 + em;
+      while (m + 30 <= endM) {
+        const hh = String(Math.floor(m / 60)).padStart(2, "0");
+        const mm = String(m % 60).padStart(2, "0");
+        candidateSlotsSet.add(`${hh}:${mm}`);
+        m += 30;
+      }
+    }
+
+    const allCandidateSlots = Array.from(candidateSlotsSet).sort();
+
+    // Query booked appointments for target date
+    let aptQuery = supabase
+      .from("appointments")
+      .select("appointment_at, duration_minutes, status, assigned_user_id")
+      .gte("appointment_at", startOfDay)
+      .lte("appointment_at", endOfDay)
+      .neq("status", "Cancelled");
+
+    if (selectedDoctor) {
+      aptQuery = aptQuery.eq("assigned_user_id", selectedDoctor.userId);
+    }
+
+    const { data: bookedAppointments } = await aptQuery;
+
+    // Filter available slots
+    const availableSlots = allCandidateSlots.filter((slot) => {
+      const [h, min] = slot.split(":").map(Number);
+      const slotMin = h * 60 + min;
+
+      // Find doctors working at this specific slot
+      const docsAtThisSlot = workingDoctors.filter((doc: any) => {
+        const daySched = doc.daily[String(targetDayOfWeek)] || { start: doc.start, end: doc.end };
+        const [sh, sm] = (daySched.start || "09:00").split(":").map(Number);
+        const [eh, em] = (daySched.end || "17:00").split(":").map(Number);
+        return slotMin >= (sh * 60 + sm) && (slotMin + 30) <= (eh * 60 + em);
+      });
+
+      if (docsAtThisSlot.length === 0) return false;
+
+      // Slot is free if at least one doctor who works during this slot is not booked
+      return docsAtThisSlot.some((doc: any) => {
+        const docApts = (bookedAppointments || []).filter((apt: any) => apt.assigned_user_id === doc.userId);
+        return !docApts.some((apt: any) => {
+          const d = new Date(apt.appointment_at);
+          const aptStart = d.getUTCHours() * 60 + d.getUTCMinutes();
+          const aptEnd = aptStart + (Number(apt.duration_minutes) || 30);
+          return slotMin >= aptStart && slotMin < aptEnd;
+        });
+      });
+    });
+
+    const morningSlots = availableSlots.filter((s) => parseInt(s.split(":")[0], 10) < 14);
+    const eveningSlots = availableSlots.filter((s) => parseInt(s.split(":")[0], 10) >= 14);
+
+    return {
+      available: availableSlots.length > 0,
+      date: targetDate,
+      day: `${dayAr} / ${dayEn}`,
+      doctor: selectedDoctor ? `Dr. ${selectedDoctor.fullName}` : "All Available Doctors",
+      morning_slots: morningSlots.slice(0, 5),
+      evening_slots: eveningSlots.slice(0, 5),
+      available_slots: availableSlots.slice(0, 10),
+      total_free: availableSlots.length,
+    };
+  }
+
+  if (name === "book_appointment") {
+    const { patient_name, date, time, doctor_name, visit_type, notes } = args;
+    const appointmentAtIso = `${date}T${time}:00Z`;
+
+    // 1. Find or create patient
+    let patientId = conversation.patient_id;
+    if (!patientId) {
+      const tail = getPhoneTail(conversation.phone);
+      const { data: existingPatient } = await supabase
+        .from("patients")
+        .select("id, name")
+        .or(`phone.eq.${conversation.phone},phone.ilike.%${tail}`)
+        .maybeSingle();
+
+      if (existingPatient) {
+        patientId = existingPatient.id;
+      } else {
+        const nameParts = (patient_name || conversation.patient_name || "WhatsApp Patient").trim().split(" ");
+        const firstName = nameParts[0] || "Patient";
+        const lastName = nameParts.slice(1).join(" ") || "";
+        const { data: newPatient } = await supabase
+          .from("patients")
+          .insert({
+            name: patient_name || conversation.patient_name,
+            first_name: firstName,
+            last_name: lastName,
+            phone: conversation.phone,
+          })
+          .select("id")
+          .single();
+        patientId = newPatient?.id;
+      }
+
+      if (patientId) {
+        await supabase
+          .from("whatsapp_conversations")
+          .update({ patient_id: patientId, patient_name: patient_name || conversation.patient_name })
+          .eq("id", conversation.id);
+      }
+    }
+
+    // 2. Find doctor if specified
+    let assignedUserId = null;
+    let confirmedDoctorName = "General Clinic";
+    if (doctor_name) {
+      const { data: doctorUser } = await supabase
+        .from("user_profiles")
+        .select("user_id, full_name")
+        .eq("is_doctor", true)
+        .ilike("full_name", `%${doctor_name}%`)
+        .maybeSingle();
+      if (doctorUser) {
+        assignedUserId = doctorUser.user_id;
+        confirmedDoctorName = `Dr. ${doctorUser.full_name}`;
+      }
+    }
+
+    // 3. Find visit type if specified
+    let visitTypeId = null;
+    let confirmedVisitType = visit_type || "Check-up";
+    if (visit_type) {
+      const { data: vt } = await supabase
+        .from("appointment_visit_types")
+        .select("id, name")
+        .ilike("name", `%${visit_type}%`)
+        .maybeSingle();
+      if (vt) {
+        visitTypeId = vt.id;
+        confirmedVisitType = vt.name;
+      }
+    }
+
+    // 4. Create appointment
+    const { data: apt, error: aptError } = await supabase
+      .from("appointments")
+      .insert({
+        patient_id: patientId,
+        appointment_at: appointmentAtIso,
+        appointment_type: confirmedVisitType,
+        visit_type_id: visitTypeId,
+        assigned_user_id: assignedUserId,
+        status: "Scheduled",
+        notes: `Booked via WhatsApp AI Agent. ${notes || ""}`.trim(),
+        duration_minutes: 30,
+      })
+      .select("id")
+      .single();
+
+    if (aptError) {
+      console.error("Appointment creation error:", aptError);
+      return { success: false, error: aptError.message };
+    }
+
+    return {
+      success: true,
+      appointment_id: apt.id,
+      patient_name: patient_name || conversation.patient_name,
+      date,
+      time,
+      doctor: confirmedDoctorName,
+      visit_type: confirmedVisitType,
+      status: "Confirmed",
+    };
+  }
+
+  if (name === "request_human_support") {
+    const { reason } = args;
+    await supabase
+      .from("whatsapp_conversations")
+      .update({
+        ai_enabled: false,
+        status: "human_needed",
+      })
+      .eq("id", conversation.id);
+
+    return {
+      success: true,
+      message: "AI disabled. Conversation marked for human receptionist assistance.",
+      reason,
+    };
+  }
+
+  return { error: `Unknown tool: ${name}` };
+}
+
+// Call Google Gemini API with timeout and model-specific configs
+async function callGeminiApi(
+  model: string,
+  apiKey: string,
+  systemInstruction: string,
+  contents: any[],
+  tools: any[],
+  timeoutMs = 45000
+): Promise<any> {
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const generationConfig: any = {
+      temperature: 0.3,
+      maxOutputTokens: 600,
+    };
+    if (model.includes("3.8")) {
+      generationConfig.thinkingConfig = { thinkingLevel: "low" };
+    }
+
+    const reqBody = {
+      systemInstruction: { parts: [{ text: systemInstruction }] },
+      contents,
+      tools,
+      generationConfig,
+    };
+
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(reqBody),
+      signal: controller.signal,
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      console.error(`Gemini API error [${model}] (${res.status}):`, data);
+      throw new Error(data?.error?.message || `Gemini API request failed with status ${res.status}`);
+    }
+    return data;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function runGeminiAgentWithModel(
+  supabase: any,
+  model: string,
+  apiKey: string,
+  systemInstruction: string,
+  conversation: any,
+  initialContents: any[],
+  tools: any[]
+): Promise<string> {
+  const contents = JSON.parse(JSON.stringify(initialContents));
+
+  for (let turn = 0; turn < 3; turn++) {
+    const data = await callGeminiApi(model, apiKey, systemInstruction, contents, tools, 45000);
+
+    const candidate = data.candidates?.[0];
+    const candidateContent = candidate?.content;
+    const parts = candidateContent?.parts || [];
+    const functionCalls = parts.filter((p: any) => p.functionCall);
+
+    if (functionCalls.length > 0) {
+      // Retain candidate.content exactly as returned by Gemini.
+      // This preserves thoughtSignature and internal thought reasoning required for turn validation.
+      contents.push(candidateContent);
+
+      const functionResponses = [];
+      for (const fcPart of functionCalls) {
+        const call = fcPart.functionCall;
+        console.log(`[${model}] Gemini tool call:`, call.name, call.args);
+
+        const toolResult = await handleGeminiToolCall(supabase, call, conversation);
+        console.log(`[${model}] Tool result:`, toolResult);
+
+        functionResponses.push({
+          functionResponse: {
+            name: call.name,
+            response: toolResult,
+          },
+        });
+      }
+
+      contents.push({
+        role: "user",
+        parts: functionResponses,
+      });
+    } else {
+      const textPart = parts.find((p: any) => p.text);
+      return textPart?.text || "شكراً لتواصلك معنا. سنقوم بالرد عليك في أقرب وقت.";
+    }
+  }
+
+  return "تم تسجيل طلبك وسيقوم فريق العيادة بالتواصل معك لتأكيد الموعد.";
+}
+
+// Call Google Gemini API with multi-turn tool calling and automatic fallback
+async function runGeminiAgent(
+  supabase: any,
+  apiKey: string,
+  customInstructions: string,
+  conversation: any,
+  conversationHistory: any[],
+  preferredModel: string = "gemini-3.5-flash-lite",
+  incomingAudioPart: any = null
+): Promise<string> {
+  const now = new Date();
+  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const dayNamesAr = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+  const dayName = dayNames[now.getUTCDay()];
+  const dayNameAr = dayNamesAr[now.getUTCDay()];
+  const todayStr = `${now.toISOString().split("T")[0]} (${dayName} / ${dayNameAr})`;
+
+  // 1. Dynamic Auto-Sync: Fetch active doctors, their working schedules, and visit types in parallel
+  const [{ data: activeDoctors }, { data: activeVisitTypes }, { data: staffSettings }] = await Promise.all([
+    supabase
+      .from("user_profiles")
+      .select("user_id, full_name")
+      .eq("is_doctor", true)
+      .eq("active", true)
+      .order("full_name", { ascending: true }),
+    supabase
+      .from("appointment_visit_types")
+      .select("id, name")
+      .eq("active", true)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("hr_staff_settings")
+      .select("user_id, weekly_schedule"),
+  ]);
+
+  const settingsMap = new Map((staffSettings || []).map((s: any) => [s.user_id, s.weekly_schedule]));
+
+  const doctorNames: string[] = (activeDoctors && activeDoctors.length > 0)
+    ? activeDoctors.map((d: any) => d.full_name)
+    : ["Mohamed Gazzar", "Abdel Reheem Elsayed", "Mariam Soliman", "Salma El Sayed", "Mohamed Magdy"];
+
+  const doctorScheduleLines: string[] = (activeDoctors || []).map((doc: any) => {
+    return formatDoctorScheduleForPrompt(doc.full_name, settingsMap.get(doc.user_id));
+  });
+  const doctorsScheduleStr = doctorScheduleLines.join("\n");
+
+  const visitTypeNames: string[] = (activeVisitTypes && activeVisitTypes.length > 0)
+    ? activeVisitTypes.map((v: any) => v.name)
+    : ["Cleaning", "Consultation", "Procedure", "Follow-up", "Endo", "Extraction", "Restoration", "Check-up", "Ortho"];
+
+  const servicesListStr = visitTypeNames.join(", ");
+
+  const dynamicTools = buildGeminiTools(doctorNames, visitTypeNames);
+
+  const systemInstruction = `You are the polite, welcoming, and efficient AI receptionist for Lumin Dental Clinic (عيادة لومين لطب الأسنان).
+Current date & day of the week: ${todayStr}.
+When a patient asks about a specific day (such as "غداً" / tomorrow, "يوم الأربعاء" / Wednesday, etc.), accurately calculate the exact date based on today (${todayStr}). For example, if today is Monday, tomorrow is Tuesday, and the day after is Wednesday.
+Clinic operating hours: Saturday to Thursday from 10:00 AM to 8:00 PM (10:00 to 20:00). Closed on Fridays.
+
+Active Clinic Doctors & Live Working Schedules (Directly from Clinic HR Staff Settings):
+${doctorsScheduleStr}
+
+Rules for Doctor Schedules & Working Hours:
+- Each doctor only accepts appointments on their scheduled days and during their shift hours listed above.
+- If a patient asks for a doctor on a day they do NOT work, inform them politely of the doctor's exact working days, and suggest booking on one of their working days or seeing another doctor available on that day.
+
+Available Clinic Services & Visit Types (Live from clinic service catalog):
+${servicesListStr}
+Common Arabic translations:
+- كشف / فحص / استشارة = Consultation / Check-up
+- تنظيف وتلميع أسنان = Cleaning
+- حشو تجميلي / عادي = Restoration
+- علاج عصب وجذور = Endo
+- خلع أسنان = Extraction
+- تقويم أسنان = Ortho
+- تركيبات وتيجان = Crown prep / Procedure
+- متابعة = Follow-up
+
+Rules:
+1. Speak in the patient's language naturally (Arabic or English). If the patient speaks Arabic or Iraqi/Egyptian dialect, respond in warm, polite Arabic.
+2. If the patient wants to book an appointment or asks about availability:
+   - Always call \`check_available_slots\` with the calculated YYYY-MM-DD date to check real-time open slots (and provide doctor_name if the patient asked for a specific doctor).
+   - Propose 3 to 5 convenient slots (including morning and afternoon/evening options from the tool response) to the patient.
+   - Ask for their full name if not already known.
+   - When the patient agrees on a specific date and time, call \`book_appointment\` to save it to the system with the appropriate doctor and visit type.
+   - Once booked, provide a clear, warm confirmation message summarizing the date, time, doctor, and service.
+3. If the patient has severe medical emergencies, pain that requires immediate triage, or requests to speak to a person, call \`request_human_support\` and politely inform the patient that our clinic team will reply shortly.
+4. Keep your responses concise, friendly, and formatted nicely for WhatsApp (use *bold* and bullet points sparingly). Do not use long markdown tables.
+
+${customInstructions ? `Additional clinic instructions & doctor shift rules: ${customInstructions}` : ""}`;
+
+  // Build Gemini contents array from history, merging consecutive turns of the same role
+  const initialContents: any[] = [];
+
+  for (const msg of conversationHistory) {
+    const role = msg.sender === "patient" ? "user" : "model";
+    const text = String(msg.content || (msg.media_url ? "[Media Attachment]" : "")).trim();
+    if (!text) continue;
+
+    const last = initialContents[initialContents.length - 1];
+    if (last && last.role === role) {
+      last.parts.push({ text });
+    } else {
+      initialContents.push({
+        role,
+        parts: [{ text }],
+      });
+    }
+  }
+
+  // Ensure conversation ends with a user turn
+  if (initialContents.length === 0 || initialContents[initialContents.length - 1].role !== "user") {
+    initialContents.push({
+      role: "user",
+      parts: [{ text: "أهلاً بك، أود الاستفسار عن حجز موعد في العيادة." }],
+    });
+  }
+
+  // If incoming message is an audio voice note, append audio inlineData to user parts
+  if (incomingAudioPart) {
+    const lastUser = initialContents[initialContents.length - 1];
+    if (lastUser && lastUser.role === "user") {
+      lastUser.parts.push(incomingAudioPart);
+      lastUser.parts.push({
+        text: "The patient sent a voice message above. Listen carefully to their spoken words (they may speak Arabic, Iraqi/Egyptian dialect, or English), extract their inquiry, doctor or date preference, and respond helpfully and warmly in their language.",
+      });
+    }
+  }
+
+  // Resilient multi-model fallback chain prioritizing multimodal audio understanding & fast models
+  const modelsToTry = [
+    preferredModel,
+    "gemini-3.5-flash",
+    "gemini-3.8-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-flash-lite-latest",
+    "gemini-3-flash-preview",
+    "gemini-3.6-flash",
+  ].filter((v, i, a) => v && a.indexOf(v) === i);
+
+  let lastError: any = null;
+  for (const model of modelsToTry) {
+    try {
+      console.log(`Executing Gemini agent with model: ${model}`);
+      return await runGeminiAgentWithModel(
+        supabase,
+        model,
+        apiKey,
+        systemInstruction,
+        conversation,
+        initialContents,
+        dynamicTools
+      );
+    } catch (err: any) {
+      console.warn(`Model ${model} failed (attempting next in chain):`, err?.message || err);
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error("All configured Gemini models failed to generate response");
+}
+
+// Main Edge Function Handler
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  const supabase = getSupabaseClient();
+  const settings = await getClinicWhatsAppSettings(supabase);
+
+  // 1. GET: Webhook Verification by Meta
+  if (req.method === "GET") {
+    const url = new URL(req.url);
+    const mode = url.searchParams.get("hub.mode");
+    const token = url.searchParams.get("hub.verify_token");
+    const challenge = url.searchParams.get("hub.challenge");
+
+    if (mode === "subscribe" && token === settings.verifyToken) {
+      console.log("Meta webhook verified successfully!");
+      return new Response(challenge, {
+        status: 200,
+        headers: { "Content-Type": "text/plain" },
+      });
+    }
+
+    console.warn("Meta webhook verification failed: token mismatch", { expected: settings.verifyToken, received: token });
+    return new Response("Forbidden", { status: 403 });
+  }
+
+  // 2. POST: Handle Events or Manual Outbound Send
+  if (req.method === "POST") {
+    try {
+      const body = await req.json();
+
+      // Case A: Staff Manual Outbound Message from Lumin Webapp
+      if (body.action === "send_manual_message") {
+        const {
+          conversation_id,
+          content,
+          phone,
+          patient_name,
+          patient_id,
+          message_type = "text",
+          audio_base64,
+          audio_mime_type,
+        } = body;
+
+        const isAudio = message_type === "audio" && Boolean(audio_base64);
+        if ((!conversation_id && !phone) || (!content && !isAudio)) {
+          return jsonResponse({ error: "conversation_id or phone, and content or audio_base64 are required" }, 400);
+        }
+
+        let conv: any = null;
+        if (conversation_id) {
+          const { data, error: convErr } = await supabase
+            .from("whatsapp_conversations")
+            .select("*")
+            .eq("id", conversation_id)
+            .single();
+
+          if (convErr || !data) {
+            return jsonResponse({ error: "Conversation not found" }, 404);
+          }
+          conv = data;
+        } else if (phone) {
+          const clean = cleanPhone(phone);
+          const tail = getPhoneTail(clean);
+
+          // Try to find existing conversation
+          const { data: existingConv } = await supabase
+            .from("whatsapp_conversations")
+            .select("*")
+            .or(`phone.eq.${clean},phone.ilike.%${tail}`)
+            .maybeSingle();
+
+          if (existingConv) {
+            conv = existingConv;
+          } else {
+            // Find or link patient if exists
+            let linkedPatientId = patient_id || null;
+            let linkedPatientName = patient_name || `+${clean}`;
+            if (!linkedPatientId) {
+              const { data: p } = await supabase
+                .from("patients")
+                .select("id, name")
+                .or(`phone.eq.${clean},phone.ilike.%${tail}`)
+                .maybeSingle();
+              if (p) {
+                linkedPatientId = p.id;
+                linkedPatientName = p.name || linkedPatientName;
+              }
+            }
+
+            const { data: newConv, error: createConvErr } = await supabase
+              .from("whatsapp_conversations")
+              .insert({
+                phone: clean,
+                patient_id: linkedPatientId,
+                patient_name: linkedPatientName,
+                ai_enabled: true,
+                last_message: content || (isAudio ? "🎤 Voice Message" : ""),
+                last_message_at: new Date().toISOString(),
+                unread_count: 0,
+                status: "active",
+              })
+              .select()
+              .single();
+
+            if (createConvErr) throw createConvErr;
+            conv = newConv;
+          }
+        }
+
+        let metaSendResult = null;
+        let mediaUrl: string | null = null;
+        const finalContent = content || (isAudio ? "🎤 Voice Message" : "");
+
+        if (isAudio) {
+          const mime = audio_mime_type || "audio/mp4";
+          let ext = "m4a";
+          if (mime.includes("ogg")) ext = "ogg";
+          else if (mime.includes("mp4") || mime.includes("m4a")) ext = "m4a";
+          else if (mime.includes("webm")) ext = "webm";
+          else if (mime.includes("mpeg") || mime.includes("mp3")) ext = "mp3";
+          else if (mime.includes("aac")) ext = "aac";
+
+          const audioBytes = base64ToUint8Array(audio_base64);
+          const storagePath = `conv_${conv.id}/${Date.now()}_staff_voice.${ext}`;
+
+          const { error: uploadErr } = await supabase.storage
+            .from("whatsapp-media")
+            .upload(storagePath, audioBytes, {
+              contentType: mime,
+              upsert: true,
+            });
+
+          if (uploadErr) {
+            console.error("Failed to upload staff voice note to storage:", uploadErr);
+            throw new Error(`Failed to upload audio to storage: ${uploadErr.message}`);
+          }
+
+          const { data: pUrlData } = supabase.storage
+            .from("whatsapp-media")
+            .getPublicUrl(storagePath);
+          mediaUrl = pUrlData?.publicUrl || null;
+
+          if (settings.phoneId && settings.accessToken && mediaUrl) {
+            metaSendResult = await sendMetaWhatsAppAudioMessage(
+              settings.phoneId,
+              settings.accessToken,
+              conv.phone,
+              mediaUrl
+            );
+          }
+        } else {
+          if (settings.phoneId && settings.accessToken) {
+            metaSendResult = await sendMetaWhatsAppMessage(settings.phoneId, settings.accessToken, conv.phone, content);
+          }
+        }
+
+        const { data: newMsg, error: msgErr } = await supabase
+          .from("whatsapp_messages")
+          .insert({
+            conversation_id: conv.id,
+            sender: "staff",
+            sender_name: "Clinic Staff",
+            content: finalContent,
+            message_type: isAudio ? "audio" : "text",
+            media_url: mediaUrl,
+            whatsapp_message_id: metaSendResult?.messages?.[0]?.id || null,
+            status: metaSendResult ? "sent" : "recorded",
+          })
+          .select()
+          .single();
+
+        if (msgErr) throw msgErr;
+
+        await supabase
+          .from("whatsapp_conversations")
+          .update({
+            last_message: finalContent,
+            last_message_at: new Date().toISOString(),
+            unread_count: 0,
+          })
+          .eq("id", conv.id);
+
+        return jsonResponse({ success: true, message: newMsg, conversation_id: conv.id, media_url: mediaUrl });
+      }
+
+      // Case B: Incoming Webhook Event from Meta
+      if (body.object === "whatsapp_business_account" && Array.isArray(body.entry)) {
+        for (const entry of body.entry) {
+          const changes = entry.changes || [];
+          for (const change of changes) {
+            const value = change.value || {};
+
+            // Status updates (delivered, read)
+            if (Array.isArray(value.statuses)) {
+              for (const st of value.statuses) {
+                if (st.id && st.status) {
+                  await supabase
+                    .from("whatsapp_messages")
+                    .update({ status: st.status })
+                    .eq("whatsapp_message_id", st.id);
+                }
+              }
+            }
+
+            // Incoming messages
+            if (Array.isArray(value.messages)) {
+              for (const incoming of value.messages) {
+                const fromPhone = cleanPhone(incoming.from);
+                const messageId = incoming.id;
+                const contact = (value.contacts || []).find((c: any) => c.wa_id === incoming.from) || {};
+                const contactName = contact.profile?.name || `+${fromPhone}`;
+
+                let messageType = "text";
+                let textContent = "";
+                let mediaUrl: string | null = null;
+                let currentAudioPart: any = null;
+
+                if (incoming.type === "text") {
+                  messageType = "text";
+                  textContent = incoming.text?.body || "";
+                } else if (incoming.type === "image") {
+                  messageType = "image";
+                  textContent = incoming.image?.caption || "📷 Photo";
+                  const mediaRes = await processIncomingMedia(
+                    supabase,
+                    incoming.image?.id,
+                    settings.accessToken,
+                    fromPhone,
+                    "image.jpg"
+                  );
+                  mediaUrl = mediaRes.publicUrl;
+                } else if (incoming.type === "document") {
+                  messageType = "document";
+                  textContent = incoming.document?.filename || "📄 Document";
+                  const mediaRes = await processIncomingMedia(
+                    supabase,
+                    incoming.document?.id,
+                    settings.accessToken,
+                    fromPhone,
+                    incoming.document?.filename || "document.pdf"
+                  );
+                  mediaUrl = mediaRes.publicUrl;
+                } else if (incoming.type === "audio" || incoming.type === "voice") {
+                  messageType = "audio";
+                  textContent = "🎤 Voice Message";
+                  const mediaRes = await processIncomingMedia(
+                    supabase,
+                    incoming.audio?.id || incoming.voice?.id,
+                    settings.accessToken,
+                    fromPhone,
+                    "audio.ogg",
+                    true // include base64 for Gemini
+                  );
+                  mediaUrl = mediaRes.publicUrl;
+                  if (mediaRes.base64) {
+                    const rawMime = (mediaRes.mimeType || "audio/ogg").split(";")[0].trim();
+                    currentAudioPart = {
+                      inlineData: {
+                        mimeType: rawMime,
+                        data: mediaRes.base64,
+                      },
+                    };
+                  }
+                } else {
+                  messageType = "text";
+                  textContent = `[${incoming.type || "message"}]`;
+                }
+
+                // 1. Find or create conversation in whatsapp_conversations
+                let { data: conv } = await supabase
+                  .from("whatsapp_conversations")
+                  .select("*")
+                  .eq("phone", fromPhone)
+                  .maybeSingle();
+
+                if (!conv) {
+                  const tail = getPhoneTail(fromPhone);
+                  const { data: patient } = await supabase
+                    .from("patients")
+                    .select("id, name")
+                    .or(`phone.eq.${fromPhone},phone.ilike.%${tail}`)
+                    .maybeSingle();
+
+                  const patientName = patient?.name || contactName;
+                  const patientId = patient?.id || null;
+
+                  const { data: newConv, error: insertConvErr } = await supabase
+                    .from("whatsapp_conversations")
+                    .insert({
+                      phone: fromPhone,
+                      patient_id: patientId,
+                      patient_name: patientName,
+                      ai_enabled: true,
+                      last_message: textContent,
+                      last_message_at: new Date().toISOString(),
+                      unread_count: 1,
+                      status: "active",
+                    })
+                    .select()
+                    .single();
+
+                  if (insertConvErr) {
+                    console.error("Failed to insert conversation:", insertConvErr);
+                    continue;
+                  }
+                  conv = newConv;
+                } else {
+                  const { data: updatedConv } = await supabase
+                    .from("whatsapp_conversations")
+                    .update({
+                      last_message: textContent,
+                      last_message_at: new Date().toISOString(),
+                      unread_count: (conv.unread_count || 0) + 1,
+                    })
+                    .eq("id", conv.id)
+                    .select()
+                    .single();
+                  if (updatedConv) conv = updatedConv;
+                }
+
+                // 2. Insert incoming message into whatsapp_messages
+                const { error: msgInsertErr } = await supabase
+                  .from("whatsapp_messages")
+                  .insert({
+                    conversation_id: conv.id,
+                    sender: "patient",
+                    sender_name: conv.patient_name,
+                    content: textContent,
+                    message_type: messageType,
+                    media_url: mediaUrl,
+                    whatsapp_message_id: messageId,
+                    status: "received",
+                  });
+
+                if (msgInsertErr) {
+                  console.error("Failed to insert whatsapp message:", msgInsertErr);
+                }
+
+                // 3. Trigger AI Agent if enabled
+                const isAiActive = settings.enabled && conv.ai_enabled && conv.status !== "human_needed" && settings.geminiApiKey;
+
+                if (isAiActive) {
+                  const aiTask = (async () => {
+                    try {
+                      const { data: rawHistory } = await supabase
+                        .from("whatsapp_messages")
+                        .select("sender, content, media_url")
+                        .eq("conversation_id", conv.id)
+                        .order("created_at", { ascending: false })
+                        .limit(8);
+
+                      const history = (rawHistory || [])
+                        .reverse()
+                        .filter((m: any) => !m.content?.includes("أهلاً بك في عيادة لومين لطب الأسنان! 🦷✨"));
+
+                      const aiResponse = await runGeminiAgent(
+                        supabase,
+                        settings.geminiApiKey,
+                        settings.aiInstructions,
+                        conv,
+                        history.length > 0 ? history : [{ sender: "patient", content: textContent }],
+                        settings.aiModel || "gemini-3.5-flash-lite",
+                        currentAudioPart
+                      );
+
+                      let metaAiSend = null;
+                      if (settings.phoneId && settings.accessToken) {
+                        try {
+                          metaAiSend = await sendMetaWhatsAppMessage(
+                            settings.phoneId,
+                            settings.accessToken,
+                            fromPhone,
+                            aiResponse
+                          );
+                        } catch (sendErr) {
+                          console.warn("sendMetaWhatsAppMessage outbound failed:", sendErr);
+                        }
+                      }
+
+                      await supabase.from("whatsapp_messages").insert({
+                        conversation_id: conv.id,
+                        sender: "ai",
+                        sender_name: "Lumin AI Agent",
+                        content: aiResponse,
+                        message_type: "text",
+                        whatsapp_message_id: metaAiSend?.messages?.[0]?.id || null,
+                        status: metaAiSend ? "sent" : "recorded",
+                      });
+
+                      await supabase
+                        .from("whatsapp_conversations")
+                        .update({
+                          last_message: aiResponse,
+                          last_message_at: new Date().toISOString(),
+                        })
+                        .eq("id", conv.id);
+                    } catch (aiErr: any) {
+                      console.error("AI Agent processing error:", aiErr);
+                      try {
+                        const fallbackMsg = "أهلاً بك في عيادة لومين لطب الأسنان! 🦷✨ تم استلام رسالتك بنجاح وسيقوم فريق الاستقبال بالتواصل معك والمتابعة في أقرب وقت.";
+                        let metaFallbackSend = null;
+                        if (settings.phoneId && settings.accessToken) {
+                          try {
+                            metaFallbackSend = await sendMetaWhatsAppMessage(
+                              settings.phoneId,
+                              settings.accessToken,
+                              fromPhone,
+                              fallbackMsg
+                            );
+                          } catch (fallbackSendErr) {
+                            console.warn("sendMetaWhatsAppMessage fallback failed:", fallbackSendErr);
+                          }
+                        }
+                        await supabase.from("whatsapp_messages").insert({
+                          conversation_id: conv.id,
+                          sender: "ai",
+                          sender_name: "Lumin AI Agent",
+                          content: fallbackMsg,
+                          message_type: "text",
+                          whatsapp_message_id: metaFallbackSend?.messages?.[0]?.id || null,
+                          status: metaFallbackSend ? "sent" : "recorded",
+                        });
+                        await supabase
+                          .from("whatsapp_conversations")
+                          .update({
+                            last_message: fallbackMsg,
+                            last_message_at: new Date().toISOString(),
+                          })
+                          .eq("id", conv.id);
+                      } catch (fallbackErr) {
+                        console.error("Failed to store or send fallback message:", fallbackErr);
+                      }
+                    }
+                  })();
+
+                  if (typeof (globalThis as any).EdgeRuntime?.waitUntil === "function") {
+                    (globalThis as any).EdgeRuntime.waitUntil(aiTask);
+                  } else {
+                    await aiTask;
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        return jsonResponse({ status: "success" });
+      }
+
+      return jsonResponse({ status: "ignored" });
+    } catch (err: any) {
+      console.error("Webhook processing error:", err);
+      return jsonResponse({ error: err.message }, 500);
+    }
+  }
+
+  return new Response("Method not allowed", { status: 405 });
+});

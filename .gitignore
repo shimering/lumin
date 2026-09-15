@@ -12,3 +12,5 @@ storage-server/Storage/
 supabase/*
 !supabase/migrations/
 !supabase/migrations/*.sql
+!supabase/functions/
+!supabase/functions/**

@@ -5540,12 +5540,38 @@
                   <i data-lucide="bookmark" class="h-4 w-4"></i>
                 </button>
 
+                <!-- Voice Recording Button -->
+                <button type="button" id="whatsapp-voice-record-btn" onclick="toggleWhatsAppVoiceRecording()" class="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 transition mb-0.5" title="Record Voice Message">
+                  <i data-lucide="mic" class="h-4 w-4"></i>
+                </button>
+
                 <!-- Expanding Textarea -->
-                <div class="relative flex-1 min-w-0">
+                <div id="whatsapp-text-input-container" class="relative flex-1 min-w-0">
                   <textarea id="whatsapp-reply-input" rows="1" dir="auto" oninput="autoResizeWhatsAppInput(this)" onkeydown="handleWhatsAppInputKeydown(event)" placeholder="Type a message to send to patient on WhatsApp..." class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 sm:px-3.5 sm:py-2.5 text-xs sm:text-sm leading-relaxed outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition"></textarea>
                   <div class="hidden sm:flex items-center justify-between px-1 text-[10px] text-slate-400 mt-0.5">
                     <span id="whatsapp-replying-to-hint" class="truncate font-semibold">Replying directly via WhatsApp Cloud API</span>
                     <span class="opacity-70">Enter ↵ to send</span>
+                  </div>
+                </div>
+
+                <!-- Voice Recording Active Bar -->
+                <div id="whatsapp-voice-recording-bar" class="hidden flex-1 min-w-0 items-center justify-between rounded-xl border border-rose-200 bg-rose-50/80 px-3 py-2 mb-0.5">
+                  <div class="flex items-center gap-2">
+                    <span class="relative flex h-2.5 w-2.5">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+                    </span>
+                    <span id="whatsapp-voice-timer" class="font-mono text-xs font-bold text-rose-700">0:00</span>
+                    <span class="text-[11px] font-semibold text-rose-600 hidden sm:inline">Recording voice note...</span>
+                  </div>
+                  <div class="flex items-center gap-1.5">
+                    <button type="button" onclick="cancelWhatsAppVoiceRecording()" class="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-100 hover:text-rose-600 transition" title="Cancel & Discard">
+                      <i data-lucide="trash-2" class="h-3.5 w-3.5"></i>
+                    </button>
+                    <button type="button" onclick="sendWhatsAppVoiceRecording()" class="inline-flex h-7 items-center gap-1 rounded-lg bg-rose-600 px-2.5 text-[11px] font-black text-white hover:bg-rose-700 shadow-xs transition" title="Send Voice Message">
+                      <i data-lucide="send" class="h-3 w-3"></i>
+                      <span>Send Voice</span>
+                    </button>
                   </div>
                 </div>
 
@@ -5657,6 +5683,27 @@
           <span class="mb-1.5 block text-xs font-black text-slate-700">AI Booking Agent Instructions</span>
           <textarea id="setting-whatsapp-ai-prompt" rows="3" placeholder="You are Lumin Dental Clinic's friendly receptionist. Working hours: 10 AM to 8 PM, closed Friday..." class="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"></textarea>
         </label>
+
+        <!-- WhatsApp Media Storage Meter (1 GB Free Tier) -->
+        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <i data-lucide="hard-drive" class="h-4 w-4 text-emerald-600"></i>
+              <span class="text-xs font-black text-slate-800">Supabase Media Storage (1 GB Free Tier)</span>
+            </div>
+            <button type="button" onclick="refreshWhatsAppStorageUsage(true)" class="text-[10px] font-bold text-emerald-700 hover:text-emerald-800 transition flex items-center gap-1">
+              <i data-lucide="refresh-cw" class="h-3 w-3"></i> Refresh
+            </button>
+          </div>
+          <p class="text-[11px] text-slate-500">Audio voice notes, photos, and documents exchanged with patients are stored securely in Supabase Storage (<code class="font-mono text-[10px] bg-slate-200/80 px-1 py-0.5 rounded">whatsapp-media</code> bucket).</p>
+          <div class="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+            <div id="whatsapp-storage-progress" class="bg-gradient-to-r from-emerald-500 to-teal-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+          <div class="flex items-center justify-between text-[11px] font-bold">
+            <span id="whatsapp-storage-text" class="text-slate-700">Checking storage...</span>
+            <span id="whatsapp-storage-files" class="text-slate-400">0 files</span>
+          </div>
+        </div>
 
         <div class="flex items-center justify-end gap-3 pt-2">
           <button type="button" onclick="closeWhatsAppSettingsModal()" class="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition">Cancel</button>
@@ -29528,6 +29575,9 @@
     }
 
     async function selectWhatsAppConversation(convId) {
+      if (typeof isRecordingVoice !== 'undefined' && isRecordingVoice) {
+        cancelWhatsAppVoiceRecording();
+      }
       activeWhatsAppConversationId = convId;
       activeWhatsAppConversation = whatsappConversations.find(c => c.id === convId) || null;
       document.body.classList.toggle('whatsapp-mobile-chat-open', window.innerWidth < 768);
@@ -29891,6 +29941,211 @@
       }
     }
 
+    let mediaRecorder = null;
+    let audioMediaStream = null;
+    let audioChunks = [];
+    let voiceTimerInterval = null;
+    let voiceStartTime = 0;
+    let isRecordingVoice = false;
+
+    function getSupportedAudioMimeType() {
+      const candidates = [
+        'audio/mp4',
+        'audio/aac',
+        'audio/ogg;codecs=opus',
+        'audio/ogg',
+        'audio/webm;codecs=opus',
+        'audio/webm'
+      ];
+      for (const t of candidates) {
+        if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) {
+          return t;
+        }
+      }
+      return '';
+    }
+
+    async function startWhatsAppVoiceRecording() {
+      if (!activeWhatsAppConversationId) {
+        alert(currentUiLanguage === 'ar' ? 'يرجى اختيار محادثة أولاً' : 'Please select a conversation first');
+        return;
+      }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert(currentUiLanguage === 'ar' ? 'المتصفح لا يدعم تسجيل الصوت عبر الميكروفون' : 'Microphone audio recording is not supported in this browser');
+        return;
+      }
+
+      try {
+        audioMediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioChunks = [];
+        const mimeType = getSupportedAudioMimeType();
+        const options = mimeType ? { mimeType } : undefined;
+        mediaRecorder = new MediaRecorder(audioMediaStream, options);
+
+        mediaRecorder.ondataavailable = e => {
+          if (e.data && e.data.size > 0) {
+            audioChunks.push(e.data);
+          }
+        };
+
+        mediaRecorder.start(250);
+        isRecordingVoice = true;
+
+        const recordingBar = document.getElementById('whatsapp-voice-recording-bar');
+        const textContainer = document.getElementById('whatsapp-text-input-container');
+        const micBtn = document.getElementById('whatsapp-voice-record-btn');
+        const submitBtn = document.getElementById('whatsapp-reply-submit');
+        const timerEl = document.getElementById('whatsapp-voice-timer');
+
+        if (recordingBar) {
+          recordingBar.classList.remove('hidden');
+          recordingBar.classList.add('flex');
+        }
+        if (textContainer) textContainer.classList.add('hidden');
+        if (micBtn) micBtn.classList.add('hidden');
+        if (submitBtn) submitBtn.classList.add('hidden');
+
+        voiceStartTime = Date.now();
+        if (timerEl) timerEl.textContent = '0:00';
+        voiceTimerInterval = setInterval(() => {
+          const elapsedSec = Math.floor((Date.now() - voiceStartTime) / 1000);
+          const m = Math.floor(elapsedSec / 60);
+          const s = elapsedSec % 60;
+          if (timerEl) timerEl.textContent = `${m}:${s < 10 ? '0' : ''}${s}`;
+        }, 500);
+
+        lucide.createIcons();
+      } catch (err) {
+        console.error('Microphone access denied:', err);
+        alert(currentUiLanguage === 'ar' ? 'تعذر الوصول للميكروفون. يرجى السماح بالأذونات في المتصفح.' : 'Microphone access denied. Please grant microphone permissions in your browser.');
+        resetWhatsAppVoiceRecordingUI();
+      }
+    }
+
+    function toggleWhatsAppVoiceRecording() {
+      if (isRecordingVoice) {
+        cancelWhatsAppVoiceRecording();
+      } else {
+        startWhatsAppVoiceRecording();
+      }
+    }
+
+    function resetWhatsAppVoiceRecordingUI() {
+      isRecordingVoice = false;
+      if (voiceTimerInterval) {
+        clearInterval(voiceTimerInterval);
+        voiceTimerInterval = null;
+      }
+      audioChunks = [];
+      mediaRecorder = null;
+      if (audioMediaStream) {
+        audioMediaStream.getTracks().forEach(t => t.stop());
+        audioMediaStream = null;
+      }
+
+      const recordingBar = document.getElementById('whatsapp-voice-recording-bar');
+      const textContainer = document.getElementById('whatsapp-text-input-container');
+      const micBtn = document.getElementById('whatsapp-voice-record-btn');
+      const submitBtn = document.getElementById('whatsapp-reply-submit');
+      const timerEl = document.getElementById('whatsapp-voice-timer');
+
+      if (recordingBar) {
+        recordingBar.classList.add('hidden');
+        recordingBar.classList.remove('flex');
+      }
+      if (textContainer) textContainer.classList.remove('hidden');
+      if (micBtn) micBtn.classList.remove('hidden');
+      if (submitBtn) submitBtn.classList.remove('hidden');
+      if (timerEl) timerEl.textContent = '0:00';
+
+      const sendBtn = document.querySelector('#whatsapp-voice-recording-bar button[onclick="sendWhatsAppVoiceRecording()"]');
+      if (sendBtn) sendBtn.disabled = false;
+
+      lucide.createIcons();
+    }
+
+    function cancelWhatsAppVoiceRecording() {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.onstop = null;
+        mediaRecorder.stop();
+      }
+      resetWhatsAppVoiceRecordingUI();
+    }
+
+    async function sendWhatsAppVoiceRecording() {
+      if (!mediaRecorder || !isRecordingVoice) return;
+      if (!activeWhatsAppConversationId) return;
+
+      const convId = activeWhatsAppConversationId;
+      const sendBtn = document.querySelector('#whatsapp-voice-recording-bar button[onclick="sendWhatsAppVoiceRecording()"]');
+      if (sendBtn) sendBtn.disabled = true;
+
+      const stoppedPromise = new Promise(resolve => {
+        mediaRecorder.onstop = () => {
+          const mime = mediaRecorder.mimeType || 'audio/mp4';
+          const blob = new Blob(audioChunks, { type: mime });
+          resolve({ blob, mime });
+        };
+      });
+
+      mediaRecorder.stop();
+      if (audioMediaStream) {
+        audioMediaStream.getTracks().forEach(t => t.stop());
+        audioMediaStream = null;
+      }
+      if (voiceTimerInterval) {
+        clearInterval(voiceTimerInterval);
+        voiceTimerInterval = null;
+      }
+
+      try {
+        const { blob, mime } = await stoppedPromise;
+        if (!blob || blob.size < 100) {
+          alert(currentUiLanguage === 'ar' ? 'التسجيل قصير جداً' : 'Voice recording is too short');
+          resetWhatsAppVoiceRecordingUI();
+          return;
+        }
+
+        const base64Data = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+
+        const { data, error } = await db.functions.invoke('whatsapp-webhook', {
+          body: {
+            action: 'send_manual_message',
+            conversation_id: convId,
+            message_type: 'audio',
+            audio_base64: base64Data,
+            audio_mime_type: mime,
+            content: '🎤 Voice Message'
+          }
+        });
+
+        if (error) throw error;
+
+        if (data?.message) {
+          whatsappMessages = mergeWhatsAppMessages(whatsappMessages, data.message);
+          renderWhatsAppMessages(true);
+        } else {
+          await syncNewWhatsAppMessages(convId, true);
+        }
+
+        if (activeWhatsAppConversation) {
+          activeWhatsAppConversation.last_message = '🎤 Voice Message';
+          activeWhatsAppConversation.last_message_at = new Date().toISOString();
+          renderWhatsAppConversationsList();
+        }
+      } catch (err) {
+        console.error('Failed to send voice recording:', err);
+        alert(currentUiLanguage === 'ar' ? 'فشل إرسال التسجيل الصوتي: ' + (err.message || 'خطأ غير معروف') : 'Failed to send voice note: ' + (err.message || 'Unknown error'));
+      } finally {
+        resetWhatsAppVoiceRecordingUI();
+      }
+    }
+
     function renderActiveWhatsAppAiState() {
       if (!activeWhatsAppConversation) return;
 
@@ -30216,6 +30471,48 @@
       }
     }
 
+    async function refreshWhatsAppStorageUsage(showToast = false) {
+      const textEl = document.getElementById('whatsapp-storage-text');
+      const filesEl = document.getElementById('whatsapp-storage-files');
+      const progressEl = document.getElementById('whatsapp-storage-progress');
+      if (!textEl) return;
+
+      try {
+        const { data, error } = await db.rpc('get_whatsapp_storage_usage');
+        if (error) throw error;
+
+        const totalBytes = Number(data?.total_bytes || 0);
+        const maxBytes = Number(data?.max_bytes || 1073741824); // 1 GB
+        const totalFiles = Number(data?.total_files || 0);
+
+        const mbUsed = (totalBytes / (1024 * 1024)).toFixed(2);
+        const mbTotal = (maxBytes / (1024 * 1024)).toFixed(0);
+        const percent = Math.min(100, Math.max(0.1, (totalBytes / maxBytes) * 100));
+
+        textEl.textContent = `${mbUsed} MB / ${mbTotal} MB (${percent < 1 ? '<1' : percent.toFixed(1)}%)`;
+        if (filesEl) {
+          filesEl.textContent = `${totalFiles} ${totalFiles === 1 ? 'file' : 'files'}`;
+        }
+        if (progressEl) {
+          progressEl.style.width = `${percent}%`;
+          if (percent > 90) {
+            progressEl.className = 'bg-rose-500 h-2.5 rounded-full transition-all duration-500';
+          } else if (percent > 75) {
+            progressEl.className = 'bg-amber-500 h-2.5 rounded-full transition-all duration-500';
+          } else {
+            progressEl.className = 'bg-gradient-to-r from-emerald-500 to-teal-500 h-2.5 rounded-full transition-all duration-500';
+          }
+        }
+
+        if (showToast) {
+          showAppointmentNotificationToast('WhatsApp Storage', `WhatsApp media storage: ${mbUsed} MB used of 1 GB (${totalFiles} files).`);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch storage usage:', err);
+        if (textEl) textEl.textContent = 'Storage status unavailable';
+      }
+    }
+
     async function openWhatsAppSettingsModal() {
       const modal = document.getElementById('modal-whatsapp-settings');
       if (!modal) return;
@@ -30223,7 +30520,10 @@
       modal.classList.add('flex');
 
       try {
-        await loadWhatsAppSettingsIntoModal();
+        await Promise.all([
+          loadWhatsAppSettingsIntoModal(),
+          refreshWhatsAppStorageUsage()
+        ]);
       } catch (err) {
         console.warn('Could not load WhatsApp settings:', err);
         showAppointmentNotificationToast('WhatsApp Settings', err.message || 'Could not load WhatsApp settings.');
