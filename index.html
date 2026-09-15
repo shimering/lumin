@@ -15872,9 +15872,11 @@
       renderHrDoctorDetailKpis();
     }
 
-    function renderHrDoctorDetailKpis() {
+    function renderHrDoctorDetailKpis(user = null) {
       const container = document.getElementById('hr-doctor-detail-kpis');
       if (!container || !hrDoctorDetailDraft) return;
+      const doctor = user || hrDirectoryUsers.find(item => item.userId === hrDoctorDetailDraft.userId && item.active && item.isDoctor);
+      const payroll = doctor ? hrDoctorMetrics(doctor) : { salary: 0 };
       const schedule = normaliseHrSchedule(hrDoctorDetailDraft.schedule);
       const rules = hrDoctorDetailDraft.compensation.rules;
       const percentageCount = rules.filter(rule => rule.type === 'percentage').length;
@@ -15909,7 +15911,7 @@
       document.getElementById('hr-doctor-detail-save').classList.toggle('hidden', !canModifyHr());
       document.getElementById('hr-doctor-compensation-builder').classList.toggle('hidden', !canModifyHr());
       renderHrDoctorScheduleEditor(hrDoctorDetailDraft.schedule);
-      renderHrDoctorDetailKpis();
+      renderHrDoctorDetailKpis(user);
       renderHrDoctorPayroll(user);
       renderHrDoctorCompensationRules();
       updateHrDoctorCompensationBuilder();
