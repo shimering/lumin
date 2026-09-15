@@ -2772,11 +2772,33 @@
     }
 
     /* WhatsApp Center Styles */
+    #nav-btn-whatsapp {
+      position: relative;
+    }
+    #nav-whatsapp-unread-badge {
+      position: absolute;
+      z-index: 2;
+      inset-block-start: 0.2rem;
+      inset-inline-end: 0.3rem;
+      display: inline-flex;
+      min-width: 1.15rem;
+      height: 1.15rem;
+      align-items: center;
+      justify-content: center;
+      padding: 0 0.25rem;
+      line-height: 1;
+      pointer-events: none;
+      box-shadow: 0 0 0 2px #ffffff, 0 3px 8px rgba(5, 150, 105, 0.28);
+    }
+    #nav-whatsapp-unread-badge.hidden {
+      display: none !important;
+    }
     #view-whatsapp {
-      height: calc(100dvh - 8.5rem);
-      min-height: 32rem;
+      height: calc(100dvh - 3rem);
+      min-height: 40rem;
       display: flex;
       flex-direction: column;
+      gap: 1rem;
     }
     #view-whatsapp.hidden {
       display: none !important;
@@ -2784,7 +2806,7 @@
     .whatsapp-chat-shell {
       flex: 1 1 0%;
       min-height: 0;
-      height: 100% !important;
+      height: auto !important;
     }
     #whatsapp-sidebar,
     #whatsapp-main-chat,
@@ -2825,12 +2847,20 @@
       min-height: 38px;
       line-height: 1.4;
     }
+    @media (min-width: 768px) and (max-width: 1023px) {
+      #view-whatsapp {
+        height: calc(100dvh - 6.75rem - var(--mobile-nav-height));
+        min-height: 0;
+      }
+    }
     @media (max-width: 767px) {
       #view-whatsapp {
-        height: calc(100dvh - 7rem);
+        height: calc(100dvh - 5.75rem - var(--mobile-nav-height));
+        min-height: 0;
+        gap: 0.75rem;
       }
       .whatsapp-chat-shell {
-        height: calc(100dvh - 10.5rem) !important;
+        height: auto !important;
         min-height: 0 !important;
       }
       .whatsapp-mobile-chat-open #whatsapp-sidebar {
@@ -2851,18 +2881,35 @@
         overflow: hidden !important;
       }
       body.whatsapp-mobile-chat-open #app-header {
+        display: block !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+      }
+      body.whatsapp-mobile-chat-open #app-header-inner {
+        height: 0 !important;
+        min-height: 0 !important;
+        padding: 0 !important;
+      }
+      body.whatsapp-mobile-chat-open #clinic-brand,
+      body.whatsapp-mobile-chat-open #app-user-actions {
         display: none !important;
+      }
+      body.whatsapp-mobile-chat-open #app-primary-nav {
+        display: flex !important;
       }
       body.whatsapp-mobile-chat-open #app-main {
         padding: 0 !important;
         margin: 0 !important;
-        height: 100dvh !important;
-        max-height: 100dvh !important;
+        height: calc(100dvh - var(--mobile-nav-height)) !important;
+        max-height: calc(100dvh - var(--mobile-nav-height)) !important;
         overflow: hidden !important;
       }
       body.whatsapp-mobile-chat-open #view-whatsapp {
-        height: 100dvh !important;
-        max-height: 100dvh !important;
+        height: calc(100dvh - var(--mobile-nav-height)) !important;
+        max-height: calc(100dvh - var(--mobile-nav-height)) !important;
         padding: 0 !important;
         margin: 0 !important;
         gap: 0 !important;
@@ -2872,8 +2919,8 @@
         display: none !important;
       }
       body.whatsapp-mobile-chat-open .whatsapp-chat-shell {
-        height: 100dvh !important;
-        max-height: 100dvh !important;
+        height: calc(100dvh - var(--mobile-nav-height)) !important;
+        max-height: calc(100dvh - var(--mobile-nav-height)) !important;
         min-height: 0 !important;
         border: none !important;
         border-radius: 0 !important;
@@ -2881,13 +2928,13 @@
       }
       body.whatsapp-mobile-chat-open #whatsapp-main-chat,
       body.whatsapp-mobile-chat-open #whatsapp-chat-active {
-        height: 100dvh !important;
-        max-height: 100dvh !important;
+        height: calc(100dvh - var(--mobile-nav-height)) !important;
+        max-height: calc(100dvh - var(--mobile-nav-height)) !important;
         min-height: 0 !important;
         border-radius: 0 !important;
       }
       #whatsapp-reply-panel {
-        padding: 0.5rem 0.625rem max(0.5rem, env(safe-area-inset-bottom, 0px)) 0.625rem !important;
+        padding: 0.5rem 0.625rem !important;
       }
       #whatsapp-reply-input {
         font-size: 14px !important;
@@ -5224,7 +5271,7 @@
     </section>
 
     <!-- ================= VIEW: WHATSAPP CENTER ================= -->
-    <section id="view-whatsapp" class="hidden space-y-4">
+    <section id="view-whatsapp" class="hidden">
       <div class="app-page-bar">
         <div class="app-page-heading">
           <span class="app-page-icon text-emerald-600 bg-emerald-50" aria-hidden="true"><i data-lucide="message-circle"></i></span>
@@ -5245,7 +5292,7 @@
       </div>
 
       <!-- Main WhatsApp Chat Shell -->
-      <div class="whatsapp-chat-shell grid grid-cols-1 md:grid-cols-12 rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden" style="height: calc(100dvh - 13.5rem); min-height: 34rem;">
+      <div class="whatsapp-chat-shell grid grid-cols-1 md:grid-cols-12 rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
         
         <!-- Left Column: Conversations List -->
         <div id="whatsapp-sidebar" class="md:col-span-4 lg:col-span-4 border-r border-slate-200 flex flex-col h-full bg-slate-50/50">
@@ -28917,6 +28964,9 @@
 
         if (error) throw error;
         whatsappConversations = data || [];
+        if (activeWhatsAppConversationId) {
+          activeWhatsAppConversation = whatsappConversations.find(conv => conv.id === activeWhatsAppConversationId) || null;
+        }
         whatsappLoaded = true;
         updateWhatsAppNavBadge();
         renderWhatsAppConversationsList();
@@ -28927,22 +28977,72 @@
       }
     }
 
+    function getWhatsAppUnreadCount(conversation) {
+      return Math.max(0, Number(conversation?.unread_count) || 0);
+    }
+
+    function isActiveWhatsAppChatVisible() {
+      if (!realtimeViewIsVisible('whatsapp') || !activeWhatsAppConversationId) return false;
+      return window.innerWidth >= 768 || document.body.classList.contains('whatsapp-mobile-chat-open');
+    }
+
     function updateWhatsAppNavBadge() {
       const badge = document.getElementById('nav-whatsapp-unread-badge');
       if (!badge) return;
-      const totalUnread = (whatsappConversations || []).reduce((acc, conv) => acc + (conv.unread_count || 0), 0);
+      const navButton = document.getElementById('nav-btn-whatsapp');
+      const totalUnread = (whatsappConversations || []).reduce((acc, conv) => acc + getWhatsAppUnreadCount(conv), 0);
       if (totalUnread > 0) {
         badge.textContent = totalUnread > 99 ? '99+' : String(totalUnread);
         badge.classList.remove('hidden');
+        navButton?.setAttribute('aria-label', `WhatsApp, ${totalUnread} unread message${totalUnread === 1 ? '' : 's'}`);
       } else {
+        badge.textContent = '';
         badge.classList.add('hidden');
+        navButton?.setAttribute('aria-label', 'WhatsApp');
       }
+    }
+
+    async function markWhatsAppConversationRead(conversation = activeWhatsAppConversation, retryOnConflict = true) {
+      const conversationId = conversation?.id;
+      const unreadCount = getWhatsAppUnreadCount(conversation);
+      if (!conversationId || unreadCount === 0 || !isActiveWhatsAppChatVisible()) return true;
+
+      const localConversation = whatsappConversations.find(conv => conv.id === conversationId);
+      if (localConversation) localConversation.unread_count = 0;
+      if (activeWhatsAppConversationId === conversationId) activeWhatsAppConversation = localConversation || conversation;
+      if (activeWhatsAppConversation) activeWhatsAppConversation.unread_count = 0;
+      updateWhatsAppNavBadge();
+      renderWhatsAppConversationsList();
+
+      try {
+        const { data, error } = await db
+          .from('whatsapp_conversations')
+          .update({ unread_count: 0 })
+          .eq('id', conversationId)
+          .eq('unread_count', unreadCount)
+          .select('id, unread_count')
+          .maybeSingle();
+
+        if (error) throw error;
+        if (data) return true;
+
+        await fetchWhatsAppConversations();
+        if (retryOnConflict && activeWhatsAppConversationId === conversationId && isActiveWhatsAppChatVisible()) {
+          await loadWhatsAppMessages(conversationId, false);
+          return markWhatsAppConversationRead(activeWhatsAppConversation, false);
+        }
+      } catch (err) {
+        console.warn('Failed to mark WhatsApp conversation as read:', err);
+        await fetchWhatsAppConversations();
+      }
+      return false;
     }
 
     async function refreshWhatsAppRealtime() {
       await fetchWhatsAppConversations();
       if (activeWhatsAppConversationId) {
         await loadWhatsAppMessages(activeWhatsAppConversationId, false);
+        if (isActiveWhatsAppChatVisible()) await markWhatsAppConversationRead();
       }
     }
 
@@ -28953,6 +29053,7 @@
       await fetchWhatsAppConversations();
       if (activeWhatsAppConversationId) {
         await loadWhatsAppMessages(activeWhatsAppConversationId, false);
+        if (isActiveWhatsAppChatVisible()) await markWhatsAppConversationRead();
       }
       setTimeout(() => refreshIcon?.classList.remove('animate-spin'), 500);
       if (showToast) {
@@ -28963,7 +29064,13 @@
     async function renderWhatsAppView() {
       await ensureWhatsAppLoaded();
       renderWhatsAppConversationsList();
-      if (activeWhatsAppConversationId) {
+      if (window.innerWidth < 768) {
+        document.body.classList.remove('whatsapp-mobile-chat-open');
+        document.getElementById('whatsapp-chat-empty')?.classList.remove('hidden');
+        const activeChatEl = document.getElementById('whatsapp-chat-active');
+        activeChatEl?.classList.add('hidden');
+        activeChatEl?.classList.remove('flex');
+      } else if (activeWhatsAppConversationId) {
         await selectWhatsAppConversation(activeWhatsAppConversationId);
       } else if (whatsappConversations.length > 0) {
         await selectWhatsAppConversation(whatsappConversations[0].id);
@@ -29024,7 +29131,7 @@
       container.innerHTML = filtered.map(conv => {
         const isActive = conv.id === activeWhatsAppConversationId;
         const initials = (conv.patient_name || 'PA').trim().split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
-        const unreadCount = conv.unread_count || 0;
+        const unreadCount = getWhatsAppUnreadCount(conv);
         const timeStr = formatWhatsAppTime(conv.last_message_at);
         const isHumanNeeded = !conv.ai_enabled || conv.status === 'human_needed';
 
@@ -29063,7 +29170,7 @@
     async function selectWhatsAppConversation(convId) {
       activeWhatsAppConversationId = convId;
       activeWhatsAppConversation = whatsappConversations.find(c => c.id === convId) || null;
-      document.body.classList.add('whatsapp-mobile-chat-open');
+      document.body.classList.toggle('whatsapp-mobile-chat-open', window.innerWidth < 768);
 
       document.querySelectorAll('.whatsapp-conv-item').forEach(el => el.classList.remove('active'));
       const activeBtn = document.querySelector(`.whatsapp-conv-item[onclick*="${convId}"]`);
@@ -29093,15 +29200,11 @@
         if (aiLabel) aiLabel.textContent = activeWhatsAppConversation.ai_enabled ? 'AI Auto-Reply' : 'Human Mode';
         if (aiLabelMobile) aiLabelMobile.textContent = activeWhatsAppConversation.ai_enabled ? 'AI' : 'Staff';
 
-        if ((activeWhatsAppConversation.unread_count || 0) > 0) {
-          activeWhatsAppConversation.unread_count = 0;
-          updateWhatsAppNavBadge();
-          void db.from('whatsapp_conversations').update({ unread_count: 0 }).eq('id', convId);
-        }
         updateWhatsAppBarTakeoverState();
       }
 
       await loadWhatsAppMessages(convId, true);
+      if (activeWhatsAppConversationId === convId) await markWhatsAppConversationRead();
       lucide.createIcons();
       setTimeout(() => {
         const input = document.getElementById('whatsapp-reply-input');
