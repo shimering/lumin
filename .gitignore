@@ -9,4 +9,6 @@ node_modules/
 *.exe
 storage-server/Storage
 storage-server/Storage/
-supabase/
+supabase/*
+!supabase/migrations/
+!supabase/migrations/*.sql

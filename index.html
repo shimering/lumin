@@ -623,6 +623,17 @@
       font-weight: 750;
       letter-spacing: -0.012em;
     }
+    .procedure-step-admin-row {
+      grid-template-columns: auto minmax(0, 1fr) 5.5rem auto;
+    }
+    .procedure-step-clinical-row {
+      grid-template-columns: auto minmax(0, 1fr) minmax(11rem, auto) minmax(10rem, auto);
+    }
+    @media (max-width: 639px) {
+      .procedure-step-admin-row {
+        grid-template-columns: auto minmax(0, 1fr) 5.25rem auto;
+      }
+    }
     .finding-surface-toggle {
       min-width: 1.75rem;
       height: 1.65rem;
@@ -807,6 +818,12 @@
       #findings-container .finding-status-control {
         width: 12rem;
         flex: 0 0 12rem;
+      }
+      #findings-container .finding-row.has-procedure-steps {
+        flex-wrap: wrap;
+      }
+      #findings-container .finding-row.has-procedure-steps [data-procedure-steps-panel] {
+        flex: 0 0 100%;
       }
     }
 
@@ -4862,6 +4879,23 @@
               <div class="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3"><span class="block text-[10px] font-black uppercase tracking-wider text-slate-400">Permanent operation code</span><code id="admin-operation-code-preview" class="mt-1 block truncate text-xs font-bold text-slate-600">custom_operation</code></div>
               <label class="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3"><span><span class="block text-xs font-black text-slate-700">Active</span><span class="mt-0.5 block text-[10px] text-slate-400">Available in chart</span></span><input id="admin-operation-active" type="checkbox" checked class="h-4 w-4 rounded border-slate-300 text-blue-600" /></label>
             </div>
+            <div class="overflow-hidden rounded-2xl border border-cyan-200 bg-cyan-50/35">
+              <label class="flex cursor-pointer items-center justify-between gap-4 px-4 py-3.5">
+                <span><span class="block text-xs font-black text-slate-800">Divide this procedure into steps</span><span class="mt-1 block text-[10px] font-semibold leading-4 text-slate-500">Assign doctors and completion separately. The procedure completes when every step is completed.</span></span>
+                <input id="admin-operation-has-steps" type="checkbox" onchange="toggleDentalOperationSteps(this.checked)" class="h-4 w-4 shrink-0 rounded border-slate-300 text-cyan-600" />
+              </label>
+              <div id="admin-operation-steps-editor" class="hidden border-t border-cyan-100 bg-white p-4">
+                <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div><p class="text-xs font-black text-slate-800">Procedure steps</p><p class="mt-0.5 text-[10px] font-semibold text-slate-400">Add up to 5 steps. Their percentages must total exactly 100%.</p></div>
+                  <span id="admin-operation-steps-total" class="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black text-amber-700">0% of 100%</span>
+                </div>
+                <div id="admin-operation-steps-list" class="space-y-2"></div>
+                <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
+                  <button id="admin-operation-add-step" type="button" onclick="addDentalOperationStep()" class="inline-flex items-center gap-1.5 rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2 text-[10px] font-black text-cyan-700 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-40"><i data-lucide="plus" class="h-3.5 w-3.5"></i> Add step</button>
+                  <p id="admin-operation-steps-validation" class="text-[10px] font-bold text-amber-700" role="status">Add a step and allocate 100%.</p>
+                </div>
+              </div>
+            </div>
             <p id="admin-operation-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="status"></p>
             <div class="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
               <button id="admin-operation-cancel-button" type="button" onclick="resetDentalOperationForm()" class="hidden rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 hover:bg-slate-50">Cancel editing</button>
@@ -6414,6 +6448,7 @@
     let editingWhatsAppTemplateId = null;
     let editingDentalSpecialtyId = null;
     let editingDentalOperationId = null;
+    let dentalOperationStepDraft = [];
     let selectedAdminDentalSpecialtyId = '';
     let pendingDentalOperationDeletion = null;
     let editingPaymentMethodId = null;
@@ -6627,6 +6662,7 @@
     let activeClinicalOperationStatus = 'P';
     let documentedFindingsTab = 'treatment';
     let documentedFindingsStatusFilter = 'all';
+    let expandedFindingProcedureSteps = new Set();
     let showRootsAnatomy = true;
 
     // Appointment calendar state
@@ -8686,6 +8722,7 @@
         activeDiagnosisAppointmentId = null;
         selectedFindingIds = new Set();
         invoicedFindingIds = new Set();
+        expandedFindingProcedureSteps = new Set();
         chartInvoiceStatePatientId = null;
         chartInvoiceStateLoading = false;
         editingWhatsAppTemplateId = null;
@@ -10066,6 +10103,34 @@
       };
     }
 
+    const MAX_DENTAL_PROCEDURE_STEPS = 5;
+
+    function normaliseDentalProcedureSteps(value, options = {}) {
+      const requireCompleteTotal = options.requireCompleteTotal !== false;
+      const seen = new Set();
+      const steps = (Array.isArray(value) ? value : []).slice(0, MAX_DENTAL_PROCEDURE_STEPS).map(step => {
+        const id = String(step?.id || '').trim();
+        const name = String(step?.name || '').trim().slice(0, 100);
+        const percentage = Math.round(Number(step?.percentage) * 100) / 100;
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
+          || seen.has(id)
+          || !name
+          || !Number.isFinite(percentage)
+          || percentage <= 0
+          || percentage > 100) return null;
+        seen.add(id);
+        return { id, name, percentage };
+      }).filter(Boolean);
+      const total = Math.round(steps.reduce((sum, step) => sum + step.percentage, 0) * 100) / 100;
+      if (steps.length !== (Array.isArray(value) ? value.length : 0)) return [];
+      if (requireCompleteTotal && steps.length && total !== 100) return [];
+      return steps;
+    }
+
+    function dentalProcedureStepsTotal(steps) {
+      return Math.round((Array.isArray(steps) ? steps : []).reduce((sum, step) => sum + (Number(step?.percentage) || 0), 0) * 100) / 100;
+    }
+
     function normaliseDentalOperation(record) {
       return {
         id: record.id,
@@ -10078,6 +10143,7 @@
         active: Boolean(record.active),
         sortOrder: Number(record.sort_order) || 0,
         trackImplantProgress: Boolean(record.track_implant_progress),
+        steps: normaliseDentalProcedureSteps(record.procedure_steps),
         createdAt: record.created_at,
         updatedAt: record.updated_at
       };
@@ -10190,6 +10256,61 @@
         .slice(0, 20);
     }
 
+    function normaliseChartFindingStep(value) {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+      const id = String(value.id || value.stepId || value.step_id || '').trim();
+      const payrollFindingId = String(value.payrollFindingId || value.payroll_finding_id || '').trim();
+      const name = String(value.name || value.stepName || value.step_name || '').trim().slice(0, 100);
+      const percentage = Math.round(Number(value.percentage) * 100) / 100;
+      const status = ['P', 'In', 'C'].includes(value.status) ? value.status : 'P';
+      const doctorIdValue = value.doctorId || value.doctor_id;
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
+        || !name
+        || !Number.isFinite(percentage)
+        || percentage <= 0
+        || percentage > 100) return null;
+      return {
+        id,
+        payrollFindingId: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(payrollFindingId) ? payrollFindingId : null,
+        name,
+        percentage,
+        status,
+        doctorId: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(doctorIdValue || '')) ? String(doctorIdValue) : null,
+        doctorName: String(value.doctorName || value.doctor_name || '').trim().slice(0, 100),
+        completedAt: normaliseChartCreatedAt(value.completedAt || value.completed_at)
+      };
+    }
+
+    function normaliseChartFindingSteps(value) {
+      const seen = new Set();
+      const steps = (Array.isArray(value) ? value : []).slice(0, MAX_DENTAL_PROCEDURE_STEPS)
+        .map(normaliseChartFindingStep)
+        .filter(step => step && !seen.has(step.id) && seen.add(step.id));
+      return steps.length && dentalProcedureStepsTotal(steps) === 100 ? steps : [];
+    }
+
+    function createChartFindingSteps(definitions, initialStatus = 'P') {
+      const steps = normaliseDentalProcedureSteps(definitions);
+      if (!steps.length || initialStatus === 'E') return [];
+      const completedAt = initialStatus === 'C' ? new Date().toISOString() : null;
+      return steps.map((step, index) => ({
+        ...step,
+        payrollFindingId: createChartFindingId(),
+        status: initialStatus === 'C' ? 'C' : initialStatus === 'In' && index === 0 ? 'In' : 'P',
+        doctorId: null,
+        doctorName: '',
+        completedAt
+      }));
+    }
+
+    function chartFindingStatusFromSteps(steps, fallback = 'P') {
+      const normalisedSteps = normaliseChartFindingSteps(steps);
+      if (!normalisedSteps.length) return normaliseOperationStatus(fallback, 'P');
+      if (normalisedSteps.every(step => step.status === 'C')) return 'C';
+      if (normalisedSteps.some(step => step.status === 'C' || step.status === 'In')) return 'In';
+      return 'P';
+    }
+
     function normaliseChartFinding(value) {
       if (value && typeof value === 'object' && !Array.isArray(value)) {
         const hasStoredPrice = value.price !== null && value.price !== undefined && String(value.price).trim() !== '';
@@ -10199,9 +10320,11 @@
         const billingMultiplier = Number(billingMultiplierValue);
         const doctorIdValue = value.doctorId || value.doctor_id;
         const doctorNameValue = value.doctorName || value.doctor_name;
+        const steps = normaliseChartFindingSteps(value.steps || value.procedureSteps || value.procedure_steps);
+        const isProcedureStep = Boolean(value.isProcedureStep || value.is_procedure_step);
         return {
           code: String(value.code || value.operation || value.value || 'none'),
-          status: normaliseOperationStatus(value.status, 'E'),
+          status: steps.length ? chartFindingStatusFromSteps(steps, value.status) : normaliseOperationStatus(value.status, 'E'),
           createdAt: normaliseChartCreatedAt(value.createdAt || value.created_at),
           completedAt: normaliseChartCreatedAt(value.completedAt || value.completed_at),
           id: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value.id || '')) ? String(value.id) : null,
@@ -10210,10 +10333,16 @@
           billingMultiplier: Number.isInteger(billingMultiplier) && billingMultiplier >= 1 && billingMultiplier <= 999 ? billingMultiplier : null,
           doctorId: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(doctorIdValue || '')) ? String(doctorIdValue) : null,
           doctorName: String(doctorNameValue || '').trim().slice(0, 100),
-          notes: normaliseChartOperationNotes(value.notes)
+          notes: normaliseChartOperationNotes(value.notes),
+          steps,
+          isProcedureStep,
+          parentFindingId: isProcedureStep && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value.parentFindingId || value.parent_finding_id || '')) ? String(value.parentFindingId || value.parent_finding_id) : null,
+          procedureStepId: isProcedureStep ? String(value.procedureStepId || value.procedure_step_id || '').trim() : '',
+          procedureStepName: isProcedureStep ? String(value.procedureStepName || value.procedure_step_name || '').trim().slice(0, 100) : '',
+          procedureStepPercentage: isProcedureStep ? Math.max(0, Math.min(100, Number(value.procedureStepPercentage || value.procedure_step_percentage) || 0)) : 0
         };
       }
-      return { code: String(value || 'none'), status: 'E', createdAt: null, completedAt: null, id: null, price: null, batchId: null, billingMultiplier: null, doctorId: null, doctorName: '', notes: [] };
+      return { code: String(value || 'none'), status: 'E', createdAt: null, completedAt: null, id: null, price: null, batchId: null, billingMultiplier: null, doctorId: null, doctorName: '', notes: [], steps: [], isProcedureStep: false, parentFindingId: null, procedureStepId: '', procedureStepName: '', procedureStepPercentage: 0 };
     }
 
     function createChartFindingId() {
@@ -10263,19 +10392,33 @@
       return amountByFindingId;
     }
 
-    function chartFindingStorageRecord(code, status, createdAt = null, id = null, price = null, batchId = null, notes = null, billingMultiplier = null, doctorId = null, doctorName = '', completedAt = null) {
+    function chartFindingProcedureStepMeta(finding) {
+      return finding?.isProcedureStep ? {
+        isProcedureStep: true,
+        parentFindingId: finding.parentFindingId,
+        procedureStepId: finding.procedureStepId,
+        procedureStepName: finding.procedureStepName,
+        procedureStepPercentage: finding.procedureStepPercentage
+      } : null;
+    }
+
+    function chartFindingStorageRecord(code, status, createdAt = null, id = null, price = null, batchId = null, notes = null, billingMultiplier = null, doctorId = null, doctorName = '', completedAt = null, steps = null, procedureStepMeta = null) {
       const hasExplicitPrice = price !== null && price !== undefined && String(price).trim() !== '';
       const numericPrice = hasExplicitPrice ? Number(price) : Number.NaN;
+      const normalisedSteps = normaliseChartFindingSteps(steps);
       const record = {
         code: String(code || 'none'),
-        status: normaliseOperationStatus(status, 'E'),
+        status: normalisedSteps.length ? chartFindingStatusFromSteps(normalisedSteps, status) : normaliseOperationStatus(status, 'E'),
         id: id || createChartFindingId(),
         price: Number.isFinite(numericPrice) && numericPrice >= 0 ? numericPrice : chartFindingDefaultPrice(code)
       };
       const normalisedCreatedAt = normaliseChartCreatedAt(createdAt);
       if (normalisedCreatedAt) record.createdAt = normalisedCreatedAt;
       const normalisedCompletedAt = normaliseChartCreatedAt(completedAt);
-      if (normalisedCompletedAt) record.completedAt = normalisedCompletedAt;
+      const stepCompletedAt = record.status === 'C'
+        ? normalisedSteps.map(step => step.completedAt).filter(Boolean).sort().at(-1) || null
+        : null;
+      if (normalisedCompletedAt || stepCompletedAt) record.completedAt = normalisedCompletedAt || stepCompletedAt;
       if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(batchId || ''))) {
         record.batchId = String(batchId);
         const numericBillingMultiplier = Number(billingMultiplier);
@@ -10290,6 +10433,22 @@
       }
       const normalisedNotes = normaliseChartOperationNotes(notes);
       if (normalisedNotes.length) record.notes = normalisedNotes;
+      if (normalisedSteps.length) record.steps = normalisedSteps.map(step => ({
+        id: step.id,
+        payrollFindingId: step.payrollFindingId || createChartFindingId(),
+        name: step.name,
+        percentage: step.percentage,
+        status: step.status,
+        ...(step.doctorId ? { doctorId: step.doctorId, doctorName: step.doctorName } : {}),
+        ...(step.completedAt ? { completedAt: step.completedAt } : {})
+      }));
+      if (procedureStepMeta?.isProcedureStep) {
+        record.isProcedureStep = true;
+        record.parentFindingId = String(procedureStepMeta.parentFindingId || '');
+        record.procedureStepId = String(procedureStepMeta.procedureStepId || '');
+        record.procedureStepName = String(procedureStepMeta.procedureStepName || '').trim().slice(0, 100);
+        record.procedureStepPercentage = Math.max(0, Math.min(100, Number(procedureStepMeta.procedureStepPercentage) || 0));
+      }
       return record;
     }
 
@@ -10320,7 +10479,9 @@
           finding.billingMultiplier,
           finding.doctorId,
           finding.doctorName,
-          finding.completedAt
+          finding.completedAt,
+          finding.steps,
+          chartFindingProcedureStepMeta(finding)
         ));
       if (records.length) toothData.surfaces[surface] = records;
       else delete toothData.surfaces[surface];
@@ -10345,7 +10506,7 @@
 
     function ensureWholeOperations(toothData) {
       toothData.wholeOperations = chartWholeFindings(toothData).map(finding => (
-        chartFindingStorageRecord(finding.code, finding.status, finding.createdAt, finding.id, finding.price, finding.batchId, finding.notes, finding.billingMultiplier, finding.doctorId, finding.doctorName, finding.completedAt)
+        chartFindingStorageRecord(finding.code, finding.status, finding.createdAt, finding.id, finding.price, finding.batchId, finding.notes, finding.billingMultiplier, finding.doctorId, finding.doctorName, finding.completedAt, finding.steps, chartFindingProcedureStepMeta(finding))
       ));
       toothData.status = 'none';
       return toothData.wholeOperations;
@@ -10361,7 +10522,7 @@
     function ensureMouthOperations(patient) {
       const meta = ensureChartMeta(patient);
       meta.mouthOperations = chartMouthFindings(patient).map(finding => (
-        chartFindingStorageRecord(finding.code, finding.status, finding.createdAt, finding.id, finding.price, null, finding.notes, null, finding.doctorId, finding.doctorName, finding.completedAt)
+        chartFindingStorageRecord(finding.code, finding.status, finding.createdAt, finding.id, finding.price, null, finding.notes, null, finding.doctorId, finding.doctorName, finding.completedAt, finding.steps, chartFindingProcedureStepMeta(finding))
       ));
       return meta.mouthOperations;
     }
@@ -10382,7 +10543,9 @@
           null,
           finding.doctorId,
           finding.doctorName,
-          finding.completedAt
+          finding.completedAt,
+          finding.steps,
+          chartFindingProcedureStepMeta(finding)
         ));
       if (records.length) meta.mouthOperations = records;
       else delete meta.mouthOperations;
@@ -10436,12 +10599,64 @@
             finding.billingMultiplier,
             finding.doctorId,
             finding.doctorName,
-            finding.completedAt
+            finding.completedAt,
+            finding.steps,
+            chartFindingProcedureStepMeta(finding)
           ));
         });
         toothData.surfaces = nextSurfaces;
       });
       return previousState !== stableJsonStringify(patient.chartState);
+    }
+
+    function rebuildChartProcedureStepPayrollFindings(patient) {
+      if (!patient?.chartState || typeof patient.chartState !== 'object' || Array.isArray(patient.chartState)) return [];
+      let groups = collectDocumentedFindings(patient);
+      groups.flatMap(group => group.memberFindings || [group]).forEach(finding => {
+        if (!finding.id || !finding.steps?.length || finding.steps.every(step => step.payrollFindingId)) return;
+        updateChartFindingById(patient, finding.id, current => ({
+          ...current,
+          steps: current.steps.map(step => ({ ...step, payrollFindingId: step.payrollFindingId || createChartFindingId() }))
+        }));
+      });
+      groups = collectDocumentedFindings(patient);
+
+      const payrollFindings = [];
+      groups.forEach(group => {
+        const members = group.memberFindings || [group];
+        const groupTotal = group.batchId ? chartFindingBatchTotal(group, members.length) : null;
+        members.forEach(member => {
+          const memberValue = groupTotal === null ? Math.max(0, Number(member.price) || 0) : groupTotal / Math.max(1, members.length);
+          normaliseChartFindingSteps(member.steps).forEach(step => {
+            const weightedValue = Math.round(memberValue * step.percentage) / 100;
+            payrollFindings.push(chartFindingStorageRecord(
+              member.code,
+              step.status,
+              member.createdAt,
+              step.payrollFindingId,
+              weightedValue,
+              null,
+              null,
+              null,
+              step.doctorId,
+              step.doctorName,
+              step.completedAt,
+              null,
+              {
+                isProcedureStep: true,
+                parentFindingId: member.id,
+                procedureStepId: step.id,
+                procedureStepName: step.name,
+                procedureStepPercentage: step.percentage
+              }
+            ));
+          });
+        });
+      });
+
+      const regularMouthFindings = chartMouthFindings(patient).filter(finding => !finding.isProcedureStep);
+      storeMouthOperations(patient, [...regularMouthFindings, ...payrollFindings]);
+      return payrollFindings.map(finding => finding.id).filter(Boolean);
     }
 
     function operationStatusDefinition(status) {
@@ -10471,11 +10686,14 @@
         return false;
       }
 
-      const [specialtiesResult, operationsResult] = await Promise.all([
+      let [specialtiesResult, operationsResult] = await Promise.all([
         db.from('dental_specialties').select('id, name, description, icon_name, accent_color, active, sort_order, created_at, updated_at').order('sort_order').order('name'),
-        db.from('dental_operations').select('id, specialty_id, code, name, action_scope, visual_code, price, active, sort_order, track_implant_progress, created_at, updated_at').order('sort_order').order('name')
+        db.from('dental_operations').select('id, specialty_id, code, name, action_scope, visual_code, price, active, sort_order, track_implant_progress, procedure_steps, created_at, updated_at').order('sort_order').order('name')
       ]);
       if (specialtiesResult.error) throw specialtiesResult.error;
+      if (operationsResult.error && /procedure_steps/i.test(String(operationsResult.error.message || ''))) {
+        operationsResult = await db.from('dental_operations').select('id, specialty_id, code, name, action_scope, visual_code, price, active, sort_order, track_implant_progress, created_at, updated_at').order('sort_order').order('name');
+      }
       if (operationsResult.error) throw operationsResult.error;
       dentalSpecialties = (specialtiesResult.data || []).map(normaliseDentalSpecialty);
       applySavedPricesSpecialtiesOrder();
@@ -10700,11 +10918,11 @@
       const operation = dentalOperations.find(item => item.id === operationId && item.active);
       if (!operation) return;
       if (operation.actionScope === 'mouth') {
-        applyMouthOperation(operation.code, activeClinicalOperationStatus, operation.price);
+        applyMouthOperation(operation.code, activeClinicalOperationStatus, operation.price, operation.steps);
       } else if (operation.actionScope === 'surface') {
-        applySurfaceCondition(operation.code, activeClinicalOperationStatus, operation.price);
+        applySurfaceCondition(operation.code, activeClinicalOperationStatus, operation.price, operation.steps);
       } else {
-        applyToothStatus(operation.code, activeClinicalOperationStatus, operation.price);
+        applyToothStatus(operation.code, activeClinicalOperationStatus, operation.price, operation.steps);
       }
     }
 
@@ -10759,6 +10977,96 @@
       lucide.createIcons();
     }
 
+    function dentalOperationStepsAreValid(steps = dentalOperationStepDraft) {
+      if (!Array.isArray(steps) || !steps.length || steps.length > MAX_DENTAL_PROCEDURE_STEPS) return false;
+      if (steps.some(step => !String(step?.name || '').trim() || !Number.isFinite(Number(step?.percentage)) || Number(step.percentage) <= 0 || Number(step.percentage) > 100)) return false;
+      return dentalProcedureStepsTotal(steps) === 100;
+    }
+
+    function renderDentalOperationStepsEditor() {
+      const enabled = Boolean(document.getElementById('admin-operation-has-steps')?.checked);
+      const editor = document.getElementById('admin-operation-steps-editor');
+      const list = document.getElementById('admin-operation-steps-list');
+      const totalBadge = document.getElementById('admin-operation-steps-total');
+      const validation = document.getElementById('admin-operation-steps-validation');
+      const addButton = document.getElementById('admin-operation-add-step');
+      const saveButton = document.getElementById('admin-operation-save-button');
+      if (!editor || !list || !totalBadge || !validation || !addButton || !saveButton) return;
+      editor.classList.toggle('hidden', !enabled);
+      const total = dentalProcedureStepsTotal(dentalOperationStepDraft);
+      const valid = enabled && dentalOperationStepsAreValid();
+      list.innerHTML = dentalOperationStepDraft.map((step, index) => `<div class="procedure-step-admin-row grid items-end gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-2.5">
+        <span class="mb-1 flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-100 text-[10px] font-black text-cyan-700">${index + 1}</span>
+        <label class="min-w-0"><span class="mb-1 block text-[9px] font-black uppercase tracking-wider text-slate-400">Step name</span><input type="text" minlength="1" maxlength="100" value="${escapeHtml(step.name)}" oninput="updateDentalOperationStep(${index},'name',this.value)" placeholder="e.g. Access" class="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold text-slate-800 outline-none focus:border-cyan-400" aria-label="Step ${index + 1} name"></label>
+        <label><span class="mb-1 block text-[9px] font-black uppercase tracking-wider text-slate-400">Share</span><span class="flex overflow-hidden rounded-lg border border-slate-200 bg-white focus-within:border-cyan-400"><input type="number" min="0.01" max="100" step="0.01" value="${escapeHtml(step.percentage)}" oninput="updateDentalOperationStep(${index},'percentage',this.value)" class="min-w-0 w-full px-2 py-2 text-right text-xs font-black text-slate-800 outline-none" aria-label="Step ${index + 1} percentage"><span class="flex items-center bg-slate-100 px-2 text-[10px] font-black text-slate-500">%</span></span></label>
+        <button type="button" onclick="removeDentalOperationStep(${index})" class="mb-0.5 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100" aria-label="Remove step ${index + 1}"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button>
+      </div>`).join('') || '<div class="rounded-xl border border-dashed border-slate-300 px-4 py-6 text-center text-xs font-bold text-slate-400">No steps yet. Add the first step to begin.</div>';
+      totalBadge.textContent = `${total}% of 100%`;
+      totalBadge.className = `rounded-full px-2.5 py-1 text-[10px] font-black ${valid ? 'bg-emerald-100 text-emerald-700' : total > 100 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`;
+      validation.textContent = !enabled
+        ? ''
+        : !dentalOperationStepDraft.length
+          ? 'Add at least one step.'
+          : valid
+            ? `${dentalOperationStepDraft.length} step${dentalOperationStepDraft.length === 1 ? '' : 's'} ready to save.`
+            : total > 100
+              ? `Reduce the total by ${Math.round((total - 100) * 100) / 100}%.`
+              : `Allocate the remaining ${Math.round((100 - total) * 100) / 100}%.`;
+      validation.className = `text-[10px] font-bold ${valid ? 'text-emerald-700' : total > 100 ? 'text-red-700' : 'text-amber-700'}`;
+      addButton.disabled = dentalOperationStepDraft.length >= MAX_DENTAL_PROCEDURE_STEPS;
+      saveButton.disabled = enabled && !valid;
+      lucide.createIcons();
+    }
+
+    function toggleDentalOperationSteps(enabled) {
+      if (enabled && !dentalOperationStepDraft.length) {
+        dentalOperationStepDraft = [{ id: createChartFindingId(), name: '', percentage: 100 }];
+      }
+      renderDentalOperationStepsEditor();
+    }
+
+    function addDentalOperationStep() {
+      if (dentalOperationStepDraft.length >= MAX_DENTAL_PROCEDURE_STEPS) return;
+      let percentage = Math.max(0, Math.round((100 - dentalProcedureStepsTotal(dentalOperationStepDraft)) * 100) / 100);
+      if (dentalOperationStepDraft.length && percentage === 0) {
+        const lastStep = dentalOperationStepDraft[dentalOperationStepDraft.length - 1];
+        const split = Math.round(Number(lastStep.percentage || 0) * 50) / 100;
+        lastStep.percentage = Math.round((Number(lastStep.percentage || 0) - split) * 100) / 100;
+        percentage = split;
+      }
+      dentalOperationStepDraft.push({ id: createChartFindingId(), name: '', percentage });
+      renderDentalOperationStepsEditor();
+      document.querySelector('#admin-operation-steps-list > div:last-child input[type="text"]')?.focus();
+    }
+
+    function updateDentalOperationStep(index, field, value) {
+      const step = dentalOperationStepDraft[Number(index)];
+      if (!step) return;
+      if (field === 'name') step.name = String(value || '').slice(0, 100);
+      if (field === 'percentage') step.percentage = value === '' ? 0 : Math.round(Number(value) * 100) / 100;
+      const activeElement = document.activeElement;
+      const totalBadge = document.getElementById('admin-operation-steps-total');
+      const validation = document.getElementById('admin-operation-steps-validation');
+      const saveButton = document.getElementById('admin-operation-save-button');
+      const total = dentalProcedureStepsTotal(dentalOperationStepDraft);
+      const valid = dentalOperationStepsAreValid();
+      if (totalBadge) {
+        totalBadge.textContent = `${total}% of 100%`;
+        totalBadge.className = `rounded-full px-2.5 py-1 text-[10px] font-black ${valid ? 'bg-emerald-100 text-emerald-700' : total > 100 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`;
+      }
+      if (validation) {
+        validation.textContent = valid ? `${dentalOperationStepDraft.length} step${dentalOperationStepDraft.length === 1 ? '' : 's'} ready to save.` : total > 100 ? `Reduce the total by ${Math.round((total - 100) * 100) / 100}%.` : `Allocate the remaining ${Math.round((100 - total) * 100) / 100}%.`;
+        validation.className = `text-[10px] font-bold ${valid ? 'text-emerald-700' : total > 100 ? 'text-red-700' : 'text-amber-700'}`;
+      }
+      if (saveButton) saveButton.disabled = !valid;
+      if (activeElement instanceof HTMLInputElement) activeElement.setAttribute('aria-invalid', String(!valid));
+    }
+
+    function removeDentalOperationStep(index) {
+      dentalOperationStepDraft.splice(Number(index), 1);
+      renderDentalOperationStepsEditor();
+    }
+
     function resetDentalSpecialtyForm() {
       editingDentalSpecialtyId = null;
       const form = document.getElementById('admin-dental-specialty-form');
@@ -10775,16 +11083,19 @@
 
     function resetDentalOperationForm() {
       editingDentalOperationId = null;
+      dentalOperationStepDraft = [];
       const form = document.getElementById('admin-dental-operation-form');
       if (!form) return;
       form.reset();
       document.getElementById('admin-operation-sort-order').value = '10';
       document.getElementById('admin-operation-price').value = '0';
       document.getElementById('admin-operation-active').checked = true;
+      document.getElementById('admin-operation-has-steps').checked = false;
       document.getElementById('admin-operation-form-title').textContent = 'Add clinical operation';
       document.getElementById('admin-operation-cancel-button').classList.add('hidden');
       setAdminMessage('admin-operation-message', '');
       renderDentalVisualPresetOptions();
+      renderDentalOperationStepsEditor();
       updateDentalOperationCodePreview();
     }
 
@@ -10817,9 +11128,12 @@
       document.getElementById('admin-operation-sort-order').value = operation.sortOrder;
       document.getElementById('admin-operation-price').value = String(operation.price);
       document.getElementById('admin-operation-active').checked = operation.active;
+      dentalOperationStepDraft = operation.steps.map(step => ({ ...step }));
+      document.getElementById('admin-operation-has-steps').checked = dentalOperationStepDraft.length > 0;
       document.getElementById('admin-operation-form-title').textContent = 'Edit clinical operation';
       document.getElementById('admin-operation-cancel-button').classList.remove('hidden');
       renderDentalVisualPresetOptions(operation.visualCode);
+      renderDentalOperationStepsEditor();
       updateDentalOperationCodePreview();
       setAdminMessage('admin-operation-message', '');
       document.getElementById('admin-dental-operation-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -10868,6 +11182,12 @@
       const specialtyId = document.getElementById('admin-operation-specialty').value;
       const actionScope = document.getElementById('admin-operation-scope').value;
       const existingOperation = dentalOperations.find(operation => operation.id === operationId);
+      const stepsEnabled = document.getElementById('admin-operation-has-steps').checked;
+      if (stepsEnabled && !dentalOperationStepsAreValid()) {
+        renderDentalOperationStepsEditor();
+        return setAdminMessage('admin-operation-message', 'Procedure step percentages must total exactly 100% before saving.', 'error');
+      }
+      const procedureSteps = stepsEnabled ? normaliseDentalProcedureSteps(dentalOperationStepDraft) : [];
       const payload = {
         specialty_id: specialtyId,
         name,
@@ -10875,7 +11195,8 @@
         visual_code: actionScope === 'mouth' ? 'none' : document.getElementById('admin-operation-visual-code').value,
         price: Math.max(0, Number(document.getElementById('admin-operation-price').value) || 0),
         sort_order: Number(document.getElementById('admin-operation-sort-order').value) || 0,
-        active: document.getElementById('admin-operation-active').checked
+        active: document.getElementById('admin-operation-active').checked,
+        procedure_steps: procedureSteps
       };
       if (!operationId) payload.code = dentalOperationCode(name, specialtyId);
       button.disabled = true;
@@ -11149,7 +11470,7 @@
 
       operationsList.innerHTML = selectedOperations.length ? selectedOperations.map((operation, index) => `<article class="grid grid-cols-[auto_minmax(0,1fr)] gap-3 p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
         <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-[10px] font-black text-slate-500">${index + 1}</span>
-        <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><h5 class="text-sm font-black text-slate-800">${escapeHtml(operation.name)}</h5><span class="rounded-md border px-2 py-0.5 text-[10px] font-black ${dentalOperationBadgeClass(operation.code, operation.actionScope)}">${dentalOperationScopeLabel(operation.actionScope, 'Surfaces')}</span><span class="rounded-md bg-violet-50 px-2 py-0.5 text-[10px] font-black text-violet-700">${escapeHtml(formatInvoiceMoney(operation.price))}</span><span class="rounded-md px-2 py-0.5 text-[10px] font-black ${operation.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">${operation.active ? 'Active' : 'Inactive'}</span></div><p class="mt-1.5 break-all font-mono text-[10px] leading-4 text-slate-400">${escapeHtml(operation.code)} · visual: ${escapeHtml(operation.visualCode)} · order ${operation.sortOrder}</p></div>
+        <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><h5 class="text-sm font-black text-slate-800">${escapeHtml(operation.name)}</h5><span class="rounded-md border px-2 py-0.5 text-[10px] font-black ${dentalOperationBadgeClass(operation.code, operation.actionScope)}">${dentalOperationScopeLabel(operation.actionScope, 'Surfaces')}</span><span class="rounded-md bg-violet-50 px-2 py-0.5 text-[10px] font-black text-violet-700">${escapeHtml(formatInvoiceMoney(operation.price))}</span>${operation.steps.length ? `<span class="inline-flex items-center gap-1 rounded-md bg-cyan-50 px-2 py-0.5 text-[10px] font-black text-cyan-700"><i data-lucide="list-checks" class="h-3 w-3"></i>${operation.steps.length} step${operation.steps.length === 1 ? '' : 's'}</span>` : ''}<span class="rounded-md px-2 py-0.5 text-[10px] font-black ${operation.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">${operation.active ? 'Active' : 'Inactive'}</span></div><p class="mt-1.5 break-all font-mono text-[10px] leading-4 text-slate-400">${escapeHtml(operation.code)} · visual: ${escapeHtml(operation.visualCode)} · order ${operation.sortOrder}</p></div>
         <div class="col-span-2 flex flex-wrap justify-end gap-2 sm:col-span-1"><button type="button" onclick="setDentalOperationActive('${operation.id}', ${!operation.active})" class="rounded-lg border px-2.5 py-2 text-[10px] font-black ${operation.active ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}">${operation.active ? 'Deactivate' : 'Activate'}</button><button type="button" onclick="editDentalOperation('${operation.id}')" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-black text-slate-600 hover:bg-slate-50"><i data-lucide="pencil" class="h-3.5 w-3.5"></i> Edit</button><button type="button" onclick="openDentalOperationDeleteModal('${operation.id}')" class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[10px] font-black text-red-600 hover:bg-red-100"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i> Delete</button></div>
       </article>`).join('') : '<div class="flex min-h-44 flex-col items-center justify-center p-8 text-center"><i data-lucide="list-plus" class="h-7 w-7 text-slate-300"></i><p class="mt-3 text-sm font-black text-slate-600">No procedures in this category</p><button type="button" onclick="startDentalOperationForSpecialty(\'' + selectedSpecialty.id + '\')" class="mt-3 rounded-lg bg-cyan-600 px-3 py-2 text-[10px] font-black text-white hover:bg-cyan-700">Add the first procedure</button></div>';
       lucide.createIcons();
@@ -15430,8 +15751,8 @@
     function hrDoctorCompensationSummary(userId) {
       const rules = hrUserSettings(userId).doctorCompensation.rules;
       if (!rules.length) return 'No salary rules';
-      const user = hrDirectoryUsers.find(item => item.userId === activeHrDoctorDetailsId);
-      const payroll = user ? hrDoctorMetrics(user) : { salary: 0 };
+      const percentageCount = rules.filter(rule => rule.type === 'percentage').length;
+      const fixedCount = rules.length - percentageCount;
       return `${rules.length} procedure${rules.length === 1 ? '' : 's'} · ${[percentageCount ? `${percentageCount} percentage` : '', fixedCount ? `${fixedCount} fixed` : ''].filter(Boolean).join(' · ')}`;
     }
 
@@ -16646,6 +16967,7 @@
     async function saveActivePatientChart() {
       const patient = getActivePatient();
       if (!patient) return false;
+      rebuildChartProcedureStepPayrollFindings(patient);
 
       const { error } = await db
         .from('patients')
@@ -22264,7 +22586,7 @@
     }
 
     // Apply surface condition to all currently selected surfaces
-    function applySurfaceCondition(condition, operationStatus = activeClinicalOperationStatus, catalogPrice = null) {
+    function applySurfaceCondition(condition, operationStatus = activeClinicalOperationStatus, catalogPrice = null, procedureSteps = []) {
       const targets = chartSelectionTargets().filter(target => target.surfaces.length > 0);
       if (!targets.length) {
         alert('Please click on one or more tooth surfaces first.');
@@ -22289,7 +22611,13 @@
           createdAt,
           null,
           configuredPrice,
-          batchId
+          batchId,
+          null,
+          null,
+          null,
+          '',
+          null,
+          createChartFindingSteps(procedureSteps, normalisedStatus)
         );
         target.surfaces.forEach(surface => {
           storeChartSurfaceFindings(toothData, surface, [
@@ -22308,7 +22636,7 @@
     }
 
     // Apply a whole-tooth operation with its workflow status.
-    function applyToothStatus(operationCode, operationStatus = activeClinicalOperationStatus, catalogPrice = null) {
+    function applyToothStatus(operationCode, operationStatus = activeClinicalOperationStatus, catalogPrice = null, procedureSteps = []) {
       const targets = chartSelectionTargets();
       if (!targets.length) {
         alert('Please select one or more teeth first.');
@@ -22329,7 +22657,13 @@
           createdAt,
           null,
           catalogPrice,
-          batchId
+          batchId,
+          null,
+          null,
+          null,
+          '',
+          null,
+          createChartFindingSteps(procedureSteps, operationStatus)
         );
         wholeOperations.push(record);
         renderToothVisuals(target.tooth);
@@ -22345,7 +22679,7 @@
     }
 
     // Apply exactly one whole-mouth operation without consulting tooth selection.
-    function applyMouthOperation(operationCode, operationStatus = activeClinicalOperationStatus, catalogPrice = null) {
+    function applyMouthOperation(operationCode, operationStatus = activeClinicalOperationStatus, catalogPrice = null, procedureSteps = []) {
       const patient = getActivePatient();
       if (!patient) return false;
 
@@ -22355,7 +22689,13 @@
         new Date().toISOString(),
         null,
         catalogPrice,
-        null
+        null,
+        null,
+        null,
+        null,
+        '',
+        null,
+        createChartFindingSteps(procedureSteps, operationStatus)
       ));
       updateClinicalOperationPreview();
       renderFindingsList();
@@ -22749,7 +23089,9 @@
             nextFinding.billingMultiplier,
             nextFinding.doctorId,
             nextFinding.doctorName,
-            nextFinding.completedAt
+            nextFinding.completedAt,
+            nextFinding.steps,
+            chartFindingProcedureStepMeta(nextFinding)
           );
           updated = true;
         });
@@ -22969,7 +23311,9 @@
           sourceFinding.billingMultiplier,
           sourceFinding.doctorId,
           sourceFinding.doctorName,
-          sourceFinding.completedAt
+          sourceFinding.completedAt,
+          sourceFinding.steps?.map(step => ({ ...step, payrollFindingId: existingFinding ? step.payrollFindingId : createChartFindingId() })),
+          chartFindingProcedureStepMeta(sourceFinding)
         );
         const toothData = getOrCreateChartTooth(patient, toothId);
         if (documentedGroup.kind === 'whole') {
@@ -23037,6 +23381,90 @@
       });
       if (!chartDoctorsLoaded && !assignedId) options.push('<option value="" disabled>Loading doctors...</option>');
       return options.join('');
+    }
+
+    function toggleFindingProcedureSteps(button) {
+      const card = button.closest('[data-finding-id]');
+      const findingId = String(card?.dataset.findingId || '');
+      if (!findingId) return;
+      if (expandedFindingProcedureSteps.has(findingId)) expandedFindingProcedureSteps.delete(findingId);
+      else expandedFindingProcedureSteps.add(findingId);
+      renderFindingsList();
+    }
+
+    function chartProcedureStepStatusOptions(currentStatus) {
+      return ['P', 'In', 'C'].map(status => {
+        const definition = operationStatusDefinition(status);
+        return `<option value="${status}" ${status === currentStatus ? 'selected' : ''}>${escapeHtml(definition.key)} · ${escapeHtml(definition.label)}</option>`;
+      }).join('');
+    }
+
+    async function updateFindingProcedureStepFromControl(control, field) {
+      const patient = getActivePatient();
+      const findingIds = chartFindingIdsFromControl(control);
+      const stepId = String(control.dataset.procedureStepId || '');
+      if (!patient || !findingIds.length || !stepId || !['doctor', 'status'].includes(field)) return;
+
+      let doctor = null;
+      if (field === 'doctor' && control.value) {
+        doctor = chartDoctors.find(item => item.userId === String(control.value));
+        if (!doctor) {
+          alert('Choose an active doctor from the list.');
+          renderFindingsList();
+          return;
+        }
+      }
+      const nextStepStatus = field === 'status' ? (['P', 'In', 'C'].includes(control.value) ? control.value : 'P') : null;
+      const previousChartState = JSON.parse(JSON.stringify(patient.chartState || {}));
+      const changedAt = new Date().toISOString();
+      const updated = updateChartFindingsByIds(patient, findingIds, finding => {
+        const steps = normaliseChartFindingSteps(finding.steps).map(step => {
+          if (step.id !== stepId) return step;
+          if (field === 'doctor') return { ...step, doctorId: doctor?.userId || null, doctorName: doctor?.fullName || '' };
+          return {
+            ...step,
+            status: nextStepStatus,
+            completedAt: nextStepStatus === 'C' ? (step.status === 'C' ? step.completedAt : changedAt) : null
+          };
+        });
+        const status = chartFindingStatusFromSteps(steps, finding.status);
+        return {
+          ...finding,
+          steps,
+          status,
+          completedAt: status === 'C' ? (finding.status === 'C' ? finding.completedAt : changedAt) : null
+        };
+      });
+      if (!updated) return;
+      renderChartFindingTeeth(chartFindingToothIdsFromControl(control));
+      renderFindingsList();
+
+      try {
+        if (!(await saveActivePatientChart())) throw new Error('The chart update could not be saved.');
+        const refreshedGroup = chartFindingGroupFromControl(control);
+        const payrollFindingIds = (refreshedGroup?.memberFindings || [refreshedGroup]).filter(Boolean)
+          .flatMap(finding => normaliseChartFindingSteps(finding.steps).filter(step => step.id === stepId).map(step => step.payrollFindingId))
+          .filter(Boolean);
+        const { error } = await db.rpc('sync_chart_finding_doctor', {
+          p_patient_id: patient.id,
+          p_finding_ids: [...new Set([...findingIds, ...payrollFindingIds])]
+        });
+        if (error) throw error;
+        hrDirectoryLoaded = false;
+        const step = normaliseChartFindingSteps(refreshedGroup?.steps).find(item => item.id === stepId);
+        showAppointmentNotificationToast(
+          field === 'doctor' ? (doctor ? 'Step doctor assigned' : 'Step doctor unassigned') : 'Procedure step updated',
+          field === 'doctor'
+            ? doctor ? `${doctor.fullName} is assigned to ${step?.name || 'this step'}.` : `${step?.name || 'This step'} will not create percentage-based salary.`
+            : `${step?.name || 'The step'} is now ${operationStatusDefinition(step?.status || 'P').label.toLowerCase()}.`
+        );
+      } catch (error) {
+        patient.chartState = previousChartState;
+        await saveActivePatientChart();
+        renderChartFindingTeeth(chartFindingToothIdsFromControl(control));
+        renderFindingsList();
+        alert('Could not update the procedure step: ' + (error?.message || 'Unknown error'));
+      }
     }
 
     async function updateFindingDoctorFromControl(control) {
@@ -23509,7 +23937,7 @@
     function deleteChartFindingById(patient, findingId) {
       let deleted = false;
       const mouthFindings = chartMouthFindings(patient);
-      const nextMouthFindings = mouthFindings.filter(finding => finding.id !== findingId);
+      const nextMouthFindings = mouthFindings.filter(finding => finding.id !== findingId && finding.parentFindingId !== findingId);
       if (nextMouthFindings.length !== mouthFindings.length) {
         storeMouthOperations(patient, nextMouthFindings);
         deleted = true;
@@ -23684,6 +24112,7 @@
       const findings = [];
       if (!patient?.chartState) return findings;
       chartMouthFindings(patient).forEach((finding, operationIndex) => {
+        if (finding.isProcedureStep) return;
         findings.push({
           toothId: '',
           kind: 'mouth',
@@ -23699,6 +24128,7 @@
           doctorId: finding.doctorId,
           doctorName: finding.doctorName,
           notes: finding.notes,
+          steps: finding.steps,
           surfaces: []
         });
       });
@@ -23706,6 +24136,7 @@
         if (toothId === CHART_META_KEY || !data || typeof data !== 'object') return;
 
         chartWholeFindings(data).forEach((finding, operationIndex) => {
+          if (finding.isProcedureStep) return;
           findings.push({
             toothId,
             kind: 'whole',
@@ -23721,6 +24152,7 @@
             doctorId: finding.doctorId,
             doctorName: finding.doctorName,
             notes: finding.notes,
+            steps: finding.steps,
             surfaces: []
           });
         });
@@ -23728,6 +24160,7 @@
         const surfaceGroups = new Map();
         Object.entries(data.surfaces || {}).forEach(([surface, value]) => {
           chartSurfaceFindings(value).forEach((finding, findingIndex) => {
+            if (finding.isProcedureStep) return;
             const groupKey = finding.id || `${finding.code}\u0000${finding.status}\u0000${findingIndex}`;
             if (!surfaceGroups.has(groupKey)) {
               surfaceGroups.set(groupKey, {
@@ -23744,6 +24177,7 @@
                 doctorId: finding.doctorId,
                 doctorName: finding.doctorName,
                 notes: finding.notes,
+                steps: finding.steps,
                 surfaces: []
               });
             }
@@ -23839,11 +24273,28 @@
         const findingNotes = normaliseChartOperationNotes(finding.notes);
         const memberFindings = finding.memberFindings || [finding];
         const findingIds = memberFindings.map(member => member.id).filter(Boolean);
+        const procedureSteps = normaliseChartFindingSteps(finding.steps);
+        const completedProcedureSteps = procedureSteps.filter(step => step.status === 'C').length;
+        const procedureStepsExpanded = Boolean(findingIds[0] && expandedFindingProcedureSteps.has(findingIds[0]));
         const toothIds = finding.toothIds || (finding.toothId ? [finding.toothId] : []);
         const isBatch = Boolean(finding.batchId && toothIds.length > 1);
         const findingPrice = Math.max(0, Number(finding.price) || 0);
         const billingMultiplier = isBatch ? chartFindingBillingMultiplier(finding, memberFindings.length) : 1;
         const totalPrice = isBatch ? chartFindingBatchTotal(finding, memberFindings.length) : findingPrice;
+        const procedureStepsMarkup = procedureSteps.length ? `<div class="${procedureStepsExpanded ? '' : 'hidden '}w-full border-t border-cyan-100 bg-cyan-50/35 px-3 py-3" data-procedure-steps-panel>
+          <div class="mb-2 flex flex-wrap items-center justify-between gap-2"><p class="text-[10px] font-black uppercase tracking-wider text-cyan-700">Procedure steps</p><p class="text-[10px] font-bold text-slate-500">${completedProcedureSteps} of ${procedureSteps.length} completed · ${dentalProcedureStepsTotal(procedureSteps.filter(step => step.status === 'C'))}% earned</p></div>
+          <div class="space-y-2">${procedureSteps.map((step, index) => {
+            const stepStatus = operationStatusDefinition(step.status);
+            const stepValue = Math.round(totalPrice * step.percentage) / 100;
+            return `<div class="procedure-step-clinical-row grid items-center gap-2 rounded-xl border border-cyan-100 bg-white p-2.5">
+              <span class="flex h-7 w-7 items-center justify-center rounded-lg ${step.status === 'C' ? 'bg-emerald-100 text-emerald-700' : step.status === 'In' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'} text-[10px] font-black">${step.status === 'C' ? '<i data-lucide="check" class="h-3.5 w-3.5"></i>' : index + 1}</span>
+              <div class="min-w-0"><p class="truncate text-xs font-black text-slate-800">${escapeHtml(step.name)}</p><p class="mt-0.5 text-[9px] font-bold text-slate-400">${step.percentage}% · ${escapeHtml(formatInvoiceMoney(stepValue))} of this procedure</p></div>
+              <label class="inline-flex min-w-0 items-center overflow-hidden rounded-lg border border-cyan-200 bg-white focus-within:ring-2 focus-within:ring-cyan-500/20"><span class="border-r border-cyan-100 bg-cyan-50 px-2 py-1.5 text-[9px] font-black text-cyan-700">Doctor</span><select data-procedure-step-id="${escapeHtml(step.id)}" onchange="updateFindingProcedureStepFromControl(this,'doctor')" class="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-[10px] font-bold text-slate-700 outline-none" aria-label="Doctor assigned to ${escapeHtml(step.name)}">${chartDoctorSelectOptions(step)}</select></label>
+              <label class="inline-flex min-w-0 items-center gap-1.5"><span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${stepStatus.color}"></span><select data-procedure-step-id="${escapeHtml(step.id)}" onchange="updateFindingProcedureStepFromControl(this,'status')" class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[10px] font-black outline-none focus:ring-2 focus:ring-cyan-500/20" style="color:${stepStatus.color}" aria-label="Status of ${escapeHtml(step.name)}">${chartProcedureStepStatusOptions(step.status)}</select></label>
+            </div>`;
+          }).join('')}</div>
+          <p class="mt-2 text-[9px] font-semibold leading-4 text-slate-400">Percentage-based salary uses each completed step's share. Fixed per-procedure pay ignores the shares and uses the parent procedure after every step is complete.</p>
+        </div>` : '';
         const invoicedMemberIds = findingIds.filter(findingId => invoicedFindingIds.has(findingId));
         const selectableMemberIds = memberFindings
           .filter(member => member.id && !invoicedFindingIds.has(member.id) && Number(member.price) > 0)
@@ -23893,7 +24344,7 @@
         const dataAttributes = `data-finding-ids="${escapeHtml(findingIds.join(','))}" data-tooth-ids="${escapeHtml(toothIds.join(','))}" onchange="updateFindingGroupStatusFromControl(this)"`;
         const findingIdentityAttributes = `data-finding-id="${escapeHtml(findingIds[0] || '')}" data-finding-ids="${escapeHtml(findingIds.join(','))}" data-finding-kind="${escapeHtml(finding.kind)}" data-batch-id="${escapeHtml(finding.batchId || '')}" data-tooth-id="${escapeHtml(finding.toothId)}" data-tooth-ids="${escapeHtml(toothIds.join(','))}" data-operation-code="${escapeHtml(finding.code)}" data-operation-status="${finding.status}" data-surfaces="${escapeHtml(finding.surfaces.join(','))}"`;
         return `
-          <article ${findingIdentityAttributes} onclick="toggleFindingCardSelection(event, this)" aria-selected="${isSelected}" class="finding-row ${isSelected ? 'is-selected' : ''} ${isInvoiced ? 'is-invoiced' : ''} flex flex-row items-center gap-2.5 rounded-xl border border-slate-200 border-l-4 px-3 py-2.5 shadow-sm transition hover:shadow-md" style="--finding-display-color:${displayColor};--finding-status-soft:${statusSoft};--finding-status-border:${statusBorder};border-left-color:${displayColor}">
+          <article ${findingIdentityAttributes} onclick="toggleFindingCardSelection(event, this)" aria-selected="${isSelected}" class="finding-row ${procedureSteps.length ? 'has-procedure-steps' : ''} ${isSelected ? 'is-selected' : ''} ${isInvoiced ? 'is-invoiced' : ''} flex flex-row flex-wrap items-center gap-2.5 overflow-hidden rounded-xl border border-slate-200 border-l-4 px-3 py-2.5 shadow-sm transition hover:shadow-md" style="--finding-display-color:${displayColor};--finding-status-soft:${statusSoft};--finding-status-border:${statusBorder};border-left-color:${displayColor}">
             <div class="finding-row-summary flex min-w-0 flex-1 items-center gap-3">
               <input type="checkbox" class="finding-selection-checkbox ${isFullyInvoiced ? 'is-invoiced-checkbox' : ''} h-4 w-4 shrink-0 rounded border-slate-300 text-violet-600 focus:ring-violet-500" ${isCheckboxChecked ? 'checked' : ''} ${canSelect ? '' : 'disabled'} onchange="toggleFindingSelectionFromControl(this)" aria-label="${isFullyInvoiced ? 'Invoiced' : 'Select'} ${escapeHtml(dentalOperationLabel(finding.code))}${isFullyInvoiced ? '' : ' for invoicing'}" title="${isFullyInvoiced ? 'This operation is already invoiced' : !selectableMemberIds.length ? 'Add a price before selecting this operation' : isInvoiced ? 'Select the uninvoiced teeth in this batch' : 'Select for invoicing'}">
               <div class="finding-tooth-picker relative flex max-w-64 shrink-0 flex-wrap items-center gap-1">
@@ -23920,6 +24371,7 @@
               </div>
               <div class="finding-operation-details min-w-0 flex-1">
                 <div class="finding-operation-heading flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  ${procedureSteps.length ? `<button type="button" onclick="toggleFindingProcedureSteps(this)" aria-expanded="${procedureStepsExpanded}" class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-cyan-200 bg-cyan-50 text-cyan-700 transition hover:bg-cyan-100" title="${procedureStepsExpanded ? 'Collapse' : 'Open'} procedure steps" aria-label="${procedureStepsExpanded ? 'Collapse' : 'Open'} ${escapeHtml(dentalOperationLabel(finding.code))} steps"><i data-lucide="${procedureStepsExpanded ? 'minus' : 'plus'}" class="h-3 w-3"></i></button>` : ''}
                   <h4 class="finding-operation-title text-xs sm:text-sm">${escapeHtml(dentalOperationLabel(finding.code))}</h4>
                   <span class="text-[10px] font-semibold text-slate-400">${isMouth ? 'Whole mouth' : isBatch ? `${toothIds.length} teeth · Batch` : isWhole ? 'Whole tooth' : `${surfaceLabels.length} surface${surfaceLabels.length === 1 ? '' : 's'}`}</span>
                   ${isFullyInvoiced ? '<span class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-emerald-700">Invoiced</span>' : isInvoiced ? '<span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-blue-700">Partly invoiced</span>' : findingPrice <= 0 ? '<span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-700">Set price</span>' : ''}
@@ -23938,8 +24390,8 @@
             </div>
             <div class="finding-row-actions flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
               ${createdAtMarkup}
-              <label class="inline-flex min-w-44 items-center overflow-hidden rounded-lg border border-cyan-200 bg-white/85 focus-within:ring-2 focus-within:ring-cyan-500/20" title="Assign the completed procedure to a doctor for HR salary calculation">
-                <span class="border-r border-cyan-100 bg-cyan-50 px-2 py-1.5 text-[9px] font-black text-cyan-700">Doctor</span>
+              <label class="inline-flex min-w-44 items-center overflow-hidden rounded-lg border border-cyan-200 bg-white/85 focus-within:ring-2 focus-within:ring-cyan-500/20" title="${procedureSteps.length ? 'Used only for fixed per-procedure compensation after every step is complete' : 'Assign the completed procedure to a doctor for HR salary calculation'}">
+                <span class="border-r border-cyan-100 bg-cyan-50 px-2 py-1.5 text-[9px] font-black text-cyan-700">${procedureSteps.length ? 'Fixed pay' : 'Doctor'}</span>
                 <select onchange="updateFindingDoctorFromControl(this)" class="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-[11px] font-bold text-slate-700 outline-none" aria-label="Assigned doctor for ${escapeHtml(dentalOperationLabel(finding.code))}">${chartDoctorSelectOptions(finding)}</select>
               </label>
               <label class="inline-flex items-center overflow-hidden rounded-lg border ${isInvoiced ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-70' : 'border-violet-200 bg-white/85 focus-within:ring-2 focus-within:ring-violet-500/20'}" title="${isInvoiced ? 'Delete this procedure from its invoice before changing the price' : isBatch ? 'Edit the base price for this batch' : 'Edit operation price'}">
@@ -23947,17 +24399,18 @@
                 <input type="number" min="0" step="0.01" value="${findingPrice}" onchange="updateFindingPriceFromControl(this)" ${isInvoiced ? 'disabled' : ''} class="w-20 bg-transparent px-2 py-1.5 text-right text-[11px] font-black outline-none ${isInvoiced ? 'cursor-not-allowed text-slate-400' : 'text-slate-700'}" aria-label="${isBatch ? 'Base price' : 'Price'} for ${escapeHtml(dentalOperationLabel(finding.code))}" aria-disabled="${isInvoiced}">
               </label>
               ${isBatch ? `<label class="inline-flex items-center overflow-hidden rounded-lg border ${isInvoiced ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-70' : 'border-violet-200 bg-white/85 focus-within:ring-2 focus-within:ring-violet-500/20'}" title="${isInvoiced ? 'Delete this procedure from its invoice before changing the multiplier' : 'Choose how many times the base price is billed'}"><span class="border-r px-2 py-1.5 text-[11px] font-black ${isInvoiced ? 'border-slate-200 bg-slate-200 text-slate-500' : 'border-violet-100 bg-violet-50 text-violet-600'}">×</span><input type="number" min="1" max="999" step="1" inputmode="numeric" value="${billingMultiplier}" onchange="updateFindingBillingMultiplierFromControl(this)" ${isInvoiced ? 'disabled' : ''} class="w-14 bg-transparent px-2 py-1.5 text-right text-[11px] font-black outline-none ${isInvoiced ? 'cursor-not-allowed text-slate-400' : 'text-slate-700'}" aria-label="Billing multiplier for ${escapeHtml(dentalOperationLabel(finding.code))}" aria-disabled="${isInvoiced}"></label><span class="whitespace-nowrap text-[9px] font-bold text-slate-400">= ${escapeHtml(formatInvoiceMoney(totalPrice))} total</span>` : ''}
-              <label class="finding-status-control flex min-w-0 flex-1 items-center gap-2 sm:w-48">
+              ${procedureSteps.length ? `<div class="finding-status-control flex min-w-0 flex-1 items-center gap-2 rounded-lg border bg-white/80 px-2.5 py-1.5 sm:w-48" style="border-color:${statusBorder};color:${displayColor}" title="The procedure status is calculated from its steps"><span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${displayColor}"></span><span class="min-w-0 flex-1 truncate text-[11px] font-black">${completedProcedureSteps}/${procedureSteps.length} steps · ${escapeHtml(status.label)}</span></div>` : `<label class="finding-status-control flex min-w-0 flex-1 items-center gap-2 sm:w-48">
                 <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${displayColor}" title="${status.key} · ${status.label}"></span>
                 <span class="sr-only">Operation status</span>
                 <select ${dataAttributes} class="min-w-0 flex-1 rounded-lg border bg-white/80 px-2.5 py-1.5 text-[11px] font-bold outline-none transition focus:ring-2 focus:ring-blue-500/20" style="border-color:${statusBorder};color:${displayColor}">
                   ${operationStatusSelectOptions(finding.status)}
                 </select>
-              </label>
+              </label>`}
               ${isBatch ? '<button type="button" onclick="separateFindingBatch(this)" class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[10px] font-black text-violet-700 transition hover:border-violet-300 hover:bg-violet-100" aria-label="Separate this batch into one row per tooth" title="Create one independent documented row for each tooth"><i data-lucide="split" class="h-3 w-3"></i>Separate</button>' : ''}
               <button type="button" data-finding-note-trigger aria-haspopup="dialog" aria-expanded="false" aria-controls="chart-finding-note-popover" onpointerenter="showChartFindingNotePreviewFromPointer(event, this)" onpointerleave="scheduleChartFindingNotePreviewClose(event)" onclick="toggleChartFindingNotePreview(event, this)" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[10px] font-black transition ${findingNotes.length ? 'border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-100' : 'border-slate-200 bg-white text-slate-500 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700'}" aria-label="Preview notes for ${escapeHtml(dentalOperationLabel(finding.code))}" title="Hover or tap to preview operation notes"><i data-lucide="sticky-note" class="h-3.5 w-3.5"></i>Notes${findingNotes.length ? ` ${findingNotes.length}` : ''}</button>
               <button type="button" onclick="deleteFindingFromControl(this)" class="inline-flex shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-black text-red-600 transition hover:border-red-300 hover:bg-red-100" aria-label="Delete ${escapeHtml(dentalOperationLabel(finding.code))}">Delete</button>
             </div>
+            ${procedureStepsMarkup}
           </article>`;
       }).join('');
     }
