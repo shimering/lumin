@@ -2793,9 +2793,12 @@
     #nav-whatsapp-unread-badge.hidden {
       display: none !important;
     }
+    body.whatsapp-view-active #app-main {
+      padding-bottom: 0;
+    }
     #view-whatsapp {
-      height: calc(100dvh - 3rem);
-      max-height: calc(100dvh - 3rem);
+      height: calc(100dvh - 1.5rem);
+      max-height: calc(100dvh - 1.5rem);
       min-height: 0;
       display: flex;
       flex-direction: column;
@@ -2878,15 +2881,15 @@
     }
     @media (min-width: 768px) and (max-width: 1023px) {
       #view-whatsapp {
-        height: calc(100dvh - 6.75rem - var(--mobile-nav-height));
-        max-height: calc(100dvh - 6.75rem - var(--mobile-nav-height));
+        height: calc(100dvh - 5.25rem - var(--mobile-nav-height));
+        max-height: calc(100dvh - 5.25rem - var(--mobile-nav-height));
         min-height: 0;
       }
     }
     @media (max-width: 767px) {
       #view-whatsapp {
-        height: calc(100dvh - 5.75rem - var(--mobile-nav-height));
-        max-height: calc(100dvh - 5.75rem - var(--mobile-nav-height));
+        height: calc(100dvh - 4.75rem - var(--mobile-nav-height));
+        max-height: calc(100dvh - 4.75rem - var(--mobile-nav-height));
         min-height: 0;
         gap: 0.75rem;
       }
@@ -2973,6 +2976,12 @@
       }
       #whatsapp-messages-container {
         padding: 0.75rem !important;
+      }
+    }
+    @media (min-width: 640px) and (max-width: 767px) {
+      #view-whatsapp {
+        height: calc(100dvh - 5.25rem - var(--mobile-nav-height));
+        max-height: calc(100dvh - 5.25rem - var(--mobile-nav-height));
       }
     }
   </style>
@@ -22635,6 +22644,7 @@
         }
       }
       window.location.hash = viewName;
+      document.body.classList.toggle('whatsapp-view-active', viewName === 'whatsapp');
 
       if (viewName === 'dashboard') {
         await ensureAppointmentsLoaded();
