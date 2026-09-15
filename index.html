@@ -5472,7 +5472,7 @@
               <!-- AI Auto-Reply Toggle Switch -->
               <div class="flex items-center gap-2 shrink-0">
                 <!-- Desktop Full Pill -->
-                <div class="hidden sm:flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 shadow-xs" title="Toggle AI Auto-Reply for this patient">
+                <div id="whatsapp-ai-toggle-pill" class="hidden sm:flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 shadow-xs" title="Toggle AI Auto-Reply for this patient">
                   <span class="flex h-2 w-2 rounded-full bg-emerald-500" id="whatsapp-ai-status-dot"></span>
                   <span class="text-[11px] font-black text-slate-700" id="whatsapp-ai-toggle-label">AI Auto-Reply</span>
                   <label class="relative inline-flex cursor-pointer items-center ml-1">
@@ -5482,7 +5482,7 @@
                   </label>
                 </div>
                 <!-- Mobile Compact AI Toggle Pill -->
-                <label class="sm:hidden flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 cursor-pointer shadow-2xs" title="Toggle AI Auto-Reply">
+                <label id="whatsapp-ai-toggle-pill-mobile" class="sm:hidden flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 cursor-pointer shadow-2xs" title="Toggle AI Auto-Reply">
                   <span class="flex h-1.5 w-1.5 rounded-full bg-violet-500" id="whatsapp-ai-status-dot-mobile"></span>
                   <span class="text-[10px] font-black text-slate-700" id="whatsapp-ai-toggle-label-mobile">AI</span>
                   <input id="whatsapp-ai-toggle-mobile" type="checkbox" onchange="toggleActiveChatAi(this.checked)" class="peer sr-only" />
@@ -6649,6 +6649,7 @@
     let financeDeptWhatsAppSuppressClickUntil = 0;
     let adminActiveTab = 'access';
     let clinicWhatsAppDispatchMode = 'cloud_api';
+    let clinicWhatsAppAiEnabled = false;
     let useTwelveHourTime = false;
     let defaultDiagnosisFee = 0;
     let activeDiagnosisAppointmentId = null;
@@ -8711,7 +8712,7 @@
     }
 
     async function fetchClinicSettings(refreshViews = false) {
-      const { data, error } = await db.from('clinic_settings').select('use_12_hour_time, diagnosis_fee_default, appointment_status_colors, attendance_enabled, attendance_latitude, attendance_longitude, attendance_radius_m, attendance_max_accuracy_m, attendance_timezone, attendance_late_grace_minutes, storage_server_url, storage_secret_key, whatsapp_dispatch_mode').eq('id', 1).maybeSingle();
+      const { data, error } = await db.from('clinic_settings').select('use_12_hour_time, diagnosis_fee_default, appointment_status_colors, attendance_enabled, attendance_latitude, attendance_longitude, attendance_radius_m, attendance_max_accuracy_m, attendance_timezone, attendance_late_grace_minutes, storage_server_url, storage_secret_key, whatsapp_dispatch_mode, whatsapp_enabled').eq('id', 1).maybeSingle();
       if (error) {
         console.warn('Could not load clinic settings:', error.message);
         return false;
@@ -8728,6 +8729,7 @@
         populateStorageServerSettingsInputs();
       }
       clinicWhatsAppDispatchMode = String(data?.whatsapp_dispatch_mode || 'cloud_api').trim() === 'external' ? 'external' : 'cloud_api';
+      applyClinicWhatsAppAiEnabled(data?.whatsapp_enabled !== false);
       const timeFormatChanged = useTwelveHourTime !== Boolean(data?.use_12_hour_time);
       applyClinicTimeFormat(Boolean(data?.use_12_hour_time), false);
       defaultDiagnosisFee = Math.max(0, Number(data?.diagnosis_fee_default) || 0);
@@ -29459,7 +29461,7 @@
       if (whatsappFilterTab === 'unread') {
         filtered = filtered.filter(c => (c.unread_count || 0) > 0);
       } else if (whatsappFilterTab === 'manual') {
-        filtered = filtered.filter(c => !c.ai_enabled || c.status === 'human_needed');
+        filtered = filtered.filter(c => !clinicWhatsAppAiEnabled || !c.ai_enabled || c.status === 'human_needed');
       }
 
       if (whatsappSearchQuery) {
@@ -29487,6 +29489,7 @@
         const unreadCount = getWhatsAppUnreadCount(conv);
         const timeStr = formatWhatsAppTime(conv.last_message_at);
         const isHumanNeeded = !conv.ai_enabled || conv.status === 'human_needed';
+        const isAiEffectivelyEnabled = clinicWhatsAppAiEnabled && !isHumanNeeded;
 
         return `
           <button type="button" onclick="selectWhatsAppConversation('${conv.id}')" class="whatsapp-conv-item w-full text-left p-3 rounded-xl flex items-start gap-3 transition ${isActive ? 'active' : 'hover:bg-white'}">
@@ -29501,7 +29504,11 @@
               </div>
               <p class="text-[11px] text-slate-500 truncate mb-1" dir="auto">${escapeHtml(conv.last_message || 'No messages yet')}</p>
               <div class="flex items-center gap-1.5">
-                ${isHumanNeeded ? `
+                ${!clinicWhatsAppAiEnabled ? `
+                  <span class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-black text-slate-600">
+                    <span class="h-1.5 w-1.5 rounded-full bg-slate-400"></span> AI Agent Off
+                  </span>
+                ` : !isAiEffectivelyEnabled ? `
                   <span class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[9px] font-black text-amber-700">
                     <span class="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse"></span> Human Needed
                   </span>
@@ -29540,20 +29547,7 @@
         document.getElementById('whatsapp-chat-patient-name').textContent = activeWhatsAppConversation.patient_name || activeWhatsAppConversation.phone;
         document.getElementById('whatsapp-chat-patient-phone').textContent = '+' + activeWhatsAppConversation.phone;
 
-        const aiToggle = document.getElementById('whatsapp-ai-toggle');
-        const aiToggleMobile = document.getElementById('whatsapp-ai-toggle-mobile');
-        const aiDot = document.getElementById('whatsapp-ai-status-dot');
-        const aiDotMobile = document.getElementById('whatsapp-ai-status-dot-mobile');
-        const aiLabel = document.getElementById('whatsapp-ai-toggle-label');
-        const aiLabelMobile = document.getElementById('whatsapp-ai-toggle-label-mobile');
-        if (aiToggle) aiToggle.checked = Boolean(activeWhatsAppConversation.ai_enabled);
-        if (aiToggleMobile) aiToggleMobile.checked = Boolean(activeWhatsAppConversation.ai_enabled);
-        if (aiDot) aiDot.className = activeWhatsAppConversation.ai_enabled ? 'flex h-2 w-2 rounded-full bg-violet-500' : 'flex h-2 w-2 rounded-full bg-slate-300';
-        if (aiDotMobile) aiDotMobile.className = activeWhatsAppConversation.ai_enabled ? 'flex h-1.5 w-1.5 rounded-full bg-violet-500' : 'flex h-1.5 w-1.5 rounded-full bg-slate-300';
-        if (aiLabel) aiLabel.textContent = activeWhatsAppConversation.ai_enabled ? 'AI Auto-Reply' : 'Human Mode';
-        if (aiLabelMobile) aiLabelMobile.textContent = activeWhatsAppConversation.ai_enabled ? 'AI' : 'Staff';
-
-        updateWhatsAppBarTakeoverState();
+        renderActiveWhatsAppAiState();
       }
 
       await loadWhatsAppMessages(convId, true);
@@ -29897,36 +29891,90 @@
       }
     }
 
-    async function toggleActiveChatAi(enabled) {
-      if (!activeWhatsAppConversationId || !activeWhatsAppConversation) return;
+    function renderActiveWhatsAppAiState() {
+      if (!activeWhatsAppConversation) return;
 
-      activeWhatsAppConversation.ai_enabled = Boolean(enabled);
-      activeWhatsAppConversation.status = enabled ? 'active' : 'human_needed';
-
+      const globallyEnabled = Boolean(clinicWhatsAppAiEnabled);
+      const conversationEnabled = Boolean(activeWhatsAppConversation.ai_enabled);
+      const effectivelyEnabled = globallyEnabled && conversationEnabled;
       const aiToggle = document.getElementById('whatsapp-ai-toggle');
       const aiToggleMobile = document.getElementById('whatsapp-ai-toggle-mobile');
-      if (aiToggle) aiToggle.checked = Boolean(enabled);
-      if (aiToggleMobile) aiToggleMobile.checked = Boolean(enabled);
-
       const aiDot = document.getElementById('whatsapp-ai-status-dot');
       const aiDotMobile = document.getElementById('whatsapp-ai-status-dot-mobile');
       const aiLabel = document.getElementById('whatsapp-ai-toggle-label');
       const aiLabelMobile = document.getElementById('whatsapp-ai-toggle-label-mobile');
-      if (aiDot) aiDot.className = enabled ? 'flex h-2 w-2 rounded-full bg-violet-500' : 'flex h-2 w-2 rounded-full bg-slate-300';
-      if (aiDotMobile) aiDotMobile.className = enabled ? 'flex h-1.5 w-1.5 rounded-full bg-violet-500' : 'flex h-1.5 w-1.5 rounded-full bg-slate-300';
-      if (aiLabel) aiLabel.textContent = enabled ? 'AI Auto-Reply' : 'Human Mode';
-      if (aiLabelMobile) aiLabelMobile.textContent = enabled ? 'AI' : 'Staff';
+      const aiPill = document.getElementById('whatsapp-ai-toggle-pill');
+      const aiPillMobile = document.getElementById('whatsapp-ai-toggle-pill-mobile');
 
+      [aiToggle, aiToggleMobile].forEach(toggle => {
+        if (!toggle) return;
+        toggle.checked = effectivelyEnabled;
+        toggle.disabled = !globallyEnabled;
+        toggle.setAttribute('aria-disabled', String(!globallyEnabled));
+      });
+      [aiPill, aiPillMobile].forEach(pill => {
+        if (!pill) return;
+        pill.classList.toggle('opacity-60', !globallyEnabled);
+        pill.classList.toggle('cursor-not-allowed', !globallyEnabled);
+        pill.classList.toggle('cursor-pointer', globallyEnabled);
+        pill.title = globallyEnabled
+          ? 'Toggle AI Auto-Reply for this patient'
+          : 'WhatsApp AI Agent is disabled in AI & API Settings';
+      });
+      [aiToggle?.closest('label'), aiToggleMobile?.closest('label')].forEach(label => {
+        if (!label) return;
+        label.classList.toggle('cursor-not-allowed', !globallyEnabled);
+        label.classList.toggle('cursor-pointer', globallyEnabled);
+      });
+
+      if (aiDot) aiDot.className = effectivelyEnabled ? 'flex h-2 w-2 rounded-full bg-violet-500' : 'flex h-2 w-2 rounded-full bg-slate-300';
+      if (aiDotMobile) aiDotMobile.className = effectivelyEnabled ? 'flex h-1.5 w-1.5 rounded-full bg-violet-500' : 'flex h-1.5 w-1.5 rounded-full bg-slate-300';
+      if (aiLabel) aiLabel.textContent = !globallyEnabled ? 'AI Agent Off' : (conversationEnabled ? 'AI Auto-Reply' : 'Human Mode');
+      if (aiLabelMobile) aiLabelMobile.textContent = !globallyEnabled ? 'Off' : (conversationEnabled ? 'AI' : 'Staff');
       updateWhatsAppBarTakeoverState();
+    }
+
+    async function toggleActiveChatAi(enabled) {
+      if (!activeWhatsAppConversationId || !activeWhatsAppConversation) return;
+      if (!clinicWhatsAppAiEnabled) {
+        renderActiveWhatsAppAiState();
+        showAppointmentNotificationToast(
+          'WhatsApp AI Agent',
+          currentUiLanguage === 'ar'
+            ? 'وكيل واتساب متوقف من إعدادات الذكاء الاصطناعي والربط.'
+            : 'The WhatsApp AI Agent is disabled in AI & API Settings.'
+        );
+        return;
+      }
+
+      const previousEnabled = Boolean(activeWhatsAppConversation.ai_enabled);
+      const previousStatus = activeWhatsAppConversation.status;
+      activeWhatsAppConversation.ai_enabled = Boolean(enabled);
+      activeWhatsAppConversation.status = enabled ? 'active' : 'human_needed';
+      renderActiveWhatsAppAiState();
       renderWhatsAppConversationsList();
 
       try {
-        await db.from('whatsapp_conversations').update({
-          ai_enabled: Boolean(enabled),
-          status: enabled ? 'active' : 'human_needed'
-        }).eq('id', activeWhatsAppConversationId);
+        const { data, error } = await db
+          .from('whatsapp_conversations')
+          .update({
+            ai_enabled: Boolean(enabled),
+            status: enabled ? 'active' : 'human_needed'
+          })
+          .eq('id', activeWhatsAppConversationId)
+          .select('ai_enabled,status')
+          .maybeSingle();
+        if (error) throw error;
+        if (!data) throw new Error('Conversation AI setting was not updated.');
+        activeWhatsAppConversation.ai_enabled = Boolean(data.ai_enabled);
+        activeWhatsAppConversation.status = data.status;
       } catch (err) {
+        activeWhatsAppConversation.ai_enabled = previousEnabled;
+        activeWhatsAppConversation.status = previousStatus;
+        renderActiveWhatsAppAiState();
+        renderWhatsAppConversationsList();
         console.error('Failed to update AI toggle:', err);
+        alert(currentUiLanguage === 'ar' ? 'تعذر تحديث إعداد الذكاء الاصطناعي للمحادثة.' : 'Could not update the conversation AI setting.');
       }
     }
 
@@ -29955,6 +30003,16 @@
 
     async function toggleActiveChatAiFromBar() {
       if (!activeWhatsAppConversation) return;
+      if (!clinicWhatsAppAiEnabled) {
+        renderActiveWhatsAppAiState();
+        showAppointmentNotificationToast(
+          'WhatsApp AI Agent',
+          currentUiLanguage === 'ar'
+            ? 'فعّل وكيل واتساب أولاً من إعدادات الذكاء الاصطناعي والربط.'
+            : 'Enable the WhatsApp AI Agent in AI & API Settings first.'
+        );
+        return;
+      }
       const newEnabled = !activeWhatsAppConversation.ai_enabled;
       const aiToggle = document.getElementById('whatsapp-ai-toggle');
       const aiToggleMobile = document.getElementById('whatsapp-ai-toggle-mobile');
@@ -29969,14 +30027,23 @@
       const hint = document.getElementById('whatsapp-replying-to-hint');
       if (!activeWhatsAppConversation) return;
 
-      const isAi = Boolean(activeWhatsAppConversation.ai_enabled);
+      const globallyEnabled = Boolean(clinicWhatsAppAiEnabled);
+      const isAi = globallyEnabled && Boolean(activeWhatsAppConversation.ai_enabled);
       if (takeoverBtn && takeoverText) {
         const dot = takeoverBtn.querySelector('span');
-        if (isAi) {
+        takeoverBtn.disabled = !globallyEnabled;
+        if (!globallyEnabled) {
+          takeoverBtn.className = 'inline-flex cursor-not-allowed items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 px-2 sm:px-2.5 py-0.5 text-[9px] sm:text-[10px] font-bold text-slate-500 opacity-70 transition whitespace-nowrap';
+          takeoverBtn.title = currentUiLanguage === 'ar' ? 'وكيل واتساب متوقف من الإعدادات' : 'WhatsApp AI Agent is disabled in settings';
+          takeoverText.textContent = currentUiLanguage === 'ar' ? 'الذكاء متوقف' : 'AI Agent Off';
+          if (dot) dot.className = 'h-1.5 w-1.5 rounded-full bg-slate-400';
+        } else if (isAi) {
+          takeoverBtn.title = 'Switch between AI handling and Staff manual handling';
           takeoverBtn.className = 'inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 sm:px-2.5 py-0.5 text-[9px] sm:text-[10px] font-bold text-violet-800 hover:bg-violet-100 transition whitespace-nowrap';
           takeoverText.textContent = currentUiLanguage === 'ar' ? 'استلام يدوي' : 'Take Over';
           if (dot) dot.className = 'h-1.5 w-1.5 rounded-full bg-violet-500';
         } else {
+          takeoverBtn.title = 'Switch between AI handling and Staff manual handling';
           takeoverBtn.className = 'inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 sm:px-2.5 py-0.5 text-[9px] sm:text-[10px] font-bold text-emerald-800 hover:bg-emerald-100 transition whitespace-nowrap';
           takeoverText.textContent = currentUiLanguage === 'ar' ? 'تفعيل الذكاء' : 'Resume AI';
           if (dot) dot.className = 'h-1.5 w-1.5 rounded-full bg-emerald-500';
@@ -30105,6 +30172,13 @@
       }
     }
 
+    function applyClinicWhatsAppAiEnabled(enabled) {
+      clinicWhatsAppAiEnabled = Boolean(enabled);
+      setWhatsAppAgentSetting(clinicWhatsAppAiEnabled);
+      renderActiveWhatsAppAiState();
+      if (whatsappLoaded) renderWhatsAppConversationsList();
+    }
+
     function getWhatsAppAgentSetting() {
       return document.getElementById('setting-whatsapp-enabled')?.getAttribute('aria-checked') === 'true';
     }
@@ -30125,7 +30199,7 @@
         if (error) throw error;
         if (!data) throw new Error('WhatsApp settings were not found.');
 
-        setWhatsAppAgentSetting(data.whatsapp_enabled !== false);
+        applyClinicWhatsAppAiEnabled(data.whatsapp_enabled !== false);
         const dispatchSelect = document.getElementById('setting-whatsapp-dispatch-mode');
         if (dispatchSelect) dispatchSelect.value = data.whatsapp_dispatch_mode || clinicWhatsAppDispatchMode || 'cloud_api';
         document.getElementById('setting-whatsapp-phone-id').value = data.whatsapp_phone_number_id || '';
@@ -30196,7 +30270,7 @@
         if (Boolean(data.whatsapp_enabled) !== requestedEnabled) {
           throw new Error('The saved AI Agent status did not match your selection. Please try again.');
         }
-        setWhatsAppAgentSetting(data.whatsapp_enabled);
+        applyClinicWhatsAppAiEnabled(data.whatsapp_enabled);
         clinicWhatsAppDispatchMode = chosenMode;
         renderAdminWhatsAppDispatchMode();
         closeWhatsAppSettingsModal();
@@ -30213,7 +30287,7 @@
             .select('whatsapp_enabled')
             .eq('id', 1)
             .maybeSingle();
-          if (savedSetting) setWhatsAppAgentSetting(savedSetting.whatsapp_enabled !== false);
+          if (savedSetting) applyClinicWhatsAppAiEnabled(savedSetting.whatsapp_enabled !== false);
         } catch (_) {}
         alert('Failed to save settings: ' + err.message);
       } finally {
