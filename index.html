@@ -5578,17 +5578,16 @@
         </div>
       </div>
       <form id="whatsapp-settings-form" onsubmit="saveWhatsAppSettings(event)" class="space-y-4 p-5">
-        <label class="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4">
+        <div class="flex items-center justify-between gap-4 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4">
           <div>
             <span class="block text-xs font-black text-slate-900">Enable WhatsApp AI Agent</span>
             <span class="mt-0.5 block text-[11px] text-slate-500">When enabled, incoming patient WhatsApp messages trigger Gemini AI appointment bookings.</span>
+            <span id="setting-whatsapp-enabled-status" class="mt-1 block text-[10px] font-bold text-slate-500">Loading current status...</span>
           </div>
-          <span class="relative inline-flex shrink-0 items-center">
-            <input id="setting-whatsapp-enabled" type="checkbox" class="peer sr-only" checked />
-            <span class="h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-emerald-600 peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-500"></span>
-            <span class="pointer-events-none absolute left-1 h-4 w-4 rounded-full bg-white shadow-sm transition peer-checked:translate-x-5"></span>
-          </span>
-        </label>
+          <button id="setting-whatsapp-enabled" type="button" role="switch" aria-checked="false" aria-label="Enable WhatsApp AI Agent" onclick="toggleWhatsAppAgentSetting()" class="relative h-6 w-11 shrink-0 rounded-full bg-slate-300 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:cursor-wait disabled:opacity-60">
+            <span id="setting-whatsapp-enabled-knob" class="pointer-events-none absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow-sm transition"></span>
+          </button>
+        </div>
 
         <label class="block rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
           <div class="mb-2 flex items-center justify-between">
@@ -30087,6 +30086,62 @@
       }
     }
 
+    function setWhatsAppAgentSetting(enabled) {
+      const isEnabled = Boolean(enabled);
+      const toggle = document.getElementById('setting-whatsapp-enabled');
+      const knob = document.getElementById('setting-whatsapp-enabled-knob');
+      const status = document.getElementById('setting-whatsapp-enabled-status');
+      if (toggle) {
+        toggle.setAttribute('aria-checked', String(isEnabled));
+        toggle.classList.toggle('bg-emerald-600', isEnabled);
+        toggle.classList.toggle('bg-slate-300', !isEnabled);
+      }
+      knob?.classList.toggle('translate-x-5', isEnabled);
+      if (status) {
+        status.textContent = isEnabled
+          ? 'Enabled — the AI agent may answer incoming messages.'
+          : 'Disabled — incoming messages remain available for staff without an AI reply.';
+        status.className = `mt-1 block text-[10px] font-bold ${isEnabled ? 'text-emerald-700' : 'text-amber-700'}`;
+      }
+    }
+
+    function getWhatsAppAgentSetting() {
+      return document.getElementById('setting-whatsapp-enabled')?.getAttribute('aria-checked') === 'true';
+    }
+
+    function toggleWhatsAppAgentSetting() {
+      setWhatsAppAgentSetting(!getWhatsAppAgentSetting());
+    }
+
+    async function loadWhatsAppSettingsIntoModal() {
+      const enabledToggle = document.getElementById('setting-whatsapp-enabled');
+      if (enabledToggle) enabledToggle.disabled = true;
+
+      try {
+        const { data, error } = await db.from('clinic_settings').select(
+          'whatsapp_enabled, whatsapp_dispatch_mode, whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token, gemini_api_key, whatsapp_ai_instructions, whatsapp_ai_model'
+        ).eq('id', 1).maybeSingle();
+
+        if (error) throw error;
+        if (!data) throw new Error('WhatsApp settings were not found.');
+
+        setWhatsAppAgentSetting(data.whatsapp_enabled !== false);
+        const dispatchSelect = document.getElementById('setting-whatsapp-dispatch-mode');
+        if (dispatchSelect) dispatchSelect.value = data.whatsapp_dispatch_mode || clinicWhatsAppDispatchMode || 'cloud_api';
+        document.getElementById('setting-whatsapp-phone-id').value = data.whatsapp_phone_number_id || '';
+        document.getElementById('setting-whatsapp-waba-id').value = data.whatsapp_business_account_id || '';
+        document.getElementById('setting-whatsapp-verify-token').value = data.whatsapp_verify_token || 'lumin_secret_token';
+        document.getElementById('setting-whatsapp-gemini-key').value = data.gemini_api_key || '';
+        const modelSelect = document.getElementById('setting-whatsapp-model');
+        if (modelSelect) modelSelect.value = data.whatsapp_ai_model || 'gemini-3.5-flash-lite';
+        document.getElementById('setting-whatsapp-access-token').value = data.whatsapp_access_token || '';
+        document.getElementById('setting-whatsapp-ai-prompt').value = data.whatsapp_ai_instructions || '';
+        return data;
+      } finally {
+        if (enabledToggle) enabledToggle.disabled = false;
+      }
+    }
+
     async function openWhatsAppSettingsModal() {
       const modal = document.getElementById('modal-whatsapp-settings');
       if (!modal) return;
@@ -30094,26 +30149,10 @@
       modal.classList.add('flex');
 
       try {
-        const { data } = await db.from('clinic_settings').select(
-          'whatsapp_enabled, whatsapp_dispatch_mode, whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token, gemini_api_key, whatsapp_ai_instructions, whatsapp_ai_model'
-        ).eq('id', 1).maybeSingle();
-
-        if (data) {
-          const enabledCheckbox = document.getElementById('setting-whatsapp-enabled');
-          if (enabledCheckbox) enabledCheckbox.checked = Boolean(data.whatsapp_enabled ?? true);
-          const dispatchSelect = document.getElementById('setting-whatsapp-dispatch-mode');
-          if (dispatchSelect) dispatchSelect.value = data.whatsapp_dispatch_mode || clinicWhatsAppDispatchMode || 'cloud_api';
-          document.getElementById('setting-whatsapp-phone-id').value = data.whatsapp_phone_number_id || '';
-          document.getElementById('setting-whatsapp-waba-id').value = data.whatsapp_business_account_id || '';
-          document.getElementById('setting-whatsapp-verify-token').value = data.whatsapp_verify_token || 'lumin_secret_token';
-          document.getElementById('setting-whatsapp-gemini-key').value = data.gemini_api_key || '';
-          const modelSelect = document.getElementById('setting-whatsapp-model');
-          if (modelSelect) modelSelect.value = data.whatsapp_ai_model || 'gemini-3.5-flash-lite';
-          document.getElementById('setting-whatsapp-access-token').value = data.whatsapp_access_token || '';
-          document.getElementById('setting-whatsapp-ai-prompt').value = data.whatsapp_ai_instructions || '';
-        }
+        await loadWhatsAppSettingsIntoModal();
       } catch (err) {
         console.warn('Could not load WhatsApp settings:', err);
+        showAppointmentNotificationToast('WhatsApp Settings', err.message || 'Could not load WhatsApp settings.');
       }
       lucide.createIcons();
     }
@@ -30131,8 +30170,9 @@
       if (saveBtn) saveBtn.disabled = true;
 
       const chosenMode = document.getElementById('setting-whatsapp-dispatch-mode')?.value || clinicWhatsAppDispatchMode || 'cloud_api';
+      const requestedEnabled = getWhatsAppAgentSetting();
       const payload = {
-        whatsapp_enabled: Boolean(document.getElementById('setting-whatsapp-enabled')?.checked),
+        whatsapp_enabled: requestedEnabled,
         whatsapp_dispatch_mode: chosenMode,
         whatsapp_phone_number_id: String(document.getElementById('setting-whatsapp-phone-id')?.value || '').trim(),
         whatsapp_business_account_id: String(document.getElementById('setting-whatsapp-waba-id')?.value || '').trim(),
@@ -30145,13 +30185,36 @@
       };
 
       try {
-        const { error } = await db.from('clinic_settings').update(payload).eq('id', 1);
+        const { data, error } = await db
+          .from('clinic_settings')
+          .update(payload)
+          .eq('id', 1)
+          .select('whatsapp_enabled, whatsapp_dispatch_mode')
+          .maybeSingle();
         if (error) throw error;
+        if (!data) throw new Error('Settings were not updated. Administrator access is required.');
+        if (Boolean(data.whatsapp_enabled) !== requestedEnabled) {
+          throw new Error('The saved AI Agent status did not match your selection. Please try again.');
+        }
+        setWhatsAppAgentSetting(data.whatsapp_enabled);
         clinicWhatsAppDispatchMode = chosenMode;
         renderAdminWhatsAppDispatchMode();
         closeWhatsAppSettingsModal();
-        showAppointmentNotificationToast('WhatsApp Settings', currentUiLanguage === 'ar' ? 'تم حفظ الإعدادات بنجاح' : 'Settings saved successfully');
+        showAppointmentNotificationToast(
+          'WhatsApp Settings',
+          requestedEnabled
+            ? (currentUiLanguage === 'ar' ? 'تم حفظ الإعدادات وتفعيل وكيل الذكاء الاصطناعي' : 'Settings saved and the AI agent is enabled')
+            : (currentUiLanguage === 'ar' ? 'تم حفظ الإعدادات وإيقاف وكيل الذكاء الاصطناعي' : 'Settings saved and the AI agent is disabled')
+        );
       } catch (err) {
+        try {
+          const { data: savedSetting } = await db
+            .from('clinic_settings')
+            .select('whatsapp_enabled')
+            .eq('id', 1)
+            .maybeSingle();
+          if (savedSetting) setWhatsAppAgentSetting(savedSetting.whatsapp_enabled !== false);
+        } catch (_) {}
         alert('Failed to save settings: ' + err.message);
       } finally {
         if (saveBtn) saveBtn.disabled = false;
