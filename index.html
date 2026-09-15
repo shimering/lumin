@@ -2795,23 +2795,31 @@
     }
     #view-whatsapp {
       height: calc(100dvh - 3rem);
-      min-height: 40rem;
+      max-height: calc(100dvh - 3rem);
+      min-height: 0;
       display: flex;
       flex-direction: column;
       gap: 1rem;
+      overflow: hidden;
     }
     #view-whatsapp.hidden {
       display: none !important;
     }
     .whatsapp-chat-shell {
       flex: 1 1 0%;
+      width: 100%;
       min-height: 0;
       height: auto !important;
+      overflow: hidden;
     }
     #whatsapp-sidebar,
     #whatsapp-main-chat,
     #whatsapp-chat-active {
       min-height: 0 !important;
+    }
+    #whatsapp-sidebar,
+    #whatsapp-main-chat {
+      overflow: hidden;
     }
     #whatsapp-messages-container {
       min-height: 0 !important;
@@ -2847,15 +2855,38 @@
       min-height: 38px;
       line-height: 1.4;
     }
+    @media (min-width: 768px) {
+      .whatsapp-chat-shell {
+        direction: ltr;
+        grid-template-columns: clamp(17.5rem, 31vw, 25rem) minmax(0, 1fr) !important;
+        grid-template-rows: minmax(0, 1fr);
+      }
+      #whatsapp-sidebar {
+        grid-column: 1 !important;
+        grid-row: 1;
+        width: 100%;
+      }
+      #whatsapp-main-chat {
+        grid-column: 2 !important;
+        grid-row: 1;
+        width: 100%;
+      }
+      html[dir="rtl"] #whatsapp-sidebar,
+      html[dir="rtl"] #whatsapp-main-chat {
+        direction: rtl;
+      }
+    }
     @media (min-width: 768px) and (max-width: 1023px) {
       #view-whatsapp {
         height: calc(100dvh - 6.75rem - var(--mobile-nav-height));
+        max-height: calc(100dvh - 6.75rem - var(--mobile-nav-height));
         min-height: 0;
       }
     }
     @media (max-width: 767px) {
       #view-whatsapp {
         height: calc(100dvh - 5.75rem - var(--mobile-nav-height));
+        max-height: calc(100dvh - 5.75rem - var(--mobile-nav-height));
         min-height: 0;
         gap: 0.75rem;
       }
