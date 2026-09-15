@@ -3614,7 +3614,7 @@
           <div role="tablist" aria-label="HR team sections" class="inline-flex rounded-xl bg-slate-100 p-1"><button id="hr-tab-staff" type="button" onclick="switchHrTeamTab('staff')" class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-white px-4 py-2 text-xs font-black text-rose-700 shadow-xs"><i data-lucide="users-round" class="h-4 w-4"></i> Staff</button><button id="hr-tab-doctors" type="button" onclick="switchHrTeamTab('doctors')" class="inline-flex min-h-10 items-center gap-2 rounded-lg px-4 py-2 text-xs font-black text-slate-500"><i data-lucide="stethoscope" class="h-4 w-4"></i> Doctors</button></div>
           <div id="hr-period-actions" class="flex flex-wrap items-center gap-2"><button id="hr-review-period-button" type="button" onclick="setHrPayrollPeriodStatus('reviewed')" class="rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2.5 text-[11px] font-black text-blue-700 hover:bg-blue-100">Review month</button><button id="hr-lock-period-button" type="button" onclick="setHrPayrollPeriodStatus('locked')" class="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[11px] font-black text-amber-700 hover:bg-amber-100">Lock payroll</button><button id="hr-pay-all-button" type="button" onclick="payAllHrSalaries()" class="rounded-xl bg-emerald-600 px-3.5 py-2.5 text-[11px] font-black text-white hover:bg-emerald-700">Pay all salaries</button></div>
         </div>
-        <div class="grid grid-cols-2 gap-3 border-b border-slate-100 p-4 lg:grid-cols-4 sm:p-5"><div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4"><span class="text-[10px] font-black uppercase tracking-wider text-slate-400">Team shown</span><p id="hr-team-total" class="mt-2 text-xl font-black text-slate-900">0</p></div><div class="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4"><span class="text-[10px] font-black uppercase tracking-wider text-emerald-600">Attended shifts</span><p id="hr-attended-total" class="mt-2 text-xl font-black text-emerald-800">0</p></div><div class="rounded-2xl border border-amber-200 bg-amber-50/60 p-4"><span class="text-[10px] font-black uppercase tracking-wider text-amber-600">Late arrivals</span><p id="hr-late-total" class="mt-2 text-xl font-black text-amber-800">0</p></div><div class="rounded-2xl border border-violet-200 bg-violet-50/60 p-4"><span id="hr-salary-total-label" class="text-[10px] font-black uppercase tracking-wider text-violet-600">Salary total</span><p id="hr-salary-total" class="mt-2 text-xl font-black text-violet-800">EGP 0</p></div></div>
+        <div class="grid grid-cols-2 gap-3 border-b border-slate-100 p-4 lg:grid-cols-4 sm:p-5"><div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4"><span class="text-[10px] font-black uppercase tracking-wider text-slate-400">Team shown</span><p id="hr-team-total" class="mt-2 text-xl font-black text-slate-900">0</p></div><div class="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4"><span id="hr-attended-total-label" class="text-[10px] font-black uppercase tracking-wider text-emerald-600">Attended shifts</span><p id="hr-attended-total" class="mt-2 text-xl font-black text-emerald-800">0</p></div><div class="rounded-2xl border border-amber-200 bg-amber-50/60 p-4"><span id="hr-late-total-label" class="text-[10px] font-black uppercase tracking-wider text-amber-600">Late arrivals</span><p id="hr-late-total" class="mt-2 text-xl font-black text-amber-800">0</p></div><div class="rounded-2xl border border-violet-200 bg-violet-50/60 p-4"><span id="hr-salary-total-label" class="text-[10px] font-black uppercase tracking-wider text-violet-600">Salary total</span><p id="hr-salary-total" class="mt-2 text-xl font-black text-violet-800">EGP 0</p></div></div>
         <div class="space-y-3 border-b border-slate-100 p-4 sm:p-5"><div class="grid gap-3 md:grid-cols-[minmax(220px,1fr)_auto]"><label class="relative block"><i data-lucide="search" class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i><input id="hr-team-search" type="search" oninput="renderHrDirectory()" placeholder="Search by name or user type" class="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-rose-400 focus:bg-white" /></label><button type="button" onclick="setHrRoleFilter('all')" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-600">All user types</button></div><div id="hr-role-filters" class="flex gap-2 overflow-x-auto pb-1"></div></div>
         <div class="mobile-scroll-region overflow-x-auto"><table id="hr-team-table" class="w-full min-w-[1120px] text-left text-xs"><thead class="border-b border-slate-200 bg-white text-[10px] font-black uppercase tracking-wider text-slate-400"><tr><th class="px-5 py-3.5">Team member</th><th class="px-5 py-3.5">Schedule</th><th class="px-5 py-3.5">Attendance</th><th class="px-5 py-3.5">Performance</th><th class="px-5 py-3.5">Salary calculation</th><th class="px-5 py-3.5">Payment</th><th class="px-5 py-3.5 text-right">Actions</th></tr></thead><tbody id="hr-team-table-body" class="divide-y divide-slate-100 font-medium text-slate-700"><tr><td colspan="7" class="px-5 py-12 text-center text-sm font-bold text-slate-400">Loading monthly HR records...</td></tr></tbody></table></div>
         <p id="hr-directory-error" class="hidden border-t border-red-100 bg-red-50 px-5 py-3 text-xs font-bold text-red-700" role="alert"></p>
@@ -3665,6 +3665,15 @@
         </div>
 
         <div id="hr-doctor-detail-kpis" class="grid grid-cols-2 gap-3 lg:grid-cols-4"></div>
+
+        <section class="overflow-hidden rounded-2xl border border-cyan-200 bg-white shadow-xs">
+          <div class="flex flex-col gap-3 border-b border-cyan-100 bg-cyan-50/55 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+            <div><h3 class="flex items-center gap-2 text-sm font-black text-slate-800"><i data-lucide="calculator" class="h-4 w-4 text-cyan-700"></i> Monthly procedure salary</h3><p id="hr-doctor-payroll-month-label" class="mt-1 text-[11px] font-bold text-slate-500">Completed procedures assigned to this doctor.</p></div>
+            <div class="flex flex-wrap items-center gap-2"><span id="hr-doctor-payment-status" class="rounded-full bg-slate-100 px-3 py-1.5 text-[10px] font-black text-slate-600">Unpaid</span><button id="hr-doctor-pay-salary" type="button" onclick="payHrDoctorSalary()" class="hidden min-h-10 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-sm hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60"><i data-lucide="wallet-cards" class="h-4 w-4"></i> Pay salary</button></div>
+          </div>
+          <div class="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-3 sm:p-5"><div class="rounded-xl bg-slate-50 p-3"><span class="text-[9px] font-black uppercase tracking-wider text-slate-400">Completed quantity</span><p id="hr-doctor-procedure-count" class="mt-1.5 text-lg font-black text-slate-900">0</p></div><div class="rounded-xl bg-blue-50 p-3"><span class="text-[9px] font-black uppercase tracking-wider text-blue-500">Procedure value</span><p id="hr-doctor-procedure-value" class="mt-1.5 text-lg font-black text-blue-800">EGP 0</p></div><div class="rounded-xl bg-emerald-50 p-3"><span class="text-[9px] font-black uppercase tracking-wider text-emerald-600">Calculated salary</span><p id="hr-doctor-calculated-salary" class="mt-1.5 text-lg font-black text-emerald-800">EGP 0</p></div></div>
+          <div class="mobile-scroll-region overflow-x-auto"><table class="w-full min-w-[720px] text-left text-xs"><thead class="border-b border-slate-100 bg-slate-50/70 text-[9px] font-black uppercase tracking-wider text-slate-400"><tr><th class="px-4 py-3">Procedure</th><th class="px-4 py-3">Completed</th><th class="px-4 py-3">Procedure value</th><th class="px-4 py-3">Rule</th><th class="px-4 py-3 text-right">Doctor salary</th></tr></thead><tbody id="hr-doctor-payroll-lines" class="divide-y divide-slate-100 font-semibold text-slate-600"></tbody></table></div>
+        </section>
 
         <div class="grid gap-5 xl:grid-cols-2">
           <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
@@ -6493,6 +6502,7 @@
     let hrExtraShifts = [];
     let hrPerformanceAdjustments = [];
     let hrSalaryPayments = [];
+    let hrDoctorPayrollLines = [];
     let hrPayrollPeriod = null;
     let activeHrTeamTab = 'staff';
     let hrRoleFilter = 'all';
@@ -6632,10 +6642,13 @@
     let patientAppointmentsPatientId = null;
     let patientAppointmentsRequest = 0;
     let appointmentStaff = [];
+    let chartDoctors = [];
     let appointmentsLoaded = false;
     let appointmentsLoadPromise = null;
     let appointmentStaffLoaded = false;
     let appointmentStaffLoadPromise = null;
+    let chartDoctorsLoaded = false;
+    let chartDoctorsLoadPromise = null;
     let appointmentCalendarMode = 'day';
     let appointmentShowMineOnly = false;
     let appointmentWeekNavigationDirection = 0;
@@ -8574,6 +8587,9 @@
         appointmentStaff = [];
         appointmentStaffLoaded = false;
         appointmentStaffLoadPromise = null;
+        chartDoctors = [];
+        chartDoctorsLoaded = false;
+        chartDoctorsLoadPromise = null;
         whatsappMessageTemplates = [];
         whatsappTemplatesLoaded = false;
         whatsappTemplatesLoadPromise = null;
@@ -8647,6 +8663,7 @@
         hrExtraShifts = [];
         hrPerformanceAdjustments = [];
         hrSalaryPayments = [];
+        hrDoctorPayrollLines = [];
         hrPayrollPeriod = null;
         hrLoadedMonth = '';
         activeHrTeamTab = 'staff';
@@ -8730,6 +8747,9 @@
         appointmentStaff = [];
         appointmentStaffLoaded = false;
         appointmentStaffLoadPromise = null;
+        chartDoctors = [];
+        chartDoctorsLoaded = false;
+        chartDoctorsLoadPromise = null;
         whatsappMessageTemplates = [];
         whatsappTemplatesLoaded = false;
         whatsappTemplatesLoadPromise = null;
@@ -8784,6 +8804,14 @@
         hrDirectoryUsers = [];
         hrDirectoryLoaded = false;
         hrDirectoryLoadPromise = null;
+        hrStaffSettings = [];
+        hrAttendanceSessions = [];
+        hrExtraShifts = [];
+        hrPerformanceAdjustments = [];
+        hrSalaryPayments = [];
+        hrDoctorPayrollLines = [];
+        hrPayrollPeriod = null;
+        hrLoadedMonth = '';
         activeHrStaffDetailsId = null;
         activeHrDoctorDetailsId = null;
         hrDoctorDetailDraft = null;
@@ -10169,18 +10197,23 @@
         const batchIdValue = value.batchId || value.batch_id;
         const billingMultiplierValue = value.billingMultiplier ?? value.billing_multiplier;
         const billingMultiplier = Number(billingMultiplierValue);
+        const doctorIdValue = value.doctorId || value.doctor_id;
+        const doctorNameValue = value.doctorName || value.doctor_name;
         return {
           code: String(value.code || value.operation || value.value || 'none'),
           status: normaliseOperationStatus(value.status, 'E'),
           createdAt: normaliseChartCreatedAt(value.createdAt || value.created_at),
+          completedAt: normaliseChartCreatedAt(value.completedAt || value.completed_at),
           id: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value.id || '')) ? String(value.id) : null,
           price: Number.isFinite(price) && price >= 0 ? price : null,
           batchId: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(batchIdValue || '')) ? String(batchIdValue) : null,
           billingMultiplier: Number.isInteger(billingMultiplier) && billingMultiplier >= 1 && billingMultiplier <= 999 ? billingMultiplier : null,
+          doctorId: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(doctorIdValue || '')) ? String(doctorIdValue) : null,
+          doctorName: String(doctorNameValue || '').trim().slice(0, 100),
           notes: normaliseChartOperationNotes(value.notes)
         };
       }
-      return { code: String(value || 'none'), status: 'E', createdAt: null, id: null, price: null, batchId: null, billingMultiplier: null, notes: [] };
+      return { code: String(value || 'none'), status: 'E', createdAt: null, completedAt: null, id: null, price: null, batchId: null, billingMultiplier: null, doctorId: null, doctorName: '', notes: [] };
     }
 
     function createChartFindingId() {
@@ -10230,7 +10263,7 @@
       return amountByFindingId;
     }
 
-    function chartFindingStorageRecord(code, status, createdAt = null, id = null, price = null, batchId = null, notes = null, billingMultiplier = null) {
+    function chartFindingStorageRecord(code, status, createdAt = null, id = null, price = null, batchId = null, notes = null, billingMultiplier = null, doctorId = null, doctorName = '', completedAt = null) {
       const hasExplicitPrice = price !== null && price !== undefined && String(price).trim() !== '';
       const numericPrice = hasExplicitPrice ? Number(price) : Number.NaN;
       const record = {
@@ -10241,12 +10274,19 @@
       };
       const normalisedCreatedAt = normaliseChartCreatedAt(createdAt);
       if (normalisedCreatedAt) record.createdAt = normalisedCreatedAt;
+      const normalisedCompletedAt = normaliseChartCreatedAt(completedAt);
+      if (normalisedCompletedAt) record.completedAt = normalisedCompletedAt;
       if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(batchId || ''))) {
         record.batchId = String(batchId);
         const numericBillingMultiplier = Number(billingMultiplier);
         if (Number.isInteger(numericBillingMultiplier) && numericBillingMultiplier >= 1 && numericBillingMultiplier <= 999) {
           record.billingMultiplier = numericBillingMultiplier;
         }
+      }
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(doctorId || ''))) {
+        record.doctorId = String(doctorId);
+        const normalisedDoctorName = String(doctorName || '').trim().slice(0, 100);
+        if (normalisedDoctorName) record.doctorName = normalisedDoctorName;
       }
       const normalisedNotes = normaliseChartOperationNotes(notes);
       if (normalisedNotes.length) record.notes = normalisedNotes;
@@ -10277,7 +10317,10 @@
           finding.price,
           finding.batchId,
           finding.notes,
-          finding.billingMultiplier
+          finding.billingMultiplier,
+          finding.doctorId,
+          finding.doctorName,
+          finding.completedAt
         ));
       if (records.length) toothData.surfaces[surface] = records;
       else delete toothData.surfaces[surface];
@@ -10302,7 +10345,7 @@
 
     function ensureWholeOperations(toothData) {
       toothData.wholeOperations = chartWholeFindings(toothData).map(finding => (
-        chartFindingStorageRecord(finding.code, finding.status, finding.createdAt, finding.id, finding.price, finding.batchId, finding.notes, finding.billingMultiplier)
+        chartFindingStorageRecord(finding.code, finding.status, finding.createdAt, finding.id, finding.price, finding.batchId, finding.notes, finding.billingMultiplier, finding.doctorId, finding.doctorName, finding.completedAt)
       ));
       toothData.status = 'none';
       return toothData.wholeOperations;
@@ -10318,7 +10361,7 @@
     function ensureMouthOperations(patient) {
       const meta = ensureChartMeta(patient);
       meta.mouthOperations = chartMouthFindings(patient).map(finding => (
-        chartFindingStorageRecord(finding.code, finding.status, finding.createdAt, finding.id, finding.price, null, finding.notes)
+        chartFindingStorageRecord(finding.code, finding.status, finding.createdAt, finding.id, finding.price, null, finding.notes, null, finding.doctorId, finding.doctorName, finding.completedAt)
       ));
       return meta.mouthOperations;
     }
@@ -10335,7 +10378,11 @@
           finding.id,
           finding.price,
           null,
-          finding.notes
+          finding.notes,
+          null,
+          finding.doctorId,
+          finding.doctorName,
+          finding.completedAt
         ));
       if (records.length) meta.mouthOperations = records;
       else delete meta.mouthOperations;
@@ -10386,7 +10433,10 @@
             finding.price,
             finding.batchId,
             finding.notes,
-            finding.billingMultiplier
+            finding.billingMultiplier,
+            finding.doctorId,
+            finding.doctorName,
+            finding.completedAt
           ));
         });
         toothData.surfaces = nextSurfaces;
@@ -14203,6 +14253,9 @@
         if ((refreshLoadedResourcesForAccess || dentalCustomizationChanged) && dentalCustomizationLoaded && (hasPageAccess('chart') || hasPageAccess('hr'))) {
           await fetchDentalCustomization();
         }
+        if (accessChanged && chartDoctorsLoaded && hasPageAccess('chart')) {
+          await fetchChartDoctors();
+        }
         const invoicesChanged = [...changedTables].some(table => REALTIME_INVOICE_TABLES.has(table));
         if (invoicesChanged) {
           financeInvoicesLoaded = false;
@@ -14249,7 +14302,7 @@
           await loadAdminData();
         }
         if (hrChanged && (attendanceStateLoadedAt || realtimeViewIsVisible('dashboard'))) await refreshMyAttendanceState({ force: true });
-        if ((accessChanged || hrChanged) && hasPageAccess('hr') && !document.getElementById('view-hr').classList.contains('hidden')) {
+        if ((accessChanged || hrChanged || changedTables.has('patients')) && hasPageAccess('hr') && !document.getElementById('view-hr').classList.contains('hidden')) {
           hrDirectoryLoaded = false;
           await refreshHrDirectory({ refresh: true });
         }
@@ -15025,6 +15078,28 @@
       return appointmentStaffLoadPromise;
     }
 
+    async function ensureChartDoctorsLoaded() {
+      if (chartDoctorsLoaded) return true;
+      if (!currentSession || !hasPageAccess('chart')) return false;
+      if (!chartDoctorsLoadPromise) {
+        chartDoctorsLoadPromise = fetchChartDoctors()
+          .then(() => true)
+          .finally(() => { chartDoctorsLoadPromise = null; });
+      }
+      return chartDoctorsLoadPromise;
+    }
+
+    async function fetchChartDoctors() {
+      const { data, error } = await db.rpc('list_chart_doctors');
+      if (error) throw error;
+      chartDoctors = (data || []).map(doctor => ({
+        userId: doctor.user_id,
+        fullName: String(doctor.full_name || '').trim()
+      })).filter(doctor => doctor.userId && doctor.fullName);
+      chartDoctorsLoaded = true;
+      if (activePatientId && !document.getElementById('view-chart')?.classList.contains('hidden')) renderFindingsList();
+    }
+
     async function ensureAppointmentsLoaded() {
       if (appointmentsLoaded) {
         if (!appointmentVisitTypesLoaded) await ensureAppointmentVisitTypesLoaded();
@@ -15189,6 +15264,75 @@
       return { settings, attended: completedDates.size, expected: hrExpectedShiftCount(settings.schedule), late: lateCount, extraRows, performanceRows, extraAmount, performanceAmount, performanceScore, regularAmount, salary, paid };
     }
 
+    function hrDoctorMetrics(user) {
+      const settings = hrUserSettings(user.userId);
+      const payrollLines = hrDoctorPayrollLines.filter(line => line.doctor_id === user.userId);
+      const procedureCount = payrollLines.reduce((sum, line) => sum + Number(line.procedure_count || 0), 0);
+      const grossAmount = payrollLines.reduce((sum, line) => sum + Number(line.gross_amount || 0), 0);
+      const salary = payrollLines.reduce((sum, line) => sum + Number(line.salary_amount || 0), 0);
+      const paid = hrSalaryPayments.find(item => item.user_id === user.userId);
+      return {
+        settings,
+        payrollLines,
+        procedureCount,
+        grossAmount,
+        attended: procedureCount,
+        expected: 0,
+        late: 0,
+        extraRows: [],
+        performanceRows: [],
+        extraAmount: 0,
+        performanceAmount: 0,
+        performanceScore: null,
+        regularAmount: salary,
+        salary,
+        paid
+      };
+    }
+
+    function hrProcedureQuantityLabel(value) {
+      const quantity = Math.round(Number(value || 0) * 100) / 100;
+      return Number.isInteger(quantity) ? String(quantity) : quantity.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+    }
+
+    function renderHrDoctorPayroll(user) {
+      const table = document.getElementById('hr-doctor-payroll-lines');
+      if (!table) return;
+      const metrics = hrDoctorMetrics(user);
+      const monthStart = hrMonthBounds().start;
+      const monthLabel = new Intl.DateTimeFormat(currentUiLanguage === 'ar' ? 'ar-EG' : 'en-GB', { month: 'long', year: 'numeric' }).format(new Date(`${monthStart}T12:00:00`));
+      document.getElementById('hr-doctor-payroll-month-label').textContent = `${monthLabel} · completed procedures assigned to this doctor.`;
+      document.getElementById('hr-doctor-procedure-count').textContent = hrProcedureQuantityLabel(metrics.procedureCount);
+      document.getElementById('hr-doctor-procedure-value').textContent = formatInvoiceMoney(metrics.grossAmount);
+      document.getElementById('hr-doctor-calculated-salary').textContent = formatInvoiceMoney(metrics.salary);
+
+      const status = document.getElementById('hr-doctor-payment-status');
+      const payButton = document.getElementById('hr-doctor-pay-salary');
+      if (metrics.paid) {
+        status.textContent = `Paid ${formatInvoiceMoney(metrics.paid.total_amount)}`;
+        status.className = 'rounded-full bg-emerald-100 px-3 py-1.5 text-[10px] font-black text-emerald-700';
+      } else if (metrics.salary <= 0) {
+        status.textContent = 'No payable procedures';
+        status.className = 'rounded-full bg-slate-100 px-3 py-1.5 text-[10px] font-black text-slate-500';
+      } else if (hrPayrollPeriod?.status === 'locked') {
+        status.textContent = 'Ready to pay';
+        status.className = 'rounded-full bg-amber-100 px-3 py-1.5 text-[10px] font-black text-amber-700';
+      } else {
+        status.textContent = hrPayrollPeriod?.status === 'paid' ? 'Payroll closed' : 'Lock payroll to pay';
+        status.className = 'rounded-full bg-blue-100 px-3 py-1.5 text-[10px] font-black text-blue-700';
+      }
+      const canPay = canModifyHr() && hrPayrollPeriod?.status === 'locked' && !metrics.paid && metrics.salary > 0;
+      payButton.classList.toggle('hidden', !canPay);
+      payButton.classList.toggle('inline-flex', canPay);
+
+      table.innerHTML = metrics.payrollLines.length ? metrics.payrollLines.map(line => {
+        const method = line.compensation_type === 'fixed'
+          ? `${formatInvoiceMoney(line.compensation_rate)} fixed`
+          : `${hrProcedureQuantityLabel(line.compensation_rate)}%`;
+        return `<tr><td class="px-4 py-3"><p class="font-black text-slate-800">${escapeHtml(line.operation_name || line.operation_code || 'Procedure')}</p><p class="mt-1 text-[10px] font-bold text-slate-400">${escapeHtml(line.operation_code || '')}</p></td><td class="px-4 py-3 font-black text-slate-700">${escapeHtml(hrProcedureQuantityLabel(line.procedure_count))}</td><td class="px-4 py-3 font-black text-blue-700">${escapeHtml(formatInvoiceMoney(line.gross_amount))}</td><td class="px-4 py-3"><span class="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-black text-violet-700">${escapeHtml(method)}</span></td><td class="px-4 py-3 text-right font-black text-emerald-700">${escapeHtml(formatInvoiceMoney(line.salary_amount))}</td></tr>`;
+      }).join('') : '<tr><td colspan="5" class="px-5 py-10 text-center text-xs font-bold text-slate-400">No completed assigned procedures with a salary rule in this month.</td></tr>';
+    }
+
     function renderHrPeriodControls() {
       const status = hrPayrollPeriod?.status || 'draft';
       const badge = document.getElementById('hr-payroll-status');
@@ -15196,7 +15340,7 @@
       badge.textContent = status;
       badge.className = `rounded-full px-3 py-2 text-[10px] font-black uppercase tracking-wider ${styles[status]}`;
       const actions = document.getElementById('hr-period-actions');
-      actions.classList.toggle('hidden', !canModifyHr() || activeHrTeamTab === 'doctors');
+      actions.classList.toggle('hidden', !canModifyHr());
       const review = document.getElementById('hr-review-period-button');
       const lock = document.getElementById('hr-lock-period-button');
       const pay = document.getElementById('hr-pay-all-button');
@@ -15204,7 +15348,7 @@
       review.textContent = status === 'draft' ? 'Review month' : status === 'reviewed' ? 'Return to draft' : 'Unlock for review';
       review.onclick = () => setHrPayrollPeriodStatus(status === 'draft' ? 'reviewed' : status === 'reviewed' ? 'draft' : 'reviewed');
       lock.classList.toggle('hidden', status !== 'reviewed');
-      pay.classList.toggle('hidden', status !== 'locked');
+      pay.classList.toggle('hidden', status !== 'locked' || activeHrTeamTab === 'doctors');
     }
 
     function renderHrRoleFilters(users) {
@@ -15286,8 +15430,8 @@
     function hrDoctorCompensationSummary(userId) {
       const rules = hrUserSettings(userId).doctorCompensation.rules;
       if (!rules.length) return 'No salary rules';
-      const percentageCount = rules.filter(rule => rule.type === 'percentage').length;
-      const fixedCount = rules.length - percentageCount;
+      const user = hrDirectoryUsers.find(item => item.userId === activeHrDoctorDetailsId);
+      const payroll = user ? hrDoctorMetrics(user) : { salary: 0 };
       return `${rules.length} procedure${rules.length === 1 ? '' : 's'} · ${[percentageCount ? `${percentageCount} percentage` : '', fixedCount ? `${fixedCount} fixed` : ''].filter(Boolean).join(' · ')}`;
     }
 
@@ -15420,7 +15564,7 @@
         ['Working days', schedule.days.length, 'border-rose-200 bg-rose-50/70 text-rose-800'],
         ['Weekly hours', weeklyHours, 'border-blue-200 bg-blue-50/70 text-blue-800'],
         ['Salary procedures', rules.length, 'border-violet-200 bg-violet-50/70 text-violet-800'],
-        ['Salary methods', rules.length ? `${percentageCount} % · ${fixedCount} fixed` : 'Not configured', 'border-slate-200 bg-white text-slate-900']
+        ['Month salary', formatInvoiceMoney(payroll.salary), 'border-emerald-200 bg-emerald-50/70 text-emerald-800']
       ];
       container.innerHTML = kpis.map(([label, value, classes]) => `<div class="rounded-2xl border p-3.5 shadow-xs ${classes}"><span class="text-[9px] font-black uppercase tracking-wider opacity-70">${escapeHtml(label)}</span><p class="mt-2 text-lg font-black">${escapeHtml(String(value))}</p></div>`).join('');
     }
@@ -15445,6 +15589,7 @@
       document.getElementById('hr-doctor-compensation-builder').classList.toggle('hidden', !canModifyHr());
       renderHrDoctorScheduleEditor(hrDoctorDetailDraft.schedule);
       renderHrDoctorDetailKpis();
+      renderHrDoctorPayroll(user);
       renderHrDoctorCompensationRules();
       updateHrDoctorCompensationBuilder();
       lucide.createIcons();
@@ -15527,6 +15672,9 @@
         const { data, error: reloadError } = await db.from('hr_staff_settings').select('user_id, attendance_enabled, regular_shift_rate, extra_shift_rate, weekly_schedule, updated_at');
         if (reloadError) throw reloadError;
         hrStaffSettings = data || [];
+        const { data: payrollData, error: payrollError } = await db.rpc('get_hr_doctor_payroll', { p_pay_month: hrMonthBounds().start });
+        if (payrollError) throw payrollError;
+        hrDoctorPayrollLines = payrollData || [];
         const saved = hrUserSettings(user.userId);
         hrDoctorDetailDraft = { userId: user.userId, schedule: normaliseHrSchedule(saved.schedule), compensation: normaliseHrDoctorCompensation(saved.doctorCompensation) };
         renderHrDoctorDetails();
@@ -15771,28 +15919,38 @@
       const baseUsers = hrDirectoryUsers.filter(user => user.active && (activeHrTeamTab === 'doctors' ? user.isDoctor : !user.isDoctor));
       renderHrRoleFilters(baseUsers);
       const users = baseUsers.filter(user => (hrRoleFilter === 'all' || user.roleId === hrRoleFilter || user.roleName === hrRoleFilter) && (!query || [user.fullName, user.loginName, user.roleName].some(value => value.toLowerCase().includes(query))));
-      const metrics = users.map(user => ({ user, ...hrUserMetrics(user) }));
+      const metrics = users.map(user => ({ user, ...(user.isDoctor ? hrDoctorMetrics(user) : hrUserMetrics(user)) }));
       document.getElementById('hr-team-total').textContent = String(users.length);
       document.getElementById('hr-attended-total').textContent = String(metrics.reduce((sum, item) => sum + item.attended, 0));
-      document.getElementById('hr-late-total').textContent = String(metrics.reduce((sum, item) => sum + item.late, 0));
-      const configuredDoctors = users.filter(user => user.isDoctor && hrUserSettings(user.userId).doctorCompensation.rules.length).length;
-      document.getElementById('hr-salary-total-label').textContent = activeHrTeamTab === 'doctors' ? 'Salary settings' : 'Salary total';
-      document.getElementById('hr-salary-total').textContent = activeHrTeamTab === 'doctors' ? `${configuredDoctors} / ${users.length} configured` : formatInvoiceMoney(metrics.reduce((sum, item) => sum + item.salary, 0));
+      document.getElementById('hr-late-total').textContent = String(activeHrTeamTab === 'doctors' ? metrics.reduce((sum, item) => sum + item.payrollLines.length, 0) : metrics.reduce((sum, item) => sum + item.late, 0));
+      document.getElementById('hr-attended-total-label').textContent = activeHrTeamTab === 'doctors' ? 'Completed quantity' : 'Attended shifts';
+      document.getElementById('hr-late-total-label').textContent = activeHrTeamTab === 'doctors' ? 'Procedure types' : 'Late arrivals';
+      document.getElementById('hr-salary-total-label').textContent = activeHrTeamTab === 'doctors' ? 'Calculated salary' : 'Salary total';
+      document.getElementById('hr-salary-total').textContent = formatInvoiceMoney(metrics.reduce((sum, item) => sum + item.salary, 0));
       renderHrPeriodControls();
       const periodLocked = ['locked', 'paid'].includes(hrPayrollPeriod?.status);
       tbody.innerHTML = metrics.map(item => {
         const { user, settings } = item;
         const initials = user.fullName.split(/\s+/).filter(Boolean).map(part => part[0]).join('').substring(0, 2).toUpperCase() || '—';
         const attendanceClass = item.attended >= item.expected ? 'text-emerald-700' : 'text-amber-700';
-        const paymentMarkup = user.isDoctor ? '<span class="text-[11px] font-bold text-slate-400">Managed on doctor details page</span>' : item.paid ? `<span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700"><i data-lucide="circle-check" class="h-3.5 w-3.5"></i>Paid ${escapeHtml(formatInvoiceMoney(item.paid.total_amount))}</span>` : `<span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-500">Unpaid</span>`;
+        const paymentMarkup = item.paid
+          ? `<span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700"><i data-lucide="circle-check" class="h-3.5 w-3.5"></i>Paid ${escapeHtml(formatInvoiceMoney(item.paid.total_amount))}</span>`
+          : user.isDoctor && item.salary <= 0
+            ? '<span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-500">No payable procedures</span>'
+            : `<span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-500">Unpaid</span>`;
         const actionMarkup = user.isDoctor
           ? `<button type="button" onclick="event.stopPropagation(); void openHrDoctorDetails('${user.userId}')" class="inline-flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-[10px] font-black text-cyan-700 hover:bg-cyan-100"><i data-lucide="external-link" class="h-3.5 w-3.5"></i>Open details</button>`
           : !canModifyHr() ? '<span class="text-[10px] font-bold text-slate-400">Read only</span>' : `<div class="flex flex-wrap justify-end gap-1.5"><button type="button" ${periodLocked ? 'disabled' : ''} onclick="event.stopPropagation(); openHrManualShiftModal('${user.userId}')" class="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-[10px] font-black text-rose-700 disabled:opacity-40">Add shift</button><button type="button" ${periodLocked ? 'disabled' : ''} onclick="event.stopPropagation(); openHrAdjustmentModal('extra','${user.userId}')" class="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] font-black text-amber-700 disabled:opacity-40">Extra shift</button><button type="button" ${periodLocked ? 'disabled' : ''} onclick="event.stopPropagation(); openHrAdjustmentModal('performance','${user.userId}')" class="rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-2 text-[10px] font-black text-violet-700 disabled:opacity-40">Performance</button>${hrPayrollPeriod?.status === 'locked' && !item.paid ? `<button type="button" onclick="event.stopPropagation(); payHrSalary('${user.userId}')" class="rounded-lg bg-emerald-600 px-2.5 py-2 text-[10px] font-black text-white">Pay salary</button>` : ''}</div>`;
         const cardAttributes = user.isDoctor
           ? ` tabindex="0" role="button" aria-label="Open ${escapeHtml(user.fullName)} doctor details" onclick="void openHrDoctorDetails('${user.userId}')" onkeydown="handleHrDoctorCardKeydown(event,'${user.userId}')" class="cursor-pointer transition hover:bg-cyan-50/40 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-cyan-400"`
           : ` tabindex="0" role="button" aria-label="Open ${escapeHtml(user.fullName)} staff details" onclick="openHrStaffDetails('${user.userId}')" onkeydown="handleHrStaffCardKeydown(event,'${user.userId}')" class="cursor-pointer transition hover:bg-rose-50/40 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-rose-400"`;
-        const doctorRules = user.isDoctor ? settings.doctorCompensation.rules : [];
-        return `<tr${cardAttributes}><td data-label="Team member" class="px-5 py-4"><div class="flex min-w-0 items-center gap-3"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${user.isDoctor ? 'bg-cyan-50 text-cyan-700' : 'bg-rose-50 text-rose-700'} text-[11px] font-black">${escapeHtml(initials)}</span><div class="min-w-0"><p class="truncate font-black text-slate-800">${escapeHtml(user.fullName)}</p><p class="mt-1 text-[10px] font-bold text-slate-400">${escapeHtml(user.roleName)} · Open details</p></div></div></td><td data-label="Schedule" class="px-5 py-4"><p class="text-[11px] font-bold text-slate-600">${escapeHtml(hrScheduleLabel(settings.schedule))}</p><p class="mt-1 text-[10px] font-bold ${settings.attendanceEnabled ? 'text-rose-600' : 'text-slate-400'}">${settings.attendanceEnabled ? 'Mobile attendance enabled' : 'Attendance not configured'}</p></td><td data-label="Attendance" class="px-5 py-4"><p class="font-black ${attendanceClass}">${item.attended} / ${item.expected} shifts</p><p class="mt-1 text-[10px] font-bold ${item.late ? 'text-amber-600' : 'text-slate-400'}">${item.late} late · ${Math.max(0, item.expected - item.attended)} absent</p></td><td data-label="Performance" class="px-5 py-4"><p class="font-black ${item.performanceAmount >= 0 ? 'text-emerald-700' : 'text-red-600'}">${item.performanceAmount >= 0 ? '+' : '−'}${escapeHtml(formatInvoiceMoney(Math.abs(item.performanceAmount)))}</p><p class="mt-1 text-[10px] font-bold text-slate-400">${item.performanceScore == null ? 'No score' : `${item.performanceScore.toFixed(1)}% score`} · ${item.performanceRows.length} entries</p></td><td data-label="Salary calculation" class="px-5 py-4"><p class="font-black text-slate-900">${user.isDoctor ? `${doctorRules.length} procedure${doctorRules.length === 1 ? '' : 's'}` : escapeHtml(formatInvoiceMoney(item.salary))}</p><p class="mt-1 text-[10px] font-bold text-slate-400">${user.isDoctor ? escapeHtml(hrDoctorCompensationSummary(user.userId)) : `${formatInvoiceMoney(item.regularAmount)} regular · ${formatInvoiceMoney(item.extraAmount)} extra`}</p></td><td data-label="Payment" class="px-5 py-4">${paymentMarkup}</td><td data-label="Actions" class="px-5 py-4 text-right">${actionMarkup}</td></tr>`;
+        const activityMarkup = user.isDoctor
+          ? `<p class="font-black text-cyan-800">${escapeHtml(hrProcedureQuantityLabel(item.procedureCount))} completed</p><p class="mt-1 text-[10px] font-bold text-slate-400">${item.payrollLines.length} compensated procedure type${item.payrollLines.length === 1 ? '' : 's'}</p>`
+          : `<p class="font-black ${attendanceClass}">${item.attended} / ${item.expected} shifts</p><p class="mt-1 text-[10px] font-bold ${item.late ? 'text-amber-600' : 'text-slate-400'}">${item.late} late · ${Math.max(0, item.expected - item.attended)} absent</p>`;
+        const performanceMarkup = user.isDoctor
+          ? `<p class="font-black text-blue-700">${escapeHtml(formatInvoiceMoney(item.grossAmount))}</p><p class="mt-1 text-[10px] font-bold text-slate-400">Completed procedure value</p>`
+          : `<p class="font-black ${item.performanceAmount >= 0 ? 'text-emerald-700' : 'text-red-600'}">${item.performanceAmount >= 0 ? '+' : '−'}${escapeHtml(formatInvoiceMoney(Math.abs(item.performanceAmount)))}</p><p class="mt-1 text-[10px] font-bold text-slate-400">${item.performanceScore == null ? 'No score' : `${item.performanceScore.toFixed(1)}% score`} · ${item.performanceRows.length} entries</p>`;
+        return `<tr${cardAttributes}><td data-label="Team member" class="px-5 py-4"><div class="flex min-w-0 items-center gap-3"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${user.isDoctor ? 'bg-cyan-50 text-cyan-700' : 'bg-rose-50 text-rose-700'} text-[11px] font-black">${escapeHtml(initials)}</span><div class="min-w-0"><p class="truncate font-black text-slate-800">${escapeHtml(user.fullName)}</p><p class="mt-1 text-[10px] font-bold text-slate-400">${escapeHtml(user.roleName)} · Open details</p></div></div></td><td data-label="Schedule" class="px-5 py-4"><p class="text-[11px] font-bold text-slate-600">${escapeHtml(hrScheduleLabel(settings.schedule))}</p><p class="mt-1 text-[10px] font-bold ${settings.attendanceEnabled ? 'text-rose-600' : 'text-slate-400'}">${settings.attendanceEnabled ? 'Mobile attendance enabled' : 'Attendance not configured'}</p></td><td data-label="Attendance" class="px-5 py-4">${activityMarkup}</td><td data-label="Performance" class="px-5 py-4">${performanceMarkup}</td><td data-label="Salary calculation" class="px-5 py-4"><p class="font-black text-slate-900">${escapeHtml(formatInvoiceMoney(item.salary))}</p><p class="mt-1 text-[10px] font-bold text-slate-400">${user.isDoctor ? escapeHtml(hrDoctorCompensationSummary(user.userId)) : `${formatInvoiceMoney(item.regularAmount)} regular · ${formatInvoiceMoney(item.extraAmount)} extra`}</p></td><td data-label="Payment" class="px-5 py-4">${paymentMarkup}</td><td data-label="Actions" class="px-5 py-4 text-right">${actionMarkup}</td></tr>`;
       }).join('') || '<tr><td colspan="7" class="px-5 py-12 text-center text-sm font-bold text-slate-400">No team members match this view.</td></tr>';
       if (activeHrStaffDetailsId) renderHrStaffDetails();
       if (activeHrDoctorDetailsId) renderHrDoctorDetails();
@@ -15809,16 +15967,17 @@
       if (hrDirectoryLoadPromise) return hrDirectoryLoadPromise;
       errorElement?.classList.add('hidden');
       hrDirectoryLoadPromise = (async () => {
-        const [usersResult, settingsResult, attendanceResult, extraResult, performanceResult, periodResult, paymentsResult] = await Promise.all([
+        const [usersResult, settingsResult, attendanceResult, extraResult, performanceResult, periodResult, paymentsResult, doctorPayrollResult] = await Promise.all([
           db.from('user_profiles').select('user_id, email, full_name, login_name, is_doctor, active, access_roles(id,name)').order('full_name'),
           db.from('hr_staff_settings').select('user_id, attendance_enabled, regular_shift_rate, extra_shift_rate, weekly_schedule'),
           db.from('hr_attendance_sessions').select('id,user_id,work_date,check_in_at,check_out_at,planned_start,planned_end,source,check_in_method,check_out_method,note').gte('work_date', start).lt('work_date', end),
           db.from('hr_extra_shifts').select('id,user_id,shift_date,shift_count,rate,note,approved').gte('shift_date', start).lt('shift_date', end),
           db.from('hr_performance_adjustments').select('id,user_id,adjustment_date,kind,amount,performance_score,note').gte('adjustment_date', start).lt('adjustment_date', end),
           db.from('hr_payroll_periods').select('*').eq('pay_month', start).maybeSingle(),
-          db.from('hr_salary_payments').select('*').eq('pay_month', start)
+          db.from('hr_salary_payments').select('*').eq('pay_month', start),
+          db.rpc('get_hr_doctor_payroll', { p_pay_month: start })
         ]);
-        for (const result of [usersResult, settingsResult, attendanceResult, extraResult, performanceResult, periodResult, paymentsResult]) if (result.error) throw result.error;
+        for (const result of [usersResult, settingsResult, attendanceResult, extraResult, performanceResult, periodResult, paymentsResult, doctorPayrollResult]) if (result.error) throw result.error;
         hrDirectoryUsers = (usersResult.data || []).map(normaliseHrDirectoryUser);
         hrStaffSettings = settingsResult.data || [];
         hrAttendanceSessions = attendanceResult.data || [];
@@ -15826,6 +15985,7 @@
         hrPerformanceAdjustments = performanceResult.data || [];
         hrPayrollPeriod = periodResult.data || { pay_month: start, status: 'draft' };
         hrSalaryPayments = paymentsResult.data || [];
+        hrDoctorPayrollLines = doctorPayrollResult.data || [];
         hrDirectoryLoaded = true;
         hrLoadedMonth = month;
         renderHrDirectory();
@@ -16106,6 +16266,38 @@
         if (!options.deferRefresh) await refreshHrDirectory({ refresh: true });
         return true;
       } catch (error) { if (!options.quiet) alert('Could not pay salary: ' + error.message); return false; }
+    }
+
+    async function payHrDoctorSalary(userId = activeHrDoctorDetailsId) {
+      if (!canModifyHr() || !userId || hrPayrollPeriod?.status !== 'locked') return false;
+      const user = hrDirectoryUsers.find(item => item.userId === userId && item.active && item.isDoctor);
+      if (!user) return false;
+      const metrics = hrDoctorMetrics(user);
+      if (metrics.paid || metrics.salary <= 0) return false;
+      if (!confirm(`Pay ${formatInvoiceMoney(metrics.salary)} to ${user.fullName} and add it to Finance expenses as Salary?`)) return false;
+      const button = document.getElementById('hr-doctor-pay-salary');
+      if (button) button.disabled = true;
+      try {
+        const { error } = await db.rpc('hr_pay_doctor_salary', { p_user_id: userId, p_pay_month: hrMonthBounds().start });
+        if (error) throw error;
+        financeExpensesLoaded = false;
+        financeOverviewLoaded = false;
+        incomeStatementLoadedRange = '';
+        hrDirectoryLoaded = false;
+        await refreshHrDirectory({ refresh: true });
+        try {
+          const { data, error: finalizeError } = await db.rpc('hr_finalize_payroll_period', { p_pay_month: hrMonthBounds().start });
+          if (!finalizeError) hrPayrollPeriod = Array.isArray(data) ? data[0] : data;
+        } catch (_) {}
+        renderHrDirectory();
+        showAppointmentNotificationToast('Doctor salary paid', `A Salary expense for ${user.fullName} was added to Finances.`);
+        return true;
+      } catch (error) {
+        alert('Could not pay doctor salary: ' + (error?.message || 'Unknown error'));
+        return false;
+      } finally {
+        if (button?.isConnected) button.disabled = false;
+      }
     }
 
     async function payAllHrSalaries() {
@@ -16464,6 +16656,7 @@
         console.error('Failed to sync chart with Supabase:', error);
         return false;
       }
+      hrDirectoryLoaded = false;
       return true;
     }
 
@@ -21531,7 +21724,7 @@
           initChartStructure();
           chartStructureInitialized = true;
         }
-        await Promise.all([ensurePatientsLoaded(), ensureDentalCustomizationLoaded()]);
+        await Promise.all([ensurePatientsLoaded(), ensureDentalCustomizationLoaded(), ensureChartDoctorsLoaded()]);
       } else if (viewName === 'appointments') {
         await ensureAppointmentsLoaded();
       } else if (viewName === 'whatsapp') {
@@ -22553,7 +22746,10 @@
             nextFinding.price,
             nextFinding.batchId,
             nextFinding.notes,
-            nextFinding.billingMultiplier
+            nextFinding.billingMultiplier,
+            nextFinding.doctorId,
+            nextFinding.doctorName,
+            nextFinding.completedAt
           );
           updated = true;
         });
@@ -22770,7 +22966,10 @@
           sourceFinding.price,
           nextBatchId,
           sourceFinding.notes,
-          sourceFinding.billingMultiplier
+          sourceFinding.billingMultiplier,
+          sourceFinding.doctorId,
+          sourceFinding.doctorName,
+          sourceFinding.completedAt
         );
         const toothData = getOrCreateChartTooth(patient, toothId);
         if (documentedGroup.kind === 'whole') {
@@ -22824,6 +23023,64 @@
         if (updateChartFindingById(patient, findingId, updater)) updated = true;
       });
       return updated;
+    }
+
+    function chartDoctorSelectOptions(finding) {
+      const assignedId = String(finding?.doctorId || '');
+      const assignedDoctor = chartDoctors.find(doctor => doctor.userId === assignedId);
+      const options = ['<option value="">Unassigned doctor</option>'];
+      if (assignedId && !assignedDoctor) {
+        options.push(`<option value="${escapeHtml(assignedId)}" selected>${escapeHtml(finding?.doctorName || 'Previously assigned doctor')} (inactive)</option>`);
+      }
+      chartDoctors.forEach(doctor => {
+        options.push(`<option value="${escapeHtml(doctor.userId)}" ${doctor.userId === assignedId ? 'selected' : ''}>${escapeHtml(doctor.fullName)}</option>`);
+      });
+      if (!chartDoctorsLoaded && !assignedId) options.push('<option value="" disabled>Loading doctors...</option>');
+      return options.join('');
+    }
+
+    async function updateFindingDoctorFromControl(control) {
+      const patient = getActivePatient();
+      const findingIds = chartFindingIdsFromControl(control);
+      if (!patient || !findingIds.length) return;
+      const doctorId = String(control.value || '');
+      const doctor = doctorId ? chartDoctors.find(item => item.userId === doctorId) : null;
+      if (doctorId && !doctor) {
+        alert('Choose an active doctor from the list.');
+        renderFindingsList();
+        return;
+      }
+
+      const previousChartState = JSON.parse(JSON.stringify(patient.chartState || {}));
+      const updated = updateChartFindingsByIds(patient, findingIds, finding => ({
+        ...finding,
+        doctorId: doctor?.userId || null,
+        doctorName: doctor?.fullName || ''
+      }));
+      if (!updated) return;
+      renderFindingsList();
+
+      try {
+        if (!(await saveActivePatientChart())) throw new Error('The chart update could not be saved.');
+        const { error } = await db.rpc('sync_chart_finding_doctor', {
+          p_patient_id: patient.id,
+          p_finding_ids: findingIds
+        });
+        if (error) throw error;
+        hrDirectoryLoaded = false;
+        financeInvoicesLoaded = false;
+        dashboardInvoiceCache.clear();
+        showAppointmentNotificationToast(
+          doctor ? 'Doctor assigned' : 'Doctor unassigned',
+          doctor ? `${doctor.fullName} will receive the configured salary when this procedure is completed.` : 'This procedure will not be included in doctor payroll.'
+        );
+      } catch (error) {
+        patient.chartState = previousChartState;
+        await saveActivePatientChart();
+        renderChartFindingTeeth(chartFindingToothIdsFromControl(control));
+        renderFindingsList();
+        alert('Could not update the assigned doctor: ' + (error?.message || 'Unknown error'));
+      }
     }
 
     function chartFindingGroupFromControl(control) {
@@ -23231,7 +23488,12 @@
       const findingIds = chartFindingIdsFromControl(control);
       if (!patient || !findingIds.length) return;
       const nextStatus = normaliseOperationStatus(control.value, 'E');
-      if (!updateChartFindingsByIds(patient, findingIds, finding => ({ ...finding, status: nextStatus }))) return;
+      const completedAt = new Date().toISOString();
+      if (!updateChartFindingsByIds(patient, findingIds, finding => ({
+        ...finding,
+        status: nextStatus,
+        completedAt: nextStatus === 'C' && finding.status !== 'C' ? completedAt : finding.completedAt
+      }))) return;
       renderChartFindingTeeth(chartFindingToothIdsFromControl(control));
       renderFindingsList();
       await saveActivePatientChart();
@@ -23430,9 +23692,12 @@
           code: finding.code,
           status: finding.status,
           createdAt: finding.createdAt,
+          completedAt: finding.completedAt,
           price: finding.price ?? chartFindingDefaultPrice(finding.code),
           batchId: null,
           billingMultiplier: null,
+          doctorId: finding.doctorId,
+          doctorName: finding.doctorName,
           notes: finding.notes,
           surfaces: []
         });
@@ -23449,9 +23714,12 @@
             code: finding.code,
             status: finding.status,
             createdAt: finding.createdAt,
+            completedAt: finding.completedAt,
             price: finding.price ?? chartFindingDefaultPrice(finding.code),
             batchId: finding.batchId,
             billingMultiplier: finding.billingMultiplier,
+            doctorId: finding.doctorId,
+            doctorName: finding.doctorName,
             notes: finding.notes,
             surfaces: []
           });
@@ -23469,9 +23737,12 @@
                 code: finding.code,
                 status: finding.status,
                 createdAt: finding.createdAt,
+                completedAt: finding.completedAt,
                 price: finding.price ?? chartFindingDefaultPrice(finding.code),
                 batchId: finding.batchId,
                 billingMultiplier: finding.billingMultiplier,
+                doctorId: finding.doctorId,
+                doctorName: finding.doctorName,
                 notes: finding.notes,
                 surfaces: []
               });
@@ -23667,6 +23938,10 @@
             </div>
             <div class="finding-row-actions flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
               ${createdAtMarkup}
+              <label class="inline-flex min-w-44 items-center overflow-hidden rounded-lg border border-cyan-200 bg-white/85 focus-within:ring-2 focus-within:ring-cyan-500/20" title="Assign the completed procedure to a doctor for HR salary calculation">
+                <span class="border-r border-cyan-100 bg-cyan-50 px-2 py-1.5 text-[9px] font-black text-cyan-700">Doctor</span>
+                <select onchange="updateFindingDoctorFromControl(this)" class="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-[11px] font-bold text-slate-700 outline-none" aria-label="Assigned doctor for ${escapeHtml(dentalOperationLabel(finding.code))}">${chartDoctorSelectOptions(finding)}</select>
+              </label>
               <label class="inline-flex items-center overflow-hidden rounded-lg border ${isInvoiced ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-70' : 'border-violet-200 bg-white/85 focus-within:ring-2 focus-within:ring-violet-500/20'}" title="${isInvoiced ? 'Delete this procedure from its invoice before changing the price' : isBatch ? 'Edit the base price for this batch' : 'Edit operation price'}">
                 <span class="border-r px-2 py-1.5 text-[9px] font-black ${isInvoiced ? 'border-slate-200 bg-slate-200 text-slate-500' : 'border-violet-100 bg-violet-50 text-violet-600'}">EGP</span>
                 <input type="number" min="0" step="0.01" value="${findingPrice}" onchange="updateFindingPriceFromControl(this)" ${isInvoiced ? 'disabled' : ''} class="w-20 bg-transparent px-2 py-1.5 text-right text-[11px] font-black outline-none ${isInvoiced ? 'cursor-not-allowed text-slate-400' : 'text-slate-700'}" aria-label="${isBatch ? 'Base price' : 'Price'} for ${escapeHtml(dentalOperationLabel(finding.code))}" aria-disabled="${isInvoiced}">
