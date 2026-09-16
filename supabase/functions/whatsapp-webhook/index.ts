@@ -1834,14 +1834,28 @@ Deno.serve(async (req: Request) => {
           return jsonResponse({ error: "Conversation not found" }, 404);
         }
 
-        const metaResult = await sendMetaWhatsAppTemplate(
-          settings.phoneId,
-          settings.accessToken,
-          conv.phone,
-          template_name,
-          language_code,
-          components
-        );
+        let metaResult = null;
+        try {
+          metaResult = await sendMetaWhatsAppTemplate(
+            settings.phoneId,
+            settings.accessToken,
+            conv.phone,
+            template_name,
+            language_code,
+            components
+          );
+        } catch (metaErr: any) {
+          console.error("sendMetaWhatsAppTemplate error:", metaErr);
+          let friendlyError = metaErr.message || "Failed to send WhatsApp template via Meta API";
+          if (friendlyError.includes("131058") || friendlyError.toLowerCase().includes("hello world")) {
+            friendlyError = "قالب 'hello_world' مخصص لأرقام الاختبار من Meta فقط ولا تسمح Meta بإرساله من رقم العيادة الحقيقي. يرجى اعتماد قالب العيادة الخاص.";
+          }
+          return jsonResponse({
+            success: false,
+            error: friendlyError,
+            meta_error: metaErr.message
+          }, 200);
+        }
 
         const targetWamid = metaResult?.messages?.[0]?.id || null;
         const displayText = rendered_text || `📋 Template: ${template_name}`;

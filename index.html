@@ -5968,6 +5968,14 @@
             <div id="wa-meta-templates-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-48 overflow-y-auto pr-1">
               <!-- Rendered dynamically -->
             </div>
+
+            <!-- Meta Manager Direct Link -->
+            <div class="flex items-center justify-between pt-1">
+              <a href="https://business.facebook.com/wa/manage/message-templates/?waba_id=1287948023356742" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 hover:underline transition">
+                <i data-lucide="external-link" class="h-3 w-3"></i>
+                <span>Manage & Create Templates on Meta WhatsApp Manager ↗</span>
+              </a>
+            </div>
           </div>
 
           <!-- Selected Template Config & Preview Area -->
@@ -31418,12 +31426,15 @@
         const isSelected = tpl.name === selectedMetaTemplateName;
         const isApproved = tpl.status === 'APPROVED';
         const isPending = tpl.status === 'PENDING';
+        const isHelloWorld = tpl.name.toLowerCase() === 'hello_world';
         
         let statusBadge = '';
-        if (isApproved) {
-          statusBadge = `<span class="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[9px] font-black text-emerald-800">APPROVED</span>`;
+        if (isHelloWorld) {
+          statusBadge = `<span class="rounded-md bg-purple-100 px-1.5 py-0.5 text-[9px] font-black text-purple-800" title="Meta test template: restricted to developer sandbox numbers">TEST ONLY 🧪</span>`;
+        } else if (isApproved) {
+          statusBadge = `<span class="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[9px] font-black text-emerald-800">APPROVED ✓</span>`;
         } else if (isPending) {
-          statusBadge = `<span class="rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-800">PENDING</span>`;
+          statusBadge = `<span class="rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-800">PENDING ⏳</span>`;
         } else {
           statusBadge = `<span class="rounded-md bg-rose-100 px-1.5 py-0.5 text-[9px] font-black text-rose-800">${escapeHtml(tpl.status || 'UNKNOWN')}</span>`;
         }
@@ -31471,18 +31482,33 @@
       if (nameEl) nameEl.textContent = tpl.name;
       if (langEl) langEl.textContent = `${tpl.language} (${tpl.category})`;
 
+      const isHelloWorld = tpl.name.toLowerCase() === 'hello_world';
       const isApproved = tpl.status === 'APPROVED';
+
       if (badgeEl) {
-        badgeEl.textContent = tpl.status;
-        badgeEl.className = isApproved ? 'rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-800' : 'rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-800';
+        if (isHelloWorld) {
+          badgeEl.textContent = 'META TEST NUMBER ONLY';
+          badgeEl.className = 'rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-black text-purple-800';
+        } else if (isApproved) {
+          badgeEl.textContent = 'APPROVED';
+          badgeEl.className = 'rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-800';
+        } else {
+          badgeEl.textContent = 'PENDING APPROVAL';
+          badgeEl.className = 'rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-800';
+        }
       }
 
       if (sendBtn) {
-        sendBtn.disabled = !isApproved;
-        if (!isApproved) {
+        if (isHelloWorld) {
+          sendBtn.disabled = true;
+          sendBtn.title = 'hello_world is restricted by Meta to Developer Test Numbers only';
+          if (sendBtnText) sendBtnText.textContent = 'Test Numbers Only 🧪';
+        } else if (!isApproved) {
+          sendBtn.disabled = true;
           sendBtn.title = 'Only APPROVED templates can be sent via Meta';
           if (sendBtnText) sendBtnText.textContent = 'Pending Meta Approval ⏳';
         } else {
+          sendBtn.disabled = false;
           sendBtn.title = 'Send this approved template to patient';
           if (sendBtnText) sendBtnText.textContent = 'Send Official Template 🚀';
         }
@@ -31613,8 +31639,20 @@
           body: payload
         });
 
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
+        if (error) {
+          let errMsg = error.message;
+          try {
+            if (error.context) {
+              const body = await error.context.json();
+              if (body?.error) errMsg = body.error;
+            }
+          } catch (_) {}
+          throw new Error(errMsg);
+        }
+
+        if (data?.success === false || data?.error) {
+          throw new Error(data.error || 'Failed to send template');
+        }
 
         // Append message to chat view
         if (data?.message) {
