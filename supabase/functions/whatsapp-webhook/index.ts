@@ -362,18 +362,24 @@ async function sendAppointmentPushNotification(
     dayEn = "",
   } = params;
 
+  if (!assignedUserId) {
+    console.log("sendAppointmentPushNotification: No assigned doctor user ID. Skipping notification to avoid broadcasting to all users.");
+    return null;
+  }
+
   const titleAr = "موعد جديد عبر واتساب 🦷";
   const titleEn = "New WhatsApp Appointment 🦷";
 
   const dateDisplayAr = dayAr ? `${dayAr} (${date})` : date;
   const dateDisplayEn = dayEn ? `${dayEn} (${date})` : date;
 
-  const bodyAr = `تم حجز موعد جديد عبر واتساب للمريض ${patientName} مع ${doctorName} يوم ${dateDisplayAr} الساعة ${time} (${visitType}).`;
-  const bodyEn = `New appointment booked via WhatsApp for ${patientName} with ${doctorName} on ${dateDisplayEn} at ${time} (${visitType}).`;
+  const bodyAr = `تم حجز موعد جديد عبر واتساب للمريض ${patientName} معك (${doctorName}) يوم ${dateDisplayAr} الساعة ${time} (${visitType}).`;
+  const bodyEn = `New appointment booked via WhatsApp for ${patientName} with you (${doctorName}) on ${dateDisplayEn} at ${time} (${visitType}).`;
 
   const payload: Record<string, unknown> = {
     app_id: appId,
-    included_segments: ["Total Subscriptions"],
+    include_external_user_ids: [assignedUserId],
+    channel_for_external_user_ids: "push",
     headings: {
       ar: titleAr,
       en: titleEn,
@@ -386,7 +392,7 @@ async function sendAppointmentPushNotification(
       view: "appointments",
       appointment_id: appointmentId,
       source: "whatsapp_ai",
-      assigned_user_id: assignedUserId || null,
+      assigned_user_id: assignedUserId,
       date,
       time,
       patient_name: patientName,
@@ -412,7 +418,7 @@ async function sendAppointmentPushNotification(
     if (!res.ok) {
       console.warn("OneSignal push notification error:", result);
     } else {
-      console.log("OneSignal push notification sent:", result?.id);
+      console.log(`OneSignal push notification sent to assigned doctor [${assignedUserId}]:`, result?.id);
     }
     return result;
   } catch (err) {
@@ -767,19 +773,74 @@ async function handleGeminiToolCall(
       }
     }
 
-    // 2. Find doctor if specified
+    // 2. Find doctor if specified or resolve to working doctor
     let assignedUserId = null;
     let confirmedDoctorName = "General Clinic";
     if (doctor_name) {
+      const cleanDocName = String(doctor_name)
+        .replace(/^(dr\.?|د\.?|دكتور|دكتورة)\s+/i, "")
+        .trim();
       const { data: doctorUser } = await supabase
         .from("user_profiles")
         .select("user_id, full_name")
         .eq("is_doctor", true)
-        .ilike("full_name", `%${doctor_name}%`)
+        .or(`full_name.ilike.%${cleanDocName}%,full_name.ilike.%${doctor_name}%`)
         .maybeSingle();
       if (doctorUser) {
         assignedUserId = doctorUser.user_id;
         confirmedDoctorName = `Dr. ${doctorUser.full_name}`;
+      }
+    }
+
+    // If doctor not specified or not matched, automatically resolve to active doctor scheduled to work at this time
+    if (!assignedUserId) {
+      const [{ data: activeDocs }, { data: staffSettings }] = await Promise.all([
+        supabase
+          .from("user_profiles")
+          .select("user_id, full_name")
+          .eq("is_doctor", true)
+          .eq("active", true),
+        supabase
+          .from("hr_staff_settings")
+          .select("user_id, weekly_schedule"),
+      ]);
+
+      const settingsMap = new Map((staffSettings || []).map((s: any) => [s.user_id, s.weekly_schedule]));
+      const dayOfWeek = new Date(`${date}T12:00:00Z`).getUTCDay();
+      const [th, tm] = time.split(":").map(Number);
+      const reqMin = th * 60 + tm;
+
+      for (const doc of (activeDocs || [])) {
+        const sched = settingsMap.get(doc.user_id) || {};
+        const days: number[] = Array.isArray(sched.days) ? sched.days.map(Number) : [0, 1, 2, 3, 4];
+        if (!days.includes(dayOfWeek)) continue;
+        const daily = (sched.daily && typeof sched.daily === "object") ? sched.daily : {};
+        const daySched = daily[String(dayOfWeek)] || { start: sched.start || "09:00", end: sched.end || "17:00" };
+        const [sh, sm] = (daySched.start || "09:00").split(":").map(Number);
+        const [eh, em] = (daySched.end || "17:00").split(":").map(Number);
+        if (reqMin >= (sh * 60 + sm) && (reqMin + 30) <= (eh * 60 + em)) {
+          const checkStartIso = new Date(reqStartMs - 4 * 3600 * 1000).toISOString();
+          const checkEndIso = new Date(reqEndMs + 4 * 3600 * 1000).toISOString();
+          const { data: conflicts } = await supabase
+            .from("appointments")
+            .select("id, appointment_at, duration_minutes, status")
+            .eq("assigned_user_id", doc.user_id)
+            .neq("status", "Cancelled")
+            .gte("appointment_at", checkStartIso)
+            .lte("appointment_at", checkEndIso);
+
+          const hasConflict = (conflicts || []).some((apt: any) => {
+            const aStart = Date.parse(apt.appointment_at);
+            const aEnd = aStart + (Number(apt.duration_minutes) || 30) * 60 * 1000;
+            return reqStartMs < aEnd && reqEndMs > aStart;
+          });
+
+          if (!hasConflict) {
+            assignedUserId = doc.user_id;
+            confirmedDoctorName = `Dr. ${doc.full_name}`;
+            break;
+          }
+        }
       }
     }
 
