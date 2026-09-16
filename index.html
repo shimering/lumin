@@ -2853,6 +2853,24 @@
       color: #064e3b;
       border-bottom-right-radius: 4px;
     }
+    .whatsapp-msg-row {
+      position: relative;
+    }
+    .whatsapp-swipe-icon {
+      pointer-events: none;
+      transition: opacity 0.15s ease, transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes whatsappMsgPulse {
+      0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
+      50% { transform: scale(1.025); filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.35)); }
+    }
+    .whatsapp-msg-highlight {
+      animation: whatsappMsgPulse 0.8s ease-in-out 2;
+    }
+    .whatsapp-msg-actions {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      user-select: none;
+    }
     #whatsapp-reply-input {
       max-height: 140px;
       min-height: 38px;
@@ -5543,6 +5561,21 @@
                     <span id="whatsapp-takeover-btn-text">Take Over Chat</span>
                   </button>
                 </div>
+              <!-- Active Quoted Reply Preview Bar -->
+              <div id="whatsapp-active-reply-bar" class="hidden items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50/90 px-3 py-1.5 shadow-2xs transition mb-1.5 animate-in fade-in slide-in-from-bottom-1">
+                <div class="flex items-center gap-2 min-w-0 flex-1">
+                  <div class="h-7 w-1 rounded-full bg-emerald-500 shrink-0"></div>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-1.5">
+                      <i data-lucide="reply" class="h-3 w-3 text-emerald-600 shrink-0"></i>
+                      <span id="whatsapp-active-reply-sender" class="text-[11px] font-black text-emerald-800 truncate">Patient</span>
+                    </div>
+                    <p id="whatsapp-active-reply-text" class="text-[10px] font-semibold text-slate-600 truncate" dir="auto">Message preview...</p>
+                  </div>
+                </div>
+                <button type="button" onclick="clearWhatsAppReplyMessage()" class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-emerald-100 hover:text-emerald-800 transition" title="Cancel Reply (Esc)">
+                  <i data-lucide="x" class="h-3.5 w-3.5"></i>
+                </button>
               </div>
 
               <!-- Manual Message Form -->
@@ -29415,7 +29448,7 @@
     let whatsappLoading = false;
     const WHATSAPP_MESSAGE_PAGE_SIZE = 10;
     const WHATSAPP_MESSAGE_SYNC_PAGE_SIZE = 100;
-    const WHATSAPP_MESSAGE_COLUMNS = 'id,conversation_id,sender,sender_name,content,message_type,media_url,status,created_at';
+    const WHATSAPP_MESSAGE_COLUMNS = 'id,conversation_id,sender,sender_name,content,message_type,media_url,status,created_at,reaction,reply_to_id,reply_to_text,reply_to_sender';
     const WHATSAPP_CONVERSATION_COLUMNS = 'id,phone,patient_id,patient_name,ai_enabled,last_message,last_message_at,unread_count,status';
     let whatsappMessagesConversationId = null;
     let whatsappMessagesHasOlder = false;
@@ -29423,6 +29456,176 @@
     let whatsappMessagesLoadingOlder = false;
     let whatsappMessagesSyncing = false;
     let whatsappMessagesRequestToken = 0;
+    let whatsappActiveReplyMessage = null;
+
+    function setWhatsAppReplyMessage(message) {
+      whatsappActiveReplyMessage = message;
+      renderWhatsAppActiveReplyBar();
+      const input = document.getElementById('whatsapp-reply-input');
+      if (input) {
+        input.focus();
+      }
+    }
+
+    function clearWhatsAppReplyMessage() {
+      whatsappActiveReplyMessage = null;
+      renderWhatsAppActiveReplyBar();
+    }
+
+    function renderWhatsAppActiveReplyBar() {
+      const bar = document.getElementById('whatsapp-active-reply-bar');
+      const previewSender = document.getElementById('whatsapp-active-reply-sender');
+      const previewText = document.getElementById('whatsapp-active-reply-text');
+      if (!bar) return;
+
+      if (!whatsappActiveReplyMessage) {
+        bar.classList.add('hidden');
+        bar.classList.remove('flex');
+        return;
+      }
+
+      const senderName = whatsappActiveReplyMessage.sender_name || (whatsappActiveReplyMessage.sender === 'patient' ? (activeWhatsAppConversation?.patient_name || 'Patient') : (whatsappActiveReplyMessage.sender === 'ai' ? 'Lumin AI' : 'Clinic Staff'));
+      const rawContent = whatsappActiveReplyMessage.content || (whatsappActiveReplyMessage.message_type === 'audio' ? '🎤 Voice Message' : (whatsappActiveReplyMessage.message_type === 'image' ? '📷 Photo' : 'Message'));
+      
+      if (previewSender) previewSender.textContent = senderName;
+      if (previewText) previewText.textContent = rawContent;
+      
+      bar.classList.remove('hidden');
+      bar.classList.add('flex');
+      lucide.createIcons();
+    }
+
+    function triggerWhatsAppReplyById(msgId) {
+      const msg = (whatsappMessages || []).find(m => m.id === msgId);
+      if (msg) {
+        setWhatsAppReplyMessage(msg);
+      }
+    }
+
+    function scrollToWhatsAppMessage(msgId) {
+      if (!msgId) return;
+      const el = document.getElementById(`whatsapp-msg-${msgId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('whatsapp-msg-highlight');
+        setTimeout(() => el.classList.remove('whatsapp-msg-highlight'), 1800);
+      }
+    }
+
+    async function sendWhatsAppReaction(messageId, emoji) {
+      if (!activeWhatsAppConversationId || !messageId) return;
+
+      const msg = (whatsappMessages || []).find(m => m.id === messageId);
+      const prevReaction = msg?.reaction;
+      const newReaction = (prevReaction === emoji) ? null : emoji;
+
+      // Optimistic update
+      if (msg) {
+        msg.reaction = newReaction;
+        renderWhatsAppMessages(false);
+      }
+
+      try {
+        const { data, error } = await db.functions.invoke('whatsapp-webhook', {
+          body: {
+            action: 'send_reaction',
+            conversation_id: activeWhatsAppConversationId,
+            message_id: messageId,
+            emoji: newReaction
+          }
+        });
+        if (error) throw error;
+      } catch (err) {
+        console.error('Failed to send reaction:', err);
+        if (msg) {
+          msg.reaction = prevReaction;
+          renderWhatsAppMessages(false);
+        }
+      }
+    }
+
+    let waTouchStartX = 0;
+    let waTouchStartY = 0;
+    let waSwipedRow = null;
+    let waSwipedTrack = null;
+    let waSwipedIcon = null;
+    let waIsSwiping = false;
+
+    function initWhatsAppSwipeGestures() {
+      const container = document.getElementById('whatsapp-messages-container');
+      if (!container || container.hasAttribute('data-swipe-bound')) return;
+      container.setAttribute('data-swipe-bound', 'true');
+
+      container.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) return;
+        const row = e.target.closest('.whatsapp-msg-row');
+        if (!row) return;
+        waTouchStartX = e.touches[0].clientX;
+        waTouchStartY = e.touches[0].clientY;
+        waSwipedRow = row;
+        waSwipedTrack = row.querySelector('.whatsapp-msg-bubble-track');
+        waSwipedIcon = row.querySelector('.whatsapp-swipe-icon');
+        waIsSwiping = false;
+      }, { passive: true });
+
+      container.addEventListener('touchmove', (e) => {
+        if (!waSwipedRow || !waSwipedTrack || e.touches.length !== 1) return;
+        const dx = e.touches[0].clientX - waTouchStartX;
+        const dy = e.touches[0].clientY - waTouchStartY;
+
+        if (!waIsSwiping) {
+          if (Math.abs(dx) > Math.abs(dy) && dx > 8) {
+            waIsSwiping = true;
+          } else if (Math.abs(dy) > Math.abs(dx)) {
+            waSwipedRow = null;
+            return;
+          }
+        }
+
+        if (waIsSwiping && dx > 0) {
+          const clampedDx = Math.min(dx * 0.65, 70);
+          waSwipedTrack.style.transform = `translateX(${clampedDx}px)`;
+          waSwipedTrack.style.transition = 'none';
+          if (waSwipedIcon) {
+            const progress = Math.min(1, clampedDx / 45);
+            waSwipedIcon.style.opacity = String(progress);
+            waSwipedIcon.style.transform = `translateY(-50%) scale(${0.5 + progress * 0.55})`;
+          }
+        }
+      }, { passive: true });
+
+      const endSwipe = () => {
+        if (!waSwipedRow || !waSwipedTrack) return;
+        const currentTransform = waSwipedTrack.style.transform;
+        const match = currentTransform.match(/translateX\(([\d.]+)px\)/);
+        const moved = match ? parseFloat(match[1]) : 0;
+
+        waSwipedTrack.style.transition = 'transform 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+        waSwipedTrack.style.transform = '';
+        if (waSwipedIcon) {
+          waSwipedIcon.style.opacity = '0';
+          waSwipedIcon.style.transform = 'translateY(-50%) scale(0)';
+        }
+
+        if (moved >= 40) {
+          const msgId = waSwipedRow.getAttribute('data-message-id');
+          if (msgId) {
+            triggerWhatsAppReplyById(msgId);
+            if (navigator.vibrate) {
+              try { navigator.vibrate(20); } catch (_) {}
+            }
+          }
+        }
+
+        waSwipedRow = null;
+        waSwipedTrack = null;
+        waSwipedIcon = null;
+        waIsSwiping = false;
+      };
+
+      container.addEventListener('touchend', endSwipe, { passive: true });
+      container.addEventListener('touchcancel', endSwipe, { passive: true });
+    }
 
     async function ensureWhatsAppLoaded() {
       if (whatsappLoaded) return;
@@ -29651,6 +29854,7 @@
       if (typeof isRecordingVoice !== 'undefined' && isRecordingVoice) {
         cancelWhatsAppVoiceRecording();
       }
+      clearWhatsAppReplyMessage();
       activeWhatsAppConversationId = convId;
       activeWhatsAppConversation = whatsappConversations.find(c => c.id === convId) || null;
       document.body.classList.toggle('whatsapp-mobile-chat-open', window.innerWidth < 768);
@@ -29935,24 +30139,86 @@
           }
         }
 
+        // Quoted message preview
+        let quotedHtml = '';
+        if (msg.reply_to_text) {
+          quotedHtml = `
+            <div onclick="scrollToWhatsAppMessage('${escapeHtml(msg.reply_to_id || '')}')" class="mb-1.5 cursor-pointer rounded-lg border-s-4 border-emerald-500 bg-black/5 hover:bg-black/10 transition px-2 py-1 text-left select-none" title="Jump to quoted message">
+              <div class="flex items-center gap-1 text-[10px] font-black text-emerald-800">
+                <i data-lucide="reply" class="h-2.5 w-2.5"></i>
+                <span>${escapeHtml(msg.reply_to_sender || 'Quoted Message')}</span>
+              </div>
+              <p class="text-[11px] text-slate-600 truncate max-w-xs" dir="auto">${escapeHtml(msg.reply_to_text || '')}</p>
+            </div>
+          `;
+        }
+
+        // Accurate Status Ticks
+        let statusTickHtml = '';
+        if (isStaff || isAi) {
+          if (msg.status === 'read') {
+            statusTickHtml = `<i data-lucide="check-check" class="h-3 w-3 text-sky-500" title="Read"></i>`;
+          } else if (msg.status === 'delivered') {
+            statusTickHtml = `<i data-lucide="check-check" class="h-3 w-3 text-slate-400 opacity-70" title="Delivered"></i>`;
+          } else if (msg.status === 'sent') {
+            statusTickHtml = `<i data-lucide="check" class="h-3 w-3 text-slate-400 opacity-70" title="Sent"></i>`;
+          } else if (msg.status === 'failed') {
+            statusTickHtml = `<i data-lucide="alert-circle" class="h-3 w-3 text-rose-500" title="Failed to deliver"></i>`;
+          } else {
+            statusTickHtml = `<i data-lucide="clock" class="h-2.5 w-2.5 text-slate-400 opacity-60" title="Sending..."></i>`;
+          }
+        }
+
+        // Emoji Reaction Badge
+        let reactionBadgeHtml = '';
+        if (msg.reaction) {
+          reactionBadgeHtml = `
+            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '${escapeHtml(msg.reaction)}')" class="absolute -bottom-2.5 ${alignClass === 'justify-end' ? 'right-2' : 'left-2'} inline-flex items-center gap-0.5 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-xs shadow-xs hover:scale-110 active:scale-95 transition z-10" title="Reaction: ${escapeHtml(msg.reaction)} (Click to remove)">
+              <span>${escapeHtml(msg.reaction)}</span>
+            </button>
+          `;
+        }
+
+        // Quick React & Reply Action Menu on hover / tap
+        const actionMenuHtml = `
+          <div class="whatsapp-msg-actions hidden group-hover:flex items-center gap-1 absolute -top-3.5 ${alignClass === 'justify-end' ? 'left-2' : 'right-2'} rounded-full border border-slate-200 bg-white/95 px-1.5 py-0.5 shadow-sm text-xs backdrop-blur-xs z-20">
+            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '👍')" class="hover:scale-125 transition px-0.5 text-xs" title="Like">👍</button>
+            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '❤️')" class="hover:scale-125 transition px-0.5 text-xs" title="Love">❤️</button>
+            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '😂')" class="hover:scale-125 transition px-0.5 text-xs" title="Laugh">😂</button>
+            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '😮')" class="hover:scale-125 transition px-0.5 text-xs" title="Surprised">😮</button>
+            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '🙏')" class="hover:scale-125 transition px-0.5 text-xs" title="Thank you">🙏</button>
+            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '🦷')" class="hover:scale-125 transition px-0.5 text-xs" title="Dental">🦷</button>
+            <div class="h-3 w-px bg-slate-200 mx-0.5"></div>
+            <button type="button" onclick="triggerWhatsAppReplyById('${msg.id}')" class="hover:text-emerald-700 text-slate-500 p-0.5 transition" title="Reply / Quote">
+              <i data-lucide="reply" class="h-3 w-3"></i>
+            </button>
+          </div>
+        `;
+
         return `
-          <div class="flex ${alignClass}">
-            <div class="max-w-[85%] sm:max-w-lg rounded-2xl p-3 sm:p-3.5 shadow-xs ${bubbleClass}">
+          <div class="group relative flex ${alignClass} py-1 whatsapp-msg-row" id="whatsapp-msg-${msg.id}" data-message-id="${msg.id}">
+            <!-- Reply gesture indicator for mobile swipe -->
+            <div class="whatsapp-swipe-icon absolute left-2 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 opacity-0 pointer-events-none">
+              <i data-lucide="reply" class="h-4 w-4"></i>
+            </div>
+            <div class="whatsapp-msg-bubble-track relative max-w-[85%] sm:max-w-lg rounded-2xl p-3 sm:p-3.5 shadow-xs ${bubbleClass}">
+              ${actionMenuHtml}
               ${senderTag}
+              ${quotedHtml}
               ${mediaHtml}
               <p class="text-xs sm:text-[13px] leading-relaxed whitespace-pre-wrap select-text" dir="auto">${escapeHtml(msg.content || '')}</p>
               <div class="flex items-center justify-end gap-1 mt-1">
                 <span class="text-[9px] font-semibold opacity-60">${timeStr}</span>
-                ${isStaff || isAi ? `
-                  <i data-lucide="${msg.status === 'read' ? 'check-check' : 'check'}" class="h-2.5 w-2.5 opacity-60 ${msg.status === 'read' ? 'text-blue-500' : ''}"></i>
-                ` : ''}
+                ${statusTickHtml}
               </div>
+              ${reactionBadgeHtml}
             </div>
           </div>
         `;
       }).join('');
 
       lucide.createIcons();
+      initWhatsAppSwipeGestures();
 
       if (scrollToBottom) {
         container.scrollTop = container.scrollHeight;
@@ -29969,6 +30235,9 @@
       const content = String(input?.value || '').trim();
       if (!content) return;
 
+      const replyingMessage = whatsappActiveReplyMessage;
+      clearWhatsAppReplyMessage();
+
       input.value = '';
       autoResizeWhatsAppInput(input);
 
@@ -29978,12 +30247,20 @@
       }
 
       try {
+        const payload = {
+          action: 'send_manual_message',
+          conversation_id: activeWhatsAppConversationId,
+          content: content
+        };
+
+        if (replyingMessage) {
+          payload.reply_to_id = replyingMessage.id;
+          payload.reply_to_text = replyingMessage.content ? replyingMessage.content.slice(0, 200) : (replyingMessage.message_type === 'audio' ? '🎤 Voice Message' : (replyingMessage.message_type === 'image' ? '📷 Photo' : 'Attachment'));
+          payload.reply_to_sender = replyingMessage.sender_name || (replyingMessage.sender === 'patient' ? (activeWhatsAppConversation?.patient_name || 'Patient') : 'Clinic Staff');
+        }
+
         const { data, error } = await db.functions.invoke('whatsapp-webhook', {
-          body: {
-            action: 'send_manual_message',
-            conversation_id: activeWhatsAppConversationId,
-            content: content
-          }
+          body: payload
         });
 
         if (error) throw error;
@@ -30005,6 +30282,9 @@
         alert(currentUiLanguage === 'ar' ? 'فشل إرسال الرسالة: ' + (err.message || 'خطأ غير معروف') : 'Failed to send message: ' + (err.message || 'Unknown error'));
         input.value = content;
         autoResizeWhatsAppInput(input);
+        if (replyingMessage) {
+          setWhatsAppReplyMessage(replyingMessage);
+        }
       } finally {
         if (submitBtn) {
           submitBtn.disabled = false;
@@ -30313,6 +30593,11 @@
     }
 
     function handleWhatsAppInputKeydown(event) {
+      if (event.key === 'Escape' && whatsappActiveReplyMessage) {
+        event.preventDefault();
+        clearWhatsAppReplyMessage();
+        return;
+      }
       if (event.key === 'Enter' && !event.shiftKey) {
         if (window.innerWidth >= 768) {
           event.preventDefault();

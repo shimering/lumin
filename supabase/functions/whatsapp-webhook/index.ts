@@ -55,9 +55,63 @@ async function getClinicWhatsAppSettings(supabase: any) {
 }
 
 // Send a WhatsApp text message via Meta Graph API
-async function sendMetaWhatsAppMessage(phoneId: string, accessToken: string, toPhone: string, text: string) {
+async function sendMetaWhatsAppMessage(
+  phoneId: string,
+  accessToken: string,
+  toPhone: string,
+  text: string,
+  contextMessageId?: string | null
+) {
   if (!phoneId || !accessToken || !toPhone || !text) {
     console.warn("sendMetaWhatsAppMessage: missing required parameter", { phoneId: Boolean(phoneId), accessToken: Boolean(accessToken), toPhone: Boolean(toPhone) });
+    return null;
+  }
+
+  const url = `https://graph.facebook.com/v21.0/${phoneId}/messages`;
+  const payload: any = {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to: cleanPhone(toPhone),
+    type: "text",
+    text: { body: text },
+  };
+
+  if (contextMessageId) {
+    payload.context = { message_id: contextMessageId };
+  }
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    console.error("Meta Graph API error:", data);
+    throw new Error(data?.error?.message || "Failed to send WhatsApp message via Meta API");
+  }
+  return data;
+}
+
+// Send a WhatsApp emoji reaction via Meta Graph API
+async function sendMetaWhatsAppReaction(
+  phoneId: string,
+  accessToken: string,
+  toPhone: string,
+  messageId: string,
+  emoji: string | null
+) {
+  if (!phoneId || !accessToken || !toPhone || !messageId) {
+    console.warn("sendMetaWhatsAppReaction: missing required parameter", {
+      phoneId: Boolean(phoneId),
+      accessToken: Boolean(accessToken),
+      toPhone: Boolean(toPhone),
+      messageId: Boolean(messageId),
+    });
     return null;
   }
 
@@ -72,15 +126,18 @@ async function sendMetaWhatsAppMessage(phoneId: string, accessToken: string, toP
       messaging_product: "whatsapp",
       recipient_type: "individual",
       to: cleanPhone(toPhone),
-      type: "text",
-      text: { body: text },
+      type: "reaction",
+      reaction: {
+        message_id: messageId,
+        emoji: emoji || "",
+      },
     }),
   });
 
   const data = await res.json();
   if (!res.ok) {
-    console.error("Meta Graph API error:", data);
-    throw new Error(data?.error?.message || "Failed to send WhatsApp message via Meta API");
+    console.error("Meta Graph API reaction error:", data);
+    throw new Error(data?.error?.message || "Failed to send reaction via Meta API");
   }
   return data;
 }
@@ -1387,6 +1444,9 @@ Deno.serve(async (req: Request) => {
           message_type = "text",
           audio_base64,
           audio_mime_type,
+          reply_to_id,
+          reply_to_text,
+          reply_to_sender,
         } = body;
 
         const isAudio = message_type === "audio" && Boolean(audio_base64);
@@ -1459,6 +1519,18 @@ Deno.serve(async (req: Request) => {
         let mediaUrl: string | null = null;
         const finalContent = content || (isAudio ? "🎤 Voice Message" : "");
 
+        let contextWamid: string | null = null;
+        if (reply_to_id) {
+          const { data: parentMsg } = await supabase
+            .from("whatsapp_messages")
+            .select("whatsapp_message_id")
+            .eq("id", reply_to_id)
+            .maybeSingle();
+          if (parentMsg?.whatsapp_message_id) {
+            contextWamid = parentMsg.whatsapp_message_id;
+          }
+        }
+
         if (isAudio) {
           const mime = audio_mime_type || "audio/mp4";
           let ext = "m4a";
@@ -1498,7 +1570,13 @@ Deno.serve(async (req: Request) => {
           }
         } else {
           if (settings.phoneId && settings.accessToken) {
-            metaSendResult = await sendMetaWhatsAppMessage(settings.phoneId, settings.accessToken, conv.phone, content);
+            metaSendResult = await sendMetaWhatsAppMessage(
+              settings.phoneId,
+              settings.accessToken,
+              conv.phone,
+              content,
+              contextWamid
+            );
           }
         }
 
@@ -1513,6 +1591,9 @@ Deno.serve(async (req: Request) => {
             media_url: mediaUrl,
             whatsapp_message_id: metaSendResult?.messages?.[0]?.id || null,
             status: metaSendResult ? "sent" : "recorded",
+            reply_to_id: reply_to_id || null,
+            reply_to_text: reply_to_text || null,
+            reply_to_sender: reply_to_sender || null,
           })
           .select()
           .single();
@@ -1529,6 +1610,55 @@ Deno.serve(async (req: Request) => {
           .eq("id", conv.id);
 
         return jsonResponse({ success: true, message: newMsg, conversation_id: conv.id, media_url: mediaUrl });
+      }
+
+      // Case A.2: Staff Emoji Reaction to a WhatsApp Message
+      if (body.action === "send_reaction") {
+        const { conversation_id, message_id, emoji } = body;
+        if (!conversation_id || !message_id) {
+          return jsonResponse({ error: "conversation_id and message_id are required" }, 400);
+        }
+
+        const { data: targetMsg, error: msgErr } = await supabase
+          .from("whatsapp_messages")
+          .select("id, whatsapp_message_id, conversation_id")
+          .eq("id", message_id)
+          .maybeSingle();
+
+        if (msgErr || !targetMsg) {
+          return jsonResponse({ error: "Message not found" }, 404);
+        }
+
+        const { data: conv } = await supabase
+          .from("whatsapp_conversations")
+          .select("phone")
+          .eq("id", conversation_id)
+          .maybeSingle();
+
+        if (targetMsg.whatsapp_message_id && conv?.phone && settings.phoneId && settings.accessToken) {
+          try {
+            await sendMetaWhatsAppReaction(
+              settings.phoneId,
+              settings.accessToken,
+              conv.phone,
+              targetMsg.whatsapp_message_id,
+              emoji || ""
+            );
+          } catch (metaErr: any) {
+            console.warn("Failed to dispatch reaction to Meta API (proceeding with local DB update):", metaErr?.message || metaErr);
+          }
+        }
+
+        const { data: updatedMsg, error: updateErr } = await supabase
+          .from("whatsapp_messages")
+          .update({ reaction: emoji || null })
+          .eq("id", message_id)
+          .select()
+          .single();
+
+        if (updateErr) throw updateErr;
+
+        return jsonResponse({ success: true, message: updatedMsg, reaction: emoji || null });
       }
 
       // Case B: Incoming Webhook Event from Meta
@@ -1553,6 +1683,19 @@ Deno.serve(async (req: Request) => {
             // Incoming messages
             if (Array.isArray(value.messages)) {
               for (const incoming of value.messages) {
+                // Check if this is an emoji reaction from patient
+                if (incoming.type === "reaction") {
+                  const targetWamid = incoming.reaction?.message_id;
+                  const emoji = incoming.reaction?.emoji || null;
+                  if (targetWamid) {
+                    await supabase
+                      .from("whatsapp_messages")
+                      .update({ reaction: emoji })
+                      .eq("whatsapp_message_id", targetWamid);
+                  }
+                  continue;
+                }
+
                 const fromPhone = cleanPhone(incoming.from);
                 const messageId = incoming.id;
                 const contact = (value.contacts || []).find((c: any) => c.wa_id === incoming.from) || {};
@@ -1562,6 +1705,25 @@ Deno.serve(async (req: Request) => {
                 let textContent = "";
                 let mediaUrl: string | null = null;
                 let currentAudioPart: any = null;
+
+                // Check if incoming message is quoting/replying to an earlier message
+                let replyToId: string | null = null;
+                let replyToText: string | null = null;
+                let replyToSender: string | null = null;
+
+                if (incoming.context?.id) {
+                  const { data: parentMsg } = await supabase
+                    .from("whatsapp_messages")
+                    .select("id, content, sender_name, sender")
+                    .eq("whatsapp_message_id", incoming.context.id)
+                    .maybeSingle();
+
+                  if (parentMsg) {
+                    replyToId = parentMsg.id;
+                    replyToText = parentMsg.content ? parentMsg.content.slice(0, 200) : "";
+                    replyToSender = parentMsg.sender_name || (parentMsg.sender === "patient" ? "Patient" : "Clinic Staff");
+                  }
+                }
 
                 if (incoming.type === "text") {
                   messageType = "text";
@@ -1678,6 +1840,9 @@ Deno.serve(async (req: Request) => {
                     media_url: mediaUrl,
                     whatsapp_message_id: messageId,
                     status: "received",
+                    reply_to_id: replyToId,
+                    reply_to_text: replyToText,
+                    reply_to_sender: replyToSender,
                   });
 
                 if (msgInsertErr) {
