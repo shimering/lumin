@@ -35,7 +35,7 @@ async function getClinicWhatsAppSettings(supabase: any) {
   const { data } = await supabase
     .from("clinic_settings")
     .select(
-      "whatsapp_enabled, whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token, gemini_api_key, whatsapp_ai_instructions, whatsapp_ai_model"
+      "whatsapp_enabled, whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token, gemini_api_key, whatsapp_ai_instructions, whatsapp_ai_model, attendance_timezone"
     )
     .eq("id", 1)
     .maybeSingle();
@@ -49,6 +49,7 @@ async function getClinicWhatsAppSettings(supabase: any) {
     geminiApiKey: String(data?.gemini_api_key || Deno.env.get("GEMINI_API_KEY") || "").trim(),
     aiInstructions: String(data?.whatsapp_ai_instructions || "").trim(),
     aiModel: String(data?.whatsapp_ai_model || "gemini-3.5-flash-lite").trim(),
+    attendanceTimezone: String(data?.attendance_timezone || "Africa/Cairo").trim(),
   };
 }
 
@@ -220,6 +221,96 @@ async function processIncomingMedia(
 const WEEKDAY_NAMES_EN = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const WEEKDAY_NAMES_AR = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
 
+// Parse any UTC ISO date string into clinic local parts (YYYY-MM-DD, HH:mm, minutesOfDay, dayOfWeek)
+function parseLocalAppointmentTime(
+  isoStr: string,
+  timeZone: string = "Africa/Cairo"
+): { dateStr: string; timeStr: string; startMin: number; dayOfWeek: number } {
+  const date = new Date(isoStr);
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    weekday: "short",
+  });
+
+  const parts: Record<string, string> = {};
+  for (const part of formatter.formatToParts(date)) {
+    if (part.type !== "literal") {
+      parts[part.type] = part.value;
+    }
+  }
+
+  let hour = parts.hour || "00";
+  if (hour === "24") hour = "00";
+  const minute = parts.minute || "00";
+  const year = parts.year || "";
+  const month = parts.month || "";
+  const day = parts.day || "";
+
+  const dateStr = `${year}-${month}-${day}`;
+  const timeStr = `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
+  const startMin = parseInt(hour, 10) * 60 + parseInt(minute, 10);
+
+  const shortDays: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  };
+  const dayOfWeek = shortDays[parts.weekday] ?? date.getUTCDay();
+
+  return { dateStr, timeStr, startMin, dayOfWeek };
+}
+
+// Losslessly convert local clinic date & time to exact UTC ISO string for DB storage
+function localDateTimeToUtcIso(
+  dateStr: string,
+  timeStr: string,
+  timeZone: string = "Africa/Cairo"
+): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const [hh, mm] = timeStr.split(":").map(Number);
+  let utcMs = Date.UTC(y, m - 1, d, hh, mm, 0);
+
+  for (let i = 0; i < 3; i++) {
+    const parsed = parseLocalAppointmentTime(new Date(utcMs).toISOString(), timeZone);
+    const [pY, pM, pD] = parsed.dateStr.split("-").map(Number);
+    const [pH, pMin] = parsed.timeStr.split(":").map(Number);
+
+    const formattedUtcMs = Date.UTC(pY, pM - 1, pD, pH, pMin, 0);
+    const desiredUtcMs = Date.UTC(y, m - 1, d, hh, mm, 0);
+    const diff = formattedUtcMs - desiredUtcMs;
+    if (diff === 0) break;
+    utcMs -= diff;
+  }
+  return new Date(utcMs).toISOString();
+}
+
+// Get current date, time, and day of week in clinic local timezone
+function getClinicNow(timeZone: string = "Africa/Cairo") {
+  const now = new Date();
+  const { dateStr, timeStr, startMin, dayOfWeek } = parseLocalAppointmentTime(now.toISOString(), timeZone);
+  const dayEn = WEEKDAY_NAMES_EN[dayOfWeek];
+  const dayAr = WEEKDAY_NAMES_AR[dayOfWeek];
+  return {
+    dateStr,
+    timeStr,
+    minutesOfDay: startMin,
+    dayOfWeek,
+    dayEn,
+    dayAr,
+    display: `${dateStr} (${dayEn} / ${dayAr})`,
+  };
+}
+
 function formatDoctorScheduleForPrompt(fullName: string, sched: any): string {
   const days: number[] = Array.isArray(sched?.days)
     ? sched.days.map(Number).filter((d: number) => d >= 0 && d <= 6).sort()
@@ -248,7 +339,7 @@ function buildGeminiTools(doctorNames: string[] = [], visitTypeNames: string[] =
       functionDeclarations: [
         {
           name: "check_available_slots",
-          description: "Check available appointment slots for a given date according to doctors' actual working days and shift hours.",
+          description: "Check available appointment slots for a given date according to doctors' actual working days, shift hours, and already booked appointments.",
           parameters: {
             type: "OBJECT",
             properties: {
@@ -266,7 +357,7 @@ function buildGeminiTools(doctorNames: string[] = [], visitTypeNames: string[] =
         },
         {
           name: "book_appointment",
-          description: "Book an appointment for a patient in the clinic calendar.",
+          description: "Book an appointment for a patient in the clinic calendar. ONLY call this tool after verifying that the requested slot is present in available_slots and NOT in occupied_slots.",
           parameters: {
             type: "OBJECT",
             properties: {
@@ -321,19 +412,28 @@ function buildGeminiTools(doctorNames: string[] = [], visitTypeNames: string[] =
 async function handleGeminiToolCall(
   supabase: any,
   call: { name: string; args: any },
-  conversation: any
+  conversation: any,
+  timeZone: string = "Africa/Cairo"
 ): Promise<any> {
   const { name, args } = call;
 
   if (name === "check_available_slots") {
-    const targetDate = args.date;
-    const startOfDay = `${targetDate}T00:00:00Z`;
-    const endOfDay = `${targetDate}T23:59:59Z`;
+    const targetDate = String(args.date || "").trim();
+    if (!targetDate || !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+      return {
+        available: false,
+        error: "Invalid date format. Please provide YYYY-MM-DD.",
+        available_slots: [],
+        occupied_slots: [],
+      };
+    }
 
     // Target day of week: 0 = Sun, 1 = Mon, ..., 6 = Sat
-    const targetDayOfWeek = new Date(targetDate + "T12:00:00Z").getUTCDay();
+    // Noon UTC guarantees correct calendar day in all timezones
+    const targetDayOfWeek = new Date(`${targetDate}T12:00:00Z`).getUTCDay();
     const dayEn = WEEKDAY_NAMES_EN[targetDayOfWeek];
     const dayAr = WEEKDAY_NAMES_AR[targetDayOfWeek];
+    const clinicNow = getClinicNow(timeZone);
 
     // Fetch active doctors and their HR staff settings (weekly_schedule) in parallel
     const [{ data: activeDoctors }, { data: staffSettings }] = await Promise.all([
@@ -382,7 +482,8 @@ async function handleGeminiToolCall(
             doctor: `Dr. ${selectedDoctor.fullName}`,
             message: `د. ${selectedDoctor.fullName} لا يعمل يوم ${dayAr} (${dayEn}). مواعيد عمله في العيادة هي: ${workingDaysAr} (${workingDaysEn}). هل ترغب بالحجز في أحد هذه الأيام، أو الحجز مع طبيب آخر متاح في العيادة يوم ${dayAr}؟`,
             working_days: workingDaysAr,
-            slots: [],
+            available_slots: [],
+            occupied_slots: [],
           };
         }
       }
@@ -399,7 +500,8 @@ async function handleGeminiToolCall(
         date: targetDate,
         day: `${dayAr} / ${dayEn}`,
         message: `العيادة لا يتوفر بها أطباء مناوبون يوم ${dayAr} (${dayEn}). يرجى اختيار يوم آخر من أيام العمل المتاحة.`,
-        slots: [],
+        available_slots: [],
+        occupied_slots: [],
       };
     }
 
@@ -421,46 +523,76 @@ async function handleGeminiToolCall(
 
     const allCandidateSlots = Array.from(candidateSlotsSet).sort();
 
-    // Query booked appointments for target date
+    // Query booked appointments for target date across a wide UTC window
+    const queryStartUtc = new Date(Date.parse(`${targetDate}T00:00:00Z`) - 24 * 3600 * 1000).toISOString();
+    const queryEndUtc = new Date(Date.parse(`${targetDate}T23:59:59Z`) + 24 * 3600 * 1000).toISOString();
+
     let aptQuery = supabase
       .from("appointments")
-      .select("appointment_at, duration_minutes, status, assigned_user_id")
-      .gte("appointment_at", startOfDay)
-      .lte("appointment_at", endOfDay)
+      .select("id, appointment_at, duration_minutes, status, assigned_user_id, appointment_type")
+      .gte("appointment_at", queryStartUtc)
+      .lte("appointment_at", queryEndUtc)
       .neq("status", "Cancelled");
 
     if (selectedDoctor) {
       aptQuery = aptQuery.eq("assigned_user_id", selectedDoctor.userId);
     }
 
-    const { data: bookedAppointments } = await aptQuery;
+    const { data: rawBookedAppointments } = await aptQuery;
 
-    // Filter available slots
-    const availableSlots = allCandidateSlots.filter((slot) => {
+    // Convert raw booked appointments to local clinic day minutes
+    const bookedAppointments = (rawBookedAppointments || [])
+      .map((apt: any) => {
+        const local = parseLocalAppointmentTime(apt.appointment_at, timeZone);
+        if (local.dateStr !== targetDate) return null;
+        const duration = Number(apt.duration_minutes) || 30;
+        return {
+          assigned_user_id: apt.assigned_user_id,
+          startMin: local.startMin,
+          endMin: local.startMin + duration,
+          timeStr: local.timeStr,
+        };
+      })
+      .filter(Boolean);
+
+    // Calculate available and occupied slots
+    const availableSlots: string[] = [];
+    const occupiedSlots: string[] = [];
+    const isToday = targetDate === clinicNow.dateStr;
+
+    for (const slot of allCandidateSlots) {
       const [h, min] = slot.split(":").map(Number);
-      const slotMin = h * 60 + min;
+      const slotStartMin = h * 60 + min;
+      const slotEndMin = slotStartMin + 30;
 
-      // Find doctors working at this specific slot
+      // Filter out past slots if requested for today (allow at least 15 min buffer)
+      if (isToday && slotStartMin <= (clinicNow.minutesOfDay + 15)) {
+        continue;
+      }
+
+      // Find doctors scheduled to work during this specific slot
       const docsAtThisSlot = workingDoctors.filter((doc: any) => {
         const daySched = doc.daily[String(targetDayOfWeek)] || { start: doc.start, end: doc.end };
         const [sh, sm] = (daySched.start || "09:00").split(":").map(Number);
         const [eh, em] = (daySched.end || "17:00").split(":").map(Number);
-        return slotMin >= (sh * 60 + sm) && (slotMin + 30) <= (eh * 60 + em);
+        return slotStartMin >= (sh * 60 + sm) && slotEndMin <= (eh * 60 + em);
       });
 
-      if (docsAtThisSlot.length === 0) return false;
+      if (docsAtThisSlot.length === 0) continue;
 
-      // Slot is free if at least one doctor who works during this slot is not booked
-      return docsAtThisSlot.some((doc: any) => {
-        const docApts = (bookedAppointments || []).filter((apt: any) => apt.assigned_user_id === doc.userId);
-        return !docApts.some((apt: any) => {
-          const d = new Date(apt.appointment_at);
-          const aptStart = d.getUTCHours() * 60 + d.getUTCMinutes();
-          const aptEnd = aptStart + (Number(apt.duration_minutes) || 30);
-          return slotMin >= aptStart && slotMin < aptEnd;
-        });
+      // Check if at least one doctor has no overlapping appointment at this slot
+      const hasFreeDoctor = docsAtThisSlot.some((doc: any) => {
+        const docApts = bookedAppointments.filter((apt: any) => apt.assigned_user_id === doc.userId);
+        const isConflict = docApts.some((apt: any) => slotStartMin < apt.endMin && slotEndMin > apt.startMin);
+        return !isConflict;
       });
-    });
+
+      if (hasFreeDoctor) {
+        availableSlots.push(slot);
+      } else {
+        occupiedSlots.push(slot);
+      }
+    }
 
     const morningSlots = availableSlots.filter((s) => parseInt(s.split(":")[0], 10) < 14);
     const eveningSlots = availableSlots.filter((s) => parseInt(s.split(":")[0], 10) >= 14);
@@ -471,15 +603,22 @@ async function handleGeminiToolCall(
       day: `${dayAr} / ${dayEn}`,
       doctor: selectedDoctor ? `Dr. ${selectedDoctor.fullName}` : "All Available Doctors",
       morning_slots: morningSlots.slice(0, 5),
-      evening_slots: eveningSlots.slice(0, 5),
-      available_slots: availableSlots.slice(0, 10),
+      evening_slots: eveningSlots.slice(0, 8),
+      available_slots: availableSlots,
+      occupied_slots: occupiedSlots,
       total_free: availableSlots.length,
+      total_occupied: occupiedSlots.length,
+      rules_and_warnings: occupiedSlots.length > 0
+        ? `IMPORTANT: The following slots are OCCUPIED/ALREADY BOOKED: ${occupiedSlots.join(", ")}. NEVER offer or book any occupied slot. If the patient requested an occupied slot, tell them it is taken and propose alternative slots from available_slots.`
+        : "All scheduled slots on this date are currently available.",
     };
   }
 
   if (name === "book_appointment") {
     const { patient_name, date, time, doctor_name, visit_type, notes } = args;
-    const appointmentAtIso = `${date}T${time}:00Z`;
+    const appointmentAtIso = localDateTimeToUtcIso(date, time, timeZone);
+    const reqStartMs = Date.parse(appointmentAtIso);
+    const reqEndMs = reqStartMs + 30 * 60 * 1000;
 
     // 1. Find or create patient
     let patientId = conversation.patient_id;
@@ -534,7 +673,35 @@ async function handleGeminiToolCall(
       }
     }
 
-    // 3. Find visit type if specified
+    // 3. Collision guard: Ensure doctor doesn't already have an overlapping booking
+    if (assignedUserId) {
+      const checkStartIso = new Date(reqStartMs - 4 * 3600 * 1000).toISOString();
+      const checkEndIso = new Date(reqEndMs + 4 * 3600 * 1000).toISOString();
+
+      const { data: existingApts } = await supabase
+        .from("appointments")
+        .select("id, appointment_at, duration_minutes, status")
+        .eq("assigned_user_id", assignedUserId)
+        .neq("status", "Cancelled")
+        .gte("appointment_at", checkStartIso)
+        .lte("appointment_at", checkEndIso);
+
+      const hasConflict = (existingApts || []).some((apt: any) => {
+        const aStart = Date.parse(apt.appointment_at);
+        const aEnd = aStart + (Number(apt.duration_minutes) || 30) * 60 * 1000;
+        return reqStartMs < aEnd && reqEndMs > aStart;
+      });
+
+      if (hasConflict) {
+        return {
+          success: false,
+          error: "SLOT_OCCUPIED",
+          message: `عذراً، الموعد الساعة ${time} محجوز بالفعل مع ${confirmedDoctorName}. يرجى إبلاغ المريض واقتراح موعد آخر متاح من available_slots.`,
+        };
+      }
+    }
+
+    // 4. Find visit type if specified
     let visitTypeId = null;
     let confirmedVisitType = visit_type || "Check-up";
     if (visit_type) {
@@ -549,7 +716,7 @@ async function handleGeminiToolCall(
       }
     }
 
-    // 4. Create appointment
+    // 5. Create appointment
     const { data: apt, error: aptError } = await supabase
       .from("appointments")
       .insert({
@@ -656,7 +823,8 @@ async function runGeminiAgentWithModel(
   systemInstruction: string,
   conversation: any,
   initialContents: any[],
-  tools: any[]
+  tools: any[],
+  timeZone: string = "Africa/Cairo"
 ): Promise<string> {
   const contents = JSON.parse(JSON.stringify(initialContents));
 
@@ -678,7 +846,7 @@ async function runGeminiAgentWithModel(
         const call = fcPart.functionCall;
         console.log(`[${model}] Gemini tool call:`, call.name, call.args);
 
-        const toolResult = await handleGeminiToolCall(supabase, call, conversation);
+        const toolResult = await handleGeminiToolCall(supabase, call, conversation, timeZone);
         console.log(`[${model}] Tool result:`, toolResult);
 
         functionResponses.push({
@@ -710,14 +878,11 @@ async function runGeminiAgent(
   conversation: any,
   conversationHistory: any[],
   preferredModel: string = "gemini-3.5-flash-lite",
-  incomingAudioPart: any = null
+  incomingAudioPart: any = null,
+  timeZone: string = "Africa/Cairo"
 ): Promise<string> {
-  const now = new Date();
-  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  const dayNamesAr = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
-  const dayName = dayNames[now.getUTCDay()];
-  const dayNameAr = dayNamesAr[now.getUTCDay()];
-  const todayStr = `${now.toISOString().split("T")[0]} (${dayName} / ${dayNameAr})`;
+  const clinicNow = getClinicNow(timeZone);
+  const todayStr = clinicNow.display;
 
   // 1. Dynamic Auto-Sync: Fetch active doctors, their working schedules, and visit types in parallel
   const [{ data: activeDoctors }, { data: activeVisitTypes }, { data: staffSettings }] = await Promise.all([
@@ -757,7 +922,8 @@ async function runGeminiAgent(
   const dynamicTools = buildGeminiTools(doctorNames, visitTypeNames);
 
   const systemInstruction = `You are the polite, welcoming, and efficient AI receptionist for Lumin Dental Clinic (عيادة لومين لطب الأسنان).
-Current date & day of the week: ${todayStr}.
+Current clinic date & day of the week: ${todayStr}.
+Current clinic local time: ${clinicNow.timeStr}.
 When a patient asks about a specific day (such as "غداً" / tomorrow, "يوم الأربعاء" / Wednesday, etc.), accurately calculate the exact date based on today (${todayStr}). For example, if today is Monday, tomorrow is Tuesday, and the day after is Wednesday.
 Clinic operating hours: Saturday to Thursday from 10:00 AM to 8:00 PM (10:00 to 20:00). Closed on Fridays.
 
@@ -767,6 +933,15 @@ ${doctorsScheduleStr}
 Rules for Doctor Schedules & Working Hours:
 - Each doctor only accepts appointments on their scheduled days and during their shift hours listed above.
 - If a patient asks for a doctor on a day they do NOT work, inform them politely of the doctor's exact working days, and suggest booking on one of their working days or seeing another doctor available on that day.
+
+CRITICAL CALENDAR & OCCUPIED APPOINTMENTS RULES:
+1. NEVER assume or guess slot availability. You MUST ALWAYS call \`check_available_slots\` before proposing or confirming any slot.
+2. In the \`check_available_slots\` response, strictly observe \`available_slots\` and \`occupied_slots\`.
+3. NEVER suggest, offer, or book any time listed in \`occupied_slots\` or absent from \`available_slots\`.
+4. If a patient asks for an occupied or already-booked slot:
+   - Explicitly tell the patient that this time is already booked / occupied (e.g. "عذراً، هذا الموعد محجوز مسبقاً" / "Sorry, this time slot is already booked").
+   - Offer them the nearest vacant slots from \`available_slots\`.
+5. ONLY call \`book_appointment\` for a slot that is confirmed present in \`available_slots\`.
 
 Available Clinic Services & Visit Types (Live from clinic service catalog):
 ${servicesListStr}
@@ -784,7 +959,7 @@ Rules:
 1. Speak in the patient's language naturally (Arabic or English). If the patient speaks Arabic or Iraqi/Egyptian dialect, respond in warm, polite Arabic.
 2. If the patient wants to book an appointment or asks about availability:
    - Always call \`check_available_slots\` with the calculated YYYY-MM-DD date to check real-time open slots (and provide doctor_name if the patient asked for a specific doctor).
-   - Propose 3 to 5 convenient slots (including morning and afternoon/evening options from the tool response) to the patient.
+   - Propose 3 to 5 convenient vacant slots (from available_slots) to the patient.
    - Ask for their full name if not already known.
    - When the patient agrees on a specific date and time, call \`book_appointment\` to save it to the system with the appropriate doctor and visit type.
    - Once booked, provide a clear, warm confirmation message summarizing the date, time, doctor, and service.
@@ -853,7 +1028,8 @@ ${customInstructions ? `Additional clinic instructions & doctor shift rules: ${c
         systemInstruction,
         conversation,
         initialContents,
-        dynamicTools
+        dynamicTools,
+        timeZone
       );
     } catch (err: any) {
       console.warn(`Model ${model} failed (attempting next in chain):`, err?.message || err);
@@ -1229,7 +1405,8 @@ Deno.serve(async (req: Request) => {
                         conv,
                         history.length > 0 ? history : [{ sender: "patient", content: textContent }],
                         settings.aiModel || "gemini-3.5-flash-lite",
-                        currentAudioPart
+                        currentAudioPart,
+                        settings.attendanceTimezone || "Africa/Cairo"
                       );
 
                       let metaAiSend = null;
