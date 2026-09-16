@@ -427,6 +427,118 @@ async function sendAppointmentPushNotification(
   }
 }
 
+// Send OneSignal push notification for incoming WhatsApp messages to subscribed user types
+async function sendIncomingWhatsAppPushNotification(
+  supabase: any,
+  params: {
+    conversationId: string;
+    patientName: string;
+    phone: string;
+    messageContent: string;
+    messageType: string;
+  }
+): Promise<any> {
+  const appId = "1796b727-661f-43cb-9770-1b3938e4db8c";
+  let apiKey = (Deno.env.get("ONESIGNAL_REST_API_KEY") || "").trim();
+
+  if (!apiKey && supabase) {
+    try {
+      const { data } = await supabase
+        .from("clinic_settings")
+        .select("onesignal_rest_api_key")
+        .eq("id", 1)
+        .maybeSingle();
+      if (data?.onesignal_rest_api_key) {
+        apiKey = String(data.onesignal_rest_api_key).trim();
+      }
+    } catch (_) {}
+  }
+
+  if (!apiKey) return null;
+
+  // Find all active user IDs whose user type / role has whatsapp_notifications enabled
+  const { data: users, error: usersErr } = await supabase
+    .from("user_profiles")
+    .select(`
+      user_id,
+      access_roles(id, whatsapp_notifications, role_permissions(page_key, can_view))
+    `)
+    .eq("active", true);
+
+  if (usersErr || !users || users.length === 0) return null;
+
+  const recipientUserIds: string[] = users
+    .filter((u: any) => {
+      const role = u.access_roles;
+      if (!role) return false;
+      if (role.whatsapp_notifications === true) return true;
+      const hasPerm = Array.isArray(role.role_permissions) && role.role_permissions.some(
+        (p: any) => p.page_key === "whatsapp_notifications" && p.can_view === true
+      );
+      return hasPerm;
+    })
+    .map((u: any) => u.user_id);
+
+  if (recipientUserIds.length === 0) {
+    return null;
+  }
+
+  const { conversationId, patientName, phone, messageContent, messageType } = params;
+
+  const preview = messageType === "audio"
+    ? "🎤 رسالة صوتية (Voice Note)"
+    : messageType === "image"
+    ? "📷 صورة (Photo)"
+    : messageType === "document"
+    ? "📄 مستند (Document)"
+    : (messageContent || "").slice(0, 100);
+
+  const payload: Record<string, unknown> = {
+    app_id: appId,
+    include_external_user_ids: recipientUserIds,
+    channel_for_external_user_ids: "push",
+    headings: {
+      ar: `رسالة واتساب من ${patientName} 💬`,
+      en: `WhatsApp message from ${patientName} 💬`,
+    },
+    contents: {
+      ar: preview,
+      en: preview,
+    },
+    data: {
+      view: "whatsapp",
+      conversation_id: conversationId,
+      phone,
+      patient_name: patientName,
+    },
+    url: `https://lumin.pages.dev/?view=whatsapp&conversation_id=${conversationId}`,
+    priority: 10,
+    ttl: 86400,
+  };
+
+  try {
+    const res = await fetch("https://api.onesignal.com/notifications", {
+      method: "POST",
+      headers: {
+        "Authorization": `Key ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const result = await res.json();
+    if (!res.ok) {
+      console.warn("OneSignal incoming WhatsApp push error:", result);
+    } else {
+      console.log(`OneSignal incoming WhatsApp push sent to ${recipientUserIds.length} user(s):`, result?.id);
+    }
+    return result;
+  } catch (err) {
+    console.error("sendIncomingWhatsAppPushNotification failed:", err);
+    return null;
+  }
+}
+
 function formatDoctorScheduleForPrompt(fullName: string, sched: any): string {
   const days: number[] = Array.isArray(sched?.days)
     ? sched.days.map(Number).filter((d: number) => d >= 0 && d <= 6).sort()
@@ -1571,6 +1683,17 @@ Deno.serve(async (req: Request) => {
                 if (msgInsertErr) {
                   console.error("Failed to insert whatsapp message:", msgInsertErr);
                 }
+
+                // Dispatch push notification to users whose user type has WhatsApp incoming notifications enabled
+                sendIncomingWhatsAppPushNotification(supabase, {
+                  conversationId: conv.id,
+                  patientName: conv.patient_name || contactName || "Patient",
+                  phone: fromPhone,
+                  messageContent: textContent,
+                  messageType,
+                }).catch((pushErr) => {
+                  console.warn("sendIncomingWhatsAppPushNotification error:", pushErr);
+                });
 
                 // 3. Trigger AI Agent if enabled
                 const isAiActive = settings.enabled && conv.ai_enabled && conv.status !== "human_needed" && settings.geminiApiKey;

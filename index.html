@@ -4615,6 +4615,17 @@
             <span><span class="block text-xs font-black text-slate-700">Can manage HR &amp; payroll</span><span id="new-role-hr-access-label" class="mt-0.5 block text-[11px] text-slate-400">Enable HR access first.</span></span>
             <span class="relative inline-flex shrink-0 items-center"><input id="admin-role-hr-modify" type="checkbox" disabled onchange="updateNewRoleHrModifyLabel()" class="peer sr-only" /><span class="h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-rose-600 peer-disabled:opacity-50"></span><span class="pointer-events-none absolute left-1 h-4 w-4 rounded-full bg-white shadow-sm transition peer-checked:translate-x-5 peer-disabled:opacity-70"></span></span>
           </label>
+          <label class="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3">
+            <span>
+              <span class="block text-xs font-black text-slate-700">Incoming WhatsApp notifications</span>
+              <span class="mt-0.5 block text-[11px] text-slate-400">Send push notifications to this user type for incoming patient WhatsApp messages.</span>
+            </span>
+            <span class="relative inline-flex shrink-0 items-center">
+              <input id="admin-role-whatsapp-notifications" type="checkbox" class="peer sr-only" />
+              <span class="h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-emerald-600 peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-500 peer-focus-visible:ring-offset-2"></span>
+              <span class="pointer-events-none absolute left-1 h-4 w-4 rounded-full bg-white shadow-sm transition peer-checked:translate-x-5"></span>
+            </span>
+          </label>
           <p id="admin-role-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="status"></p>
           <button id="admin-create-role-button" type="submit" class="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-violet-700 disabled:cursor-wait disabled:opacity-60">
             <i data-lucide="plus" class="h-4 w-4"></i> Create type
@@ -4626,6 +4637,7 @@
         <div class="border-b border-slate-100 p-5">
           <h3 class="text-sm font-black text-slate-800">User types and page access</h3>
           <p class="mt-1 text-xs text-slate-400">Changes apply the next time users navigate or sign in.</p>
+          <p id="admin-roles-list-message" class="hidden mt-3 rounded-xl px-3 py-2 text-xs font-bold" role="status"></p>
         </div>
         <div id="admin-roles-list" class="grid grid-cols-1 gap-4 p-5 lg:grid-cols-2"></div>
       </div>
@@ -6853,7 +6865,7 @@
       { key: 'implants', label: 'Implant Progress' },
       { key: 'prices', label: 'Prices' }
     ]);
-    const ROLE_PERMISSION_PAGES = Object.freeze([...APP_PAGES, { key: 'dashboard_invoices', label: 'Dashboard invoices' }, { key: 'loyalty', label: 'Patient Loyalty tab' }, { key: 'finance_depts', label: 'Finance Depts tab' }]);
+    const ROLE_PERMISSION_PAGES = Object.freeze([...APP_PAGES, { key: 'dashboard_invoices', label: 'Dashboard invoices' }, { key: 'loyalty', label: 'Patient Loyalty tab' }, { key: 'finance_depts', label: 'Finance Depts tab' }, { key: 'whatsapp_notifications', label: 'Incoming WhatsApp message notifications' }]);
     const WHATSAPP_TEMPLATE_VARIABLES = Object.freeze([
       '{{patient_name}}',
       '{{doctor_name}}',
@@ -13511,7 +13523,7 @@
     async function loadAdminData() {
       if (!hasPageAccess('admin')) return;
       const [rolesResult, usersResult, hrSettingsResult] = await Promise.all([
-        db.from('access_roles').select('id, name, is_admin, is_system, role_permissions(page_key, can_view, can_modify)').order('is_admin', { ascending: false }).order('name'),
+        db.from('access_roles').select('id, name, is_admin, is_system, whatsapp_notifications, role_permissions(page_key, can_view, can_modify)').order('is_admin', { ascending: false }).order('name'),
         db.from('user_profiles').select('user_id, email, full_name, login_name, role_id, is_doctor, active, created_at').order('created_at'),
         db.from('hr_staff_settings').select('user_id, attendance_enabled, regular_shift_rate, extra_shift_rate, weekly_schedule, updated_at')
       ]);
@@ -13558,6 +13570,43 @@
 
     function roleShowsFinanceDepts(role) {
       return Boolean(role.is_admin || (role.role_permissions || []).some(permission => permission.page_key === 'finance_depts' && permission.can_view));
+    }
+
+    function roleHasWhatsAppNotifications(role) {
+      if (role?.whatsapp_notifications !== undefined && role?.whatsapp_notifications !== null) {
+        return Boolean(role.whatsapp_notifications);
+      }
+      return (role?.role_permissions || []).some(permission => permission.page_key === 'whatsapp_notifications' && permission.can_view);
+    }
+
+    async function toggleRoleWhatsAppNotifications(roleId, isEnabled) {
+      if (!hasPageAccess('admin')) return;
+      const toggle = document.querySelector(`[data-role-whatsapp-notifications="${roleId}"]`);
+      if (toggle) toggle.disabled = true;
+      try {
+        const { error } = await db.rpc('set_role_whatsapp_notifications', {
+          target_role_id: roleId,
+          is_enabled: Boolean(isEnabled)
+        });
+        if (error) throw error;
+        const role = adminRoles.find(r => r.id === roleId);
+        if (role) {
+          role.whatsapp_notifications = Boolean(isEnabled);
+          let perm = (role.role_permissions || []).find(p => p.page_key === 'whatsapp_notifications');
+          if (perm) {
+            perm.can_view = Boolean(isEnabled);
+          } else if (role.role_permissions) {
+            role.role_permissions.push({ page_key: 'whatsapp_notifications', can_view: Boolean(isEnabled), can_modify: false });
+          }
+        }
+        setAdminMessage('admin-roles-list-message', `WhatsApp push notifications ${isEnabled ? 'enabled' : 'disabled'} for ${role?.name || 'this user type'}.`);
+      } catch (err) {
+        console.error('Failed to update WhatsApp notification setting for role:', err);
+        alert('Failed to update WhatsApp notification setting: ' + (err.message || err));
+        if (toggle) toggle.checked = !isEnabled;
+      } finally {
+        if (toggle) toggle.disabled = false;
+      }
     }
 
     function updateRoleHrModifyLabel(roleId) {
@@ -13713,6 +13762,20 @@
               </label>
             `).join('')}
           </div>
+          <label class="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 px-3.5 py-2.5">
+            <div class="flex items-center gap-2.5">
+              <i data-lucide="message-square" class="h-4 w-4 shrink-0 text-emerald-600"></i>
+              <div>
+                <span class="block text-xs font-black text-slate-800">Incoming WhatsApp notifications</span>
+                <span class="block text-[10px] text-slate-500">Send push notification to users of this type when incoming WhatsApp messages arrive</span>
+              </div>
+            </div>
+            <span class="relative inline-flex shrink-0 items-center">
+              <input data-role-whatsapp-notifications="${role.id}" type="checkbox" role="switch" onchange="toggleRoleWhatsAppNotifications('${role.id}', this.checked)" ${roleHasWhatsAppNotifications(role) ? 'checked' : ''} class="peer sr-only" />
+              <span class="h-5 w-9 rounded-full bg-slate-300 transition peer-checked:bg-emerald-600 peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-500"></span>
+              <span class="pointer-events-none absolute left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition peer-checked:translate-x-4"></span>
+            </span>
+          </label>
           ${role.is_system ? '' : `
             <div class="mt-4 flex justify-end gap-2">
               <button type="button" onclick="deleteRole('${role.id}')" class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-black text-red-600 transition hover:border-red-300 hover:bg-red-100">Delete type</button>
@@ -13721,6 +13784,7 @@
           `}
         </article>
       `).join('');
+      lucide.createIcons();
     }
 
     function renderAdminUsers() {
@@ -13862,9 +13926,10 @@
       button.textContent = 'Creating...';
 
       try {
+        const whatsappNotifications = Boolean(document.getElementById('admin-role-whatsapp-notifications')?.checked);
         const { data: role, error: roleError } = await db
           .from('access_roles')
-          .insert({ name, is_admin: false, is_system: false })
+          .insert({ name, is_admin: false, is_system: false, whatsapp_notifications: whatsappNotifications })
           .select('id')
           .single();
         if (roleError) throw roleError;
@@ -13877,7 +13942,7 @@
         const permissions = ROLE_PERMISSION_PAGES.map(page => ({
           role_id: role.id,
           page_key: page.key,
-          can_view: page.key === 'loyalty' ? showLoyalty : page.key === 'dashboard_invoices' ? showDashboardInvoices : page.key === 'finance_depts' ? showFinanceDepts : selectedPages.includes(page.key),
+          can_view: page.key === 'loyalty' ? showLoyalty : page.key === 'dashboard_invoices' ? showDashboardInvoices : page.key === 'finance_depts' ? showFinanceDepts : page.key === 'whatsapp_notifications' ? whatsappNotifications : selectedPages.includes(page.key),
           can_modify: (page.key === 'appointments' && appointmentCanModify) || (page.key === 'hr' && hrCanModify),
           updated_at: new Date().toISOString()
         }));
@@ -13917,10 +13982,17 @@
       const showDashboardInvoices = Boolean(document.querySelector(`[data-role-dashboard-invoices="${roleId}"]`)?.checked);
       const showLoyalty = Boolean(document.querySelector(`[data-role-loyalty="${roleId}"]`)?.checked && selectedPages.includes('patients'));
       const showFinanceDepts = Boolean(document.querySelector(`[data-role-finance-depts="${roleId}"]`)?.checked && selectedPages.includes('finances'));
+      const whatsappNotifications = Boolean(document.querySelector(`[data-role-whatsapp-notifications="${roleId}"]`)?.checked);
+
+      await db.rpc('set_role_whatsapp_notifications', {
+        target_role_id: roleId,
+        is_enabled: whatsappNotifications
+      });
+
       const permissions = ROLE_PERMISSION_PAGES.map(page => ({
         role_id: roleId,
         page_key: page.key,
-        can_view: page.key === 'loyalty' ? showLoyalty : page.key === 'dashboard_invoices' ? showDashboardInvoices : page.key === 'finance_depts' ? showFinanceDepts : selectedPages.includes(page.key),
+        can_view: page.key === 'loyalty' ? showLoyalty : page.key === 'dashboard_invoices' ? showDashboardInvoices : page.key === 'finance_depts' ? showFinanceDepts : page.key === 'whatsapp_notifications' ? whatsappNotifications : selectedPages.includes(page.key),
         can_modify: (page.key === 'appointments' && appointmentCanModify) || (page.key === 'hr' && hrCanModify),
         updated_at: new Date().toISOString()
       }));
@@ -13929,6 +14001,7 @@
         alert('Failed to update permissions: ' + error.message);
         return;
       }
+      setAdminMessage('admin-roles-list-message', `Permissions saved for ${role.name}.`);
       await loadAdminData();
     }
 
