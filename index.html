@@ -5900,6 +5900,127 @@
     </div>
   </div>
 
+  <!-- ================= MODAL: WHATSAPP TEMPLATES & META TEMPLATES ================= -->
+  <div id="modal-whatsapp-template-picker" onclick="if (event.target === this) closeWhatsAppTemplatePickerModal()" class="fixed inset-0 z-[95] hidden items-center justify-center bg-slate-900/50 p-3 sm:p-4 backdrop-blur-xs">
+    <div role="dialog" aria-modal="true" aria-labelledby="whatsapp-template-modal-title" class="flex flex-col max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-2xl">
+      <!-- Header -->
+      <div class="border-b border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-violet-50/70 p-4 sm:p-5 shrink-0">
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-sm shadow-emerald-600/20">
+              <i data-lucide="bookmark" class="h-5 w-5"></i>
+            </span>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 id="whatsapp-template-modal-title" class="text-base sm:text-lg font-black text-slate-900">WhatsApp Templates</h3>
+                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-800">
+                  <i data-lucide="zap" class="h-3 w-3 text-emerald-600"></i> Cloud API
+                </span>
+              </div>
+              <p class="text-xs font-semibold text-slate-500 mt-0.5">Send Meta-approved templates or insert quick clinic snippets.</p>
+            </div>
+          </div>
+          <button type="button" onclick="closeWhatsAppTemplatePickerModal()" aria-label="Close" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition">
+            <i data-lucide="x" class="h-5 w-5"></i>
+          </button>
+        </div>
+
+        <!-- Tabs Navigation -->
+        <div class="mt-4 flex items-center gap-2 border-b border-slate-200">
+          <button type="button" id="wa-tab-btn-meta" onclick="switchWhatsAppTemplateTab('meta')" class="relative flex items-center gap-1.5 pb-2.5 px-3 text-xs font-black transition border-b-2 border-emerald-600 text-emerald-700">
+            <i data-lucide="shield-check" class="h-3.5 w-3.5"></i>
+            <span>Official Meta Templates</span>
+            <span class="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-black text-emerald-800 uppercase tracking-wider">Bypasses 24h</span>
+          </button>
+          <button type="button" id="wa-tab-btn-snippets" onclick="switchWhatsAppTemplateTab('snippets')" class="relative flex items-center gap-1.5 pb-2.5 px-3 text-xs font-black transition border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+            <i data-lucide="message-square-text" class="h-3.5 w-3.5"></i>
+            <span>Quick Text Snippets</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal Body Scrollable Container -->
+      <div class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+        <!-- TAB 1: META TEMPLATES -->
+        <div id="wa-tpl-tab-meta" class="space-y-4">
+          <!-- Alert banner explaining 24h bypass -->
+          <div class="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3.5 text-xs text-emerald-900">
+            <i data-lucide="info" class="h-4 w-4 shrink-0 text-emerald-600 mt-0.5"></i>
+            <div>
+              <span class="font-bold">Official Meta Templates bypass the 24-hour customer window.</span>
+              <p class="text-[11px] text-emerald-800 mt-0.5">
+                Standard WhatsApp messages fail if the patient hasn't messaged within 24 hours. Pre-approved templates can be sent anytime to start a conversation, send reminders, or follow up.
+              </p>
+            </div>
+          </div>
+
+          <!-- Live Meta Templates Loader / List -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-black text-slate-800 uppercase tracking-wider">Select Approved Template</label>
+              <button type="button" onclick="loadLiveMetaTemplates(true)" id="wa-meta-refresh-btn" class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 transition">
+                <i data-lucide="refresh-cw" class="h-3 w-3"></i>
+                <span>Refresh Meta List</span>
+              </button>
+            </div>
+
+            <!-- Template list container -->
+            <div id="wa-meta-templates-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-48 overflow-y-auto pr-1">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Selected Template Config & Preview Area -->
+          <div id="wa-meta-selected-area" class="hidden rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+              <div>
+                <span class="text-xs font-black text-slate-900" id="wa-meta-selected-name">Template Name</span>
+                <span class="ml-2 text-[10px] font-bold uppercase text-slate-400" id="wa-meta-selected-lang">en_US</span>
+              </div>
+              <span id="wa-meta-selected-status-badge" class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-800">APPROVED</span>
+            </div>
+
+            <!-- Parameter inputs container -->
+            <div id="wa-meta-params-container" class="space-y-2">
+              <!-- Rendered dynamically for {{1}}, {{2}}, etc. -->
+            </div>
+
+            <!-- Live Preview Box -->
+            <div>
+              <label class="text-[11px] font-bold text-slate-500 mb-1 block">Live WhatsApp Preview:</label>
+              <div class="rounded-xl border border-emerald-200/80 bg-white p-3.5 shadow-xs">
+                <div class="text-[10px] font-black uppercase text-emerald-700 mb-1" id="wa-meta-preview-header"></div>
+                <p class="text-xs text-slate-800 whitespace-pre-wrap leading-relaxed" id="wa-meta-preview-body" dir="auto"></p>
+                <div class="text-[10px] text-slate-400 mt-2 border-t border-slate-100 pt-1" id="wa-meta-preview-footer"></div>
+              </div>
+            </div>
+
+            <!-- Send Action Button -->
+            <div class="flex justify-end pt-2">
+              <button type="button" id="wa-meta-send-btn" onclick="sendSelectedMetaTemplate()" class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-sm hover:bg-emerald-700 active:scale-95 transition disabled:opacity-50">
+                <i data-lucide="send" class="h-4 w-4"></i>
+                <span id="wa-meta-send-btn-text">Send Official Template 🚀</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: QUICK TEXT SNIPPETS -->
+        <div id="wa-tpl-tab-snippets" class="hidden space-y-3">
+          <div class="text-xs text-slate-500 font-medium">
+            Click any snippet below to insert it into the chat input box. You can edit the text before sending.
+            <span class="text-amber-700 font-bold block mt-0.5">Note: Standard text messages require the patient to have messaged the clinic in the last 24 hours.</span>
+          </div>
+
+          <!-- Snippet List -->
+          <div id="wa-snippets-list" class="space-y-2 max-h-72 overflow-y-auto pr-1">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ================= MODAL: EDIT LOGIN USER ================= -->
   <div id="modal-managed-user" onclick="if (event.target === this) closeManagedUserEditor()" class="fixed inset-0 z-[90] hidden items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
     <div role="dialog" aria-modal="true" aria-labelledby="managed-user-modal-title" class="max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto rounded-3xl border border-blue-100 bg-white shadow-2xl">
@@ -30413,6 +30534,12 @@
               ${senderTag}
               ${quotedHtml}
               ${mediaHtml}
+              ${msg.message_type === 'template' ? `
+                <div class="mb-1.5 inline-flex items-center gap-1 rounded-md bg-emerald-100/90 px-2 py-0.5 text-[10px] font-black text-emerald-800">
+                  <i data-lucide="bookmark-check" class="h-3 w-3 text-emerald-600"></i>
+                  <span>Meta Template 🚀</span>
+                </div>
+              ` : ''}
               <p class="text-xs sm:text-[13px] leading-relaxed whitespace-pre-wrap select-text" dir="auto">${escapeHtml(msg.content || '')}</p>
               <div class="flex items-center justify-end gap-1 mt-1">
                 <span class="text-[9px] font-semibold opacity-60">${timeStr}</span>
@@ -31160,58 +31287,440 @@
       }
     }
 
-    function openWhatsAppChatTemplatePicker(button) {
-      const input = document.getElementById('whatsapp-reply-input');
-      if (!input) return;
+    let liveMetaTemplatesList = [];
+    let liveMetaTemplatesLoading = false;
+    let selectedMetaTemplateName = null;
 
-      const existing = document.getElementById('whatsapp-quick-reply-picker');
-      if (existing) {
-        existing.remove();
+    function openWhatsAppChatTemplatePicker(button) {
+      const modal = document.getElementById('modal-whatsapp-template-picker');
+      if (!modal) return;
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      lucide.createIcons();
+
+      // Default to Meta Templates tab
+      switchWhatsAppTemplateTab('meta');
+
+      // If we haven't loaded Meta templates yet, load them
+      if (!liveMetaTemplatesList.length && !liveMetaTemplatesLoading) {
+        loadLiveMetaTemplates();
+      } else {
+        renderLiveMetaTemplatesList();
+      }
+
+      renderQuickSnippets();
+    }
+
+    function closeWhatsAppTemplatePickerModal() {
+      const modal = document.getElementById('modal-whatsapp-template-picker');
+      if (!modal) return;
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function switchWhatsAppTemplateTab(tab) {
+      const tabMetaBtn = document.getElementById('wa-tab-btn-meta');
+      const tabSnippetsBtn = document.getElementById('wa-tab-btn-snippets');
+      const tabMetaContent = document.getElementById('wa-tpl-tab-meta');
+      const tabSnippetsContent = document.getElementById('wa-tpl-tab-snippets');
+
+      if (!tabMetaBtn || !tabSnippetsBtn || !tabMetaContent || !tabSnippetsContent) return;
+
+      if (tab === 'meta') {
+        tabMetaBtn.className = 'relative flex items-center gap-1.5 pb-2.5 px-3 text-xs font-black transition border-b-2 border-emerald-600 text-emerald-700';
+        tabSnippetsBtn.className = 'relative flex items-center gap-1.5 pb-2.5 px-3 text-xs font-black transition border-b-2 border-transparent text-slate-500 hover:text-slate-800';
+        tabMetaContent.classList.remove('hidden');
+        tabSnippetsContent.classList.add('hidden');
+      } else {
+        tabSnippetsBtn.className = 'relative flex items-center gap-1.5 pb-2.5 px-3 text-xs font-black transition border-b-2 border-emerald-600 text-emerald-700';
+        tabMetaBtn.className = 'relative flex items-center gap-1.5 pb-2.5 px-3 text-xs font-black transition border-b-2 border-transparent text-slate-500 hover:text-slate-800';
+        tabSnippetsContent.classList.remove('hidden');
+        tabMetaContent.classList.add('hidden');
+      }
+      lucide.createIcons();
+    }
+
+    async function loadLiveMetaTemplates(forceRefresh = false) {
+      const listContainer = document.getElementById('wa-meta-templates-list');
+      const refreshBtn = document.getElementById('wa-meta-refresh-btn');
+      if (!listContainer) return;
+
+      if (liveMetaTemplatesLoading) return;
+      liveMetaTemplatesLoading = true;
+
+      if (refreshBtn) {
+        refreshBtn.classList.add('opacity-50', 'pointer-events-none');
+        refreshBtn.innerHTML = `<i data-lucide="loader-2" class="h-3 w-3 animate-spin"></i><span>Loading...</span>`;
+        lucide.createIcons();
+      }
+
+      listContainer.innerHTML = `
+        <div class="col-span-full flex items-center justify-center p-6 text-slate-400 gap-2">
+          <i data-lucide="loader-2" class="h-5 w-5 animate-spin text-emerald-600"></i>
+          <span class="text-xs font-bold">Fetching official templates from Meta...</span>
+        </div>
+      `;
+      lucide.createIcons();
+
+      try {
+        const { data, error } = await db.functions.invoke('whatsapp-webhook', {
+          body: { action: 'list_templates' }
+        });
+
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+
+        liveMetaTemplatesList = Array.isArray(data?.templates) ? data.templates : [];
+        renderLiveMetaTemplatesList();
+
+        // Auto select first approved template if none selected
+        if (!selectedMetaTemplateName && liveMetaTemplatesList.length) {
+          const firstApproved = liveMetaTemplatesList.find(t => t.status === 'APPROVED') || liveMetaTemplatesList[0];
+          selectMetaTemplate(firstApproved.name);
+        }
+      } catch (err) {
+        console.error('Failed to load Meta templates:', err);
+        listContainer.innerHTML = `
+          <div class="col-span-full rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800 space-y-1">
+            <div class="font-bold flex items-center gap-1.5">
+              <i data-lucide="alert-triangle" class="h-4 w-4 text-rose-600"></i>
+              <span>Unable to fetch templates from Meta</span>
+            </div>
+            <p class="text-[11px] text-rose-600">${escapeHtml(err.message || 'Please check clinic WABA credentials in WhatsApp Settings.')}</p>
+          </div>
+        `;
+        lucide.createIcons();
+      } finally {
+        liveMetaTemplatesLoading = false;
+        if (refreshBtn) {
+          refreshBtn.classList.remove('opacity-50', 'pointer-events-none');
+          refreshBtn.innerHTML = `<i data-lucide="refresh-cw" class="h-3 w-3"></i><span>Refresh Meta List</span>`;
+          lucide.createIcons();
+        }
+      }
+    }
+
+    function renderLiveMetaTemplatesList() {
+      const container = document.getElementById('wa-meta-templates-list');
+      if (!container) return;
+
+      if (!liveMetaTemplatesList.length) {
+        container.innerHTML = `
+          <div class="col-span-full p-4 text-center text-xs text-slate-400">
+            No templates found in your WhatsApp Business Account.
+          </div>
+        `;
         return;
       }
 
-      const templates = [
-        { label: 'Greeting', text: currentUiLanguage === 'ar' ? 'أهلاً بك في عيادة لومين لطب الأسنان، كيف يمكننا مساعدتك اليوم؟' : 'Hello! Welcome to Lumin Dental Clinic, how can we assist you today?' },
-        { label: 'Address & Location', text: currentUiLanguage === 'ar' ? 'عنوان العيادة: عيادة لومين لطب الأسنان. ساعات العمل من 10 صباحاً حتى 8 مساءً، مغلق يوم الجمعة.' : 'Clinic location: Lumin Dental Clinic. Working hours: 10:00 AM to 8:00 PM, closed on Fridays.' },
-        { label: 'Appointment Confirmed', text: currentUiLanguage === 'ar' ? 'تم تأكيد موعدك بنجاح. ننتظر تشريفك لنا في الوقت المحدد.' : 'Your appointment has been confirmed. We look forward to seeing you at the scheduled time.' },
-        { label: 'Human Follow-up', text: currentUiLanguage === 'ar' ? 'تم تحويل استفسارك إلى الفريق الطبي، وسنتواصل معك خلال لحظات.' : 'Your inquiry has been forwarded to our medical team, and we will get back to you shortly.' }
+      container.innerHTML = liveMetaTemplatesList.map(tpl => {
+        const isSelected = tpl.name === selectedMetaTemplateName;
+        const isApproved = tpl.status === 'APPROVED';
+        const isPending = tpl.status === 'PENDING';
+        
+        let statusBadge = '';
+        if (isApproved) {
+          statusBadge = `<span class="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[9px] font-black text-emerald-800">APPROVED</span>`;
+        } else if (isPending) {
+          statusBadge = `<span class="rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-800">PENDING</span>`;
+        } else {
+          statusBadge = `<span class="rounded-md bg-rose-100 px-1.5 py-0.5 text-[9px] font-black text-rose-800">${escapeHtml(tpl.status || 'UNKNOWN')}</span>`;
+        }
+
+        const bodyComp = (tpl.components || []).find(c => c.type === 'BODY');
+        const previewSnippet = bodyComp?.text ? bodyComp.text.slice(0, 70) + (bodyComp.text.length > 70 ? '...' : '') : 'No body text';
+
+        return `
+          <button type="button" onclick="selectMetaTemplate('${escapeHtml(tpl.name)}')" class="w-full text-left p-3 rounded-2xl border transition ${isSelected ? 'border-emerald-500 bg-emerald-50/60 ring-2 ring-emerald-500/20 shadow-xs' : 'border-slate-200 bg-white hover:border-emerald-200 hover:bg-slate-50/80'}">
+            <div class="flex items-center justify-between gap-1 mb-1">
+              <span class="font-black text-xs text-slate-800 truncate">${escapeHtml(tpl.name)}</span>
+              ${statusBadge}
+            </div>
+            <p class="text-[11px] text-slate-500 leading-snug line-clamp-2" dir="auto">${escapeHtml(previewSnippet)}</p>
+            <div class="mt-2 flex items-center gap-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+              <span>${escapeHtml(tpl.language || 'en')}</span>
+              <span>•</span>
+              <span>${escapeHtml(tpl.category || 'UTILITY')}</span>
+            </div>
+          </button>
+        `;
+      }).join('');
+      lucide.createIcons();
+    }
+
+    function selectMetaTemplate(name) {
+      selectedMetaTemplateName = name;
+      renderLiveMetaTemplatesList();
+
+      const tpl = liveMetaTemplatesList.find(t => t.name === name);
+      const selectedArea = document.getElementById('wa-meta-selected-area');
+      if (!tpl || !selectedArea) return;
+
+      selectedArea.classList.remove('hidden');
+
+      const nameEl = document.getElementById('wa-meta-selected-name');
+      const langEl = document.getElementById('wa-meta-selected-lang');
+      const badgeEl = document.getElementById('wa-meta-selected-status-badge');
+      const headerPreview = document.getElementById('wa-meta-preview-header');
+      const footerPreview = document.getElementById('wa-meta-preview-footer');
+      const paramsContainer = document.getElementById('wa-meta-params-container');
+      const sendBtn = document.getElementById('wa-meta-send-btn');
+      const sendBtnText = document.getElementById('wa-meta-send-btn-text');
+
+      if (nameEl) nameEl.textContent = tpl.name;
+      if (langEl) langEl.textContent = `${tpl.language} (${tpl.category})`;
+
+      const isApproved = tpl.status === 'APPROVED';
+      if (badgeEl) {
+        badgeEl.textContent = tpl.status;
+        badgeEl.className = isApproved ? 'rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-800' : 'rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-800';
+      }
+
+      if (sendBtn) {
+        sendBtn.disabled = !isApproved;
+        if (!isApproved) {
+          sendBtn.title = 'Only APPROVED templates can be sent via Meta';
+          if (sendBtnText) sendBtnText.textContent = 'Pending Meta Approval ⏳';
+        } else {
+          sendBtn.title = 'Send this approved template to patient';
+          if (sendBtnText) sendBtnText.textContent = 'Send Official Template 🚀';
+        }
+      }
+
+      const headerComp = (tpl.components || []).find(c => c.type === 'HEADER');
+      const footerComp = (tpl.components || []).find(c => c.type === 'FOOTER');
+
+      if (headerPreview) {
+        if (headerComp?.text) {
+          headerPreview.textContent = headerComp.text;
+          headerPreview.classList.remove('hidden');
+        } else {
+          headerPreview.classList.add('hidden');
+        }
+      }
+
+      if (footerPreview) {
+        if (footerComp?.text) {
+          footerPreview.textContent = footerComp.text;
+          footerPreview.classList.remove('hidden');
+        } else {
+          footerPreview.classList.add('hidden');
+        }
+      }
+
+      const bodyComp = (tpl.components || []).find(c => c.type === 'BODY');
+      const bodyText = bodyComp?.text || '';
+      // Find all parameters {{1}}, {{2}}, etc.
+      const paramMatches = [...new Set(bodyText.match(/\{\{(\d+)\}\}/g) || [])];
+
+      if (paramMatches.length && paramsContainer) {
+        const patientName = (activeWhatsAppConversation?.patient_name || '').trim();
+        paramsContainer.innerHTML = `
+          <label class="text-[11px] font-bold text-slate-700 block">Template Variables:</label>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            ${paramMatches.map((p) => {
+              const num = p.replace(/[^\d]/g, '');
+              const defaultVal = num === '1' && patientName ? patientName : '';
+              return `
+                <div>
+                  <span class="text-[10px] font-bold text-slate-500 block mb-0.5">Variable {{${num}}}:</span>
+                  <input type="text" data-wa-param-num="${num}" value="${escapeHtml(defaultVal)}" oninput="updateMetaTemplatePreview()" placeholder="Enter value for {{${num}}}..." class="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-800 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20" />
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      } else if (paramsContainer) {
+        paramsContainer.innerHTML = '';
+      }
+
+      updateMetaTemplatePreview();
+    }
+
+    function updateMetaTemplatePreview() {
+      const tpl = liveMetaTemplatesList.find(t => t.name === selectedMetaTemplateName);
+      const bodyPreview = document.getElementById('wa-meta-preview-body');
+      if (!tpl || !bodyPreview) return;
+
+      const bodyComp = (tpl.components || []).find(c => c.type === 'BODY');
+      let text = bodyComp?.text || '';
+
+      const paramInputs = document.querySelectorAll('[data-wa-param-num]');
+      paramInputs.forEach(input => {
+        const num = input.getAttribute('data-wa-param-num');
+        const val = input.value.trim() || `{{${num}}}`;
+        text = text.replaceAll(`{{${num}}}`, val);
+      });
+
+      bodyPreview.textContent = text;
+    }
+
+    async function sendSelectedMetaTemplate() {
+      if (!selectedMetaTemplateName) return;
+      if (!activeWhatsAppConversationId && !activeWhatsAppConversation?.phone) {
+        alert(currentUiLanguage === 'ar' ? 'الرجاء تحديد محادثة مريض أولاً' : 'Please select a patient conversation first.');
+        return;
+      }
+
+      const tpl = liveMetaTemplatesList.find(t => t.name === selectedMetaTemplateName);
+      if (!tpl) return;
+      if (tpl.status !== 'APPROVED') {
+        alert(currentUiLanguage === 'ar' ? 'هذا القالب قيد المراجعة من شركة Meta ولم يتم اعتماده بعد.' : 'This template is still pending approval from Meta.');
+        return;
+      }
+
+      const sendBtn = document.getElementById('wa-meta-send-btn');
+      const sendBtnText = document.getElementById('wa-meta-send-btn-text');
+
+      const paramInputs = Array.from(document.querySelectorAll('[data-wa-param-num]'));
+      const components = [];
+
+      if (paramInputs.length > 0) {
+        paramInputs.sort((a, b) => Number(a.getAttribute('data-wa-param-num')) - Number(b.getAttribute('data-wa-param-num')));
+        const parameters = paramInputs.map(input => ({
+          type: 'text',
+          text: input.value.trim() || '—'
+        }));
+        components.push({
+          type: 'body',
+          parameters: parameters
+        });
+      }
+
+      const bodyPreview = document.getElementById('wa-meta-preview-body');
+      const renderedText = bodyPreview?.textContent || `📋 Template: ${tpl.name}`;
+
+      if (sendBtn) {
+        sendBtn.disabled = true;
+        if (sendBtnText) sendBtnText.textContent = currentUiLanguage === 'ar' ? 'جارٍ الإرسال إلى واتساب...' : 'Sending via Meta Cloud API...';
+      }
+
+      try {
+        const payload = {
+          action: 'send_template',
+          conversation_id: activeWhatsAppConversationId,
+          phone: activeWhatsAppConversation?.phone,
+          patient_name: activeWhatsAppConversation?.patient_name,
+          patient_id: activeWhatsAppConversation?.patient_id,
+          template_name: tpl.name,
+          language_code: tpl.language || 'ar',
+          components: components,
+          rendered_text: renderedText
+        };
+
+        const { data, error } = await db.functions.invoke('whatsapp-webhook', {
+          body: payload
+        });
+
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+
+        // Append message to chat view
+        if (data?.message) {
+          whatsappMessages = mergeWhatsAppMessages(whatsappMessages, data.message);
+          renderWhatsAppMessages(true);
+        } else {
+          await syncNewWhatsAppMessages(activeWhatsAppConversationId, true);
+        }
+
+        if (activeWhatsAppConversation) {
+          activeWhatsAppConversation.last_message = renderedText;
+          activeWhatsAppConversation.last_message_at = new Date().toISOString();
+          renderWhatsAppConversationsList();
+        }
+
+        closeWhatsAppTemplatePickerModal();
+        alert(currentUiLanguage === 'ar' ? 'تم إرسال قالب واتساب المعتمد بنجاح! 🚀' : 'Official WhatsApp template sent successfully! 🚀');
+      } catch (err) {
+        console.error('Failed to send WhatsApp template:', err);
+        alert(currentUiLanguage === 'ar' ? 'فشل إرسال القالب: ' + (err.message || 'خطأ غير معروف') : 'Failed to send template: ' + (err.message || 'Unknown error'));
+      } finally {
+        if (sendBtn) {
+          sendBtn.disabled = false;
+          if (sendBtnText) sendBtnText.textContent = 'Send Official Template 🚀';
+        }
+      }
+    }
+
+    async function renderQuickSnippets() {
+      const container = document.getElementById('wa-snippets-list');
+      if (!container) return;
+
+      try {
+        await ensureWhatsAppTemplatesLoaded();
+      } catch (_) {}
+
+      const patientName = (activeWhatsAppConversation?.patient_name || '').trim();
+
+      const defaultSnippets = [
+        {
+          label: 'Greeting / ترحيب',
+          text: currentUiLanguage === 'ar'
+            ? `أهلاً بك${patientName ? ' أستاذ/ة ' + patientName : ''} في عيادة لومين لطب الأسنان، كيف يمكننا مساعدتك اليوم؟ 🦷✨`
+            : `Hello${patientName ? ' ' + patientName : ''}! Welcome to Lumin Dental Clinic, how can we assist you today? 🦷✨`
+        },
+        {
+          label: 'Address & Working Hours / العنوان وساعات العمل',
+          text: currentUiLanguage === 'ar'
+            ? 'عنوان العيادة: عيادة لومين لطب الأسنان. ساعات العمل: يومياً من 10:00 صباحاً حتى 8:00 مساءً (الجمعة عطلة). يسعدنا تشريفك!'
+            : 'Clinic Address: Lumin Dental Clinic. Working hours: Daily from 10:00 AM to 8:00 PM (Closed Fridays). We look forward to seeing you!'
+        },
+        {
+          label: 'Appointment Confirmed / تأكيد الموعد',
+          text: currentUiLanguage === 'ar'
+            ? `تم تأكيد موعدك بنجاح${patientName ? ' يا ' + patientName : ''}. ننتظر تشريفك لنا في الوقت المحدد 🦷✨`
+            : `Your appointment has been confirmed${patientName ? ' ' + patientName : ''}. We look forward to seeing you at the scheduled time 🦷✨`
+        },
+        {
+          label: 'Human Staff Follow-up / متابعة الاستقبال',
+          text: currentUiLanguage === 'ar'
+            ? 'تم استلام استفسارك وسيتم الرد عليك والتواصل معك من قبل الفريق الطبي فوراً.'
+            : 'Your inquiry has been received and our medical staff will follow up with you right away.'
+        }
       ];
 
-      const picker = document.createElement('div');
-      picker.id = 'whatsapp-quick-reply-picker';
-      picker.className = 'fixed z-[100] rounded-2xl border border-slate-200 bg-white p-2 shadow-xl space-y-1 w-72 text-xs font-semibold';
-      picker.innerHTML = `
-        <div class="px-2 py-1 text-[10px] font-black uppercase text-slate-400">Quick Replies</div>
-        ${templates.map((tpl, i) => `
-          <button type="button" data-tpl-idx="${i}" class="w-full text-left p-2 rounded-xl hover:bg-slate-50 transition flex flex-col gap-0.5">
-            <span class="font-bold text-slate-800">${escapeHtml(tpl.label)}</span>
-            <span class="text-[11px] text-slate-400 truncate">${escapeHtml(tpl.text)}</span>
-          </button>
-        `).join('')}
-      `;
-
-      const rect = button.getBoundingClientRect();
-      picker.style.bottom = `${window.innerHeight - rect.top + 8}px`;
-      picker.style.left = `${Math.max(8, rect.left)}px`;
-
-      document.body.appendChild(picker);
-
-      const dismiss = (e) => {
-        if (!picker.contains(e.target) && e.target !== button) {
-          picker.remove();
-          document.removeEventListener('click', dismiss);
+      const clinicSnippets = (whatsappMessageTemplates || []).filter(t => t.active !== false).map(t => {
+        let body = t.body || '';
+        if (patientName) {
+          body = body.replaceAll('{{patient_name}}', patientName)
+                     .replaceAll('{{اسم_المريض}}', patientName);
         }
-      };
-      setTimeout(() => document.addEventListener('click', dismiss), 0);
-
-      picker.querySelectorAll('[data-tpl-idx]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const idx = Number(btn.getAttribute('data-tpl-idx'));
-          input.value = templates[idx].text;
-          input.focus();
-          picker.remove();
-        });
+        return {
+          label: t.name,
+          text: body,
+          isCustom: true
+        };
       });
+
+      const allSnippets = [...defaultSnippets, ...clinicSnippets];
+
+      container.innerHTML = allSnippets.map((s, idx) => `
+        <button type="button" onclick="useQuickSnippet(${idx})" class="w-full text-left p-3 rounded-2xl border border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/50 transition group flex flex-col gap-1 shadow-xs">
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-black text-xs text-slate-800 group-hover:text-emerald-800 transition">${escapeHtml(s.label)}</span>
+            <span class="text-[10px] font-bold text-emerald-600 opacity-0 group-hover:opacity-100 transition">Click to Insert ↵</span>
+          </div>
+          <p class="text-[11px] text-slate-500 line-clamp-2 leading-relaxed" dir="auto">${escapeHtml(s.text)}</p>
+        </button>
+      `).join('');
+
+      window._currentQuickSnippets = allSnippets;
+      lucide.createIcons();
+    }
+
+    function useQuickSnippet(idx) {
+      const snippets = window._currentQuickSnippets || [];
+      const s = snippets[idx];
+      if (!s) return;
+
+      const input = document.getElementById('whatsapp-reply-input');
+      if (input) {
+        input.value = s.text;
+        autoResizeWhatsAppInput(input);
+        input.focus();
+      }
+      closeWhatsAppTemplatePickerModal();
     }
 
     // Startup Initialization

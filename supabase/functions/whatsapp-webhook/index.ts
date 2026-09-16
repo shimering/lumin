@@ -189,6 +189,62 @@ async function sendMetaWhatsAppAudioMessage(
   return data;
 }
 
+// Send a WhatsApp template message via Meta Graph API
+async function sendMetaWhatsAppTemplate(
+  phoneId: string,
+  accessToken: string,
+  toPhone: string,
+  templateName: string,
+  languageCode: string = "ar",
+  components?: any[]
+) {
+  if (!phoneId || !accessToken || !toPhone || !templateName) {
+    console.warn("sendMetaWhatsAppTemplate: missing required parameter", {
+      phoneId: Boolean(phoneId),
+      accessToken: Boolean(accessToken),
+      toPhone: Boolean(toPhone),
+      templateName: Boolean(templateName),
+    });
+    return null;
+  }
+
+  const url = `https://graph.facebook.com/v21.0/${phoneId}/messages`;
+  const templateObj: any = {
+    name: templateName,
+    language: {
+      code: languageCode || "ar",
+    },
+  };
+
+  if (Array.isArray(components) && components.length > 0) {
+    templateObj.components = components;
+  }
+
+  const payload: any = {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to: cleanPhone(toPhone),
+    type: "template",
+    template: templateObj,
+  };
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    console.error("Meta Graph API template error:", data);
+    throw new Error(data?.error?.message || "Failed to send WhatsApp template via Meta API");
+  }
+  return data;
+}
+
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   const chunkSize = 8192;
@@ -1659,6 +1715,168 @@ Deno.serve(async (req: Request) => {
         if (updateErr) throw updateErr;
 
         return jsonResponse({ success: true, message: updatedMsg, reaction: emoji || null });
+      }
+
+      // Case A.3: List Approved Meta WhatsApp Templates
+      if (body.action === "list_templates") {
+        if (!settings.wabaId || !settings.accessToken) {
+          return jsonResponse({
+            templates: [],
+            error: "Missing WhatsApp Business Account ID (WABA ID) or Access Token in clinic settings",
+          }, 400);
+        }
+
+        try {
+          const url = `https://graph.facebook.com/v21.0/${settings.wabaId}/message_templates?fields=name,status,category,language,components&limit=100`;
+          const res = await fetch(url, {
+            headers: {
+              "Authorization": `Bearer ${settings.accessToken}`,
+            },
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            console.error("Meta list_templates error:", data);
+            return jsonResponse({
+              templates: [],
+              error: data?.error?.message || "Failed to fetch templates from Meta",
+            }, res.status);
+          }
+
+          return jsonResponse({
+            success: true,
+            templates: data.data || [],
+          });
+        } catch (err: any) {
+          console.error("Failed to list templates:", err);
+          return jsonResponse({ templates: [], error: err.message || "Failed to list templates" }, 500);
+        }
+      }
+
+      // Case A.4: Staff Send Meta Approved Template
+      if (body.action === "send_template") {
+        const {
+          conversation_id,
+          phone,
+          patient_name,
+          patient_id,
+          template_name,
+          language_code = "ar",
+          components = [],
+          rendered_text,
+        } = body;
+
+        if ((!conversation_id && !phone) || !template_name) {
+          return jsonResponse({ error: "conversation_id or phone, and template_name are required" }, 400);
+        }
+
+        if (!settings.phoneId || !settings.accessToken) {
+          return jsonResponse({ error: "WhatsApp credentials not configured in clinic settings" }, 400);
+        }
+
+        let conv: any = null;
+        if (conversation_id) {
+          const { data, error: convErr } = await supabase
+            .from("whatsapp_conversations")
+            .select("*")
+            .eq("id", conversation_id)
+            .maybeSingle();
+          if (convErr) throw convErr;
+          conv = data;
+        }
+
+        if (!conv && phone) {
+          const clean = cleanPhone(phone);
+          const tail = clean.slice(-8);
+          const { data: existingConv } = await supabase
+            .from("whatsapp_conversations")
+            .select("*")
+            .or(`phone.eq.${clean},phone.ilike.%${tail}`)
+            .maybeSingle();
+
+          if (existingConv) {
+            conv = existingConv;
+          } else {
+            let linkedPatientId = patient_id || null;
+            let linkedPatientName = patient_name || `+${clean}`;
+            if (!linkedPatientId) {
+              const { data: p } = await supabase
+                .from("patients")
+                .select("id, name")
+                .or(`phone.eq.${clean},phone.ilike.%${tail}`)
+                .maybeSingle();
+              if (p) {
+                linkedPatientId = p.id;
+                linkedPatientName = p.name || linkedPatientName;
+              }
+            }
+
+            const { data: newConv, error: createConvErr } = await supabase
+              .from("whatsapp_conversations")
+              .insert({
+                phone: clean,
+                patient_id: linkedPatientId,
+                patient_name: linkedPatientName,
+                ai_enabled: true,
+                last_message: rendered_text || `📋 Template: ${template_name}`,
+                last_message_at: new Date().toISOString(),
+                unread_count: 0,
+                status: "active",
+              })
+              .select()
+              .single();
+
+            if (createConvErr) throw createConvErr;
+            conv = newConv;
+          }
+        }
+
+        if (!conv) {
+          return jsonResponse({ error: "Conversation not found" }, 404);
+        }
+
+        const metaResult = await sendMetaWhatsAppTemplate(
+          settings.phoneId,
+          settings.accessToken,
+          conv.phone,
+          template_name,
+          language_code,
+          components
+        );
+
+        const targetWamid = metaResult?.messages?.[0]?.id || null;
+        const displayText = rendered_text || `📋 Template: ${template_name}`;
+
+        const { data: newMsg, error: msgErr } = await supabase
+          .from("whatsapp_messages")
+          .insert({
+            conversation_id: conv.id,
+            sender: "staff",
+            sender_name: "Clinic Staff",
+            content: displayText,
+            message_type: "template",
+            status: targetWamid ? "sent" : "failed",
+            whatsapp_message_id: targetWamid,
+          })
+          .select()
+          .single();
+
+        if (msgErr) throw msgErr;
+
+        await supabase
+          .from("whatsapp_conversations")
+          .update({
+            last_message: displayText,
+            last_message_at: new Date().toISOString(),
+            unread_count: 0,
+          })
+          .eq("id", conv.id);
+
+        return jsonResponse({
+          success: true,
+          message: newMsg,
+          conversation_id: conv.id,
+          wamid: targetWamid,
+        });
       }
 
       // Case B: Incoming Webhook Event from Meta
