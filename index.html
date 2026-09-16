@@ -2895,10 +2895,94 @@
         right: auto !important;
       }
     }
+    #whatsapp-reply-panel {
+      padding: 0.5rem 0.75rem !important;
+      background-color: #f8fafc !important;
+      border-top: 1px solid #e2e8f0 !important;
+    }
+    #whatsapp-reply-form {
+      background-color: #ffffff !important;
+      border: 1px solid #cbd5e1 !important;
+      border-radius: 9999px !important;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04) !important;
+      padding: 0.25rem 0.5rem !important;
+      display: flex !important;
+      align-items: center !important;
+      gap: 0.375rem !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
+    }
+    #whatsapp-reply-form:focus-within {
+      border-color: #10b981 !important;
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15) !important;
+    }
     #whatsapp-reply-input {
-      max-height: 140px;
-      min-height: 38px;
-      line-height: 1.4;
+      border: none !important;
+      outline: none !important;
+      box-shadow: none !important;
+      background: transparent !important;
+      padding: 0.375rem 0.5rem !important;
+      font-size: 14px !important;
+      line-height: 1.4 !important;
+      max-height: 120px !important;
+      min-height: 32px !important;
+      resize: none !important;
+      width: 100% !important;
+    }
+    #whatsapp-reply-submit {
+      background-color: #059669 !important;
+      color: #ffffff !important;
+      border: none !important;
+      border-radius: 9999px !important;
+      width: 2.125rem !important;
+      height: 2.125rem !important;
+      min-width: 2.125rem !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      flex-shrink: 0 !important;
+      cursor: pointer !important;
+      box-shadow: 0 1px 3px rgba(5, 150, 105, 0.25) !important;
+      transition: background-color 0.15s ease, transform 0.1s ease !important;
+    }
+    #whatsapp-reply-submit:hover {
+      background-color: #047857 !important;
+    }
+    #whatsapp-reply-submit:active {
+      transform: scale(0.94) !important;
+    }
+    #whatsapp-reply-submit:disabled {
+      opacity: 0.5 !important;
+      cursor: not-allowed !important;
+    }
+    #whatsapp-reply-submit i,
+    #whatsapp-reply-submit svg {
+      color: #ffffff !important;
+      stroke: #ffffff !important;
+      width: 1rem !important;
+      height: 1rem !important;
+    }
+    html[dir="rtl"] #whatsapp-reply-submit i,
+    html[dir="rtl"] #whatsapp-reply-submit svg {
+      transform: scaleX(-1);
+    }
+    #whatsapp-voice-record-btn {
+      width: 2.125rem !important;
+      height: 2.125rem !important;
+      min-width: 2.125rem !important;
+      border-radius: 9999px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      flex-shrink: 0 !important;
+      color: #64748b !important;
+      background: transparent !important;
+      border: none !important;
+      transition: background-color 0.15s ease, color 0.15s ease !important;
+    }
+    #whatsapp-voice-record-btn:hover {
+      background-color: #f1f5f9 !important;
+      color: #1e293b !important;
     }
     @media (min-width: 768px) {
       .whatsapp-chat-shell {
@@ -3010,15 +3094,19 @@
         border-radius: 0 !important;
       }
       #whatsapp-reply-panel {
-        padding: 0.5rem 0.625rem !important;
+        padding: 0.375rem 0.5rem !important;
+        background-color: #f8fafc !important;
         width: 100% !important;
         max-width: 100% !important;
         box-sizing: border-box !important;
         overflow: hidden !important;
       }
       #whatsapp-reply-form {
+        padding: 0.2rem 0.375rem !important;
+        gap: 0.25rem !important;
         width: 100% !important;
         max-width: 100% !important;
+        border-radius: 9999px !important;
         box-sizing: border-box !important;
       }
       #whatsapp-text-input-container {
@@ -3028,8 +3116,19 @@
       }
       #whatsapp-reply-input {
         font-size: 14px !important;
-        min-height: 38px !important;
+        min-height: 30px !important;
+        padding: 0.25rem 0.375rem !important;
         width: 100% !important;
+      }
+      #whatsapp-reply-submit {
+        width: 1.875rem !important;
+        height: 1.875rem !important;
+        min-width: 1.875rem !important;
+      }
+      #whatsapp-voice-record-btn {
+        width: 1.875rem !important;
+        height: 1.875rem !important;
+        min-width: 1.875rem !important;
       }
       #whatsapp-messages-container {
         padding: 0.75rem !important;
@@ -5623,52 +5722,48 @@
                 </button>
               </div>
 
-              <!-- Manual Message Form -->
-              <form id="whatsapp-reply-form" onsubmit="sendWhatsAppManualReply(event)" class="relative flex items-end gap-1.5 sm:gap-2 w-full max-w-full min-w-0">
+              <!-- Floating Minimalist WhatsApp Chat Capsule -->
+              <form id="whatsapp-reply-form" onsubmit="sendWhatsAppManualReply(event)" class="relative flex items-center gap-1 sm:gap-1.5 w-full max-w-full rounded-full border border-slate-300 bg-white px-1.5 sm:px-2.5 py-1 shadow-sm transition-all focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20">
                 <!-- Template Picker Button -->
-                <button type="button" onclick="openWhatsAppChatTemplatePicker(this)" class="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition mb-0.5" title="Saved Templates">
+                <button type="button" onclick="openWhatsAppChatTemplatePicker(this)" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition" title="Saved Templates">
                   <i data-lucide="bookmark" class="h-4 w-4"></i>
                 </button>
 
-                <!-- Voice Recording Button -->
-                <button type="button" id="whatsapp-voice-record-btn" onclick="toggleWhatsAppVoiceRecording()" class="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 transition mb-0.5" title="Record Voice Message">
-                  <i data-lucide="mic" class="h-4 w-4"></i>
-                </button>
-
-                <!-- Expanding Textarea -->
-                <div id="whatsapp-text-input-container" class="relative flex-1 min-w-0 max-w-full">
-                  <textarea id="whatsapp-reply-input" rows="1" dir="auto" oninput="autoResizeWhatsAppInput(this)" onkeydown="handleWhatsAppInputKeydown(event)" placeholder="Type a message to send to patient on WhatsApp..." class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 sm:px-3.5 sm:py-2.5 text-xs sm:text-sm leading-relaxed outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition"></textarea>
-                  <div class="hidden sm:flex items-center justify-between px-1 text-[10px] text-slate-400 mt-0.5">
-                    <span id="whatsapp-replying-to-hint" class="truncate font-semibold">Replying directly via WhatsApp Cloud API</span>
-                    <span class="opacity-70">Enter ↵ to send</span>
-                  </div>
+                <!-- Expanding Textarea Container -->
+                <div id="whatsapp-text-input-container" class="relative flex-1 min-w-0">
+                  <textarea id="whatsapp-reply-input" rows="1" dir="auto" oninput="autoResizeWhatsAppInput(this)" onkeydown="handleWhatsAppInputKeydown(event)" placeholder="Type a message..." class="w-full resize-none border-0 bg-transparent py-1.5 px-1 text-xs sm:text-sm leading-relaxed text-slate-800 placeholder:text-slate-400 outline-none ring-0 focus:ring-0 max-h-28 overflow-y-auto block"></textarea>
                 </div>
 
                 <!-- Voice Recording Active Bar -->
-                <div id="whatsapp-voice-recording-bar" class="hidden flex-1 min-w-0 items-center justify-between rounded-xl border border-rose-200 bg-rose-50/80 px-3 py-2 mb-0.5">
-                  <div class="flex items-center gap-2">
-                    <span class="relative flex h-2.5 w-2.5">
+                <div id="whatsapp-voice-recording-bar" class="hidden flex-1 min-w-0 items-center justify-between rounded-full bg-rose-50 border border-rose-200 px-2.5 py-0.5">
+                  <div class="flex items-center gap-1.5 sm:gap-2">
+                    <span class="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5">
                       <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                      <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+                      <span class="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-rose-500"></span>
                     </span>
                     <span id="whatsapp-voice-timer" class="font-mono text-xs font-bold text-rose-700">0:00</span>
-                    <span class="text-[11px] font-semibold text-rose-600 hidden sm:inline">Recording voice note...</span>
+                    <span class="text-[10px] sm:text-[11px] font-semibold text-rose-600 hidden xs:inline">Recording...</span>
                   </div>
-                  <div class="flex items-center gap-1.5">
-                    <button type="button" onclick="cancelWhatsAppVoiceRecording()" class="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-100 hover:text-rose-600 transition" title="Cancel & Discard">
-                      <i data-lucide="trash-2" class="h-3.5 w-3.5"></i>
+                  <div class="flex items-center gap-1">
+                    <button type="button" onclick="cancelWhatsAppVoiceRecording()" class="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full text-slate-400 hover:bg-rose-100 hover:text-rose-600 transition" title="Cancel & Discard">
+                      <i data-lucide="trash-2" class="h-3 w-3 sm:h-3.5 sm:w-3.5"></i>
                     </button>
-                    <button type="button" onclick="sendWhatsAppVoiceRecording()" class="inline-flex h-7 items-center gap-1 rounded-lg bg-rose-600 px-2.5 text-[11px] font-black text-white hover:bg-rose-700 shadow-xs transition" title="Send Voice Message">
-                      <i data-lucide="send" class="h-3 w-3"></i>
-                      <span>Send Voice</span>
+                    <button type="button" onclick="sendWhatsAppVoiceRecording()" class="inline-flex h-6 sm:h-7 items-center gap-1 rounded-full bg-rose-600 px-2 sm:px-2.5 text-[10px] sm:text-[11px] font-black text-white hover:bg-rose-700 shadow-xs transition" title="Send Voice Message">
+                      <i data-lucide="send" class="h-2.5 w-2.5 sm:h-3 sm:w-3"></i>
+                      <span>Send</span>
                     </button>
                   </div>
                 </div>
 
-                <!-- Send Button -->
-                <button type="submit" id="whatsapp-reply-submit" class="flex h-9 w-9 sm:h-10 sm:w-auto shrink-0 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-0 sm:px-4 text-xs font-black text-white hover:from-emerald-700 hover:to-teal-700 shadow-xs transition disabled:opacity-50 disabled:cursor-not-allowed mb-0.5">
-                  <i data-lucide="send" class="h-3.5 w-3.5 sm:h-3.5 sm:w-3.5"></i>
-                  <span id="whatsapp-reply-submit-text" class="hidden sm:inline">Send</span>
+                <!-- Voice Recording Button -->
+                <button type="button" id="whatsapp-voice-record-btn" onclick="toggleWhatsAppVoiceRecording()" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition" title="Record Voice Message">
+                  <i data-lucide="mic" class="h-4 w-4"></i>
+                </button>
+
+                <!-- Send Button (WhatsApp Emerald Green Circle) -->
+                <button type="submit" id="whatsapp-reply-submit" class="flex h-8 w-8 sm:h-8.5 sm:w-8.5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs transition active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed" title="Send (Enter)">
+                  <i data-lucide="send" class="h-4 w-4 ml-0.5 text-white"></i>
+                  <span id="whatsapp-reply-submit-text" class="sr-only">Send</span>
                 </button>
               </form>
             </div>
@@ -30694,7 +30789,7 @@
     function autoResizeWhatsAppInput(textarea) {
       if (!textarea) return;
       textarea.style.height = 'auto';
-      textarea.style.height = Math.max(38, Math.min(textarea.scrollHeight, 140)) + 'px';
+      textarea.style.height = Math.max(30, Math.min(textarea.scrollHeight, 120)) + 'px';
     }
 
     function handleWhatsAppInputKeydown(event) {
