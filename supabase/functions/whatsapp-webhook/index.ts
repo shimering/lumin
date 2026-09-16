@@ -35,7 +35,7 @@ async function getClinicWhatsAppSettings(supabase: any) {
   const { data } = await supabase
     .from("clinic_settings")
     .select(
-      "whatsapp_enabled, whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token, gemini_api_key, whatsapp_ai_instructions, whatsapp_ai_model, attendance_timezone"
+      "whatsapp_enabled, whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token, gemini_api_key, whatsapp_ai_instructions, whatsapp_ai_model, attendance_timezone, onesignal_rest_api_key"
     )
     .eq("id", 1)
     .maybeSingle();
@@ -50,6 +50,7 @@ async function getClinicWhatsAppSettings(supabase: any) {
     aiInstructions: String(data?.whatsapp_ai_instructions || "").trim(),
     aiModel: String(data?.whatsapp_ai_model || "gemini-3.5-flash-lite").trim(),
     attendanceTimezone: String(data?.attendance_timezone || "Africa/Cairo").trim(),
+    oneSignalApiKey: String(data?.onesignal_rest_api_key || Deno.env.get("ONESIGNAL_REST_API_KEY") || "").trim(),
   };
 }
 
@@ -309,6 +310,115 @@ function getClinicNow(timeZone: string = "Africa/Cairo") {
     dayAr,
     display: `${dateStr} (${dayEn} / ${dayAr})`,
   };
+}
+
+// Send OneSignal push notification to all subscribed clinic staff and doctors
+async function sendAppointmentPushNotification(
+  supabase: any,
+  params: {
+    appointmentId: string;
+    patientName: string;
+    doctorName: string;
+    date: string;
+    time: string;
+    visitType: string;
+    assignedUserId?: string | null;
+    dayAr?: string;
+    dayEn?: string;
+  }
+): Promise<any> {
+  const appId = "1796b727-661f-43cb-9770-1b3938e4db8c";
+  let apiKey = (Deno.env.get("ONESIGNAL_REST_API_KEY") || "").trim();
+
+  if (!apiKey && supabase) {
+    try {
+      const { data } = await supabase
+        .from("clinic_settings")
+        .select("onesignal_rest_api_key")
+        .eq("id", 1)
+        .maybeSingle();
+      if (data?.onesignal_rest_api_key) {
+        apiKey = String(data.onesignal_rest_api_key).trim();
+      }
+    } catch (e) {
+      console.warn("Could not load onesignal_rest_api_key from clinic_settings:", e);
+    }
+  }
+
+  if (!apiKey) {
+    console.warn("sendAppointmentPushNotification: No OneSignal API key found.");
+    return null;
+  }
+
+  const {
+    appointmentId,
+    patientName,
+    doctorName,
+    date,
+    time,
+    visitType,
+    assignedUserId,
+    dayAr = "",
+    dayEn = "",
+  } = params;
+
+  const titleAr = "موعد جديد عبر واتساب 🦷";
+  const titleEn = "New WhatsApp Appointment 🦷";
+
+  const dateDisplayAr = dayAr ? `${dayAr} (${date})` : date;
+  const dateDisplayEn = dayEn ? `${dayEn} (${date})` : date;
+
+  const bodyAr = `تم حجز موعد جديد عبر واتساب للمريض ${patientName} مع ${doctorName} يوم ${dateDisplayAr} الساعة ${time} (${visitType}).`;
+  const bodyEn = `New appointment booked via WhatsApp for ${patientName} with ${doctorName} on ${dateDisplayEn} at ${time} (${visitType}).`;
+
+  const payload: Record<string, unknown> = {
+    app_id: appId,
+    included_segments: ["Total Subscriptions"],
+    headings: {
+      ar: titleAr,
+      en: titleEn,
+    },
+    contents: {
+      ar: bodyAr,
+      en: bodyEn,
+    },
+    data: {
+      view: "appointments",
+      appointment_id: appointmentId,
+      source: "whatsapp_ai",
+      assigned_user_id: assignedUserId || null,
+      date,
+      time,
+      patient_name: patientName,
+      doctor_name: doctorName,
+      visit_type: visitType,
+    },
+    url: "https://lumin.pages.dev/?view=appointments",
+    priority: 10,
+    ttl: 86400,
+  };
+
+  try {
+    const res = await fetch("https://api.onesignal.com/notifications", {
+      method: "POST",
+      headers: {
+        "Authorization": `Key ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const result = await res.json();
+    if (!res.ok) {
+      console.warn("OneSignal push notification error:", result);
+    } else {
+      console.log("OneSignal push notification sent:", result?.id);
+    }
+    return result;
+  } catch (err) {
+    console.error("sendAppointmentPushNotification failed:", err);
+    return null;
+  }
 }
 
 function formatDoctorScheduleForPrompt(fullName: string, sched: any): string {
@@ -736,6 +846,26 @@ async function handleGeminiToolCall(
       console.error("Appointment creation error:", aptError);
       return { success: false, error: aptError.message };
     }
+
+    // 6. Trigger OneSignal Push Notification to Clinic Staff & Doctors
+    const aptDayOfWeek = new Date(`${date}T12:00:00Z`).getUTCDay();
+    const aptDayAr = WEEKDAY_NAMES_AR[aptDayOfWeek] || "";
+    const aptDayEn = WEEKDAY_NAMES_EN[aptDayOfWeek] || "";
+
+    // Fire push notification asynchronously without blocking AI response
+    sendAppointmentPushNotification(supabase, {
+      appointmentId: apt.id,
+      patientName: patient_name || conversation.patient_name || "Patient",
+      doctorName: confirmedDoctorName,
+      date,
+      time,
+      visitType: confirmedVisitType,
+      assignedUserId,
+      dayAr: aptDayAr,
+      dayEn: aptDayEn,
+    }).catch((pushErr) => {
+      console.warn("sendAppointmentPushNotification error:", pushErr);
+    });
 
     return {
       success: true,
