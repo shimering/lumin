@@ -30355,15 +30355,22 @@
         let statusTickHtml = '';
         if (isStaff || isAi) {
           if (msg.status === 'read') {
-            statusTickHtml = `<i data-lucide="check-check" class="h-3 w-3 text-sky-500" title="Read"></i>`;
+            const readTitle = currentUiLanguage === 'ar' ? 'تمت القراءة ✓✓' : 'Read ✓✓';
+            statusTickHtml = `<i data-lucide="check-check" class="h-3 w-3 text-sky-500" title="${readTitle}"></i>`;
           } else if (msg.status === 'delivered') {
-            statusTickHtml = `<i data-lucide="check-check" class="h-3 w-3 text-slate-400 opacity-70" title="Delivered"></i>`;
+            const delTitle = currentUiLanguage === 'ar' ? 'تم التسليم لهاتف المريض ✓✓' : 'Delivered to phone ✓✓';
+            statusTickHtml = `<i data-lucide="check-check" class="h-3 w-3 text-slate-400 opacity-70" title="${delTitle}"></i>`;
           } else if (msg.status === 'sent') {
-            statusTickHtml = `<i data-lucide="check" class="h-3 w-3 text-slate-400 opacity-70" title="Sent"></i>`;
+            const sentTitle = currentUiLanguage === 'ar' ? 'تم الإرسال إلى واتساب ✓' : 'Sent to WhatsApp ✓';
+            statusTickHtml = `<i data-lucide="check" class="h-3 w-3 text-slate-400 opacity-70" title="${sentTitle}"></i>`;
           } else if (msg.status === 'failed') {
-            statusTickHtml = `<i data-lucide="alert-circle" class="h-3 w-3 text-rose-500" title="Failed to deliver"></i>`;
+            const failTitle = currentUiLanguage === 'ar'
+              ? 'فشل التسليم ⚠️ (المريض لم يراسل العيادة خلال 24 ساعة أو تعذر الوصول للرقم)'
+              : 'Failed to deliver ⚠️ (Outside 24h customer window or number unreachable)';
+            statusTickHtml = `<i data-lucide="alert-circle" class="h-3 w-3 text-rose-500" title="${failTitle}"></i>`;
           } else {
-            statusTickHtml = `<i data-lucide="clock" class="h-2.5 w-2.5 text-slate-400 opacity-60" title="Sending..."></i>`;
+            const sendingTitle = currentUiLanguage === 'ar' ? 'جارٍ الإرسال...' : 'Sending...';
+            statusTickHtml = `<i data-lucide="clock" class="h-2.5 w-2.5 text-slate-400 opacity-60" title="${sendingTitle}"></i>`;
           }
         }
 
