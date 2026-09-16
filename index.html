@@ -25940,42 +25940,37 @@
       return patient?.phone || entry?.patientPhone || '';
     }
 
-    function openWhatsAppDefaultMessage(appointmentId) {
-      if (!hasPageAccess('appointments')) return;
-      const entry = appointments.find(appointment => String(appointment.id) === String(appointmentId));
-      if (!entry) return;
-      const templates = availableWhatsAppTemplates('appointment');
-      const defaultTemplate = templates.find(item => item.isDefault) || templates[0];
-      if (defaultTemplate?.id) {
-        sendWhatsAppTemplate(appointmentId, defaultTemplate.id);
-      } else {
-        openWhatsAppCustomMessage(appointmentId);
-      }
-    }
-
     function whatsAppSplitControlMarkup(entry, options = {}) {
       const enabled = Boolean(normaliseWhatsAppPhone(appointmentWhatsAppPhone(entry)));
       const fullWidth = Boolean(options.fullWidth);
+      const dashboardStyle = options.variant === 'dashboard';
       const isAr = currentUiLanguage === 'ar';
       const whatsAppLabel = isAr ? 'واتساب' : 'WhatsApp';
       const defaultLabel = isAr
-        ? `إرسال قالب واتساب إلى ${entry.patient}`
-        : `Send WhatsApp template to ${entry.patient}`;
+        ? `فتح محادثة واتساب فارغة مع ${entry.patient}`
+        : `Open an empty WhatsApp chat with ${entry.patient}`;
       const templateLabel = isAr
         ? `عرض قوالب واتساب المتاحة لـ ${entry.patient}`
         : `Show available WhatsApp templates for ${entry.patient}`;
       const disabledClasses = enabled
-        ? 'border-emerald-700 bg-emerald-600 text-white shadow-sm'
+        ? dashboardStyle
+          ? 'border-emerald-200 bg-emerald-50 text-emerald-700 shadow-xs'
+          : 'border-emerald-700 bg-emerald-600 text-white shadow-sm'
         : 'border-slate-200 bg-slate-100 text-slate-400';
-      const mainButtonClasses = enabled ? 'bg-emerald-600 hover:bg-emerald-700' : 'cursor-not-allowed';
-      const toggleButtonClasses = enabled ? 'bg-emerald-500 hover:bg-emerald-600' : 'cursor-not-allowed';
+      const mainButtonClasses = enabled
+        ? dashboardStyle ? 'hover:bg-emerald-100' : 'bg-emerald-600 hover:bg-emerald-700'
+        : 'cursor-not-allowed';
+      const toggleButtonClasses = enabled
+        ? dashboardStyle ? 'bg-emerald-100/70 hover:bg-emerald-200' : 'bg-emerald-500 hover:bg-emerald-600'
+        : 'cursor-not-allowed';
+      const controlShapeClasses = dashboardStyle ? 'min-h-9 rounded-lg' : 'min-h-10 rounded-xl';
       return `
-        <span dir="ltr" data-whatsapp-split-control class="inline-flex ${fullWidth ? 'w-full' : ''} min-h-10 overflow-hidden rounded-xl border ${disabledClasses}">
-          <button type="button" onclick="openWhatsAppDefaultMessage('${entry.id}')" ${enabled ? '' : 'disabled'} class="inline-flex ${fullWidth ? 'flex-1' : ''} items-center justify-center gap-1.5 px-3 py-2 text-xs font-black transition ${mainButtonClasses}" aria-label="${escapeAppointmentText(defaultLabel)}" title="${escapeAppointmentText(defaultLabel)}">
-            <i data-lucide="message-circle" class="h-4 w-4 shrink-0"></i>
+        <span dir="ltr" data-whatsapp-split-control class="inline-flex ${fullWidth ? 'w-full' : ''} ${controlShapeClasses} overflow-hidden border ${disabledClasses}">
+          <button type="button" onclick="openWhatsAppCustomMessage('${entry.id}')" ${enabled ? '' : 'disabled'} class="inline-flex ${fullWidth ? 'flex-1' : ''} items-center justify-center gap-1.5 px-3 py-2 text-xs font-black transition ${mainButtonClasses}" aria-label="${escapeAppointmentText(defaultLabel)}" title="${escapeAppointmentText(defaultLabel)}">
+            <i data-lucide="message-circle" class="${dashboardStyle ? 'h-3.5 w-3.5' : 'h-4 w-4'} shrink-0"></i>
             <span>${whatsAppLabel}</span>
           </button>
-          <button type="button" data-whatsapp-template-toggle data-whatsapp-appointment-id="${escapeAppointmentText(entry.id)}" onclick="openWhatsAppTemplatePicker('${entry.id}', this)" ${enabled ? '' : 'disabled'} class="inline-flex w-9 shrink-0 items-center justify-center border-l ${enabled ? 'border-emerald-400/80' : 'border-slate-200'} transition ${toggleButtonClasses}" aria-haspopup="menu" aria-controls="whatsapp-template-dropdown" aria-expanded="false" aria-label="${escapeAppointmentText(templateLabel)}" title="${escapeAppointmentText(templateLabel)}">
+          <button type="button" data-whatsapp-template-toggle data-whatsapp-appointment-id="${escapeAppointmentText(entry.id)}" onclick="openWhatsAppTemplatePicker('${entry.id}', this)" ${enabled ? '' : 'disabled'} class="inline-flex ${dashboardStyle ? 'w-8' : 'w-9'} shrink-0 items-center justify-center border-l ${enabled ? dashboardStyle ? 'border-emerald-200' : 'border-emerald-400/80' : 'border-slate-200'} transition ${toggleButtonClasses}" aria-haspopup="menu" aria-controls="whatsapp-template-dropdown" aria-expanded="false" aria-label="${escapeAppointmentText(templateLabel)}" title="${escapeAppointmentText(templateLabel)}">
             <i data-lucide="chevron-down" class="h-4 w-4 shrink-0"></i>
           </button>
         </span>`;
@@ -26481,7 +26476,7 @@
                   <a href="tel:${escapeAppointmentText(callPhone)}" class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-100">
                     <i data-lucide="phone-call" class="h-3.5 w-3.5"></i> Call
                   </a>
-                  ${whatsappPhone ? whatsAppSplitControlMarkup(entry) : ''}
+                  ${whatsappPhone ? whatsAppSplitControlMarkup(entry, { variant: 'dashboard' }) : ''}
                 ` : `
                   <span class="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-400">
                     <i data-lucide="phone-off" class="h-3.5 w-3.5"></i> No phone number
