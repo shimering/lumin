@@ -1418,8 +1418,109 @@
       position: absolute;
       left: 0;
       right: 0;
-      border-top: 1px solid rgba(148, 163, 184, 0.16);
+      border-top: 1px solid rgba(148, 163, 184, 0.14);
       pointer-events: none;
+    }
+    .appointment-subgrid-line[style*="50%"] {
+      border-top: 1px dashed rgba(148, 163, 184, 0.32);
+    }
+    [data-day-hour-line],
+    [data-week-hour-line] {
+      border-top: 1.5px solid #cbd5e1 !important;
+    }
+    .appointment-off-hours-block {
+      position: absolute;
+      left: 0;
+      right: 0;
+      background: repeating-linear-gradient(
+        -45deg,
+        rgba(241, 245, 249, 0.82),
+        rgba(241, 245, 249, 0.82) 12px,
+        rgba(226, 232, 240, 0.45) 12px,
+        rgba(226, 232, 240, 0.45) 24px
+      );
+      border-top: 1px dashed #cbd5e1;
+      border-bottom: 1px dashed #cbd5e1;
+      pointer-events: none;
+      z-index: 1;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    .appointment-off-hours-block.is-full-day {
+      background: repeating-linear-gradient(
+        -45deg,
+        rgba(241, 245, 249, 0.9),
+        rgba(241, 245, 249, 0.9) 12px,
+        rgba(226, 232, 240, 0.6) 12px,
+        rgba(226, 232, 240, 0.6) 24px
+      );
+    }
+    .appointment-week-off-hours {
+      border-left: 1px dashed rgba(203, 213, 225, 0.6);
+      border-right: 1px dashed rgba(203, 213, 225, 0.6);
+    }
+    .appointment-off-hours-label {
+      position: sticky;
+      top: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      margin: 4px 6px;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      border: 1px solid #e2e8f0;
+      font-size: 10px;
+      font-weight: 700;
+      color: #64748b;
+      line-height: 1.2;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+      pointer-events: none;
+      max-width: calc(100% - 12px);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .appointment-week-off-hours-label {
+      font-size: 9px;
+      padding: 1.5px 5px;
+      margin: 3px 4px;
+    }
+    .dark .appointment-off-hours-block {
+      background: repeating-linear-gradient(
+        -45deg,
+        rgba(15, 23, 42, 0.65),
+        rgba(15, 23, 42, 0.65) 12px,
+        rgba(30, 41, 59, 0.45) 12px,
+        rgba(30, 41, 59, 0.45) 24px
+      );
+      border-top-color: #334155;
+      border-bottom-color: #334155;
+    }
+    .dark .appointment-off-hours-block.is-full-day {
+      background: repeating-linear-gradient(
+        -45deg,
+        rgba(15, 23, 42, 0.78),
+        rgba(15, 23, 42, 0.78) 12px,
+        rgba(30, 41, 59, 0.58) 12px,
+        rgba(30, 41, 59, 0.58) 24px
+      );
+    }
+    .dark .appointment-off-hours-label {
+      background: rgba(15, 23, 42, 0.88);
+      border-color: #334155;
+      color: #94a3b8;
+    }
+    .dark [data-day-hour-line],
+    .dark [data-week-hour-line] {
+      border-top-color: #334155 !important;
+    }
+    .dark .appointment-time-column-label {
+      background: #1e293b !important;
+      border-color: #334155 !important;
+      color: #cbd5e1 !important;
     }
     [data-appointment-schedule-fields] input,
     [data-appointment-schedule-fields] select {
@@ -1550,6 +1651,13 @@
       gap: 0.1rem;
       line-height: 1.1;
       white-space: nowrap;
+      font-weight: 800;
+      color: #334155;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 2px 4px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
     }
     .appointment-time-period { font-size: 0.85em; }
     .appointment-week-day-column {
@@ -2058,16 +2166,131 @@
         margin-inline: 0;
         padding-inline: 0.75rem;
       }
+      #mobile-header-trigger,
+      #mobile-header-backdrop,
+      #btn-header-collapse {
+        display: none !important;
+      }
     }
 
     @media (max-width: 1023px) {
       :root { --mobile-nav-height: max(5.5rem, calc(4.75rem + env(safe-area-inset-bottom))); }
       #app-shell { padding-bottom: var(--mobile-nav-height); }
-      #app-header-inner { height: 3.75rem; padding-inline: 0.75rem; }
+
+      /* Reclaim top space: All pages expand to fill the top space on mobile */
+      #app-main {
+        padding-top: max(0.5rem, env(safe-area-inset-top)) !important;
+        padding-inline: 0.75rem !important;
+      }
+
+      /* Mobile Title Bar Overlay (iOS 26 Floating Liquid Glass) */
+      #app-header {
+        position: fixed !important;
+        z-index: 40 !important;
+        top: max(0.5rem, env(safe-area-inset-top)) !important;
+        left: 0.75rem !important;
+        right: 0.75rem !important;
+        width: auto !important;
+        max-width: 34rem !important;
+        margin: 0 auto !important;
+        border-radius: 1.25rem !important;
+        background: rgba(255, 255, 255, 0.90) !important;
+        -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+        backdrop-filter: blur(24px) saturate(180%) !important;
+        border: 1px solid rgba(255, 255, 255, 0.85) !important;
+        box-shadow: 0 16px 36px -4px rgba(15, 23, 42, 0.16), 0 4px 12px -2px rgba(15, 23, 42, 0.08) !important;
+        transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease !important;
+      }
+
+      #app-header:not(.is-open) {
+        transform: translateY(-130%) !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+      }
+
+      #app-header.is-open {
+        transform: translateY(0) !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+      }
+
+      .dark #app-header {
+        background: rgba(15, 23, 42, 0.90) !important;
+        border-color: rgba(255, 255, 255, 0.12) !important;
+        box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.5) !important;
+      }
+
+      #app-header-inner {
+        height: 3.5rem;
+        padding-inline: 0.75rem;
+        border: none;
+      }
+
       #clinic-brand { min-width: 0; gap: 0.625rem; }
       #clinic-brand-icon { padding: 0.45rem; border-radius: 0.75rem; }
-      #clinic-title { max-width: 45vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.875rem; }
+      #clinic-title { max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.875rem; }
       #clinic-subtitle { display: none; }
+
+      /* Mobile Header Trigger Pill (Dynamic Island style) */
+      #mobile-header-trigger {
+        position: fixed;
+        top: max(0.35rem, env(safe-area-inset-top));
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 38;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        height: 1.75rem;
+        padding: 0 0.65rem;
+        border-radius: 9999px;
+        background: rgba(255, 255, 255, 0.85);
+        -webkit-backdrop-filter: blur(16px) saturate(180%);
+        backdrop-filter: blur(16px) saturate(180%);
+        border: 1px solid rgba(255, 255, 255, 0.75);
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+        font-size: 0.7rem;
+        font-weight: 800;
+        color: #334155;
+        cursor: pointer;
+        user-select: none;
+        transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.18s ease;
+      }
+
+      #mobile-header-trigger:hover {
+        background: rgba(255, 255, 255, 0.95);
+      }
+
+      #mobile-header-trigger:active {
+        transform: translateX(-50%) scale(0.95);
+      }
+
+      #mobile-header-trigger.is-hidden {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateX(-50%) translateY(-10px);
+      }
+
+      .dark #mobile-header-trigger {
+        background: rgba(15, 23, 42, 0.85);
+        border-color: rgba(255, 255, 255, 0.12);
+        color: #cbd5e1;
+      }
+
+      /* Backdrop scrim for tap-outside dismissal */
+      #mobile-header-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 39;
+        background: rgba(15, 23, 42, 0.15);
+        -webkit-backdrop-filter: blur(2px);
+        backdrop-filter: blur(2px);
+        transition: opacity 0.2s ease;
+      }
+
+      /* WhatsApp mobile chat mode */
+      body.whatsapp-mobile-chat-open #mobile-header-trigger { display: none !important; }
+      body.whatsapp-mobile-chat-open #mobile-header-backdrop { display: none !important; }
 
       /* iOS 26 / visionOS Floating Liquid Glass Capsule Navigation Dock */
       #app-primary-nav {
@@ -3722,7 +3945,7 @@
       .wa-settings-primary-button { flex: 1 1 0; }
     }
   </style>
-  <link rel="stylesheet" href="lumin-theme.css?v=12" />
+  <link rel="stylesheet" href="lumin-theme.css?v=13" />
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 font-sans antialiased selection:bg-blue-100">
 
@@ -3907,7 +4130,15 @@
 
   <div id="app-shell" class="hidden">
 
-  <div id="appointment-notification-toasts" class="pointer-events-none fixed right-4 top-20 z-[70] flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-2" aria-live="polite" aria-atomic="false"></div>
+  <!-- Mobile Header Backdrop (tap-outside dismissal) -->
+  <div id="mobile-header-backdrop" class="fixed inset-0 z-39 hidden bg-slate-900/15 backdrop-blur-[2px] transition-opacity lg:hidden" onclick="closeMobileHeaderOverlay()" aria-hidden="true"></div>
+
+  <!-- Mobile Header Trigger Pill (Dynamic Island style) -->
+  <button id="mobile-header-trigger" type="button" onclick="toggleMobileHeaderOverlay()" aria-expanded="false" aria-label="Open clinic menu" class="lg:hidden">
+    <i data-lucide="stethoscope" class="w-3.5 h-3.5 text-blue-600"></i>
+    <span id="mobile-header-trigger-label" class="tracking-tight">Lumin</span>
+    <i data-lucide="chevron-down" class="w-3 h-3 text-slate-400"></i>
+  </button>
 
   <!-- Top Navigation Header -->
   <header id="app-header" class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
@@ -3970,6 +4201,9 @@
         <button id="btn-logout" type="button" onclick="handleLogout()" class="rounded-lg border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800" aria-label="Sign out">
           <i data-lucide="log-out" class="h-4 w-4"></i>
           <span class="app-rail-label hidden">Sign out</span>
+        </button>
+        <button id="btn-header-collapse" type="button" onclick="closeMobileHeaderOverlay()" aria-label="Collapse header" title="Collapse header" class="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800 lg:hidden">
+          <i data-lucide="chevron-up" class="h-4 w-4"></i>
         </button>
       </div>
     </div>
@@ -5057,7 +5291,12 @@
       <div data-compact-appointments-header class="app-page-bar flex items-center justify-between">
         <div class="app-page-heading"><span class="app-page-icon" aria-hidden="true"><i data-lucide="calendar-days"></i></span><h2 class="app-page-title">Appointments</h2></div>
         <div class="flex shrink-0 items-center gap-1.5">
-          <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-600" title="Switch between your assigned appointments and the full clinic schedule">
+          <div id="appointment-doctor-filter-wrap" class="relative inline-flex items-center">
+            <select id="appointment-doctor-filter" onchange="setAppointmentDoctorFilter(this.value)" aria-label="Filter appointments by doctor" class="min-w-0 max-w-[130px] sm:max-w-none rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="all">All doctors</option>
+            </select>
+          </div>
+          <label id="appointment-mine-only-toggle-wrap" class="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-600" title="Switch between your assigned appointments and the full clinic schedule">
             <span class="sm:hidden">Mine</span><span class="hidden sm:inline">My appointments only</span>
             <span class="relative inline-flex items-center">
               <input id="appointment-mine-only-toggle" type="checkbox" onchange="setAppointmentMineOnly(this.checked)" class="peer sr-only" />
@@ -7840,7 +8079,11 @@
     let chartDoctorsLoaded = false;
     let chartDoctorsLoadPromise = null;
     let appointmentCalendarMode = 'day';
+    let appointmentDoctorFilter = 'all';
     let appointmentShowMineOnly = false;
+    let doctorWorkingSchedules = new Map();
+    let doctorWorkingSchedulesLoaded = false;
+    let doctorWorkingSchedulesLoadPromise = null;
     let appointmentWeekNavigationDirection = 0;
     let selectedAppointmentId = null;
     let editingAppointmentId = null;
@@ -8930,6 +9173,8 @@
       if (viewPricesEl) viewPricesEl.setAttribute('dir', pricesPageLanguage === 'ar' ? 'rtl' : 'ltr');
       const languageToggle = document.getElementById('settings-language-toggle');
       if (languageToggle) languageToggle.checked = isArabic;
+      const mobileTriggerLabel = document.getElementById('mobile-header-trigger-label');
+      if (mobileTriggerLabel) mobileTriggerLabel.textContent = isArabic ? 'لومين' : 'Lumin';
       configureAppointmentFormatters();
       appointments = appointments.map(entry => ({
         ...entry,
@@ -9340,12 +9585,66 @@
           }
         }
       }
+      if (!isMobile && mobileHeaderOverlayOpen) {
+        closeMobileHeaderOverlay();
+      }
     }
     window.addEventListener('resize', syncNavMountLocation, { passive: true });
     window.addEventListener('orientationchange', syncNavMountLocation, { passive: true });
 
+    let mobileHeaderOverlayOpen = false;
+
+    function openMobileHeaderOverlay() {
+      const header = document.getElementById('app-header');
+      const trigger = document.getElementById('mobile-header-trigger');
+      const backdrop = document.getElementById('mobile-header-backdrop');
+      if (!header) return;
+      mobileHeaderOverlayOpen = true;
+      header.classList.add('is-open');
+      if (trigger) {
+        trigger.classList.add('is-hidden');
+        trigger.setAttribute('aria-expanded', 'true');
+      }
+      if (backdrop) backdrop.classList.remove('hidden');
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function closeMobileHeaderOverlay() {
+      const header = document.getElementById('app-header');
+      const trigger = document.getElementById('mobile-header-trigger');
+      const backdrop = document.getElementById('mobile-header-backdrop');
+      if (!header) return;
+      mobileHeaderOverlayOpen = false;
+      header.classList.remove('is-open');
+      if (trigger) {
+        trigger.classList.remove('is-hidden');
+        trigger.setAttribute('aria-expanded', 'false');
+      }
+      if (backdrop) backdrop.classList.add('hidden');
+    }
+
+    function toggleMobileHeaderOverlay() {
+      if (mobileHeaderOverlayOpen) {
+        closeMobileHeaderOverlay();
+      } else {
+        openMobileHeaderOverlay();
+      }
+    }
+
+    window.addEventListener('scroll', () => {
+      if (mobileHeaderOverlayOpen) closeMobileHeaderOverlay();
+    }, { passive: true });
+
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && mobileHeaderOverlayOpen) {
+        closeMobileHeaderOverlay();
+      }
+    });
+
     function renderAuthorizedNavigation() {
       syncNavMountLocation();
+      const mobileTriggerLabel = document.getElementById('mobile-header-trigger-label');
+      if (mobileTriggerLabel) mobileTriggerLabel.textContent = currentUiLanguage === 'ar' ? 'لومين' : 'Lumin';
       document.getElementById('nav-btn-dashboard').classList.toggle('hidden', !hasPageAccess('dashboard'));
       ['patients', 'appointments'].forEach(pageKey => {
         document.getElementById(`nav-btn-${pageKey}`).classList.toggle('hidden', !hasPageAccess(pageKey));
@@ -9984,6 +10283,9 @@
         whatsappTemplatePickerScope = null;
         whatsappTemplatePickerRequestId += 1;
         appointmentShowMineOnly = false;
+        appointmentDoctorFilter = 'all';
+        doctorWorkingSchedules.clear();
+        doctorWorkingSchedulesLoaded = false;
         dashboardSelectedDate = new Date(appointmentToday);
         dashboardDoctorFilter = 'all';
         expandedDashboardAppointmentId = null;
@@ -10008,6 +10310,9 @@
         syncUiThemeFromSession(session);
         void refreshUiThemePreference();
         appointmentShowMineOnly = false;
+        appointmentDoctorFilter = 'all';
+        doctorWorkingSchedules.clear();
+        doctorWorkingSchedulesLoaded = false;
         dashboardSelectedDate = new Date(appointmentToday);
         dashboardDoctorFilter = 'all';
         expandedDashboardAppointmentId = null;
@@ -14397,6 +14702,8 @@
         const { data, error: reloadError } = await db.from('hr_staff_settings').select('user_id, attendance_enabled, regular_shift_rate, extra_shift_rate, weekly_schedule, updated_at');
         if (reloadError) throw reloadError;
         hrStaffSettings = data || [];
+        doctorWorkingSchedulesLoaded = false;
+        void ensureDoctorWorkingSchedulesLoaded();
         renderAdminHrStaffSettings();
         closeHrStaffSettingsModal();
       } catch (error) {
@@ -16795,6 +17102,7 @@
     async function ensureAppointmentsLoaded() {
       if (appointmentsLoaded) {
         if (!appointmentVisitTypesLoaded) await ensureAppointmentVisitTypesLoaded();
+        if (!doctorWorkingSchedulesLoaded) await ensureDoctorWorkingSchedulesLoaded();
         return true;
       }
       if (!currentSession || !hasPageAccess('appointments')) return false;
@@ -16802,7 +17110,8 @@
         appointmentsLoadPromise = (async () => {
           await Promise.all([
             appointmentStaffLoaded ? true : ensureAppointmentStaffLoaded(),
-            ensureAppointmentVisitTypesLoaded()
+            ensureAppointmentVisitTypesLoaded(),
+            ensureDoctorWorkingSchedulesLoaded()
           ]);
           return fetchAppointmentsFromDB({ refreshStaff: false });
         })().finally(() => { appointmentsLoadPromise = null; });
@@ -23722,6 +24031,7 @@
     }
 
     async function switchView(viewName) {
+      closeMobileHeaderOverlay();
       closeWhatsAppTemplatePicker();
       if (['finances', 'analytics', 'hr', 'implants'].includes(viewName)) {
         activeClinicManagementTab = viewName;
@@ -23953,6 +24263,7 @@
 
     function openNewPatientModal(options = {}) {
       if (!hasPageAccess('patients')) return;
+      closeMobileHeaderOverlay();
       const fromAppointment = Boolean(options.fromAppointment);
       patientModalReturnToAppointment = fromAppointment;
       editingPatientId = null;
@@ -26568,12 +26879,196 @@
     }
 
     function appointmentsForDate(date) {
+      const activeDoctorId = normaliseAppointmentDoctorFilter(appointmentDoctorFilter);
       return appointments
         .filter(appointment =>
           appointment.date === appointmentDateKey(date)
-          && (!appointmentShowMineOnly || appointment.assignedUserId === currentUserAccess?.userId)
+          && (activeDoctorId === 'all' || appointment.assignedUserId === activeDoctorId)
         )
         .sort((left, right) => new Date(left.startAt) - new Date(right.startAt));
+    }
+
+    async function ensureDoctorWorkingSchedulesLoaded() {
+      if (doctorWorkingSchedulesLoaded) return true;
+      if (!currentSession) return false;
+      if (!doctorWorkingSchedulesLoadPromise) {
+        doctorWorkingSchedulesLoadPromise = (async () => {
+          try {
+            const { data, error } = await db.rpc('get_doctor_working_schedules');
+            if (error) throw error;
+            doctorWorkingSchedules.clear();
+            (data || []).forEach(row => {
+              if (row.user_id && row.weekly_schedule) {
+                doctorWorkingSchedules.set(row.user_id, normaliseHrSchedule(row.weekly_schedule));
+              }
+            });
+            doctorWorkingSchedulesLoaded = true;
+          } catch (err) {
+            console.warn('Failed to load doctor working schedules via RPC:', err);
+            if (currentUserAccess?.userId && typeof hrSettingsForUser === 'function') {
+              const myHr = hrSettingsForUser(currentUserAccess.userId);
+              if (myHr?.weekly_schedule) {
+                doctorWorkingSchedules.set(currentUserAccess.userId, normaliseHrSchedule(myHr.weekly_schedule));
+              }
+            }
+          }
+        })().finally(() => {
+          doctorWorkingSchedulesLoadPromise = null;
+        });
+      }
+      return doctorWorkingSchedulesLoadPromise;
+    }
+
+    function mergeWorkingIntervals(intervals) {
+      if (!intervals || !intervals.length) return [];
+      const sorted = [...intervals].sort((a, b) => a.start - b.start);
+      const merged = [{ start: sorted[0].start, end: sorted[0].end }];
+      for (let i = 1; i < sorted.length; i++) {
+        const current = sorted[i];
+        const prev = merged[merged.length - 1];
+        if (current.start <= prev.end) {
+          prev.end = Math.max(prev.end, current.end);
+        } else {
+          merged.push({ start: current.start, end: current.end });
+        }
+      }
+      return merged;
+    }
+
+    function getNonWorkingIntervals(workingIntervals) {
+      const merged = mergeWorkingIntervals(workingIntervals);
+      if (!merged.length) {
+        return [{ start: 0, end: 1440, isFullDay: true }];
+      }
+      const nonWorking = [];
+      let currentCursor = 0;
+      for (const interval of merged) {
+        if (interval.start > currentCursor) {
+          nonWorking.push({ start: currentCursor, end: interval.start, isFullDay: false });
+        }
+        currentCursor = Math.max(currentCursor, interval.end);
+      }
+      if (currentCursor < 1440) {
+        nonWorking.push({ start: currentCursor, end: 1440, isFullDay: false });
+      }
+      return nonWorking;
+    }
+
+    function getCalendarDoctorWorkingIntervals(doctorId, date) {
+      const dayOfWeek = date.getDay(); // 0 (Sun) to 6 (Sat)
+      if (!doctorId || doctorId === 'all') {
+        const intervals = [];
+        doctorWorkingSchedules.forEach((schedule) => {
+          if (!schedule || !Array.isArray(schedule.days) || !schedule.days.includes(dayOfWeek)) return;
+          const dayConfig = schedule.daily?.[String(dayOfWeek)] || { start: schedule.start, end: schedule.end };
+          const startParts = String(dayConfig.start || '09:00').split(':').map(Number);
+          const endParts = String(dayConfig.end || '17:00').split(':').map(Number);
+          const startMin = startParts[0] * 60 + (startParts[1] || 0);
+          const endMin = endParts[0] * 60 + (endParts[1] || 0);
+          if (endMin > startMin) {
+            intervals.push({ start: startMin, end: endMin });
+          }
+        });
+        return mergeWorkingIntervals(intervals);
+      }
+
+      let schedule = doctorWorkingSchedules.get(doctorId);
+      if (!schedule && currentUserAccess?.userId === doctorId && typeof hrSettingsForUser === 'function') {
+        const userHr = hrSettingsForUser(doctorId);
+        if (userHr?.weekly_schedule) {
+          schedule = normaliseHrSchedule(userHr.weekly_schedule);
+          doctorWorkingSchedules.set(doctorId, schedule);
+        }
+      }
+      if (!schedule) {
+        return null;
+      }
+
+      if (!schedule.days || !schedule.days.includes(dayOfWeek)) {
+        return [];
+      }
+
+      const dayConfig = schedule.daily?.[String(dayOfWeek)] || { start: schedule.start, end: schedule.end };
+      const startParts = String(dayConfig.start || '09:00').split(':').map(Number);
+      const endParts = String(dayConfig.end || '17:00').split(':').map(Number);
+      const startMin = startParts[0] * 60 + (startParts[1] || 0);
+      const endMin = endParts[0] * 60 + (endParts[1] || 0);
+      if (endMin > startMin) {
+        return [{ start: startMin, end: endMin }];
+      }
+      return [];
+    }
+
+    function getCalendarNonWorkingIntervalsForDate(date, doctorId = null) {
+      if (!doctorWorkingSchedules.size) return [];
+      const activeDoctorId = doctorId !== null ? doctorId : normaliseAppointmentDoctorFilter(appointmentDoctorFilter);
+      const workingIntervals = getCalendarDoctorWorkingIntervals(activeDoctorId, date);
+      if (workingIntervals === null) {
+        return [];
+      }
+      return getNonWorkingIntervals(workingIntervals);
+    }
+
+    function appointmentDoctorOptions() {
+      if (!currentUserAccess?.userId) return [];
+      if (currentUserAccess.isDoctor) {
+        return [{ value: currentUserAccess.userId, label: currentUserAccess.fullName }];
+      }
+      const doctors = new Map();
+      appointmentStaff.filter(staff => staff.canReceiveAppointments).forEach(staff => {
+        doctors.set(staff.userId, { value: staff.userId, label: staff.fullName });
+      });
+      doctorWorkingSchedules.forEach((_, userId) => {
+        if (!doctors.has(userId)) {
+          const staff = appointmentStaff.find(s => s.userId === userId);
+          if (staff) {
+            doctors.set(userId, { value: userId, label: staff.fullName });
+          }
+        }
+      });
+      appointments.forEach(entry => {
+        if (entry.assignedUserId && !doctors.has(entry.assignedUserId)) {
+          doctors.set(entry.assignedUserId, { value: entry.assignedUserId, label: entry.doctor });
+        }
+      });
+      return [...doctors.values()].sort((left, right) => String(left.label).localeCompare(String(right.label)));
+    }
+
+    function normaliseAppointmentDoctorFilter(value) {
+      if (currentUserAccess?.isDoctor) return currentUserAccess.userId;
+      if (appointmentShowMineOnly && currentUserAccess?.userId) return currentUserAccess.userId;
+      return appointmentDoctorOptions().some(option => option.value === value) ? value : 'all';
+    }
+
+    function renderAppointmentDoctorFilter() {
+      const options = appointmentDoctorOptions();
+      appointmentDoctorFilter = normaliseAppointmentDoctorFilter(appointmentDoctorFilter);
+      const select = document.getElementById('appointment-doctor-filter');
+      const wrap = document.getElementById('appointment-doctor-filter-wrap');
+      const mineOnlyWrap = document.getElementById('appointment-mine-only-toggle-wrap');
+      const isDoctor = Boolean(currentUserAccess?.isDoctor);
+
+      if (isDoctor) {
+        if (wrap) wrap.classList.add('hidden');
+        if (mineOnlyWrap) mineOnlyWrap.classList.add('hidden');
+      } else {
+        if (wrap) wrap.classList.remove('hidden');
+        if (mineOnlyWrap) mineOnlyWrap.classList.remove('hidden');
+      }
+
+      if (select) {
+        const allOption = `<option value="all">${currentUiLanguage === 'ar' ? 'كل الأطباء' : 'All doctors'}</option>`;
+        setStableHtml(select, allOption + options.map(option => `<option value="${escapeAppointmentText(option.value)}">${escapeAppointmentText(option.label)}</option>`).join(''));
+        select.value = appointmentDoctorFilter;
+      }
+      return options.find(option => option.value === appointmentDoctorFilter) || null;
+    }
+
+    function setAppointmentDoctorFilter(value) {
+      appointmentDoctorFilter = normaliseAppointmentDoctorFilter(value);
+      appointmentShowMineOnly = (appointmentDoctorFilter !== 'all' && appointmentDoctorFilter === currentUserAccess?.userId);
+      selectedAppointmentId = null;
+      renderAppointments();
     }
 
     function dashboardDoctorOptions() {
@@ -28381,6 +28876,30 @@
           </button>`;
       }).join('');
 
+      const offHoursBlocks = weekDates.flatMap((date, dayIndex) => {
+        const dayIntervals = getCalendarNonWorkingIntervalsForDate(date);
+        const dayWidth = 100 / 7;
+        const left = dayIndex * dayWidth;
+        return dayIntervals.map(interval => {
+          const start = interval.start;
+          const duration = interval.end - interval.start;
+          const top = start / 60 * appointmentWeekHourHeight;
+          const height = duration / 60 * appointmentWeekHourHeight;
+          const fullDayLabel = currentUiLanguage === 'ar' ? 'عطلة' : 'Off day';
+          const offHoursLabel = currentUiLanguage === 'ar' ? 'خارج الدوام' : 'Outside hours';
+          const labelText = interval.isFullDay ? fullDayLabel : offHoursLabel;
+          const showLabel = height >= 28;
+          return `
+            <div data-week-off-hours data-week-day-index="${dayIndex}" data-start-minutes="${start}" data-duration-minutes="${duration}" class="appointment-off-hours-block appointment-week-off-hours ${interval.isFullDay ? 'is-full-day' : ''}" style="top:${top}px;height:${height}px;left:${left}%;width:${dayWidth}%;" aria-hidden="true">
+              ${showLabel ? `
+                <span class="appointment-off-hours-label appointment-week-off-hours-label">
+                  <i data-lucide="${interval.isFullDay ? 'calendar-x' : 'moon'}" class="h-3 w-3 text-slate-400"></i>
+                  <span>${escapeAppointmentText(labelText)}</span>
+                </span>` : ''}
+            </div>`;
+        });
+      }).join('');
+
       timeline.innerHTML = `
         <div class="sticky top-0 z-30 grid h-12 border-b border-slate-200 bg-white/95 shadow-xs backdrop-blur-sm" style="grid-template-columns:3.5rem repeat(7,minmax(0,1fr))">
           <span data-week-time-header class="flex items-center justify-center text-[9px] font-black uppercase tracking-wider text-slate-400">Time</span>
@@ -28392,10 +28911,12 @@
           <div data-week-end-line class="absolute inset-x-0 border-t border-slate-200" style="top:${timelineHeight}px"></div>
           <div data-appointment-week-surface data-week-start-date="${appointmentDateKey(weekDates[0])}" class="appointment-week-surface absolute bottom-0 right-0 top-0 left-[3.5rem]" style="--appointment-week-quarter-hour-height:${appointmentWeekHourHeight / 4}px" title="Press and hold, then drag to select the appointment time and duration" aria-label="Press and hold an empty weekly time, then drag to select the appointment duration">
             ${dayColumns}
+            ${offHoursBlocks}
             ${eventBlocks}
             <div data-appointment-current-time-line data-current-time-mode="week" data-current-week-start="${appointmentDateKey(weekDates[0])}" class="appointment-current-time-line hidden" aria-hidden="true"></div>
           </div>
         </div>`;
+      if (window.lucide) lucide.createIcons();
 
       timeline.querySelectorAll('[data-week-date]').forEach(button => {
         button.addEventListener('click', () => {
@@ -28482,12 +29003,29 @@
         `;
       }).join('');
 
+      const nonWorkingIntervals = getCalendarNonWorkingIntervalsForDate(appointmentSelectedDate);
+      const offHoursBlocks = nonWorkingIntervals.map(interval => {
+        const start = interval.start;
+        const duration = interval.end - interval.start;
+        const top = start / 60 * appointmentDayHourHeight;
+        const height = duration / 60 * appointmentDayHourHeight;
+        const labelText = interval.isFullDay
+          ? (currentUiLanguage === 'ar' ? 'يوم عطلة' : 'Off day')
+          : (currentUiLanguage === 'ar' ? 'خارج ساعات العمل' : 'Outside working hours');
+        const showLabel = height >= 32;
+        return `
+          <div data-day-off-hours data-start-minutes="${start}" data-duration-minutes="${duration}" class="appointment-off-hours-block ${interval.isFullDay ? 'is-full-day' : ''}" style="top:${top}px;height:${height}px" aria-hidden="true">
+            ${showLabel ? `<span class="appointment-off-hours-label"><i data-lucide="${interval.isFullDay ? 'calendar-x' : 'moon'}" class="h-3 w-3 text-slate-400"></i><span>${escapeAppointmentText(labelText)}</span></span>` : ''}
+          </div>`;
+      }).join('');
+
       timeline.style.height = `${timelineHeight}px`;
       timeline.innerHTML = `
         ${hourRows}
         <div data-day-end-line class="absolute inset-x-0 border-t border-slate-200" style="top:${timelineHeight}px"></div>
-        <div data-appointment-slot-surface class="appointment-slot-surface absolute bottom-0 right-3 top-0 left-[3.5rem]" style="--appointment-quarter-hour-height:${appointmentDayHourHeight / 4}px" title="Press and hold, then drag to select the appointment time and duration" aria-label="Press and hold an empty time, then drag to select the appointment duration">${eventBlocks}<div data-appointment-current-time-line data-current-time-mode="day" data-current-date="${dateKey}" class="appointment-current-time-line inset-x-0 hidden" aria-hidden="true"></div></div>
+        <div data-appointment-slot-surface class="appointment-slot-surface absolute bottom-0 right-3 top-0 left-[3.5rem]" style="--appointment-quarter-hour-height:${appointmentDayHourHeight / 4}px" title="Press and hold, then drag to select the appointment time and duration" aria-label="Press and hold an empty time, then drag to select the appointment duration">${offHoursBlocks}${eventBlocks}<div data-appointment-current-time-line data-current-time-mode="day" data-current-date="${dateKey}" class="appointment-current-time-line inset-x-0 hidden" aria-hidden="true"></div></div>
       `;
+      if (window.lucide) lucide.createIcons();
 
       const slotSurface = timeline.querySelector('[data-appointment-slot-surface]');
       slotSurface?.addEventListener('pointerdown', beginAppointmentRangeSelection);
@@ -29588,11 +30126,23 @@
       appointmentVisibleMonth = new Date(appointmentToday.getFullYear(), appointmentToday.getMonth(), 1);
       appointmentWeekNavigationDirection = 0;
       selectedAppointmentId = null;
+      if (!doctorWorkingSchedulesLoaded) {
+        ensureDoctorWorkingSchedulesLoaded().then(() => {
+          if (!document.getElementById('view-appointments')?.classList.contains('hidden')) {
+            renderAppointments();
+          }
+        });
+      }
       return switchView('appointments');
     }
 
     function setAppointmentMineOnly(showMineOnly) {
       appointmentShowMineOnly = Boolean(showMineOnly);
+      if (appointmentShowMineOnly && currentUserAccess?.userId) {
+        appointmentDoctorFilter = currentUserAccess.userId;
+      } else if (!appointmentShowMineOnly && appointmentDoctorFilter === currentUserAccess?.userId) {
+        appointmentDoctorFilter = 'all';
+      }
       selectedAppointmentId = null;
       renderAppointments();
     }
@@ -29688,6 +30238,13 @@
         const currentHeight = Math.max(durationMinutes / 60 * appointmentDayHourHeight, 24);
         block.style.height = `${currentHeight}px`;
         block.style.setProperty('--appointment-card-height', `${currentHeight}px`);
+      });
+      timeline.querySelectorAll('[data-day-off-hours]').forEach(block => {
+        const startMinutes = Number(block.dataset.startMinutes);
+        const durationMinutes = Number(block.dataset.durationMinutes);
+        if (!Number.isFinite(startMinutes) || !Number.isFinite(durationMinutes)) return;
+        block.style.top = `${startMinutes / 60 * appointmentDayHourHeight}px`;
+        block.style.height = `${durationMinutes / 60 * appointmentDayHourHeight}px`;
       });
       scroll.scrollTop = anchoredMinutes / 60 * appointmentDayHourHeight - viewportOffset;
       showAppointmentDayZoomIndicator();
@@ -29868,6 +30425,13 @@
         if (!Number.isFinite(startMinutes) || !Number.isFinite(durationMinutes)) return;
         block.style.top = `${startMinutes / 60 * appointmentWeekHourHeight}px`;
         block.style.height = `${Math.max(durationMinutes / 60 * appointmentWeekHourHeight, 24)}px`;
+      });
+      timeline.querySelectorAll('[data-week-off-hours]').forEach(block => {
+        const startMinutes = Number(block.dataset.startMinutes);
+        const durationMinutes = Number(block.dataset.durationMinutes);
+        if (!Number.isFinite(startMinutes) || !Number.isFinite(durationMinutes)) return;
+        block.style.top = `${startMinutes / 60 * appointmentWeekHourHeight}px`;
+        block.style.height = `${durationMinutes / 60 * appointmentWeekHourHeight}px`;
       });
       scroll.scrollTop = timelineBodyOffset + anchoredMinutes / 60 * appointmentWeekHourHeight - viewportOffset;
       showAppointmentWeekZoomIndicator();
@@ -30407,6 +30971,7 @@
       const showingDay = appointmentCalendarMode === 'day';
       const showingWeek = appointmentCalendarMode === 'week';
       if (mineOnlyToggle) mineOnlyToggle.checked = appointmentShowMineOnly;
+      renderAppointmentDoctorFilter();
       monthView.classList.toggle('hidden', showingDay || showingWeek);
       weekView.classList.toggle('hidden', !showingWeek);
       dayView.classList.toggle('hidden', !showingDay);

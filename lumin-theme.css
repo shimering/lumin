@@ -456,6 +456,16 @@ body.lumin-raised #app-header button:active:not(:disabled) { box-shadow: var(--l
     body.lumin-raised .appointment-week-event > p:first-child {
       margin-bottom: 0.2rem;
     }
+    @media (max-width: 1023px) {
+      body.lumin-raised #mobile-header-trigger {
+        background: var(--lumin-face);
+        box-shadow: var(--lumin-small-raised);
+      }
+      body.lumin-raised #app-header.is-open {
+        background: var(--lumin-face);
+        box-shadow: var(--lumin-raised);
+      }
+    }
     @media (min-width: 1024px) {
       body.lumin-raised #app-header {
         inset-block: 0.5rem;
