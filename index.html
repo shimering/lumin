@@ -1401,14 +1401,25 @@
       touch-action: pan-y;
       user-select: none;
       -webkit-user-select: none;
-      background-image: linear-gradient(
-        to bottom,
-        transparent 0,
-        transparent calc(100% - 1px),
-        rgba(148, 163, 184, 0.16) calc(100% - 1px),
-        rgba(148, 163, 184, 0.16) 100%
-      );
-      background-size: 100% var(--appointment-quarter-hour-height, 16px);
+    }
+    .appointment-day-subgrid,
+    .appointment-week-subgrid {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 3.5rem;
+      right: 0.75rem;
+      pointer-events: none;
+    }
+    .appointment-week-subgrid {
+      right: 0;
+    }
+    .appointment-subgrid-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      border-top: 1px solid rgba(148, 163, 184, 0.16);
+      pointer-events: none;
     }
     [data-appointment-schedule-fields] input,
     [data-appointment-schedule-fields] select {
@@ -1441,7 +1452,9 @@
       font-weight: 800;
       line-height: 1.2;
     }
-    .appointment-day-event:hover { z-index: 20 !important; transform: translateY(-1px); }
+    @media (hover: hover) {
+      .appointment-day-event:hover { z-index: 20 !important; transform: translateY(-1px); }
+    }
     .appointment-day-event.is-popover-anchor {
       z-index: 35 !important;
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2), 0 16px 34px rgba(15, 23, 42, 0.2);
@@ -1512,14 +1525,6 @@
       touch-action: pan-x pan-y;
       user-select: none;
       -webkit-user-select: none;
-      background-image: linear-gradient(
-        to bottom,
-        transparent 0,
-        transparent calc(100% - 1px),
-        rgba(148, 163, 184, 0.13) calc(100% - 1px),
-        rgba(148, 163, 184, 0.13) 100%
-      );
-      background-size: 100% var(--appointment-week-quarter-hour-height, 16px);
     }
     .appointment-week-time-gutter {
       position: absolute;
@@ -2313,7 +2318,8 @@
       #appointments-calendar-grid > button > span:not(:first-child) > span:first-child { display: none; }
       #appointments-day-view > div:first-child { padding: 0.75rem 1rem; }
       #appointments-day-timeline-scroll { height: 30rem; }
-      #appointments-day-timeline > div:last-child { right: 0.35rem !important; left: 3.35rem !important; }
+      #appointments-day-timeline [data-appointment-slot-surface],
+      #appointments-day-timeline .appointment-day-subgrid { right: 0.35rem !important; left: 3.35rem !important; }
       #appointments-day-timeline .appointment-day-event p:not(.appointment-day-patient-name) { font-size: 0.58rem; line-height: 0.78rem; }
       #appointments-day-timeline .appointment-day-event .appointment-day-patient-name {
         font-size: clamp(10px, calc(var(--appointment-card-height, 40px) * 0.07 + 7.5px), 20px);
@@ -28260,8 +28266,13 @@
       }).join('');
 
       const hourRows = Array.from({ length: 24 }, (_, hour) => `
-        <div data-week-hour-line="${hour}" class="absolute inset-x-0 border-t border-slate-200" style="top:${hour * appointmentWeekHourHeight}px">
+        <div data-week-hour-line="${hour}" class="absolute inset-x-0 border-t border-slate-200 pointer-events-none" style="top:${hour * appointmentWeekHourHeight}px;height:${appointmentWeekHourHeight}px">
           <span data-week-time-label class="appointment-time-column-label appointment-week-time-label z-10 -translate-y-1/2 rounded bg-slate-50 px-1.5 text-[10px] font-bold text-slate-400">${appointmentTimeColumnMarkup(hour * 60)}</span>
+          <div class="appointment-week-subgrid">
+            <div class="appointment-subgrid-line" style="top:25%"></div>
+            <div class="appointment-subgrid-line" style="top:50%"></div>
+            <div class="appointment-subgrid-line" style="top:75%"></div>
+          </div>
         </div>
       `).join('');
 
@@ -28359,8 +28370,13 @@
       mobileHeading.textContent = appointmentCompactDayFormatter.format(appointmentSelectedDate);
 
       const hourRows = Array.from({ length: 24 }, (_, hour) => `
-        <div data-day-hour-line="${hour}" class="absolute inset-x-0 border-t border-slate-200" style="top:${hour * appointmentDayHourHeight}px">
+        <div data-day-hour-line="${hour}" class="absolute inset-x-0 border-t border-slate-200 pointer-events-none" style="top:${hour * appointmentDayHourHeight}px;height:${appointmentDayHourHeight}px">
           <span data-day-time-label class="appointment-time-column-label absolute left-0 -translate-y-1/2 rounded bg-slate-50 px-1.5 text-[10px] font-bold text-slate-400">${appointmentTimeColumnMarkup(hour * 60)}</span>
+          <div class="appointment-day-subgrid">
+            <div class="appointment-subgrid-line" style="top:25%"></div>
+            <div class="appointment-subgrid-line" style="top:50%"></div>
+            <div class="appointment-subgrid-line" style="top:75%"></div>
+          </div>
         </div>
       `).join('');
 
@@ -29576,6 +29592,7 @@
       timeline.style.height = `${timelineHeight}px`;
       timeline.querySelectorAll('[data-day-hour-line]').forEach(line => {
         line.style.top = `${Number(line.dataset.dayHourLine) * appointmentDayHourHeight}px`;
+        line.style.height = `${appointmentDayHourHeight}px`;
       });
       const endLine = timeline.querySelector('[data-day-end-line]');
       if (endLine) endLine.style.top = `${timelineHeight}px`;
@@ -29757,6 +29774,7 @@
       timelineBody.style.height = `${timelineHeight}px`;
       timeline.querySelectorAll('[data-week-hour-line]').forEach(line => {
         line.style.top = `${Number(line.dataset.weekHourLine) * appointmentWeekHourHeight}px`;
+        line.style.height = `${appointmentWeekHourHeight}px`;
       });
       const endLine = timeline.querySelector('[data-week-end-line]');
       if (endLine) endLine.style.top = `${timelineHeight}px`;
