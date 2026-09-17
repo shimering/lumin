@@ -105,7 +105,7 @@ body.lumin-raised #btn-new-patient {
       background: linear-gradient(145deg, hsl(var(--lumin-hue) calc(100.0% * var(--lumin-chroma)) 76.3%), hsl(var(--lumin-hue) calc(95.8% * var(--lumin-chroma)) 62.5%) 55%, hsl(var(--lumin-hue) calc(83.5% * var(--lumin-chroma)) 57.3%));
       box-shadow: 0 5px 2px hsl(var(--lumin-hue) calc(79.3% * var(--lumin-chroma)) 71.6% / 0.361), 0 10px 15px hsl(var(--lumin-hue) calc(55.7% * var(--lumin-chroma)) 70.8% / 0.502), -4px -4px 10px #ffffff;
     }
-    body.lumin-raised #app-primary-nav > button,
+    body.lumin-raised #app-primary-nav > button:not(#nav-btn-quick-create),
 body.lumin-raised :is(#btn-current-user, #btn-logout) {
       border: 1px solid #ffffff;
       border-top-width: 2px;
@@ -119,8 +119,25 @@ body.lumin-raised :is(#btn-current-user, #btn-logout) {
       color: #ffffff !important;
       box-shadow: 0 5px 2px hsl(var(--lumin-hue) calc(79.3% * var(--lumin-chroma)) 71.6% / 0.361), 0 10px 15px hsl(var(--lumin-hue) calc(55.7% * var(--lumin-chroma)) 70.8% / 0.502), -4px -4px 10px #ffffff !important;
     }
-    body.lumin-raised #app-primary-nav > button:hover,
-body.lumin-raised :is(#btn-current-user, #btn-logout):hover { color: hsl(var(--lumin-hue) calc(65.6% * var(--lumin-chroma)) 41.0%); }
+    body.lumin-raised #app-primary-nav > button:not(#nav-btn-quick-create):hover,
+    body.lumin-raised :is(#btn-current-user, #btn-logout):hover { color: hsl(var(--lumin-hue) calc(65.6% * var(--lumin-chroma)) 41.0%); }
+    body.lumin-raised #nav-btn-quick-create {
+      border: 2px solid #ffffff !important;
+      background: linear-gradient(145deg, #1d4ed8 0%, #2563eb 55%, #1e40af 100%) !important;
+      color: #ffffff !important;
+      box-shadow: 0 4px 14px -1px rgba(29, 78, 216, 0.55), 0 2px 6px rgba(15, 23, 42, 0.22) !important;
+    }
+    body.lumin-raised #nav-btn-quick-create:hover {
+      background: linear-gradient(145deg, #1e40af 0%, #1d4ed8 55%, #172554 100%) !important;
+      color: #ffffff !important;
+      box-shadow: 0 6px 20px -1px rgba(29, 78, 216, 0.65), 0 2px 8px rgba(15, 23, 42, 0.25) !important;
+    }
+    body.lumin-raised #nav-btn-quick-create svg,
+    body.lumin-raised #nav-btn-quick-create .nav-btn-quick-create-icon {
+      color: #ffffff !important;
+      stroke: #ffffff !important;
+      stroke-width: 2.75px !important;
+    }
     body.lumin-raised #view-dashboard .dashboard-scroll-card,
 body.lumin-raised #view-dashboard #dashboard-attendance-card {
       border: 1px solid #ffffff;
