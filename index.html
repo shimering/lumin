@@ -2061,51 +2061,103 @@
     }
 
     @media (max-width: 1023px) {
-      :root { --mobile-nav-height: max(5.25rem, calc(4.5rem + env(safe-area-inset-bottom))); }
+      :root { --mobile-nav-height: max(5.5rem, calc(4.75rem + env(safe-area-inset-bottom))); }
       #app-shell { padding-bottom: var(--mobile-nav-height); }
       #app-header-inner { height: 3.75rem; padding-inline: 0.75rem; }
       #clinic-brand { min-width: 0; gap: 0.625rem; }
       #clinic-brand-icon { padding: 0.45rem; border-radius: 0.75rem; }
       #clinic-title { max-width: 45vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.875rem; }
       #clinic-subtitle { display: none; }
+
+      /* iOS 26 / visionOS Floating Liquid Glass Capsule Navigation Dock */
       #app-primary-nav {
         position: fixed;
-        z-index: 60;
-        right: 0;
-        bottom: 0;
-        left: 0;
+        z-index: 45;
+        bottom: max(0.85rem, env(safe-area-inset-bottom));
+        left: 50%;
+        transform: translateX(-50%);
+        right: auto;
         display: flex;
-        align-items: stretch;
-        gap: 0.125rem;
-        width: 100%;
+        align-items: center;
+        justify-content: space-around;
+        gap: 0.25rem;
+        width: calc(100% - 1.5rem);
+        max-width: 29rem;
         min-width: 0;
-        padding: 0.375rem max(0.375rem, env(safe-area-inset-right)) max(1.25rem, calc(0.375rem + env(safe-area-inset-bottom))) max(0.375rem, env(safe-area-inset-left));
-        overflow-x: auto;
-        border: 0;
-        border-top: 1px solid #e2e8f0;
-        border-radius: 0;
-        background: rgba(255, 255, 255, 0.97);
-        box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.08);
-        backdrop-filter: blur(14px);
+        margin: 0 auto;
+        padding: 0.35rem 0.5rem;
+        border-radius: 9999px;
+        background: rgba(255, 255, 255, 0.76);
+        -webkit-backdrop-filter: blur(24px) saturate(180%);
+        backdrop-filter: blur(24px) saturate(180%);
+        border: 1px solid rgba(255, 255, 255, 0.65);
+        box-shadow: 0 16px 36px -4px rgba(15, 23, 42, 0.16), 0 4px 12px -2px rgba(15, 23, 42, 0.08), inset 0 1px 1px 0 rgba(255, 255, 255, 0.85);
+        overflow: visible;
+        pointer-events: auto;
+        user-select: none;
       }
       #app-primary-nav > button {
-        flex: 1 0 3.5rem;
-        min-width: 3.5rem;
-        min-height: 3.5rem;
-        flex-direction: column;
+        position: relative;
+        display: flex;
+        align-items: center;
         justify-content: center;
-        gap: 0.2rem;
-        padding: 0.35rem 0.2rem;
-        border-radius: 0.75rem;
-        font-size: 0.58rem;
-        line-height: 0.7rem;
-        text-align: center;
-        overflow: hidden;
-        white-space: normal;
+        width: clamp(2.35rem, 11vw, 2.75rem);
+        height: clamp(2.35rem, 11vw, 2.75rem);
+        min-width: clamp(2.35rem, 11vw, 2.75rem);
+        min-height: clamp(2.35rem, 11vw, 2.75rem);
+        flex: 0 0 auto;
+        padding: 0 !important;
+        border: 0 !important;
+        border-radius: 9999px !important;
+        background: transparent !important;
+        color: #64748b;
+        box-shadow: none !important;
+        font-size: 0 !important;
+        line-height: 0 !important;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
       }
-      #app-primary-nav > button.hidden { display: none; }
-      #app-primary-nav > button.text-blue-700 { background: #eff6ff !important; color: #1d4ed8 !important; box-shadow: none !important; }
-      #app-primary-nav svg { width: 1.2rem; height: 1.2rem; }
+      #app-primary-nav > button:hover {
+        color: #1e293b;
+        background: rgba(0, 0, 0, 0.05) !important;
+      }
+      #app-primary-nav > button:active {
+        transform: scale(0.92);
+      }
+      /* Active circular blue highlight disk matching iOS 26 reference design */
+      #app-primary-nav > button[aria-current="page"],
+      #app-primary-nav > button.text-blue-700 {
+        background: linear-gradient(145deg, #2563eb, #1d4ed8) !important;
+        color: #ffffff !important;
+        border-radius: 9999px !important;
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.42), inset 0 1px 1px rgba(255, 255, 255, 0.35) !important;
+        transform: scale(1.06);
+      }
+      #app-primary-nav > button[aria-current="page"]:active,
+      #app-primary-nav > button.text-blue-700:active {
+        transform: scale(0.98);
+      }
+      #app-primary-nav > button.hidden {
+        display: none !important;
+      }
+      #app-primary-nav svg {
+        width: 1.25rem;
+        height: 1.25rem;
+        flex-shrink: 0;
+        transition: transform 160ms ease;
+      }
+      #app-primary-nav > button[aria-current="page"] svg,
+      #app-primary-nav > button.text-blue-700 svg {
+        filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+      }
+      #app-primary-nav .app-nav-label {
+        display: none !important;
+      }
+      #app-primary-nav #nav-whatsapp-unread-badge {
+        inset-block-start: 0.1rem;
+        inset-inline-end: 0.15rem;
+      }
       #app-user-actions { gap: 0.375rem; }
       #btn-new-patient,
       #btn-install-app { width: 2.5rem; height: 2.5rem; justify-content: center; padding: 0; }
@@ -2454,7 +2506,9 @@
 
     @media (max-width: 420px) {
       #clinic-title { max-width: 42vw; }
-      #app-primary-nav > button { flex-basis: 3.25rem; min-width: 3.25rem; font-size: 0.54rem; }
+      #app-primary-nav { width: calc(100% - 1rem); padding: 0.3rem 0.35rem; gap: 0.15rem; }
+      #app-primary-nav > button { width: clamp(2.2rem, 10.5vw, 2.5rem); height: clamp(2.2rem, 10.5vw, 2.5rem); min-width: clamp(2.2rem, 10.5vw, 2.5rem); min-height: clamp(2.2rem, 10.5vw, 2.5rem); }
+      #app-primary-nav svg { width: 1.15rem; height: 1.15rem; }
       #dashboard-appointments-list article { grid-template-columns: 3.25rem 0.2rem minmax(0, 1fr); gap: 0.55rem; }
       #dashboard-appointments-list article h4 { font-size: 0.9rem; }
       #appointments-calendar-grid > button { min-height: 4.9rem !important; }
@@ -3668,7 +3722,7 @@
       .wa-settings-primary-button { flex: 1 1 0; }
     }
   </style>
-  <link rel="stylesheet" href="lumin-theme.css?v=11" />
+  <link rel="stylesheet" href="lumin-theme.css?v=12" />
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 font-sans antialiased selection:bg-blue-100">
 
@@ -3870,29 +3924,29 @@
 
       <!-- Navigation Tabs -->
       <nav id="app-primary-nav" aria-label="Main navigation" class="flex items-center gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
-        <button id="nav-btn-dashboard" onclick="switchView('dashboard')" class="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition bg-white text-blue-700 shadow-xs" aria-label="Dashboard">
+        <button id="nav-btn-dashboard" onclick="switchView('dashboard')" class="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition bg-white text-blue-700 shadow-xs" aria-label="Dashboard" title="Dashboard">
           <i data-lucide="layout-dashboard" class="w-4 h-4"></i><span class="app-nav-label">Dashboard</span>
         </button>
-        <button id="nav-btn-patients" onclick="switchView('patients')" class="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900" aria-label="Patients">
+        <button id="nav-btn-patients" onclick="switchView('patients')" class="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900" aria-label="Patients" title="Patients">
           <i data-lucide="users" class="w-4 h-4"></i><span class="app-nav-label">Patients</span>
         </button>
-        <button id="nav-btn-appointments" onclick="openAppointmentsView()" class="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900" aria-label="Appointments">
+        <button id="nav-btn-appointments" onclick="openAppointmentsView()" class="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900" aria-label="Appointments" title="Appointments">
           <i data-lucide="calendar-days" class="w-4 h-4"></i><span class="app-nav-label">Appointments</span>
         </button>
-        <button id="nav-btn-whatsapp" onclick="switchView('whatsapp')" class="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900" aria-label="WhatsApp">
+        <button id="nav-btn-whatsapp" onclick="switchView('whatsapp')" class="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900" aria-label="WhatsApp" title="WhatsApp">
           <i data-lucide="message-circle" class="w-4 h-4"></i><span class="app-nav-label">WhatsApp</span>
           <span id="nav-whatsapp-unread-badge" class="hidden rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-black text-white"></span>
         </button>
-        <button id="nav-btn-clinic-management" onclick="switchView('clinic-management')" class="hidden flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900" aria-label="Clinic Management">
+        <button id="nav-btn-clinic-management" onclick="switchView('clinic-management')" class="hidden flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900" aria-label="Clinic Management" title="Clinic Management">
           <i data-lucide="building-2" class="w-4 h-4"></i><span class="app-nav-label">Clinic Management</span>
         </button>
-        <button id="nav-btn-prices" onclick="switchView('prices')" class="hidden flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900" aria-label="Prices">
+        <button id="nav-btn-prices" onclick="switchView('prices')" class="hidden flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900" aria-label="Prices" title="Prices">
           <i data-lucide="badge-dollar-sign" class="w-4 h-4"></i><span class="app-nav-label">Prices</span>
         </button>
-        <button id="nav-btn-admin" onclick="switchView('admin')" class="hidden flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900" aria-label="Admin">
+        <button id="nav-btn-admin" onclick="switchView('admin')" class="hidden flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900" aria-label="Admin" title="Admin">
           <i data-lucide="shield-check" class="w-4 h-4"></i><span class="app-nav-label">Admin</span>
         </button>
-        <button id="nav-btn-settings" onclick="switchView('settings')" class="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900" aria-label="My Settings">
+        <button id="nav-btn-settings" onclick="switchView('settings')" class="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900" aria-label="My Settings" title="My Settings">
           <i data-lucide="settings" class="w-4 h-4"></i><span class="app-nav-label">My Settings</span>
         </button>
       </nav>
@@ -9264,7 +9318,34 @@
       return null;
     }
 
+    function syncNavMountLocation() {
+      const nav = document.getElementById('app-primary-nav');
+      const header = document.getElementById('app-header');
+      const headerInner = document.getElementById('app-header-inner');
+      const appShell = document.getElementById('app-shell');
+      if (!nav || !headerInner || !appShell || !header) return;
+
+      const isMobile = window.matchMedia('(max-width: 1023px)').matches;
+      if (isMobile) {
+        if (nav.parentElement !== appShell) {
+          header.insertAdjacentElement('afterend', nav);
+        }
+      } else {
+        if (nav.parentElement !== headerInner) {
+          const userActions = document.getElementById('app-user-actions');
+          if (userActions) {
+            headerInner.insertBefore(nav, userActions);
+          } else {
+            headerInner.appendChild(nav);
+          }
+        }
+      }
+    }
+    window.addEventListener('resize', syncNavMountLocation, { passive: true });
+    window.addEventListener('orientationchange', syncNavMountLocation, { passive: true });
+
     function renderAuthorizedNavigation() {
+      syncNavMountLocation();
       document.getElementById('nav-btn-dashboard').classList.toggle('hidden', !hasPageAccess('dashboard'));
       ['patients', 'appointments'].forEach(pageKey => {
         document.getElementById(`nav-btn-${pageKey}`).classList.toggle('hidden', !hasPageAccess(pageKey));
@@ -23686,6 +23767,7 @@
           btn.removeAttribute('aria-current');
         }
       }
+      syncNavMountLocation();
       window.location.hash = viewName;
       document.body.classList.toggle('whatsapp-view-active', viewName === 'whatsapp');
 
@@ -32794,6 +32876,7 @@
 
     // Startup Initialization
     window.addEventListener('DOMContentLoaded', async () => {
+      syncNavMountLocation();
       postToLuminHost({ type: 'lumin:request-host-state' });
       startUiTranslationObserver();
       setupAppointmentDaySwipeNavigation();
