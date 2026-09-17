@@ -2872,29 +2872,53 @@
       flex: 1 1 0% !important;
     }
     .whatsapp-conv-item {
-      transition: background-color 150ms ease;
+      transition: all 160ms cubic-bezier(0.4, 0, 0.2, 1);
+      border: 1px solid transparent;
+    }
+    .whatsapp-conv-item:hover {
+      background-color: #ffffff;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
     }
     .whatsapp-conv-item.active {
-      background-color: #ecfdf5 !important;
-      border-color: #a7f3d0 !important;
+      background-color: #ffffff !important;
+      border-color: rgba(16, 185, 129, 0.4) !important;
+      box-shadow: 0 4px 16px rgba(5, 150, 105, 0.1), 0 1px 3px rgba(0, 0, 0, 0.04) !important;
     }
     .whatsapp-bubble-patient {
       background-color: #ffffff;
-      border: 1px solid #e2e8f0;
-      color: #1e293b;
-      border-bottom-left-radius: 4px;
+      border: 1px solid rgba(226, 232, 240, 0.85);
+      color: #0f172a;
+      border-radius: 1.25rem;
+      border-bottom-left-radius: 0.25rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+    html[dir="rtl"] .whatsapp-bubble-patient {
+      border-bottom-left-radius: 1.25rem;
+      border-bottom-right-radius: 0.25rem;
     }
     .whatsapp-bubble-ai {
-      background-color: #f5f3ff;
-      border: 1px solid #ede9fe;
+      background: linear-gradient(135deg, #fbfaff 0%, #f5f3ff 100%);
+      border: 1px solid rgba(196, 181, 253, 0.65);
       color: #1e1b4b;
-      border-bottom-right-radius: 4px;
+      border-radius: 1.25rem;
+      border-bottom-right-radius: 0.25rem;
+      box-shadow: 0 2px 10px rgba(124, 58, 237, 0.06);
+    }
+    html[dir="rtl"] .whatsapp-bubble-ai {
+      border-bottom-right-radius: 1.25rem;
+      border-bottom-left-radius: 0.25rem;
     }
     .whatsapp-bubble-staff {
-      background-color: #ecfdf5;
-      border: 1px solid #a7f3d0;
+      background: linear-gradient(135deg, #f6fef9 0%, #ecfdf5 100%);
+      border: 1px solid rgba(167, 243, 208, 0.85);
       color: #064e3b;
-      border-bottom-right-radius: 4px;
+      border-radius: 1.25rem;
+      border-bottom-right-radius: 0.25rem;
+      box-shadow: 0 2px 10px rgba(5, 150, 105, 0.06);
+    }
+    html[dir="rtl"] .whatsapp-bubble-staff {
+      border-bottom-right-radius: 1.25rem;
+      border-bottom-left-radius: 0.25rem;
     }
     .whatsapp-msg-row {
       position: relative;
@@ -2911,7 +2935,7 @@
       animation: whatsappMsgPulse 0.8s ease-in-out 2;
     }
     .whatsapp-msg-actions {
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.09);
       user-select: none;
     }
     @media (hover: hover) and (pointer: fine) {
@@ -2939,36 +2963,37 @@
       }
     }
     #whatsapp-reply-panel {
-      padding: 0.5rem 0.75rem !important;
-      background-color: #f8fafc !important;
+      padding: 0.75rem 1rem !important;
+      background-color: #ffffff !important;
       border-top: 1px solid #e2e8f0 !important;
     }
     #whatsapp-reply-form {
       background-color: #ffffff !important;
       border: 1px solid #cbd5e1 !important;
       border-radius: 9999px !important;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04) !important;
-      padding: 0.25rem 0.5rem !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+      padding: 0.35rem 0.65rem !important;
       display: flex !important;
       align-items: center !important;
-      gap: 0.375rem !important;
+      gap: 0.5rem !important;
       width: 100% !important;
       box-sizing: border-box !important;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
     }
     #whatsapp-reply-form:focus-within {
       border-color: #10b981 !important;
-      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15) !important;
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18) !important;
     }
     #whatsapp-reply-input {
       border: none !important;
       outline: none !important;
       box-shadow: none !important;
       background: transparent !important;
-      padding: 0.375rem 0.5rem !important;
-      font-size: 14px !important;
-      line-height: 1.4 !important;
-      max-height: 120px !important;
-      min-height: 32px !important;
+      padding: 0.45rem 0.6rem !important;
+      font-size: 16px !important;
+      line-height: 1.5 !important;
+      max-height: 140px !important;
+      min-height: 38px !important;
       resize: none !important;
       width: 100% !important;
     }
@@ -2977,22 +3002,22 @@
       color: #ffffff !important;
       border: none !important;
       border-radius: 9999px !important;
-      width: 2.125rem !important;
-      height: 2.125rem !important;
-      min-width: 2.125rem !important;
+      width: 2.5rem !important;
+      height: 2.5rem !important;
+      min-width: 2.5rem !important;
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
       flex-shrink: 0 !important;
       cursor: pointer !important;
-      box-shadow: 0 1px 3px rgba(5, 150, 105, 0.25) !important;
+      box-shadow: 0 2px 6px rgba(5, 150, 105, 0.28) !important;
       transition: background-color 0.15s ease, transform 0.1s ease !important;
     }
     #whatsapp-reply-submit:hover {
       background-color: #047857 !important;
     }
     #whatsapp-reply-submit:active {
-      transform: scale(0.94) !important;
+      transform: scale(0.95) !important;
     }
     #whatsapp-reply-submit:disabled {
       opacity: 0.5 !important;
@@ -3002,17 +3027,17 @@
     #whatsapp-reply-submit svg {
       color: #ffffff !important;
       stroke: #ffffff !important;
-      width: 1rem !important;
-      height: 1rem !important;
+      width: 1.15rem !important;
+      height: 1.15rem !important;
     }
     html[dir="rtl"] #whatsapp-reply-submit i,
     html[dir="rtl"] #whatsapp-reply-submit svg {
       transform: scaleX(-1);
     }
     #whatsapp-voice-record-btn {
-      width: 2.125rem !important;
-      height: 2.125rem !important;
-      min-width: 2.125rem !important;
+      width: 2.5rem !important;
+      height: 2.5rem !important;
+      min-width: 2.5rem !important;
       border-radius: 9999px !important;
       display: flex !important;
       align-items: center !important;
@@ -3026,6 +3051,11 @@
     #whatsapp-voice-record-btn:hover {
       background-color: #f1f5f9 !important;
       color: #1e293b !important;
+    }
+    #whatsapp-voice-record-btn i,
+    #whatsapp-voice-record-btn svg {
+      width: 1.15rem !important;
+      height: 1.15rem !important;
     }
     @media (min-width: 768px) {
       .whatsapp-chat-shell {
@@ -3137,16 +3167,18 @@
         border-radius: 0 !important;
       }
       #whatsapp-reply-panel {
-        padding: 0.375rem 0.5rem !important;
-        background-color: #f8fafc !important;
+        padding: 0.5rem 0.75rem !important;
+        padding-bottom: max(0.65rem, env(safe-area-inset-bottom)) !important;
+        background-color: #ffffff !important;
         width: 100% !important;
         max-width: 100% !important;
         box-sizing: border-box !important;
         overflow: hidden !important;
+        border-top: 1px solid #e2e8f0 !important;
       }
       #whatsapp-reply-form {
-        padding: 0.2rem 0.375rem !important;
-        gap: 0.25rem !important;
+        padding: 0.25rem 0.5rem !important;
+        gap: 0.375rem !important;
         width: 100% !important;
         max-width: 100% !important;
         border-radius: 9999px !important;
@@ -3158,23 +3190,23 @@
         max-width: 100% !important;
       }
       #whatsapp-reply-input {
-        font-size: 14px !important;
-        min-height: 30px !important;
-        padding: 0.25rem 0.375rem !important;
+        font-size: 16px !important;
+        min-height: 36px !important;
+        padding: 0.35rem 0.5rem !important;
         width: 100% !important;
       }
       #whatsapp-reply-submit {
-        width: 1.875rem !important;
-        height: 1.875rem !important;
-        min-width: 1.875rem !important;
+        width: 2.25rem !important;
+        height: 2.25rem !important;
+        min-width: 2.25rem !important;
       }
       #whatsapp-voice-record-btn {
-        width: 1.875rem !important;
-        height: 1.875rem !important;
-        min-width: 1.875rem !important;
+        width: 2.25rem !important;
+        height: 2.25rem !important;
+        min-width: 2.25rem !important;
       }
       #whatsapp-messages-container {
-        padding: 0.75rem !important;
+        padding: 0.85rem !important;
         overflow-x: hidden !important;
         width: 100% !important;
         max-width: 100% !important;
@@ -5986,46 +6018,46 @@
           <span class="app-page-icon text-emerald-600 bg-emerald-50" aria-hidden="true"><i data-lucide="message-circle"></i></span>
           <div>
             <h2 class="app-page-title" data-i18n="whatsapp_center_title">WhatsApp Center</h2>
-            <p class="text-xs font-semibold text-slate-400" data-i18n="whatsapp_center_subtitle">AI Booking Agent & Live Patient Chat</p>
+            <p class="text-xs sm:text-sm font-semibold text-slate-500" data-i18n="whatsapp_center_subtitle">AI Booking Agent & Live Patient Chat</p>
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <button type="button" onclick="openWhatsAppSettingsModal()" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-50 transition">
+          <button type="button" onclick="openWhatsAppSettingsModal()" class="inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white px-4 py-2.5 text-xs sm:text-sm font-bold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 transition">
             <i data-lucide="bot" class="h-4 w-4 text-violet-600"></i>
             <span data-i18n="whatsapp_bot_settings">AI & API Settings</span>
           </button>
-          <button type="button" onclick="refreshWhatsAppConversations(true)" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-50 transition" title="Refresh messages">
+          <button type="button" onclick="refreshWhatsAppConversations(true)" class="inline-flex items-center justify-center rounded-xl border border-slate-200/80 bg-white h-10 w-10 text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 transition" title="Refresh messages">
             <i data-lucide="refresh-cw" class="h-4 w-4"></i>
           </button>
         </div>
       </div>
 
       <!-- Main WhatsApp Chat Shell -->
-      <div class="whatsapp-chat-shell grid grid-cols-1 md:grid-cols-12 rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+      <div class="whatsapp-chat-shell grid grid-cols-1 md:grid-cols-12 rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
         
         <!-- Left Column: Conversations List -->
-        <div id="whatsapp-sidebar" class="md:col-span-4 lg:col-span-4 border-r border-slate-200 flex flex-col h-full bg-slate-50/50">
+        <div id="whatsapp-sidebar" class="md:col-span-4 lg:col-span-4 border-r border-slate-200/80 flex flex-col h-full bg-slate-50/60">
           <!-- Search & Filter Header -->
-          <div class="p-3 border-b border-slate-200 bg-white space-y-2">
+          <div class="p-3.5 border-b border-slate-200/80 bg-white space-y-2.5">
             <div class="flex items-center gap-2">
               <div class="relative flex-1">
-                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400"></i>
-                <input id="whatsapp-search-input" oninput="filterWhatsAppConversations(this.value)" placeholder="Search conversations..." class="w-full rounded-xl border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-3 text-xs outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20" />
+                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400"></i>
+                <input id="whatsapp-search-input" oninput="filterWhatsAppConversations(this.value)" placeholder="Search conversations..." class="w-full rounded-xl border border-slate-200 bg-slate-50/80 py-2 pl-9 pr-3 text-sm outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition" />
               </div>
-              <button type="button" onclick="promptNewWhatsAppChat()" class="flex h-8 shrink-0 items-center gap-1 rounded-xl bg-emerald-50 border border-emerald-200 px-2.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition shadow-2xs" title="Start new WhatsApp chat with phone number">
-                <i data-lucide="plus" class="h-3.5 w-3.5"></i>
+              <button type="button" onclick="promptNewWhatsAppChat()" class="flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200/80 px-3 text-xs sm:text-sm font-bold text-emerald-700 hover:bg-emerald-100 transition shadow-2xs" title="Start new WhatsApp chat with phone number">
+                <i data-lucide="plus" class="h-4 w-4"></i>
                 <span class="hidden sm:inline">New</span>
               </button>
             </div>
-            <div class="flex items-center gap-1">
-              <button type="button" onclick="setWhatsAppFilter('all')" data-whatsapp-filter="all" class="flex-1 rounded-lg py-1 text-[11px] font-bold bg-emerald-100 text-emerald-800 transition">All</button>
-              <button type="button" onclick="setWhatsAppFilter('unread')" data-whatsapp-filter="unread" class="flex-1 rounded-lg py-1 text-[11px] font-bold text-slate-500 hover:bg-slate-100 transition">Unread</button>
-              <button type="button" onclick="setWhatsAppFilter('manual')" data-whatsapp-filter="manual" class="flex-1 rounded-lg py-1 text-[11px] font-bold text-slate-500 hover:bg-slate-100 transition">Human Needed</button>
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="setWhatsAppFilter('all')" data-whatsapp-filter="all" class="flex-1 rounded-xl py-1.5 text-xs sm:text-[13px] font-bold bg-emerald-100 text-emerald-800 transition">All</button>
+              <button type="button" onclick="setWhatsAppFilter('unread')" data-whatsapp-filter="unread" class="flex-1 rounded-xl py-1.5 text-xs sm:text-[13px] font-bold text-slate-500 hover:bg-slate-100 transition">Unread</button>
+              <button type="button" onclick="setWhatsAppFilter('manual')" data-whatsapp-filter="manual" class="flex-1 rounded-xl py-1.5 text-xs sm:text-[13px] font-bold text-slate-500 hover:bg-slate-100 transition">Human Needed</button>
             </div>
           </div>
 
           <!-- Conversations Scroll List -->
-          <div id="whatsapp-conversations-list" class="flex-1 overflow-y-auto divide-y divide-slate-100 p-1">
+          <div id="whatsapp-conversations-list" class="flex-1 overflow-y-auto divide-y divide-slate-100/80 p-1.5 space-y-1">
             <div class="p-8 text-center text-xs text-slate-400">
               <div class="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-emerald-600 mb-2"></div>
               <p>Loading conversations...</p>
@@ -6034,44 +6066,44 @@
         </div>
 
         <!-- Right Column: Active Conversation -->
-        <div id="whatsapp-main-chat" class="md:col-span-8 lg:col-span-8 flex flex-col h-full min-h-0 overflow-hidden bg-slate-100/60 relative">
+        <div id="whatsapp-main-chat" class="md:col-span-8 lg:col-span-8 flex flex-col h-full min-h-0 overflow-hidden bg-gradient-to-b from-slate-50/70 via-slate-100/40 to-slate-50/70 relative">
           <!-- Empty State -->
           <div id="whatsapp-chat-empty" class="flex flex-col items-center justify-center h-full p-8 text-center">
             <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 mb-3 shadow-xs ring-1 ring-emerald-100">
               <i data-lucide="message-square" class="h-8 w-8"></i>
             </div>
-            <h3 class="text-base font-black text-slate-800" data-i18n="whatsapp_no_chat_selected">Select a Conversation</h3>
-            <p class="mt-1 max-w-sm text-xs text-slate-400" data-i18n="whatsapp_select_chat_desc">Choose a patient from the list on the left to view messages, review AI bookings, or chat manually.</p>
+            <h3 class="text-base font-bold text-slate-800" data-i18n="whatsapp_no_chat_selected">Select a Conversation</h3>
+            <p class="mt-1 max-w-sm text-xs sm:text-sm text-slate-400" data-i18n="whatsapp_select_chat_desc">Choose a patient from the list on the left to view messages, review AI bookings, or chat manually.</p>
           </div>
 
           <!-- Active Chat Container -->
           <div id="whatsapp-chat-active" class="hidden flex-col h-full min-h-0 overflow-hidden">
-            <!-- Chat Header -->
-            <div class="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-3 sm:px-4 py-2 sm:py-2.5 shadow-xs z-10">
-              <div class="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-                <button type="button" onclick="closeActiveWhatsAppChatOnMobile()" class="md:hidden flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 -ml-1" aria-label="Back to conversations">
-                  <i data-lucide="arrow-left" class="h-4 w-4"></i>
+            <!-- Chat Header (Uncluttered, Elevated, Clear Spatial Rhythm) -->
+            <div class="flex shrink-0 items-center justify-between border-b border-slate-200/80 bg-white/95 backdrop-blur-sm px-3.5 sm:px-5 py-3 sm:py-3.5 shadow-xs z-10 gap-3">
+              <div class="flex items-center gap-3 min-w-0 flex-1">
+                <button type="button" onclick="closeActiveWhatsAppChatOnMobile()" class="md:hidden flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 -ml-1 transition" aria-label="Back to conversations">
+                  <i data-lucide="arrow-left" class="h-5 w-5"></i>
                 </button>
-                <div class="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800 font-black text-xs" id="whatsapp-chat-avatar">
+                <div class="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-800 font-bold text-sm sm:text-base border border-emerald-200/60 shadow-2xs" id="whatsapp-chat-avatar">
                   PA
                 </div>
                 <div class="min-w-0 flex-1">
-                  <div class="flex items-center gap-1.5">
-                    <h4 id="whatsapp-chat-patient-name" class="truncate text-xs font-black text-slate-900">Patient Name</h4>
-                    <button type="button" id="whatsapp-chat-patient-file-btn" onclick="openActiveChatPatientFile()" class="shrink-0 inline-flex items-center gap-0.5 rounded-md bg-blue-50 px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold text-blue-700 hover:bg-blue-100 transition" title="Open patient chart">
-                      <i data-lucide="user" class="h-2.5 w-2.5"></i> <span>File</span>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <h4 id="whatsapp-chat-patient-name" class="truncate text-sm sm:text-base font-bold text-slate-900 tracking-tight">Patient Name</h4>
+                    <button type="button" id="whatsapp-chat-patient-file-btn" onclick="openActiveChatPatientFile()" class="shrink-0 inline-flex items-center gap-1 rounded-lg bg-blue-50/90 border border-blue-200/80 px-2.5 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition shadow-2xs" title="Open patient chart">
+                      <i data-lucide="user" class="h-3 w-3"></i> <span>File</span>
                     </button>
                   </div>
-                  <p id="whatsapp-chat-patient-phone" class="truncate text-[10px] font-semibold text-slate-400" dir="ltr">+964 770 000 0000</p>
+                  <p id="whatsapp-chat-patient-phone" class="truncate text-xs font-medium text-slate-500 mt-0.5" dir="ltr">+964 770 000 0000</p>
                 </div>
               </div>
 
               <!-- AI Auto-Reply Toggle Switch -->
               <div class="flex items-center gap-2 shrink-0">
                 <!-- Desktop Full Pill -->
-                <div id="whatsapp-ai-toggle-pill" class="hidden sm:flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 shadow-xs" title="Toggle AI Auto-Reply for this patient">
-                  <span class="flex h-2 w-2 rounded-full bg-emerald-500" id="whatsapp-ai-status-dot"></span>
-                  <span class="text-[11px] font-black text-slate-700" id="whatsapp-ai-toggle-label">AI Auto-Reply</span>
+                <div id="whatsapp-ai-toggle-pill" class="hidden sm:flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-slate-50/90 px-3.5 py-2 shadow-2xs" title="Toggle AI Auto-Reply for this patient">
+                  <span class="flex h-2.5 w-2.5 rounded-full bg-emerald-500" id="whatsapp-ai-status-dot"></span>
+                  <span class="text-xs sm:text-sm font-bold text-slate-700" id="whatsapp-ai-toggle-label">AI Auto-Reply</span>
                   <label class="relative inline-flex cursor-pointer items-center ml-1">
                     <input id="whatsapp-ai-toggle" type="checkbox" onchange="toggleActiveChatAi(this.checked)" class="peer sr-only" />
                     <span class="h-5 w-9 rounded-full bg-slate-300 transition peer-checked:bg-violet-600 peer-focus-visible:ring-2 peer-focus-visible:ring-violet-500"></span>
@@ -6079,9 +6111,9 @@
                   </label>
                 </div>
                 <!-- Mobile Compact AI Toggle Pill -->
-                <label id="whatsapp-ai-toggle-pill-mobile" class="sm:hidden flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 cursor-pointer shadow-2xs" title="Toggle AI Auto-Reply">
-                  <span class="flex h-1.5 w-1.5 rounded-full bg-violet-500" id="whatsapp-ai-status-dot-mobile"></span>
-                  <span class="text-[10px] font-black text-slate-700" id="whatsapp-ai-toggle-label-mobile">AI</span>
+                <label id="whatsapp-ai-toggle-pill-mobile" class="sm:hidden flex items-center gap-2 rounded-xl border border-slate-200/80 bg-slate-50 px-2.5 py-1.5 cursor-pointer shadow-2xs" title="Toggle AI Auto-Reply">
+                  <span class="flex h-2 w-2 rounded-full bg-violet-500" id="whatsapp-ai-status-dot-mobile"></span>
+                  <span class="text-xs font-bold text-slate-700" id="whatsapp-ai-toggle-label-mobile">AI</span>
                   <input id="whatsapp-ai-toggle-mobile" type="checkbox" onchange="toggleActiveChatAi(this.checked)" class="peer sr-only" />
                   <span class="relative inline-flex h-4 w-7 shrink-0 rounded-full bg-slate-300 transition peer-checked:bg-violet-600">
                     <span class="pointer-events-none absolute left-0.5 top-0.5 h-3 w-3 rounded-full bg-white shadow-xs transition peer-checked:translate-x-3"></span>
@@ -6091,103 +6123,103 @@
             </div>
 
             <!-- Messages Thread -->
-            <div id="whatsapp-messages-container" onscroll="handleWhatsAppMessagesScroll(this)" class="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-2.5 sm:space-y-3">
+            <div id="whatsapp-messages-container" onscroll="handleWhatsAppMessagesScroll(this)" class="flex-1 min-h-0 overflow-y-auto p-3.5 sm:p-5 space-y-3 sm:space-y-4">
               <!-- Messages rendered here -->
             </div>
 
             <!-- Dedicated Manual Chat & Quick Replies Area Below -->
-            <div id="whatsapp-reply-panel" class="w-full max-w-full shrink-0 border-t border-slate-200 bg-white p-2 sm:p-3 shadow-[0_-2px_10px_rgba(0,0,0,0.03)] z-10 space-y-1.5 sm:space-y-2.5 overflow-hidden">
+            <div id="whatsapp-reply-panel" class="w-full max-w-full shrink-0 border-t border-slate-200/80 bg-white p-2.5 sm:p-3.5 shadow-[0_-2px_12px_rgba(0,0,0,0.04)] z-10 space-y-2 sm:space-y-3 overflow-hidden">
               <!-- Quick Action & Suggestion Bar -->
-              <div class="flex items-center justify-between gap-1.5 sm:gap-2 overflow-x-auto pb-0.5 text-[11px] no-scrollbar w-full max-w-full">
+              <div class="flex items-center justify-between gap-2 overflow-x-auto pb-1 text-xs no-scrollbar w-full max-w-full">
                 <!-- Quick Chips -->
-                <div class="flex items-center gap-1 sm:gap-1.5 shrink-0" id="whatsapp-quick-chips">
-                  <span class="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 tracking-wider flex items-center gap-0.5 sm:gap-1 shrink-0">
-                    <i data-lucide="zap" class="h-3 w-3 text-amber-500"></i> <span class="hidden xs:inline">Quick:</span>
+                <div class="flex items-center gap-1.5 sm:gap-2 shrink-0" id="whatsapp-quick-chips">
+                  <span class="text-xs font-bold uppercase text-slate-400 tracking-wider flex items-center gap-1 shrink-0">
+                    <i data-lucide="zap" class="h-3.5 w-3.5 text-amber-500"></i> <span class="hidden xs:inline">Quick:</span>
                   </span>
-                  <button type="button" onclick="insertWhatsAppQuickReply('تم تأكيد موعدك بنجاح، ننتظر تشريفك لنا في العيادة 🦷✨')" class="rounded-lg border border-slate-200 bg-slate-50 px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-[11px] font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 transition shrink-0 whitespace-nowrap">
+                  <button type="button" onclick="insertWhatsAppQuickReply('تم تأكيد موعدك بنجاح، ننتظر تشريفك لنا في العيادة 🦷✨')" class="rounded-full border border-slate-200 bg-slate-50/80 px-3 py-1 text-xs sm:text-[13px] font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-800 transition shrink-0 whitespace-nowrap active:scale-[0.97]">
                     تم تأكيد الموعد 🦷
                   </button>
-                  <button type="button" onclick="insertWhatsAppQuickReply('أهلاً بك في عيادة لومين، كيف يمكننا مساعدتك اليوم؟')" class="rounded-lg border border-slate-200 bg-slate-50 px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-[11px] font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 transition shrink-0 whitespace-nowrap">
+                  <button type="button" onclick="insertWhatsAppQuickReply('أهلاً بك في عيادة لومين، كيف يمكننا مساعدتك اليوم؟')" class="rounded-full border border-slate-200 bg-slate-50/80 px-3 py-1 text-xs sm:text-[13px] font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-800 transition shrink-0 whitespace-nowrap active:scale-[0.97]">
                     ترحيب 👋
                   </button>
-                  <button type="button" onclick="insertWhatsAppQuickReply('يرجى الحضور إلى العيادة قبل موعدك بـ 15 دقيقة لإتمام إجراءات الكشف.')" class="rounded-lg border border-slate-200 bg-slate-50 px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-[11px] font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 transition shrink-0 whitespace-nowrap">
+                  <button type="button" onclick="insertWhatsAppQuickReply('يرجى الحضور إلى العيادة قبل موعدك بـ 15 دقيقة لإتمام إجراءات الكشف.')" class="rounded-full border border-slate-200 bg-slate-50/80 px-3 py-1 text-xs sm:text-[13px] font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-800 transition shrink-0 whitespace-nowrap active:scale-[0.97]">
                     الحضور مبكراً ⏱️
                   </button>
-                  <button type="button" onclick="insertWhatsAppQuickReply('نعتذر منك، الطبيب غير متاح في هذا التوقيت. هل يناسبك موعد آخر؟')" class="rounded-lg border border-slate-200 bg-slate-50 px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-[11px] font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 transition shrink-0 whitespace-nowrap">
+                  <button type="button" onclick="insertWhatsAppQuickReply('نعتذر منك، الطبيب غير متاح في هذا التوقيت. هل يناسبك موعد آخر؟')" class="rounded-full border border-slate-200 bg-slate-50/80 px-3 py-1 text-xs sm:text-[13px] font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-800 transition shrink-0 whitespace-nowrap active:scale-[0.97]">
                     الموعد غير متاح ❌
                   </button>
-                  <button type="button" onclick="insertWhatsAppQuickReply('سيتم التواصل معك هاتفياً من قبل إدارة العيادة لمتابعة استفسارك.')" class="rounded-lg border border-slate-200 bg-slate-50 px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-[11px] font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 transition shrink-0 whitespace-nowrap">
+                  <button type="button" onclick="insertWhatsAppQuickReply('سيتم التواصل معك هاتفياً من قبل إدارة العيادة لمتابعة استفسارك.')" class="rounded-full border border-slate-200 bg-slate-50/80 px-3 py-1 text-xs sm:text-[13px] font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-800 transition shrink-0 whitespace-nowrap active:scale-[0.97]">
                     متابعة هاتفية 📞
                   </button>
                 </div>
 
                 <!-- Template & Takeover Controls -->
                 <div class="flex items-center gap-1.5 shrink-0 ml-auto">
-                  <button type="button" id="whatsapp-takeover-btn" onclick="toggleActiveChatAiFromBar()" class="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 sm:px-2.5 py-0.5 text-[9px] sm:text-[10px] font-bold text-violet-800 hover:bg-violet-100 transition whitespace-nowrap" title="Switch between AI handling and Staff manual handling">
-                    <span class="h-1.5 w-1.5 rounded-full bg-violet-500"></span>
+                  <button type="button" id="whatsapp-takeover-btn" onclick="toggleActiveChatAiFromBar()" class="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-bold text-violet-800 hover:bg-violet-100 transition whitespace-nowrap shadow-2xs" title="Switch between AI handling and Staff manual handling">
+                    <span class="h-2 w-2 rounded-full bg-violet-500"></span>
                     <span id="whatsapp-takeover-btn-text">Take Over Chat</span>
                   </button>
                 </div>
               </div>
 
               <!-- Active Quoted Reply Preview Bar -->
-              <div id="whatsapp-active-reply-bar" class="hidden items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50/90 px-3 py-1.5 shadow-2xs transition mb-1.5 animate-in fade-in slide-in-from-bottom-1 w-full max-w-full">
-                <div class="flex items-center gap-2 min-w-0 flex-1">
-                  <div class="h-7 w-1 rounded-full bg-emerald-500 shrink-0"></div>
+              <div id="whatsapp-active-reply-bar" class="hidden items-center justify-between gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50/90 px-3.5 py-2 shadow-2xs transition mb-1.5 animate-in fade-in slide-in-from-bottom-1 w-full max-w-full">
+                <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                  <div class="h-8 w-1 rounded-full bg-emerald-500 shrink-0"></div>
                   <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-1.5">
-                      <i data-lucide="reply" class="h-3 w-3 text-emerald-600 shrink-0"></i>
-                      <span id="whatsapp-active-reply-sender" class="text-[11px] font-black text-emerald-800 truncate">Patient</span>
+                      <i data-lucide="reply" class="h-3.5 w-3.5 text-emerald-600 shrink-0"></i>
+                      <span id="whatsapp-active-reply-sender" class="text-xs font-bold text-emerald-800 truncate">Patient</span>
                     </div>
-                    <p id="whatsapp-active-reply-text" class="text-[10px] font-semibold text-slate-600 truncate" dir="auto">Message preview...</p>
+                    <p id="whatsapp-active-reply-text" class="text-xs font-medium text-slate-600 truncate mt-0.5" dir="auto">Message preview...</p>
                   </div>
                 </div>
-                <button type="button" onclick="clearWhatsAppReplyMessage()" class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-emerald-100 hover:text-emerald-800 transition" title="Cancel Reply (Esc)">
-                  <i data-lucide="x" class="h-3.5 w-3.5"></i>
+                <button type="button" onclick="clearWhatsAppReplyMessage()" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-emerald-100 hover:text-emerald-800 transition" title="Cancel Reply (Esc)">
+                  <i data-lucide="x" class="h-4 w-4"></i>
                 </button>
               </div>
 
               <!-- Floating Minimalist WhatsApp Chat Capsule -->
-              <form id="whatsapp-reply-form" onsubmit="sendWhatsAppManualReply(event)" class="relative flex items-center gap-1 sm:gap-1.5 w-full max-w-full rounded-full border border-slate-300 bg-white px-1.5 sm:px-2.5 py-1 shadow-sm transition-all focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20">
+              <form id="whatsapp-reply-form" onsubmit="sendWhatsAppManualReply(event)" class="relative flex items-center gap-1.5 sm:gap-2 w-full max-w-full rounded-full border border-slate-300 bg-white px-2 sm:px-3 py-1.5 shadow-sm transition-all focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20">
                 <!-- Template Picker Button -->
-                <button type="button" onclick="openWhatsAppChatTemplatePicker(this)" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition" title="Saved Templates">
-                  <i data-lucide="bookmark" class="h-4 w-4"></i>
+                <button type="button" onclick="openWhatsAppChatTemplatePicker(this)" class="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition" title="Saved Templates">
+                  <i data-lucide="bookmark" class="h-4 w-4 sm:h-5 sm:w-5"></i>
                 </button>
 
                 <!-- Expanding Textarea Container -->
                 <div id="whatsapp-text-input-container" class="relative flex-1 min-w-0">
-                  <textarea id="whatsapp-reply-input" rows="1" dir="auto" oninput="autoResizeWhatsAppInput(this)" onkeydown="handleWhatsAppInputKeydown(event)" placeholder="Type a message..." class="w-full resize-none border-0 bg-transparent py-1.5 px-1 text-xs sm:text-sm leading-relaxed text-slate-800 placeholder:text-slate-400 outline-none ring-0 focus:ring-0 max-h-28 overflow-y-auto block"></textarea>
+                  <textarea id="whatsapp-reply-input" rows="1" dir="auto" oninput="autoResizeWhatsAppInput(this)" onkeydown="handleWhatsAppInputKeydown(event)" placeholder="Type a message..." class="w-full resize-none border-0 bg-transparent py-2 px-1.5 text-sm sm:text-base leading-relaxed text-slate-800 placeholder:text-slate-400 outline-none ring-0 focus:ring-0 max-h-32 overflow-y-auto block"></textarea>
                 </div>
 
                 <!-- Voice Recording Active Bar -->
-                <div id="whatsapp-voice-recording-bar" class="hidden flex-1 min-w-0 items-center justify-between rounded-full bg-rose-50 border border-rose-200 px-2.5 py-0.5">
-                  <div class="flex items-center gap-1.5 sm:gap-2">
-                    <span class="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5">
+                <div id="whatsapp-voice-recording-bar" class="hidden flex-1 min-w-0 items-center justify-between rounded-full bg-rose-50 border border-rose-200 px-3 py-1">
+                  <div class="flex items-center gap-2">
+                    <span class="relative flex h-2.5 w-2.5">
                       <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                      <span class="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-rose-500"></span>
+                      <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
                     </span>
-                    <span id="whatsapp-voice-timer" class="font-mono text-xs font-bold text-rose-700">0:00</span>
-                    <span class="text-[10px] sm:text-[11px] font-semibold text-rose-600 hidden xs:inline">Recording...</span>
+                    <span id="whatsapp-voice-timer" class="font-mono text-xs sm:text-sm font-bold text-rose-700">0:00</span>
+                    <span class="text-xs font-semibold text-rose-600 hidden xs:inline">Recording...</span>
                   </div>
-                  <div class="flex items-center gap-1">
-                    <button type="button" onclick="cancelWhatsAppVoiceRecording()" class="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full text-slate-400 hover:bg-rose-100 hover:text-rose-600 transition" title="Cancel & Discard">
-                      <i data-lucide="trash-2" class="h-3 w-3 sm:h-3.5 sm:w-3.5"></i>
+                  <div class="flex items-center gap-1.5">
+                    <button type="button" onclick="cancelWhatsAppVoiceRecording()" class="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-rose-100 hover:text-rose-600 transition" title="Cancel & Discard">
+                      <i data-lucide="trash-2" class="h-3.5 w-3.5"></i>
                     </button>
-                    <button type="button" onclick="sendWhatsAppVoiceRecording()" class="inline-flex h-6 sm:h-7 items-center gap-1 rounded-full bg-rose-600 px-2 sm:px-2.5 text-[10px] sm:text-[11px] font-black text-white hover:bg-rose-700 shadow-xs transition" title="Send Voice Message">
-                      <i data-lucide="send" class="h-2.5 w-2.5 sm:h-3 sm:w-3"></i>
+                    <button type="button" onclick="sendWhatsAppVoiceRecording()" class="inline-flex h-7 items-center gap-1 rounded-full bg-rose-600 px-3 text-xs font-bold text-white hover:bg-rose-700 shadow-xs transition" title="Send Voice Message">
+                      <i data-lucide="send" class="h-3 w-3"></i>
                       <span>Send</span>
                     </button>
                   </div>
                 </div>
 
                 <!-- Voice Recording Button -->
-                <button type="button" id="whatsapp-voice-record-btn" onclick="toggleWhatsAppVoiceRecording()" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition" title="Record Voice Message">
-                  <i data-lucide="mic" class="h-4 w-4"></i>
+                <button type="button" id="whatsapp-voice-record-btn" onclick="toggleWhatsAppVoiceRecording()" class="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition" title="Record Voice Message">
+                  <i data-lucide="mic" class="h-4 w-4 sm:h-5 sm:w-5"></i>
                 </button>
 
                 <!-- Send Button (WhatsApp Emerald Green Circle) -->
-                <button type="submit" id="whatsapp-reply-submit" class="flex h-8 w-8 sm:h-8.5 sm:w-8.5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs transition active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed" title="Send (Enter)">
-                  <i data-lucide="send" class="h-4 w-4 ml-0.5 text-white"></i>
+                <button type="submit" id="whatsapp-reply-submit" class="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs transition active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed" title="Send (Enter)">
+                  <i data-lucide="send" class="h-4 w-4 sm:h-5 sm:w-5 ml-0.5 text-white"></i>
                   <span id="whatsapp-reply-submit-text" class="sr-only">Send</span>
                 </button>
               </form>
@@ -13230,7 +13262,11 @@
 
     async function openPrescriptionComposer() {
       if (!canViewPatientPrescriptions()) return;
-      const patient = patients.find(item => item.id === patientWorkspaceId());
+      const patientId = patientWorkspaceId();
+      let patient = getKnownPatient(patientId);
+      if (!patient && patientId) {
+        patient = await ensureKnownPatient(patientId);
+      }
       if (!patient) return;
       try { await fetchPrescriptionConfiguration(); }
       catch (error) { return alert('Could not load prescription settings: ' + (error.message || 'Unknown error')); }
@@ -16435,6 +16471,36 @@
       };
     }
 
+    function getKnownPatient(patientId) {
+      if (!patientId) return null;
+      return (Array.isArray(patients) && patients.find(p => p.id === patientId))
+        || (Array.isArray(patientDirectoryRows) && patientDirectoryRows.find(p => p.id === patientId))
+        || null;
+    }
+
+    async function ensureKnownPatient(patientId) {
+      if (!patientId) return null;
+      const existing = getKnownPatient(patientId);
+      if (existing) return existing;
+      if (!currentSession) return null;
+      try {
+        const { data, error } = await db
+          .from('patients')
+          .select(PATIENT_SELECT_FIELDS)
+          .eq('id', patientId)
+          .maybeSingle();
+        if (error || !data) return null;
+        const normalised = normalisePatientRecord(data);
+        if (Array.isArray(patients) && patientsLoaded && !patients.some(p => p.id === normalised.id)) {
+          patients.unshift(normalised);
+        }
+        return normalised;
+      } catch (e) {
+        console.warn('ensureKnownPatient failed:', e);
+        return null;
+      }
+    }
+
     async function fetchPatientDirectoryPage() {
       const requestedPage = patientQueryPage;
       const from = (requestedPage - 1) * PATIENT_QUERY_PAGE_SIZE;
@@ -19368,12 +19434,18 @@
 
     async function deletePatient(patientId) {
       if (!hasPageAccess('patients')) return;
-      const patient = patients.find(item => item.id === patientId);
-      if (!patient) return;
+      let patient = getKnownPatient(patientId);
+      if (!patient) {
+        patient = await ensureKnownPatient(patientId);
+      }
+      if (!patient) {
+        alert(currentUiLanguage === 'ar' ? 'تعذر العثور على بيانات المريض.' : 'Patient could not be found.');
+        return;
+      }
 
       const prompt = currentUiLanguage === 'ar'
-        ? `هل تريد حذف ${patient.name} (${formatPatientNumber(patient)})؟\n\nلن يُحذف المريض إذا كانت لديه مواعيد أو سجلات فواتير مرتبطة.`
-        : `Delete ${patient.name} (${formatPatientNumber(patient)})?\n\nThe patient cannot be deleted while linked appointments or billing records exist.`;
+        ? `هل أنت متأكد من حذف ${patient.name} (${formatPatientNumber(patient)}) نهائياً؟\n\n(تنبيه: لا يمكن حذف المريض إذا كانت لديه مواعيد أو فواتير أو مدفوعات مسجلة).`
+        : `Delete ${patient.name} (${formatPatientNumber(patient)}) permanently?\n\n(Note: The patient cannot be deleted while linked appointments or billing records exist).`;
       if (!confirm(prompt)) return;
 
       const { data, error } = await db
@@ -19399,7 +19471,17 @@
       if (activePatientId === patient.id) activePatientId = null;
       if (activeWorkspacePatientId === patient.id) activeWorkspacePatientId = null;
       if (activeInvoicePatientId === patient.id) activeInvoicePatientId = null;
-      await fetchPatientsFromDB();
+
+      patients = patients.filter(item => item.id !== patient.id);
+      patientDirectoryRows = patientDirectoryRows.filter(item => item.id !== patient.id);
+      if (patientDirectoryTotal > 0) patientDirectoryTotal -= 1;
+      runPatientQuery();
+
+      if (patientsLoaded) {
+        await fetchPatientsFromDB();
+      } else {
+        await fetchPatientDirectoryPage();
+      }
     }
 
     function countPatientFindings(patient) {
@@ -21609,7 +21691,10 @@
 
     async function renderPatientInvoices() {
       const renderToken = ++patientInvoiceRenderToken;
-      const patient = patients.find(item => item.id === activeInvoicePatientId);
+      let patient = getKnownPatient(activeInvoicePatientId);
+      if (!patient && activeInvoicePatientId) {
+        patient = await ensureKnownPatient(activeInvoicePatientId);
+      }
       const list = document.getElementById('patient-invoices-list');
       if (!list) return;
       if (!patient) {
@@ -21702,7 +21787,10 @@
     async function renderPatientPayments() {
       const renderToken = ++patientPaymentsRenderToken;
       const patientId = patientWorkspaceId();
-      const patient = patients.find(item => item.id === patientId);
+      let patient = getKnownPatient(patientId);
+      if (!patient && patientId) {
+        patient = await ensureKnownPatient(patientId);
+      }
       const list = document.getElementById('patient-payments-list');
       if (!list) return;
       if (!patient) {
@@ -21988,7 +22076,10 @@
 
     async function renderPatientMedia() {
       const patientId = activeWorkspacePatientId || patientWorkspaceId();
-      const patient = patients.find(p => p.id === patientId);
+      let patient = getKnownPatient(patientId);
+      if (!patient && patientId) {
+        patient = await ensureKnownPatient(patientId);
+      }
       const content = document.getElementById('patient-media-content');
       const warning = document.getElementById('patient-media-server-warning');
       if (!content || !patient) return;
@@ -22225,7 +22316,10 @@
       }
 
       const patientId = activeWorkspacePatientId || patientWorkspaceId();
-      const patient = patients.find(p => p.id === patientId);
+      let patient = getKnownPatient(patientId);
+      if (!patient && patientId) {
+        patient = await ensureKnownPatient(patientId);
+      }
       if (!patient) return;
 
       if (errorEl) errorEl.classList.add('hidden');
@@ -22681,7 +22775,10 @@
     async function renderPatientAppointments({ throwOnError = false } = {}) {
       if (!canViewPatientAppointments()) { resetPatientAppointmentsState(); return; }
       const patientId = patientWorkspaceId();
-      const patient = patients.find(item => item.id === patientId);
+      let patient = getKnownPatient(patientId);
+      if (!patient && patientId) {
+        patient = await ensureKnownPatient(patientId);
+      }
       if (!patient) { resetPatientAppointmentsState(); await switchView('patients'); return; }
       const content = document.getElementById('patient-appointments-content');
       const userId = currentSession?.user?.id;
@@ -22731,9 +22828,12 @@
       selectAppointmentPatient(patientId);
     }
 
-    function renderPatientProfile() {
+    async function renderPatientProfile() {
       const patientId = patientWorkspaceId();
-      const patient = patients.find(item => item.id === patientId);
+      let patient = getKnownPatient(patientId);
+      if (!patient && patientId) {
+        patient = await ensureKnownPatient(patientId);
+      }
       if (!patient) {
         switchView('patients');
         return;
@@ -23726,9 +23826,12 @@
       openNewPatientModal({ fromAppointment: true });
     }
 
-    function openEditPatientModal(patientId) {
+    async function openEditPatientModal(patientId) {
       if (!hasPageAccess('patients')) return;
-      const patient = patients.find(item => item.id === patientId);
+      let patient = getKnownPatient(patientId);
+      if (!patient) {
+        patient = await ensureKnownPatient(patientId);
+      }
       if (!patient) return;
 
       patientModalReturnToAppointment = false;
@@ -30795,8 +30898,8 @@
       document.querySelectorAll('[data-whatsapp-filter]').forEach(btn => {
         const isActive = btn.getAttribute('data-whatsapp-filter') === filter;
         btn.className = isActive
-          ? 'flex-1 rounded-lg py-1 text-[11px] font-bold bg-emerald-100 text-emerald-800 transition'
-          : 'flex-1 rounded-lg py-1 text-[11px] font-bold text-slate-500 hover:bg-slate-100 transition';
+          ? 'flex-1 rounded-xl py-1.5 text-xs sm:text-[13px] font-bold bg-emerald-100 text-emerald-800 transition'
+          : 'flex-1 rounded-xl py-1.5 text-xs sm:text-[13px] font-bold text-slate-500 hover:bg-slate-100 transition';
       });
       renderWhatsAppConversationsList();
     }
@@ -30828,8 +30931,8 @@
 
       if (!filtered.length) {
         container.innerHTML = `
-          <div class="p-8 text-center text-xs text-slate-400">
-            <i data-lucide="inbox" class="h-6 w-6 mx-auto mb-2 text-slate-300"></i>
+          <div class="p-8 text-center text-xs sm:text-sm text-slate-400">
+            <i data-lucide="inbox" class="h-8 w-8 mx-auto mb-2 text-slate-300"></i>
             <p>${currentUiLanguage === 'ar' ? 'لا توجد محادثات' : 'No conversations found'}</p>
           </div>
         `;
@@ -30846,32 +30949,32 @@
         const isAiEffectivelyEnabled = clinicWhatsAppAiEnabled && !isHumanNeeded;
 
         return `
-          <button type="button" onclick="selectWhatsAppConversation('${conv.id}')" class="whatsapp-conv-item w-full text-left p-3 rounded-xl flex items-start gap-3 transition ${isActive ? 'active' : 'hover:bg-white'}">
-            <div class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800 font-black text-xs">
+          <button type="button" onclick="selectWhatsAppConversation('${conv.id}')" class="whatsapp-conv-item w-full text-left p-3 sm:p-3.5 rounded-2xl flex items-start gap-3 transition-all duration-150 ${isActive ? 'active' : 'hover:bg-white'}">
+            <div class="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-800 font-bold text-sm border border-emerald-200/50 shadow-2xs">
               ${escapeHtml(initials)}
-              ${unreadCount > 0 ? `<span class="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-[9px] font-black text-white ring-2 ring-white">${unreadCount > 9 ? '9+' : unreadCount}</span>` : ''}
+              ${unreadCount > 0 ? `<span class="absolute -top-1 -right-1 flex h-5 min-w-[1.25rem] px-1 items-center justify-center rounded-full bg-emerald-600 text-[11px] font-bold text-white ring-2 ring-white shadow-2xs">${unreadCount > 9 ? '9+' : unreadCount}</span>` : ''}
             </div>
             <div class="flex-1 min-w-0">
               <div class="flex items-center justify-between gap-1 mb-0.5">
-                <h4 class="text-xs font-black text-slate-900 truncate">${escapeHtml(conv.patient_name || conv.phone)}</h4>
-                <span class="text-[10px] font-semibold text-slate-400 shrink-0">${timeStr}</span>
+                <h4 class="text-sm sm:text-[15px] font-bold text-slate-900 truncate tracking-tight">${escapeHtml(conv.patient_name || conv.phone)}</h4>
+                <span class="text-xs font-medium text-slate-400 shrink-0">${timeStr}</span>
               </div>
-              <p class="text-[11px] text-slate-500 truncate mb-1" dir="auto">${escapeHtml(conv.last_message || 'No messages yet')}</p>
-              <div class="flex items-center gap-1.5">
+              <p class="text-xs sm:text-[13px] text-slate-600 truncate mb-1.5 leading-snug" dir="auto">${escapeHtml(conv.last_message || 'No messages yet')}</p>
+              <div class="flex items-center gap-1.5 flex-wrap">
                 ${!clinicWhatsAppAiEnabled ? `
-                  <span class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-black text-slate-600">
-                    <span class="h-1.5 w-1.5 rounded-full bg-slate-400"></span> AI Agent Off
+                  <span class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">
+                    <span class="h-1.5 w-1.5 rounded-full bg-slate-400"></span> AI Off
                   </span>
                 ` : !isAiEffectivelyEnabled ? `
-                  <span class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[9px] font-black text-amber-700">
+                  <span class="inline-flex items-center gap-1 rounded-md bg-amber-50 border border-amber-200/80 px-2 py-0.5 text-[11px] font-bold text-amber-700">
                     <span class="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse"></span> Human Needed
                   </span>
                 ` : `
-                  <span class="inline-flex items-center gap-1 rounded-md bg-violet-50 px-1.5 py-0.5 text-[9px] font-black text-violet-700">
+                  <span class="inline-flex items-center gap-1 rounded-md bg-violet-50 border border-violet-200/80 px-2 py-0.5 text-[11px] font-bold text-violet-700">
                     <span class="h-1.5 w-1.5 rounded-full bg-violet-500"></span> AI Active
                   </span>
                 `}
-                ${conv.patient_id ? `<span class="inline-flex items-center rounded-md bg-blue-50 px-1 py-0.5 text-[9px] font-bold text-blue-700">Patient</span>` : ''}
+                ${conv.patient_id ? `<span class="inline-flex items-center rounded-md bg-blue-50 border border-blue-200/80 px-1.5 py-0.5 text-[11px] font-bold text-blue-700">Patient</span>` : ''}
               </div>
             </div>
           </button>
@@ -31082,7 +31185,7 @@
       if (whatsappMessagesLoadingInitial) {
         container.innerHTML = `
           <div class="flex h-full items-center justify-center p-8 text-slate-400">
-            <i data-lucide="loader-2" class="h-6 w-6 animate-spin"></i>
+            <i data-lucide="loader-2" class="h-7 w-7 animate-spin"></i>
           </div>
         `;
         lucide.createIcons();
@@ -31092,8 +31195,8 @@
       if (!whatsappMessages.length) {
         container.innerHTML = `
           <div class="flex flex-col items-center justify-center h-full p-8 text-center text-slate-400">
-            <i data-lucide="message-circle" class="h-8 w-8 mb-2 text-slate-300"></i>
-            <p class="text-xs font-semibold">No messages in this chat yet.</p>
+            <i data-lucide="message-circle" class="h-10 w-10 mb-2.5 text-slate-300"></i>
+            <p class="text-sm sm:text-base font-semibold">No messages in this chat yet.</p>
           </div>
         `;
         lucide.createIcons();
@@ -31101,9 +31204,9 @@
       }
 
       const olderMessagesControl = whatsappMessagesHasOlder ? `
-        <div class="flex justify-center py-1">
-          <button id="whatsapp-load-older" type="button" onclick="loadOlderWhatsAppMessages()" ${whatsappMessagesLoadingOlder ? 'disabled' : ''} class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-[10px] font-bold text-slate-500 shadow-sm transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60">
-            <i data-lucide="${whatsappMessagesLoadingOlder ? 'loader-2' : 'arrow-up'}" class="h-3 w-3 ${whatsappMessagesLoadingOlder ? 'animate-spin' : ''}"></i>
+        <div class="flex justify-center py-1.5">
+          <button id="whatsapp-load-older" type="button" onclick="loadOlderWhatsAppMessages()" ${whatsappMessagesLoadingOlder ? 'disabled' : ''} class="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/95 px-4 py-2 text-xs font-bold text-slate-600 shadow-2xs transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60">
+            <i data-lucide="${whatsappMessagesLoadingOlder ? 'loader-2' : 'arrow-up'}" class="h-3.5 w-3.5 ${whatsappMessagesLoadingOlder ? 'animate-spin' : ''}"></i>
             <span>${whatsappMessagesLoadingOlder ? 'Loading earlier messages...' : 'Scroll up or tap to load 10 earlier messages'}</span>
           </button>
         </div>
@@ -31122,8 +31225,8 @@
           bubbleClass = 'whatsapp-bubble-ai';
           alignClass = 'justify-end';
           senderTag = `
-            <div class="flex items-center gap-1 mb-1 text-[10px] font-black text-violet-700">
-              <i data-lucide="bot" class="h-3 w-3"></i>
+            <div class="flex items-center gap-1.5 mb-1.5 text-xs font-bold text-violet-700">
+              <i data-lucide="bot" class="h-3.5 w-3.5"></i>
               <span>Lumin AI</span>
             </div>
           `;
@@ -31131,14 +31234,14 @@
           bubbleClass = 'whatsapp-bubble-staff';
           alignClass = 'justify-end';
           senderTag = `
-            <div class="flex items-center gap-1 mb-1 text-[10px] font-black text-emerald-800">
-              <i data-lucide="user-check" class="h-3 w-3"></i>
+            <div class="flex items-center gap-1.5 mb-1.5 text-xs font-bold text-emerald-800">
+              <i data-lucide="user-check" class="h-3.5 w-3.5"></i>
               <span>${escapeHtml(msg.sender_name || 'Clinic Staff')}</span>
             </div>
           `;
         } else {
           senderTag = `
-            <div class="flex items-center gap-1 mb-1 text-[10px] font-black text-slate-500">
+            <div class="flex items-center gap-1.5 mb-1.5 text-xs font-bold text-slate-500">
               <span>${escapeHtml(msg.sender_name || 'Patient')}</span>
             </div>
           `;
@@ -31148,21 +31251,21 @@
         if (msg.media_url) {
           if (msg.message_type === 'image') {
             mediaHtml = `
-              <div class="mb-2 overflow-hidden rounded-xl border border-slate-200/80 bg-slate-100">
+              <div class="mb-2.5 overflow-hidden rounded-xl border border-slate-200/80 bg-slate-100 shadow-2xs">
                 <a href="${escapeHtml(msg.media_url)}" target="_blank" rel="noopener noreferrer">
-                  <img src="${escapeHtml(msg.media_url)}" alt="Attachment" class="max-h-64 w-auto object-cover hover:opacity-90 transition" loading="lazy" decoding="async" fetchpriority="low" />
+                  <img src="${escapeHtml(msg.media_url)}" alt="Attachment" class="max-h-72 w-auto object-cover hover:opacity-90 transition" loading="lazy" decoding="async" fetchpriority="low" />
                 </a>
               </div>
             `;
           } else if (msg.message_type === 'audio') {
             mediaHtml = `
-              <div class="mb-2">
-                <audio controls preload="none" src="${escapeHtml(msg.media_url)}" class="max-w-xs h-8"></audio>
+              <div class="mb-2.5 p-1 rounded-xl bg-slate-50/80 border border-slate-200/60 shadow-2xs">
+                <audio controls preload="none" src="${escapeHtml(msg.media_url)}" class="w-full max-w-xs h-9"></audio>
               </div>
             `;
           } else {
             mediaHtml = `
-              <div class="mb-2 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2 text-xs">
+              <div class="mb-2.5 flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-slate-50 p-2.5 text-sm">
                 <i data-lucide="file" class="h-4 w-4 text-blue-600"></i>
                 <a href="${escapeHtml(msg.media_url)}" target="_blank" rel="noopener noreferrer" class="font-bold text-blue-700 underline truncate">Download Document</a>
               </div>
@@ -31174,12 +31277,12 @@
         let quotedHtml = '';
         if (msg.reply_to_text) {
           quotedHtml = `
-            <div onclick="scrollToWhatsAppMessage('${escapeHtml(msg.reply_to_id || '')}')" class="mb-1.5 cursor-pointer rounded-lg border-s-4 border-emerald-500 bg-black/5 hover:bg-black/10 transition px-2 py-1 text-left select-none" title="Jump to quoted message">
-              <div class="flex items-center gap-1 text-[10px] font-black text-emerald-800">
-                <i data-lucide="reply" class="h-2.5 w-2.5"></i>
+            <div onclick="scrollToWhatsAppMessage('${escapeHtml(msg.reply_to_id || '')}')" class="mb-2 cursor-pointer rounded-xl border-s-4 border-emerald-500 bg-black/5 hover:bg-black/10 transition px-2.5 py-1.5 text-left select-none" title="Jump to quoted message">
+              <div class="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
+                <i data-lucide="reply" class="h-3 w-3"></i>
                 <span>${escapeHtml(msg.reply_to_sender || 'Quoted Message')}</span>
               </div>
-              <p class="text-[11px] text-slate-600 truncate max-w-xs" dir="auto">${escapeHtml(msg.reply_to_text || '')}</p>
+              <p class="text-xs sm:text-[13px] text-slate-600 truncate max-w-sm mt-0.5" dir="auto">${escapeHtml(msg.reply_to_text || '')}</p>
             </div>
           `;
         }
@@ -31189,21 +31292,21 @@
         if (isStaff || isAi) {
           if (msg.status === 'read') {
             const readTitle = currentUiLanguage === 'ar' ? 'تمت القراءة ✓✓' : 'Read ✓✓';
-            statusTickHtml = `<i data-lucide="check-check" class="h-3 w-3 text-sky-500" title="${readTitle}"></i>`;
+            statusTickHtml = `<i data-lucide="check-check" class="h-3.5 w-3.5 text-sky-500" title="${readTitle}"></i>`;
           } else if (msg.status === 'delivered') {
             const delTitle = currentUiLanguage === 'ar' ? 'تم التسليم لهاتف المريض ✓✓' : 'Delivered to phone ✓✓';
-            statusTickHtml = `<i data-lucide="check-check" class="h-3 w-3 text-slate-400 opacity-70" title="${delTitle}"></i>`;
+            statusTickHtml = `<i data-lucide="check-check" class="h-3.5 w-3.5 text-slate-400 opacity-70" title="${delTitle}"></i>`;
           } else if (msg.status === 'sent') {
             const sentTitle = currentUiLanguage === 'ar' ? 'تم الإرسال إلى واتساب ✓' : 'Sent to WhatsApp ✓';
-            statusTickHtml = `<i data-lucide="check" class="h-3 w-3 text-slate-400 opacity-70" title="${sentTitle}"></i>`;
+            statusTickHtml = `<i data-lucide="check" class="h-3.5 w-3.5 text-slate-400 opacity-70" title="${sentTitle}"></i>`;
           } else if (msg.status === 'failed') {
             const failTitle = currentUiLanguage === 'ar'
               ? 'فشل التسليم ⚠️ (المريض لم يراسل العيادة خلال 24 ساعة أو تعذر الوصول للرقم)'
               : 'Failed to deliver ⚠️ (Outside 24h customer window or number unreachable)';
-            statusTickHtml = `<i data-lucide="alert-circle" class="h-3 w-3 text-rose-500" title="${failTitle}"></i>`;
+            statusTickHtml = `<i data-lucide="alert-circle" class="h-3.5 w-3.5 text-rose-500" title="${failTitle}"></i>`;
           } else {
             const sendingTitle = currentUiLanguage === 'ar' ? 'جارٍ الإرسال...' : 'Sending...';
-            statusTickHtml = `<i data-lucide="clock" class="h-2.5 w-2.5 text-slate-400 opacity-60" title="${sendingTitle}"></i>`;
+            statusTickHtml = `<i data-lucide="clock" class="h-3 w-3 text-slate-400 opacity-60" title="${sendingTitle}"></i>`;
           }
         }
 
@@ -31211,7 +31314,7 @@
         let reactionBadgeHtml = '';
         if (msg.reaction) {
           reactionBadgeHtml = `
-            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '${escapeHtml(msg.reaction)}')" class="absolute -bottom-2.5 ${alignClass === 'justify-end' ? 'right-2' : 'left-2'} inline-flex items-center gap-0.5 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-xs shadow-xs hover:scale-110 active:scale-95 transition z-10" title="Reaction: ${escapeHtml(msg.reaction)} (Click to remove)">
+            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '${escapeHtml(msg.reaction)}')" class="absolute -bottom-3 ${alignClass === 'justify-end' ? 'right-3' : 'left-3'} inline-flex items-center gap-1 rounded-full border border-slate-200/90 bg-white px-2 py-0.5 text-sm shadow-xs hover:scale-110 active:scale-95 transition z-10" title="Reaction: ${escapeHtml(msg.reaction)} (Click to remove)">
               <span>${escapeHtml(msg.reaction)}</span>
             </button>
           `;
@@ -31219,42 +31322,42 @@
 
         // Quick React & Reply Action Menu on hover / tap
         const actionMenuHtml = `
-          <div class="whatsapp-msg-actions hidden group-hover:flex items-center gap-1 absolute -top-3.5 ${alignClass === 'justify-end' ? 'left-2' : 'right-2'} rounded-full border border-slate-200 bg-white/95 px-1.5 py-0.5 shadow-sm text-xs backdrop-blur-xs z-20">
-            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '👍')" class="hover:scale-125 transition px-0.5 text-xs" title="Like">👍</button>
-            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '❤️')" class="hover:scale-125 transition px-0.5 text-xs" title="Love">❤️</button>
-            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '😂')" class="hover:scale-125 transition px-0.5 text-xs" title="Laugh">😂</button>
-            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '😮')" class="hover:scale-125 transition px-0.5 text-xs" title="Surprised">😮</button>
-            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '🙏')" class="hover:scale-125 transition px-0.5 text-xs" title="Thank you">🙏</button>
-            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '🦷')" class="hover:scale-125 transition px-0.5 text-xs" title="Dental">🦷</button>
-            <div class="h-3 w-px bg-slate-200 mx-0.5"></div>
+          <div class="whatsapp-msg-actions hidden group-hover:flex items-center gap-1 absolute -top-4 ${alignClass === 'justify-end' ? 'left-3' : 'right-3'} rounded-full border border-slate-200/90 bg-white/95 px-2 py-0.5 shadow-sm text-sm backdrop-blur-xs z-20">
+            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '👍')" class="hover:scale-125 transition px-0.5 text-sm" title="Like">👍</button>
+            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '❤️')" class="hover:scale-125 transition px-0.5 text-sm" title="Love">❤️</button>
+            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '😂')" class="hover:scale-125 transition px-0.5 text-sm" title="Laugh">😂</button>
+            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '😮')" class="hover:scale-125 transition px-0.5 text-sm" title="Surprised">😮</button>
+            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '🙏')" class="hover:scale-125 transition px-0.5 text-sm" title="Thank you">🙏</button>
+            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '🦷')" class="hover:scale-125 transition px-0.5 text-sm" title="Dental">🦷</button>
+            <div class="h-3.5 w-px bg-slate-200 mx-0.5"></div>
             <button type="button" onclick="triggerWhatsAppReplyById('${msg.id}')" class="hover:text-emerald-700 text-slate-500 p-0.5 transition" title="Reply / Quote">
-              <i data-lucide="reply" class="h-3 w-3"></i>
+              <i data-lucide="reply" class="h-3.5 w-3.5"></i>
             </button>
           </div>
         `;
 
-        const swipeIconPos = (alignClass === 'justify-end') ? 'right-2' : 'left-2';
+        const swipeIconPos = (alignClass === 'justify-end') ? 'right-3' : 'left-3';
 
         return `
-          <div class="group relative flex ${alignClass} py-1 whatsapp-msg-row" id="whatsapp-msg-${msg.id}" data-message-id="${msg.id}">
+          <div class="group relative flex ${alignClass} py-1.5 whatsapp-msg-row" id="whatsapp-msg-${msg.id}" data-message-id="${msg.id}">
             <!-- Reply gesture indicator for mobile swipe -->
-            <div class="whatsapp-swipe-icon absolute ${swipeIconPos} top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 opacity-0 pointer-events-none">
+            <div class="whatsapp-swipe-icon absolute ${swipeIconPos} top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 opacity-0 pointer-events-none">
               <i data-lucide="reply" class="h-4 w-4"></i>
             </div>
-            <div class="whatsapp-msg-bubble-track relative max-w-[85%] sm:max-w-lg rounded-2xl p-3 sm:p-3.5 shadow-xs ${bubbleClass}">
+            <div class="whatsapp-msg-bubble-track relative max-w-[88%] sm:max-w-xl rounded-2xl p-3.5 sm:p-4 shadow-xs ${bubbleClass}">
               ${actionMenuHtml}
               ${senderTag}
               ${quotedHtml}
               ${mediaHtml}
               ${msg.message_type === 'template' ? `
-                <div class="mb-1.5 inline-flex items-center gap-1 rounded-md bg-emerald-100/90 px-2 py-0.5 text-[10px] font-black text-emerald-800">
-                  <i data-lucide="bookmark-check" class="h-3 w-3 text-emerald-600"></i>
+                <div class="mb-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-100/90 px-2.5 py-1 text-xs font-bold text-emerald-800">
+                  <i data-lucide="bookmark-check" class="h-3.5 w-3.5 text-emerald-600"></i>
                   <span>Meta Template 🚀</span>
                 </div>
               ` : ''}
-              <p class="text-xs sm:text-[13px] leading-relaxed whitespace-pre-wrap select-text" dir="auto">${escapeHtml(msg.content || '')}</p>
-              <div class="flex items-center justify-end gap-1 mt-1">
-                <span class="text-[9px] font-semibold opacity-60">${timeStr}</span>
+              <p class="text-sm sm:text-[15px] leading-relaxed whitespace-pre-wrap select-text tracking-normal" dir="auto">${escapeHtml(msg.content || '')}</p>
+              <div class="flex items-center justify-end gap-1.5 mt-1.5">
+                <span class="text-[11px] font-medium opacity-65">${timeStr}</span>
                 ${statusTickHtml}
               </div>
               ${reactionBadgeHtml}
