@@ -4,17 +4,21 @@ Whenever designing, styling, or refactoring user interfaces in Lumin, strictly a
 
 ## 1. Aesthetic Standard & Visual Polish
 - **Modern SaaS & Clinical Standard**: Prioritize calm, high-precision, clean clinical interfaces (Linear / Vercel / Apple HIG vibe).
-- **Borders & Surfaces**: Use subtle, semi-transparent borders (`border border-slate-200/80` or `border-white/10`) rather than harsh solid lines. Layer surfaces using elevation (`bg-slate-50` background -> `bg-white` cards -> `bg-slate-50` inputs/insets).
+- **Borders & Surfaces (CRITICAL: Zero Black Borders Rule)**:
+  - **NEVER use slash-opacity syntax on border classes** (e.g. `border-slate-200/80`, `border-emerald-200/60`). `lumin-app.css` is a precompiled bundle that lacks slash-opacity border classes. Uncompiled border classes fall back to `currentColor`, resulting in **harsh, ugly solid black borders**!
+  - **Borderless by default**: Avatars, small badges, action pills, chips, and quick replies must be **completely borderless** by default with soft tinted fills (`bg-emerald-50 text-emerald-700`, `bg-blue-50 text-blue-700`, `bg-violet-100 text-violet-800`, `bg-amber-100 text-amber-800`, `bg-slate-100 text-slate-700`).
+  - **Compiled tokens only**: When containers genuinely require a border, ONLY use compiled classes: `border-slate-100`, `border-slate-200`, `border-slate-300`, or explicit CSS (`border: 1px solid #e2e8f0;`).
+  - Layer surfaces using elevation (`bg-slate-50` background -> `bg-white` cards -> `bg-slate-50` inputs/insets).
 - **Raised Theme Compatibility**: Ensure new components support the `.lumin-raised` theme system (`var(--lumin-face)`, `var(--lumin-raised)`, `var(--lumin-small-raised)`).
 
 ## 2. Color Palette & Clinical Tokens
 - **Brand**: Blue / Cyan (`#2563eb`, `hsl(215, ...)`).
 - **Neutrals**: Slate scale (`slate-50` to `slate-900`) for balanced contrast and readability.
-- **Clinical Status Badges**:
-  - Healthy / Completed: `emerald-600` on `bg-emerald-50`, `border-emerald-200/60`.
-  - Caries / Urgent / Danger: `rose-600` on `bg-rose-50`, `border-rose-200/60`.
-  - In Progress / Composite: `blue-600` on `bg-blue-50`, `border-blue-200/60`.
-  - Pending / Warning: `amber-600` on `bg-amber-50`, `border-amber-200/60`.
+- **Clinical Status Badges (Borderless Soft Surfaces)**:
+  - Healthy / Completed: `text-emerald-700` on `bg-emerald-50` (or `bg-emerald-100 text-emerald-800`).
+  - Caries / Urgent / Danger: `text-rose-700` on `bg-rose-50` (or `bg-rose-100 text-rose-800`).
+  - In Progress / Composite: `text-blue-700` on `bg-blue-50` (or `bg-blue-100 text-blue-800`).
+  - Pending / Warning: `text-amber-800` on `bg-amber-100` (or `bg-amber-50 text-amber-700`).
 
 ## 3. Spatial Rhythm & Typography
 - **Hierarchy**: Clear distinction between headings (`font-semibold tracking-tight text-slate-900`), body (`text-sm text-slate-700`), and secondary labels (`text-xs text-slate-400 font-medium`).

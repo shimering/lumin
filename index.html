@@ -6022,29 +6022,29 @@
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <button type="button" onclick="openWhatsAppSettingsModal()" class="inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white px-4 py-2.5 text-xs sm:text-sm font-bold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 transition">
+          <button type="button" onclick="openWhatsAppSettingsModal()" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs sm:text-sm font-bold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 transition">
             <i data-lucide="bot" class="h-4 w-4 text-violet-600"></i>
             <span data-i18n="whatsapp_bot_settings">AI & API Settings</span>
           </button>
-          <button type="button" onclick="refreshWhatsAppConversations(true)" class="inline-flex items-center justify-center rounded-xl border border-slate-200/80 bg-white h-10 w-10 text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 transition" title="Refresh messages">
+          <button type="button" onclick="refreshWhatsAppConversations(true)" class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white h-10 w-10 text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 transition" title="Refresh messages">
             <i data-lucide="refresh-cw" class="h-4 w-4"></i>
           </button>
         </div>
       </div>
 
       <!-- Main WhatsApp Chat Shell -->
-      <div class="whatsapp-chat-shell grid grid-cols-1 md:grid-cols-12 rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
+      <div class="whatsapp-chat-shell grid grid-cols-1 md:grid-cols-12 rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
         
         <!-- Left Column: Conversations List -->
-        <div id="whatsapp-sidebar" class="md:col-span-4 lg:col-span-4 border-r border-slate-200/80 flex flex-col h-full bg-slate-50/60">
+        <div id="whatsapp-sidebar" class="md:col-span-4 lg:col-span-4 border-r border-slate-200 flex flex-col h-full bg-slate-50/60">
           <!-- Search & Filter Header -->
-          <div class="p-3.5 border-b border-slate-200/80 bg-white space-y-2.5">
+          <div class="p-3.5 border-b border-slate-200 bg-white space-y-2.5">
             <div class="flex items-center gap-2">
               <div class="relative flex-1">
                 <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400"></i>
                 <input id="whatsapp-search-input" oninput="filterWhatsAppConversations(this.value)" placeholder="Search conversations..." class="w-full rounded-xl border border-slate-200 bg-slate-50/80 py-2 pl-9 pr-3 text-sm outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition" />
               </div>
-              <button type="button" onclick="promptNewWhatsAppChat()" class="flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200/80 px-3 text-xs sm:text-sm font-bold text-emerald-700 hover:bg-emerald-100 transition shadow-2xs" title="Start new WhatsApp chat with phone number">
+              <button type="button" onclick="promptNewWhatsAppChat()" class="flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-emerald-600 px-3 text-xs sm:text-sm font-bold text-white hover:bg-emerald-700 transition shadow-2xs active:scale-[0.98]" title="Start new WhatsApp chat with phone number">
                 <i data-lucide="plus" class="h-4 w-4"></i>
                 <span class="hidden sm:inline">New</span>
               </button>
@@ -6057,7 +6057,7 @@
           </div>
 
           <!-- Conversations Scroll List -->
-          <div id="whatsapp-conversations-list" class="flex-1 overflow-y-auto divide-y divide-slate-100/80 p-1.5 space-y-1">
+          <div id="whatsapp-conversations-list" class="flex-1 overflow-y-auto divide-y divide-slate-100 p-1.5 space-y-1">
             <div class="p-8 text-center text-xs text-slate-400">
               <div class="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-emerald-600 mb-2"></div>
               <p>Loading conversations...</p>
@@ -6079,18 +6079,18 @@
           <!-- Active Chat Container -->
           <div id="whatsapp-chat-active" class="hidden flex-col h-full min-h-0 overflow-hidden">
             <!-- Chat Header (Uncluttered, Elevated, Clear Spatial Rhythm) -->
-            <div class="flex shrink-0 items-center justify-between border-b border-slate-200/80 bg-white/95 backdrop-blur-sm px-3.5 sm:px-5 py-3 sm:py-3.5 shadow-xs z-10 gap-3">
+            <div class="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white/95 backdrop-blur-sm px-3.5 sm:px-5 py-3 sm:py-3.5 shadow-xs z-10 gap-3">
               <div class="flex items-center gap-3 min-w-0 flex-1">
                 <button type="button" onclick="closeActiveWhatsAppChatOnMobile()" class="md:hidden flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 -ml-1 transition" aria-label="Back to conversations">
                   <i data-lucide="arrow-left" class="h-5 w-5"></i>
                 </button>
-                <div class="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-800 font-bold text-sm sm:text-base border border-emerald-200/60 shadow-2xs" id="whatsapp-chat-avatar">
+                <div class="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-800 font-bold text-sm sm:text-base shadow-2xs" id="whatsapp-chat-avatar">
                   PA
                 </div>
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-2 flex-wrap">
                     <h4 id="whatsapp-chat-patient-name" class="truncate text-sm sm:text-base font-bold text-slate-900 tracking-tight">Patient Name</h4>
-                    <button type="button" id="whatsapp-chat-patient-file-btn" onclick="openActiveChatPatientFile()" class="shrink-0 inline-flex items-center gap-1 rounded-lg bg-blue-50/90 border border-blue-200/80 px-2.5 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition shadow-2xs" title="Open patient chart">
+                    <button type="button" id="whatsapp-chat-patient-file-btn" onclick="openActiveChatPatientFile()" class="shrink-0 inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100 transition shadow-2xs" title="Open patient chart">
                       <i data-lucide="user" class="h-3 w-3"></i> <span>File</span>
                     </button>
                   </div>
@@ -6101,7 +6101,7 @@
               <!-- AI Auto-Reply Toggle Switch -->
               <div class="flex items-center gap-2 shrink-0">
                 <!-- Desktop Full Pill -->
-                <div id="whatsapp-ai-toggle-pill" class="hidden sm:flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-slate-50/90 px-3.5 py-2 shadow-2xs" title="Toggle AI Auto-Reply for this patient">
+                <div id="whatsapp-ai-toggle-pill" class="hidden sm:flex items-center gap-2.5 rounded-xl bg-slate-100/90 px-3.5 py-2 shadow-2xs" title="Toggle AI Auto-Reply for this patient">
                   <span class="flex h-2.5 w-2.5 rounded-full bg-emerald-500" id="whatsapp-ai-status-dot"></span>
                   <span class="text-xs sm:text-sm font-bold text-slate-700" id="whatsapp-ai-toggle-label">AI Auto-Reply</span>
                   <label class="relative inline-flex cursor-pointer items-center ml-1">
@@ -6111,7 +6111,7 @@
                   </label>
                 </div>
                 <!-- Mobile Compact AI Toggle Pill -->
-                <label id="whatsapp-ai-toggle-pill-mobile" class="sm:hidden flex items-center gap-2 rounded-xl border border-slate-200/80 bg-slate-50 px-2.5 py-1.5 cursor-pointer shadow-2xs" title="Toggle AI Auto-Reply">
+                <label id="whatsapp-ai-toggle-pill-mobile" class="sm:hidden flex items-center gap-2 rounded-xl bg-slate-100 px-2.5 py-1.5 cursor-pointer shadow-2xs" title="Toggle AI Auto-Reply">
                   <span class="flex h-2 w-2 rounded-full bg-violet-500" id="whatsapp-ai-status-dot-mobile"></span>
                   <span class="text-xs font-bold text-slate-700" id="whatsapp-ai-toggle-label-mobile">AI</span>
                   <input id="whatsapp-ai-toggle-mobile" type="checkbox" onchange="toggleActiveChatAi(this.checked)" class="peer sr-only" />
@@ -6128,7 +6128,7 @@
             </div>
 
             <!-- Dedicated Manual Chat & Quick Replies Area Below -->
-            <div id="whatsapp-reply-panel" class="w-full max-w-full shrink-0 border-t border-slate-200/80 bg-white p-2.5 sm:p-3.5 shadow-[0_-2px_12px_rgba(0,0,0,0.04)] z-10 space-y-2 sm:space-y-3 overflow-hidden">
+            <div id="whatsapp-reply-panel" class="w-full max-w-full shrink-0 border-t border-slate-200 bg-white p-2.5 sm:p-3.5 shadow-[0_-2px_12px_rgba(0,0,0,0.04)] z-10 space-y-2 sm:space-y-3 overflow-hidden">
               <!-- Quick Action & Suggestion Bar -->
               <div class="flex items-center justify-between gap-2 overflow-x-auto pb-1 text-xs no-scrollbar w-full max-w-full">
                 <!-- Quick Chips -->
@@ -6136,26 +6136,26 @@
                   <span class="text-xs font-bold uppercase text-slate-400 tracking-wider flex items-center gap-1 shrink-0">
                     <i data-lucide="zap" class="h-3.5 w-3.5 text-amber-500"></i> <span class="hidden xs:inline">Quick:</span>
                   </span>
-                  <button type="button" onclick="insertWhatsAppQuickReply('تم تأكيد موعدك بنجاح، ننتظر تشريفك لنا في العيادة 🦷✨')" class="rounded-full border border-slate-200 bg-slate-50/80 px-3 py-1 text-xs sm:text-[13px] font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-800 transition shrink-0 whitespace-nowrap active:scale-[0.97]">
+                  <button type="button" onclick="insertWhatsAppQuickReply('تم تأكيد موعدك بنجاح، ننتظر تشريفك لنا في العيادة 🦷✨')" class="rounded-full bg-slate-100 hover:bg-emerald-100 hover:text-emerald-800 px-3.5 py-1.5 text-xs sm:text-[13px] font-bold text-slate-700 transition shrink-0 whitespace-nowrap active:scale-[0.97]">
                     تم تأكيد الموعد 🦷
                   </button>
-                  <button type="button" onclick="insertWhatsAppQuickReply('أهلاً بك في عيادة لومين، كيف يمكننا مساعدتك اليوم؟')" class="rounded-full border border-slate-200 bg-slate-50/80 px-3 py-1 text-xs sm:text-[13px] font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-800 transition shrink-0 whitespace-nowrap active:scale-[0.97]">
+                  <button type="button" onclick="insertWhatsAppQuickReply('أهلاً بك في عيادة لومين، كيف يمكننا مساعدتك اليوم؟')" class="rounded-full bg-slate-100 hover:bg-emerald-100 hover:text-emerald-800 px-3.5 py-1.5 text-xs sm:text-[13px] font-bold text-slate-700 transition shrink-0 whitespace-nowrap active:scale-[0.97]">
                     ترحيب 👋
                   </button>
-                  <button type="button" onclick="insertWhatsAppQuickReply('يرجى الحضور إلى العيادة قبل موعدك بـ 15 دقيقة لإتمام إجراءات الكشف.')" class="rounded-full border border-slate-200 bg-slate-50/80 px-3 py-1 text-xs sm:text-[13px] font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-800 transition shrink-0 whitespace-nowrap active:scale-[0.97]">
+                  <button type="button" onclick="insertWhatsAppQuickReply('يرجى الحضور إلى العيادة قبل موعدك بـ 15 دقيقة لإتمام إجراءات الكشف.')" class="rounded-full bg-slate-100 hover:bg-emerald-100 hover:text-emerald-800 px-3.5 py-1.5 text-xs sm:text-[13px] font-bold text-slate-700 transition shrink-0 whitespace-nowrap active:scale-[0.97]">
                     الحضور مبكراً ⏱️
                   </button>
-                  <button type="button" onclick="insertWhatsAppQuickReply('نعتذر منك، الطبيب غير متاح في هذا التوقيت. هل يناسبك موعد آخر؟')" class="rounded-full border border-slate-200 bg-slate-50/80 px-3 py-1 text-xs sm:text-[13px] font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-800 transition shrink-0 whitespace-nowrap active:scale-[0.97]">
+                  <button type="button" onclick="insertWhatsAppQuickReply('نعتذر منك، الطبيب غير متاح في هذا التوقيت. هل يناسبك موعد آخر؟')" class="rounded-full bg-slate-100 hover:bg-emerald-100 hover:text-emerald-800 px-3.5 py-1.5 text-xs sm:text-[13px] font-bold text-slate-700 transition shrink-0 whitespace-nowrap active:scale-[0.97]">
                     الموعد غير متاح ❌
                   </button>
-                  <button type="button" onclick="insertWhatsAppQuickReply('سيتم التواصل معك هاتفياً من قبل إدارة العيادة لمتابعة استفسارك.')" class="rounded-full border border-slate-200 bg-slate-50/80 px-3 py-1 text-xs sm:text-[13px] font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-800 transition shrink-0 whitespace-nowrap active:scale-[0.97]">
+                  <button type="button" onclick="insertWhatsAppQuickReply('سيتم التواصل معك هاتفياً من قبل إدارة العيادة لمتابعة استفسارك.')" class="rounded-full bg-slate-100 hover:bg-emerald-100 hover:text-emerald-800 px-3.5 py-1.5 text-xs sm:text-[13px] font-bold text-slate-700 transition shrink-0 whitespace-nowrap active:scale-[0.97]">
                     متابعة هاتفية 📞
                   </button>
                 </div>
 
                 <!-- Template & Takeover Controls -->
                 <div class="flex items-center gap-1.5 shrink-0 ml-auto">
-                  <button type="button" id="whatsapp-takeover-btn" onclick="toggleActiveChatAiFromBar()" class="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-bold text-violet-800 hover:bg-violet-100 transition whitespace-nowrap shadow-2xs" title="Switch between AI handling and Staff manual handling">
+                  <button type="button" id="whatsapp-takeover-btn" onclick="toggleActiveChatAiFromBar()" class="inline-flex items-center gap-1.5 rounded-xl bg-violet-100 px-3.5 py-1.5 text-xs font-bold text-violet-800 hover:bg-violet-200 transition whitespace-nowrap shadow-2xs" title="Switch between AI handling and Staff manual handling">
                     <span class="h-2 w-2 rounded-full bg-violet-500"></span>
                     <span id="whatsapp-takeover-btn-text">Take Over Chat</span>
                   </button>
@@ -6163,7 +6163,7 @@
               </div>
 
               <!-- Active Quoted Reply Preview Bar -->
-              <div id="whatsapp-active-reply-bar" class="hidden items-center justify-between gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50/90 px-3.5 py-2 shadow-2xs transition mb-1.5 animate-in fade-in slide-in-from-bottom-1 w-full max-w-full">
+              <div id="whatsapp-active-reply-bar" class="hidden items-center justify-between gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 shadow-2xs transition mb-1.5 animate-in fade-in slide-in-from-bottom-1 w-full max-w-full">
                 <div class="flex items-center gap-2.5 min-w-0 flex-1">
                   <div class="h-8 w-1 rounded-full bg-emerald-500 shrink-0"></div>
                   <div class="min-w-0 flex-1">
@@ -6180,7 +6180,7 @@
               </div>
 
               <!-- Floating Minimalist WhatsApp Chat Capsule -->
-              <form id="whatsapp-reply-form" onsubmit="sendWhatsAppManualReply(event)" class="relative flex items-center gap-1.5 sm:gap-2 w-full max-w-full rounded-full border border-slate-300 bg-white px-2 sm:px-3 py-1.5 shadow-sm transition-all focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20">
+              <form id="whatsapp-reply-form" onsubmit="sendWhatsAppManualReply(event)" class="relative flex items-center gap-1.5 sm:gap-2 w-full max-w-full rounded-full border border-slate-200 bg-white px-2 sm:px-3 py-1.5 shadow-sm transition-all focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20">
                 <!-- Template Picker Button -->
                 <button type="button" onclick="openWhatsAppChatTemplatePicker(this)" class="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition" title="Saved Templates">
                   <i data-lucide="bookmark" class="h-4 w-4 sm:h-5 sm:w-5"></i>
@@ -30950,7 +30950,7 @@
 
         return `
           <button type="button" onclick="selectWhatsAppConversation('${conv.id}')" class="whatsapp-conv-item w-full text-left p-3 sm:p-3.5 rounded-2xl flex items-start gap-3 transition-all duration-150 ${isActive ? 'active' : 'hover:bg-white'}">
-            <div class="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-800 font-bold text-sm border border-emerald-200/50 shadow-2xs">
+            <div class="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-800 font-bold text-sm shadow-2xs">
               ${escapeHtml(initials)}
               ${unreadCount > 0 ? `<span class="absolute -top-1 -right-1 flex h-5 min-w-[1.25rem] px-1 items-center justify-center rounded-full bg-emerald-600 text-[11px] font-bold text-white ring-2 ring-white shadow-2xs">${unreadCount > 9 ? '9+' : unreadCount}</span>` : ''}
             </div>
@@ -30966,15 +30966,15 @@
                     <span class="h-1.5 w-1.5 rounded-full bg-slate-400"></span> AI Off
                   </span>
                 ` : !isAiEffectivelyEnabled ? `
-                  <span class="inline-flex items-center gap-1 rounded-md bg-amber-50 border border-amber-200/80 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+                  <span class="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">
                     <span class="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse"></span> Human Needed
                   </span>
                 ` : `
-                  <span class="inline-flex items-center gap-1 rounded-md bg-violet-50 border border-violet-200/80 px-2 py-0.5 text-[11px] font-bold text-violet-700">
+                  <span class="inline-flex items-center gap-1 rounded-md bg-violet-100 px-2 py-0.5 text-[11px] font-bold text-violet-800">
                     <span class="h-1.5 w-1.5 rounded-full bg-violet-500"></span> AI Active
                   </span>
                 `}
-                ${conv.patient_id ? `<span class="inline-flex items-center rounded-md bg-blue-50 border border-blue-200/80 px-1.5 py-0.5 text-[11px] font-bold text-blue-700">Patient</span>` : ''}
+                ${conv.patient_id ? `<span class="inline-flex items-center rounded-md bg-blue-100 px-1.5 py-0.5 text-[11px] font-bold text-blue-800">Patient</span>` : ''}
               </div>
             </div>
           </button>
@@ -31205,7 +31205,7 @@
 
       const olderMessagesControl = whatsappMessagesHasOlder ? `
         <div class="flex justify-center py-1.5">
-          <button id="whatsapp-load-older" type="button" onclick="loadOlderWhatsAppMessages()" ${whatsappMessagesLoadingOlder ? 'disabled' : ''} class="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/95 px-4 py-2 text-xs font-bold text-slate-600 shadow-2xs transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60">
+          <button id="whatsapp-load-older" type="button" onclick="loadOlderWhatsAppMessages()" ${whatsappMessagesLoadingOlder ? 'disabled' : ''} class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 shadow-2xs transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60">
             <i data-lucide="${whatsappMessagesLoadingOlder ? 'loader-2' : 'arrow-up'}" class="h-3.5 w-3.5 ${whatsappMessagesLoadingOlder ? 'animate-spin' : ''}"></i>
             <span>${whatsappMessagesLoadingOlder ? 'Loading earlier messages...' : 'Scroll up or tap to load 10 earlier messages'}</span>
           </button>
@@ -31251,7 +31251,7 @@
         if (msg.media_url) {
           if (msg.message_type === 'image') {
             mediaHtml = `
-              <div class="mb-2.5 overflow-hidden rounded-xl border border-slate-200/80 bg-slate-100 shadow-2xs">
+              <div class="mb-2.5 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 shadow-2xs">
                 <a href="${escapeHtml(msg.media_url)}" target="_blank" rel="noopener noreferrer">
                   <img src="${escapeHtml(msg.media_url)}" alt="Attachment" class="max-h-72 w-auto object-cover hover:opacity-90 transition" loading="lazy" decoding="async" fetchpriority="low" />
                 </a>
@@ -31259,13 +31259,13 @@
             `;
           } else if (msg.message_type === 'audio') {
             mediaHtml = `
-              <div class="mb-2.5 p-1 rounded-xl bg-slate-50/80 border border-slate-200/60 shadow-2xs">
+              <div class="mb-2.5 p-1 rounded-xl bg-slate-50 border border-slate-200 shadow-2xs">
                 <audio controls preload="none" src="${escapeHtml(msg.media_url)}" class="w-full max-w-xs h-9"></audio>
               </div>
             `;
           } else {
             mediaHtml = `
-              <div class="mb-2.5 flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-slate-50 p-2.5 text-sm">
+              <div class="mb-2.5 flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-sm">
                 <i data-lucide="file" class="h-4 w-4 text-blue-600"></i>
                 <a href="${escapeHtml(msg.media_url)}" target="_blank" rel="noopener noreferrer" class="font-bold text-blue-700 underline truncate">Download Document</a>
               </div>
@@ -31314,7 +31314,7 @@
         let reactionBadgeHtml = '';
         if (msg.reaction) {
           reactionBadgeHtml = `
-            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '${escapeHtml(msg.reaction)}')" class="absolute -bottom-3 ${alignClass === 'justify-end' ? 'right-3' : 'left-3'} inline-flex items-center gap-1 rounded-full border border-slate-200/90 bg-white px-2 py-0.5 text-sm shadow-xs hover:scale-110 active:scale-95 transition z-10" title="Reaction: ${escapeHtml(msg.reaction)} (Click to remove)">
+            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '${escapeHtml(msg.reaction)}')" class="absolute -bottom-3 ${alignClass === 'justify-end' ? 'right-3' : 'left-3'} inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-sm shadow-xs hover:scale-110 active:scale-95 transition z-10" title="Reaction: ${escapeHtml(msg.reaction)} (Click to remove)">
               <span>${escapeHtml(msg.reaction)}</span>
             </button>
           `;
@@ -31322,7 +31322,7 @@
 
         // Quick React & Reply Action Menu on hover / tap
         const actionMenuHtml = `
-          <div class="whatsapp-msg-actions hidden group-hover:flex items-center gap-1 absolute -top-4 ${alignClass === 'justify-end' ? 'left-3' : 'right-3'} rounded-full border border-slate-200/90 bg-white/95 px-2 py-0.5 shadow-sm text-sm backdrop-blur-xs z-20">
+          <div class="whatsapp-msg-actions hidden group-hover:flex items-center gap-1 absolute -top-4 ${alignClass === 'justify-end' ? 'left-3' : 'right-3'} rounded-full border border-slate-200 bg-white/95 px-2 py-0.5 shadow-sm text-sm backdrop-blur-xs z-20">
             <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '👍')" class="hover:scale-125 transition px-0.5 text-sm" title="Like">👍</button>
             <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '❤️')" class="hover:scale-125 transition px-0.5 text-sm" title="Love">❤️</button>
             <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '😂')" class="hover:scale-125 transition px-0.5 text-sm" title="Laugh">😂</button>

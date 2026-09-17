@@ -9,7 +9,10 @@ This repository contains **Lumin**, a modern clinical dental practice management
 Lumin must look and feel like a **top-tier modern clinical SaaS** (Linear / Apple Human Interface / Vercel design standard):
 - **Clinical Elegance**: Interfaces should feel calm, trustworthy, high-precision, and uncluttered.
 - **Surface Elevation & Layering**:
-  - Do not use harsh 100% black/white borders. Use subtle, semi-transparent borders: `border border-slate-200/80` (or `border-white/10` in dark themes).
+  - **CRITICAL: Zero Black Borders & Tailwind Opacity Safety Rule**:
+    - **NEVER use slash-opacity syntax on border classes** (e.g. `border-slate-200/80`, `border-emerald-200/60`, `border-blue-200/80`). `lumin-app.css` is a precompiled Tailwind CSS bundle that does NOT contain slash-opacity border utilities. Using an uncompiled border color class causes the browser to silently fall back to `border-color: currentColor`, producing **harsh, ugly solid black borders**!
+    - **Borderless by default for avatars, chips, badges, and pills**: Avatars, small badges, action pills, chips, and quick replies must be **completely borderless** by default, using refined soft tinted fills (`bg-emerald-50 text-emerald-700`, `bg-blue-50 text-blue-700`, `bg-violet-100 text-violet-800`, `bg-amber-100 text-amber-800`, `bg-slate-100 text-slate-700`).
+    - **Strict compiled tokens for containers**: When cards, inputs, dialogs, or dividers genuinely require a border, ONLY use verified compiled classes without slash opacity: `border-slate-100`, `border-slate-200`, `border-slate-300`, or explicit CSS (`border: 1px solid #e2e8f0;`).
   - Use layered surface elevation: Page background (`bg-slate-50/50` or `var(--lumin-surface)`) -> Card container (`bg-white` or `var(--lumin-face)`) -> Inner sections/inputs (`bg-slate-50` or elevated controls).
   - Respect the `.lumin-raised` styling system defined in `lumin-theme.css` (`var(--lumin-raised)`, `var(--lumin-small-raised)`, `var(--lumin-face)`).
 - **No Generic/Bland UI**:
@@ -22,12 +25,12 @@ Lumin must look and feel like a **top-tier modern clinical SaaS** (Linear / Appl
 
 - **Brand & Primary**: Dental Blue / Modern Cyan (`#2563eb`, `hsl(215, ...)`).
 - **Neutrals**: Slate scale (`slate-50` to `slate-900`) for balanced contrast and clean clinical readability.
-- **Status & Findings Palette**:
-  - **Healthy / Completed**: `emerald-600` on `bg-emerald-50`, border `border-emerald-200/60`.
-  - **Caries / Urgent / Danger**: `rose-600` on `bg-rose-50`, border `border-rose-200/60`.
-  - **Restorations / Composite / In Progress**: `blue-600` on `bg-blue-50`, border `border-blue-200/60`.
-  - **Pending / Warning / Follow-up**: `amber-600` on `bg-amber-50`, border `border-amber-200/60`.
-  - **Muted / Inactive**: `slate-500` on `bg-slate-100`, border `border-slate-200/60`.
+- **Status & Findings Palette (Borderless Soft Surfaces)**:
+  - **Healthy / Completed**: `text-emerald-700` on `bg-emerald-50` (or `bg-emerald-100 text-emerald-800`).
+  - **Caries / Urgent / Danger**: `text-rose-700` on `bg-rose-50` (or `bg-rose-100 text-rose-800`).
+  - **Restorations / Composite / In Progress**: `text-blue-700` on `bg-blue-50` (or `bg-blue-100 text-blue-800`).
+  - **Pending / Warning / Follow-up**: `text-amber-800` on `bg-amber-100` (or `bg-amber-50 text-amber-700`).
+  - **Muted / Inactive**: `text-slate-600` on `bg-slate-100`.
 
 ---
 
