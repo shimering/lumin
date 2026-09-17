@@ -1,4 +1,4 @@
-const LUMIN_CACHE = "lumin-dental-shell-v83";
+const LUMIN_CACHE = "lumin-dental-shell-v84";
 const LUMIN_SHELL = [
   "/",
   "/manifest.webmanifest",

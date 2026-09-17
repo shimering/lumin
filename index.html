@@ -2640,7 +2640,7 @@
         inset-block-start: 0.1rem;
         inset-inline-end: 0.15rem;
       }
-      /* Mobile Quick Create "+" Button: Prominent & High Contrast */
+      /* Mobile Quick Create "+" Button: Prominent, High Contrast with Theme Color Glow */
       #nav-btn-quick-create {
         position: relative;
         display: flex !important;
@@ -2656,7 +2656,7 @@
         border-radius: 9999px !important;
         background: linear-gradient(145deg, #1d4ed8 0%, #2563eb 55%, #1e40af 100%) !important;
         color: #ffffff !important;
-        box-shadow: 0 4px 14px -1px rgba(29, 78, 216, 0.55), 0 2px 6px rgba(15, 23, 42, 0.22) !important;
+        box-shadow: 0 0 16px 2px rgba(37, 99, 235, 0.55), 0 0 32px 6px rgba(37, 99, 235, 0.30), 0 4px 14px -1px rgba(29, 78, 216, 0.60) !important;
         cursor: pointer;
         z-index: 2;
         transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 180ms ease, background 180ms ease !important;
@@ -2673,15 +2673,16 @@
       }
       #nav-btn-quick-create:hover {
         transform: scale(1.06);
-        box-shadow: 0 6px 20px -1px rgba(29, 78, 216, 0.65), 0 2px 8px rgba(15, 23, 42, 0.25) !important;
+        box-shadow: 0 0 22px 4px rgba(37, 99, 235, 0.70), 0 0 42px 8px rgba(37, 99, 235, 0.38), 0 6px 20px -1px rgba(29, 78, 216, 0.70) !important;
       }
       #nav-btn-quick-create:active {
         transform: scale(0.94);
+        box-shadow: 0 0 12px 2px rgba(37, 99, 235, 0.45), 0 2px 8px rgba(29, 78, 216, 0.50) !important;
       }
       #nav-btn-quick-create.is-menu-open {
         background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%) !important;
         border-color: rgba(255, 255, 255, 0.95) !important;
-        box-shadow: 0 4px 14px -1px rgba(15, 23, 42, 0.6), 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+        box-shadow: 0 0 16px 2px rgba(37, 99, 235, 0.45), 0 4px 14px -1px rgba(15, 23, 42, 0.6) !important;
       }
       #nav-btn-quick-create.is-menu-open .nav-btn-quick-create-icon {
         transform: rotate(45deg);
@@ -2689,7 +2690,7 @@
       .dark #nav-btn-quick-create {
         border-color: rgba(255, 255, 255, 0.35) !important;
         background: linear-gradient(145deg, #2563eb 0%, #0284c7 100%) !important;
-        box-shadow: 0 4px 16px rgba(37, 99, 235, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4) !important;
+        box-shadow: 0 0 20px 3px rgba(59, 130, 246, 0.65), 0 0 38px 8px rgba(37, 99, 235, 0.35), 0 4px 16px rgba(37, 99, 235, 0.55) !important;
       }
       #app-user-actions { gap: 0.375rem; }
       #btn-new-patient,
@@ -27557,7 +27558,9 @@
       return appointments
         .filter(appointment =>
           appointment.date === appointmentDateKey(date)
-          && (activeDoctorId === 'all' || appointment.assignedUserId === activeDoctorId)
+          && (activeDoctorId === 'all'
+              || appointment.assignedUserId === activeDoctorId
+              || (activeDoctorId === 'unassigned' && !appointment.assignedUserId))
         )
         .sort((left, right) => new Date(left.startAt) - new Date(right.startAt));
     }
@@ -27685,9 +27688,6 @@
 
     function appointmentDoctorOptions() {
       if (!currentUserAccess?.userId) return [];
-      if (currentUserAccess.isDoctor) {
-        return [{ value: currentUserAccess.userId, label: currentUserAccess.fullName }];
-      }
       const doctors = new Map();
       appointmentStaff.filter(staff => staff.canReceiveAppointments).forEach(staff => {
         doctors.set(staff.userId, { value: staff.userId, label: staff.fullName });
@@ -27705,11 +27705,16 @@
           doctors.set(entry.assignedUserId, { value: entry.assignedUserId, label: entry.doctor });
         }
       });
-      return [...doctors.values()].sort((left, right) => String(left.label).localeCompare(String(right.label)));
+      const options = [...doctors.values()].sort((left, right) => String(left.label).localeCompare(String(right.label)));
+      if (appointments.some(entry => !entry.assignedUserId)) {
+        options.push({ value: 'unassigned', label: currentUiLanguage === 'ar' ? 'بدون طبيب' : 'Unassigned doctor' });
+      }
+      return options;
     }
 
     function normaliseAppointmentDoctorFilter(value) {
-      if (currentUserAccess?.isDoctor) return currentUserAccess.userId;
+      if (value === 'all') return 'all';
+      if (value === 'unassigned') return 'unassigned';
       return appointmentDoctorOptions().some(option => option.value === value) ? value : 'all';
     }
 
@@ -27719,14 +27724,11 @@
       const select = document.getElementById('appointment-doctor-filter');
       const wrap = document.getElementById('appointment-doctor-filter-wrap');
       const mineOnlyWrap = document.getElementById('appointment-mine-only-toggle-wrap');
-      const isDoctor = Boolean(currentUserAccess?.isDoctor);
 
-      if (isDoctor) {
-        if (wrap) wrap.classList.add('hidden');
-        if (mineOnlyWrap) mineOnlyWrap.classList.add('hidden');
-      } else {
-        if (wrap) wrap.classList.remove('hidden');
-        if (mineOnlyWrap) mineOnlyWrap.classList.remove('hidden');
+      if (wrap) wrap.classList.remove('hidden');
+      if (mineOnlyWrap) {
+        const canShowMine = Boolean(currentUserAccess?.userId && (currentUserAccess.isDoctor || options.some(o => o.value === currentUserAccess.userId)));
+        mineOnlyWrap.classList.toggle('hidden', !canShowMine);
       }
 
       if (select) {
@@ -27746,9 +27748,6 @@
 
     function dashboardDoctorOptions() {
       if (!currentUserAccess?.userId) return [];
-      if (currentUserAccess.isDoctor) {
-        return [{ value: currentUserAccess.userId, label: currentUserAccess.fullName }];
-      }
       const doctors = new Map();
       appointmentStaff.filter(staff => staff.canReceiveAppointments).forEach(staff => {
         doctors.set(staff.userId, { value: staff.userId, label: staff.fullName });
@@ -27766,7 +27765,8 @@
     }
 
     function normaliseDashboardDoctorFilter(value) {
-      if (currentUserAccess?.isDoctor) return currentUserAccess.userId;
+      if (value === 'all') return 'all';
+      if (value === 'unassigned') return 'unassigned';
       return dashboardDoctorOptions().some(option => option.value === value) ? value : 'all';
     }
 
@@ -27783,10 +27783,10 @@
       dashboardDoctorFilter = normaliseDashboardDoctorFilter(dashboardDoctorFilter);
       const select = document.getElementById('dashboard-doctor-filter');
       if (select) {
-        const allOption = currentUserAccess?.isDoctor ? '' : `<option value="all">${currentUiLanguage === 'ar' ? 'كل الأطباء' : 'All doctors'}</option>`;
+        const allOption = `<option value="all">${currentUiLanguage === 'ar' ? 'كل الأطباء' : 'All doctors'}</option>`;
         setStableHtml(select, allOption + options.map(option => `<option value="${escapeAppointmentText(option.value)}">${escapeAppointmentText(option.label)}</option>`).join(''));
         select.value = dashboardDoctorFilter;
-        select.disabled = Boolean(currentUserAccess?.isDoctor);
+        select.disabled = false;
       }
       return options.find(option => option.value === dashboardDoctorFilter) || null;
     }
@@ -27801,12 +27801,10 @@
 
     function dashboardAppointmentsForDate(date) {
       if (!currentUserAccess) return [];
-      const showAllDoctors = !currentUserAccess?.isDoctor;
       const selectedDoctor = normaliseDashboardDoctorFilter(dashboardDoctorFilter);
       return appointments
         .filter(appointment =>
           appointment.date === appointmentDateKey(date)
-          && (showAllDoctors || appointment.assignedUserId === currentUserAccess?.userId)
           && (selectedDoctor === 'all' || appointment.assignedUserId === selectedDoctor || (selectedDoctor === 'unassigned' && !appointment.assignedUserId))
         )
         .sort((left, right) => new Date(left.startAt) - new Date(right.startAt));
