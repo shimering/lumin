@@ -457,9 +457,9 @@ body.lumin-raised #app-header button:active:not(:disabled) { box-shadow: var(--l
       margin-bottom: 0.2rem;
     }
     @media (max-width: 1023px) {
-      body.lumin-raised #mobile-header-trigger {
+      body.lumin-raised #quick-create-menu {
         background: var(--lumin-face);
-        box-shadow: var(--lumin-small-raised);
+        box-shadow: var(--lumin-raised);
       }
       body.lumin-raised #app-header.is-open {
         background: var(--lumin-face);
