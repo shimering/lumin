@@ -2249,6 +2249,250 @@
         touch-action: pan-x pan-y !important;
       }
 
+      /* Compact Patient Query Pagination Footer on Mobile */
+      #patient-query-pagination {
+        padding-block: 0.35rem !important;
+        padding-inline: 0.75rem !important;
+        gap: 0.5rem !important;
+      }
+      #patient-query-pagination #patient-query-page-summary {
+        font-size: 0.75rem !important;
+        line-height: 1rem !important;
+      }
+      #patient-query-pagination [role="group"] {
+        border-radius: 0.65rem !important;
+      }
+      #patient-query-pagination [role="group"] > button {
+        height: 1.85rem !important;
+        width: 2.15rem !important;
+      }
+      #patient-query-pagination [role="group"] svg {
+        width: 0.95rem !important;
+        height: 0.95rem !important;
+      }
+
+      /* Appointments Calendar Mobile Scroll Lock & Viewport Isolation:
+         Strictly isolate scrolling inside the calendar views and prevent outer page / upward scrolling */
+      html.appointments-calendar-active,
+      body.appointments-calendar-active {
+        height: 100% !important;
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        overflow: hidden !important;
+        overscroll-behavior: none !important;
+        overscroll-behavior-y: none !important;
+      }
+      body.appointments-calendar-active #app-shell {
+        height: 100% !important;
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        overflow: hidden !important;
+        overscroll-behavior: none !important;
+        overscroll-behavior-y: none !important;
+        padding-bottom: 0 !important;
+      }
+      body.appointments-calendar-active #app-main {
+        height: 100% !important;
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        overflow: hidden !important;
+        overscroll-behavior: none !important;
+        overscroll-behavior-y: none !important;
+        padding-bottom: 0 !important;
+        margin-bottom: 0 !important;
+      }
+      body.appointments-calendar-active #view-appointments:not(.hidden) {
+        display: flex !important;
+        flex-direction: column !important;
+        height: var(--appointment-page-viewport-height, calc(100dvh - var(--mobile-nav-height) - max(0.5rem, env(safe-area-inset-top)) - 0.5rem)) !important;
+        max-height: var(--appointment-page-viewport-height, calc(100dvh - var(--mobile-nav-height) - max(0.5rem, env(safe-area-inset-top)) - 0.5rem)) !important;
+        min-height: 0 !important;
+        gap: 0.5rem !important;
+        overflow: hidden !important;
+        overscroll-behavior: none !important;
+        overscroll-behavior-y: none !important;
+        touch-action: pan-x pinch-zoom;
+      }
+      body.appointments-calendar-active #view-appointments:not(.hidden) > :not([hidden]) ~ :not([hidden]) {
+        margin-top: 0 !important;
+      }
+      body.appointments-calendar-active #view-appointments > [data-compact-appointments-header] {
+        flex: 0 0 auto !important;
+        touch-action: none;
+      }
+      body.appointments-calendar-active [data-appointments-calendar-shell] {
+        display: flex !important;
+        flex-direction: column !important;
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+      }
+      body.appointments-calendar-active [data-appointments-calendar-card] {
+        display: flex !important;
+        flex-direction: column !important;
+        flex: 1 1 auto !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+        overscroll-behavior: contain !important;
+      }
+      body.appointments-calendar-active #appointments-calendar-toolbar {
+        flex: 0 0 auto !important;
+        touch-action: none;
+      }
+      body.appointments-calendar-active #appointments-month-view,
+      body.appointments-calendar-active #appointments-week-scroll,
+      body.appointments-calendar-active #appointments-day-timeline-scroll {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        overscroll-behavior: contain !important;
+        overscroll-behavior-y: contain !important;
+        touch-action: pan-x pan-y !important;
+      }
+      body.appointments-calendar-active #appointments-week-view:not(.hidden),
+      body.appointments-calendar-active #appointments-day-view:not(.hidden) {
+        display: flex !important;
+        flex: 1 1 auto !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+      }
+
+      /* WhatsApp Mobile Scroll Lock & Viewport Isolation:
+         Strictly isolate scrolling inside conversation lists & message boxes and prevent outer page / upward scrolling */
+      html.whatsapp-view-active,
+      body.whatsapp-view-active {
+        height: 100% !important;
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        overflow: hidden !important;
+        overscroll-behavior: none !important;
+        overscroll-behavior-y: none !important;
+      }
+      body.whatsapp-view-active #app-shell {
+        height: 100% !important;
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        overflow: hidden !important;
+        overscroll-behavior: none !important;
+        overscroll-behavior-y: none !important;
+        padding-bottom: 0 !important;
+      }
+      body.whatsapp-view-active #app-main {
+        height: 100% !important;
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        overflow: hidden !important;
+        overscroll-behavior: none !important;
+        overscroll-behavior-y: none !important;
+        padding-bottom: 0 !important;
+        margin-bottom: 0 !important;
+      }
+      body.whatsapp-view-active #view-whatsapp:not(.hidden) {
+        display: flex !important;
+        flex-direction: column !important;
+        height: var(--whatsapp-mobile-viewport-height, calc(100dvh - var(--mobile-nav-height) - max(0.5rem, env(safe-area-inset-top)) - 0.5rem)) !important;
+        max-height: var(--whatsapp-mobile-viewport-height, calc(100dvh - var(--mobile-nav-height) - max(0.5rem, env(safe-area-inset-top)) - 0.5rem)) !important;
+        min-height: 0 !important;
+        gap: 0.5rem !important;
+        overflow: hidden !important;
+        overscroll-behavior: none !important;
+        overscroll-behavior-y: none !important;
+        touch-action: pan-x pinch-zoom;
+      }
+      body.whatsapp-view-active #view-whatsapp > .app-page-bar {
+        flex: 0 0 auto !important;
+        touch-action: none;
+      }
+      body.whatsapp-view-active .whatsapp-chat-shell {
+        height: 100% !important;
+        min-height: 0 !important;
+        flex: 1 1 auto !important;
+        overflow: hidden !important;
+        overscroll-behavior: contain !important;
+      }
+      @media (max-width: 767px) {
+        body.whatsapp-view-active .whatsapp-chat-shell {
+          display: flex !important;
+          flex-direction: column !important;
+        }
+        body.whatsapp-view-active:not(.whatsapp-mobile-chat-open) #whatsapp-sidebar {
+          display: flex !important;
+        }
+        body.whatsapp-view-active:not(.whatsapp-mobile-chat-open) #whatsapp-main-chat {
+          display: none !important;
+        }
+        body.whatsapp-view-active.whatsapp-mobile-chat-open #whatsapp-sidebar {
+          display: none !important;
+        }
+        body.whatsapp-view-active.whatsapp-mobile-chat-open #whatsapp-main-chat {
+          display: flex !important;
+        }
+      }
+      @media (min-width: 768px) and (max-width: 1023px) {
+        body.whatsapp-view-active #whatsapp-sidebar {
+          display: flex !important;
+        }
+        body.whatsapp-view-active #whatsapp-main-chat {
+          display: flex !important;
+        }
+      }
+      body.whatsapp-view-active #whatsapp-sidebar {
+        flex-direction: column !important;
+        flex: 1 1 auto !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+      }
+      body.whatsapp-view-active #whatsapp-sidebar > div:first-child {
+        flex: 0 0 auto !important;
+        touch-action: none;
+      }
+      body.whatsapp-view-active #whatsapp-conversations-list {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain !important;
+        overscroll-behavior-y: contain !important;
+        -webkit-overflow-scrolling: touch !important;
+        touch-action: pan-y !important;
+      }
+      body.whatsapp-view-active #whatsapp-main-chat {
+        flex-direction: column !important;
+        flex: 1 1 auto !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+      }
+      body.whatsapp-view-active #whatsapp-chat-active {
+        display: flex !important;
+        flex-direction: column !important;
+        flex: 1 1 auto !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+      }
+      body.whatsapp-view-active #whatsapp-chat-active > div:first-child {
+        flex: 0 0 auto !important;
+        touch-action: none;
+      }
+      body.whatsapp-view-active #whatsapp-messages-container {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain !important;
+        overscroll-behavior-y: contain !important;
+        -webkit-overflow-scrolling: touch !important;
+        touch-action: pan-y !important;
+      }
+      body.whatsapp-view-active #whatsapp-reply-panel {
+        flex: 0 0 auto !important;
+        touch-action: none;
+      }
+
       /* Mobile Title Bar Overlay (iOS 26 Floating Liquid Glass) */
       #app-header {
         position: fixed !important;
@@ -2502,14 +2746,7 @@
       #view-patients .grid.grid-cols-2 > div { padding: 0.65rem; }
       #view-patients .grid.grid-cols-2 span.text-\[11px\] { font-size: 0.6rem; line-height: 0.85rem; }
 
-      /* Lock the mobile shells so vertical gestures stay inside the calendar cards. */
-      body.appointments-calendar-active #app-shell {
-        height: 100dvh;
-        overflow: hidden;
-      }
-      body.appointments-calendar-active #app-main {
-        overflow: hidden;
-      }
+
       #view-patients .overflow-x-auto,
       #view-admin .overflow-x-auto,
       #view-chart .overflow-x-auto,
@@ -3560,8 +3797,12 @@
         min-height: 0;
         gap: 0.75rem;
       }
-      .whatsapp-chat-shell {
+      body:not(.whatsapp-view-active) .whatsapp-chat-shell {
         height: auto !important;
+        min-height: 0 !important;
+      }
+      body.whatsapp-view-active .whatsapp-chat-shell {
+        height: 100% !important;
         min-height: 0 !important;
       }
       .whatsapp-mobile-chat-open #whatsapp-sidebar {
@@ -9601,6 +9842,8 @@
       document.body.classList.remove('patient-query-active');
       document.documentElement.classList.remove('dashboard-active');
       document.body.classList.remove('dashboard-active');
+      document.documentElement.classList.remove('whatsapp-view-active');
+      document.body.classList.remove('whatsapp-view-active');
       document.getElementById('app-shell').classList.add('hidden');
       document.getElementById('auth-gate').classList.remove('hidden');
     }
@@ -24366,6 +24609,7 @@
       }
       syncNavMountLocation();
       window.location.hash = viewName;
+      document.documentElement.classList.toggle('whatsapp-view-active', viewName === 'whatsapp');
       document.body.classList.toggle('whatsapp-view-active', viewName === 'whatsapp');
 
       if (viewName === 'dashboard') {
@@ -24438,14 +24682,19 @@
       const appointmentsCalendarActive = viewName === 'appointments';
       const patientQueryActive = viewName === 'patients';
       const dashboardActive = viewName === 'dashboard';
+      const whatsAppActive = viewName === 'whatsapp';
       document.documentElement.classList.toggle('appointments-calendar-active', appointmentsCalendarActive);
       document.body.classList.toggle('appointments-calendar-active', appointmentsCalendarActive);
       document.documentElement.classList.toggle('patient-query-active', patientQueryActive);
       document.body.classList.toggle('patient-query-active', patientQueryActive);
       document.documentElement.classList.toggle('dashboard-active', dashboardActive);
       document.body.classList.toggle('dashboard-active', dashboardActive);
-      if ((appointmentsCalendarActive || patientQueryActive || dashboardActive) && window.scrollY) window.scrollTo(0, 0);
+      document.documentElement.classList.toggle('whatsapp-view-active', whatsAppActive);
+      document.body.classList.toggle('whatsapp-view-active', whatsAppActive);
+      if ((appointmentsCalendarActive || patientQueryActive || dashboardActive || whatsAppActive) && window.scrollY) window.scrollTo(0, 0);
       if (patientQueryActive) resetPatientQueryWindowScroll();
+      if (appointmentsCalendarActive) resetAppointmentsCalendarWindowScroll();
+      if (whatsAppActive) resetWhatsAppWindowScroll();
 
       if (viewName === 'dashboard') {
         viewDashboard.classList.remove('hidden');
@@ -24486,11 +24735,13 @@
       } else if (viewName === 'appointments') {
         viewAppointments.classList.remove('hidden');
         renderAppointments();
+        scheduleAppointmentCalendarViewportUpdate();
       } else if (viewName === 'whatsapp') {
         const viewWhatsApp = document.getElementById('view-whatsapp');
         if (viewWhatsApp) {
           viewWhatsApp.classList.remove('hidden');
           await renderWhatsAppView();
+          scheduleWhatsAppMobileViewportUpdate();
         }
       } else if (viewName === 'prices') {
         viewPrices?.classList.remove('hidden');
@@ -26812,6 +27063,16 @@
       return viewportBottom - mobileNavigationHeight - 8;
     }
 
+    function resetAppointmentsCalendarWindowScroll() {
+      if (!document.body.classList.contains('appointments-calendar-active')) return;
+      if (window.innerWidth >= 1024) return;
+      if (window.scrollY !== 0 || document.documentElement.scrollTop !== 0 || document.body.scrollTop !== 0) {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      }
+    }
+
     function updateAppointmentCalendarViewportHeight() {
       const appointmentsView = document.getElementById('view-appointments');
       const toolbar = document.getElementById('appointments-calendar-toolbar');
@@ -26823,11 +27084,13 @@
       const viewportBottom = visualViewport
         ? visualViewport.offsetTop + visualViewport.height
         : window.innerHeight;
-      const mobileControlsBelow = window.matchMedia('(max-width: 767px)').matches;
+      const isMobile = window.matchMedia('(max-width: 1023px)').matches;
       const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
-      if (mobileControlsBelow) {
+      if (isMobile) {
+        resetAppointmentsCalendarWindowScroll();
         const contentBottom = mobileViewContentBottom(appShell, viewportBottom);
-        const pageHeight = Math.floor((contentBottom - appointmentsView.getBoundingClientRect().top) / zoom);
+        const appointmentsTop = appointmentsView.getBoundingClientRect().top;
+        const pageHeight = Math.floor((contentBottom - appointmentsTop) / zoom);
         appointmentsView.style.setProperty('--appointment-page-viewport-height', `${Math.max(112, pageHeight)}px`);
         appointmentsView.style.removeProperty('--appointment-calendar-viewport-height');
         updateAppointmentMonthCardVisibility();
@@ -26840,15 +27103,12 @@
         document.getElementById('appointments-week-view'),
         document.getElementById('appointments-day-view')
       ].find(view => view && !view.classList.contains('hidden'));
-      const calendarTop = mobileControlsBelow
-        ? activeCalendarView?.getBoundingClientRect().top
-        : toolbar.getBoundingClientRect().bottom;
+      const calendarTop = toolbar.getBoundingClientRect().bottom;
       if (!Number.isFinite(calendarTop)) return;
       const mobileNavigationHeight = Number.parseFloat(getComputedStyle(appShell).paddingBottom) || 0;
       const mainBottomPadding = Number.parseFloat(getComputedStyle(main).paddingBottom) || 0;
-      const bottomToolbarHeight = mobileControlsBelow ? toolbar.getBoundingClientRect().height : 0;
       const availableHeight = Math.floor(
-        ((viewportBottom - calendarTop - bottomToolbarHeight - 2) / zoom)
+        ((viewportBottom - calendarTop - 2) / zoom)
         - mobileNavigationHeight
         - mainBottomPadding
       );
@@ -26867,7 +27127,24 @@
     function setupAppointmentCalendarViewport() {
       window.addEventListener('resize', scheduleAppointmentCalendarViewportUpdate, { passive: true });
       window.visualViewport?.addEventListener('resize', scheduleAppointmentCalendarViewportUpdate, { passive: true });
-      window.visualViewport?.addEventListener('scroll', scheduleAppointmentCalendarViewportUpdate, { passive: true });
+      window.visualViewport?.addEventListener('scroll', () => {
+        resetAppointmentsCalendarWindowScroll();
+        scheduleAppointmentCalendarViewportUpdate();
+      }, { passive: true });
+      window.addEventListener('scroll', resetAppointmentsCalendarWindowScroll, { passive: true });
+
+      // Prevent scrolling outside the calendar views on mobile/tablet viewports
+      document.addEventListener('touchmove', (e) => {
+        if (!document.body.classList.contains('appointments-calendar-active')) return;
+        if (window.innerWidth >= 1024) return;
+        // If touch gesture is inside view-appointments but outside scrollable calendar views, prevent outer page scrolling
+        if (e.target.closest('#view-appointments')) {
+          const scrollable = e.target.closest('#appointments-month-view, #appointments-week-scroll, #appointments-day-timeline-scroll');
+          if (!scrollable) {
+            if (e.cancelable) e.preventDefault();
+          }
+        }
+      }, { passive: false });
     }
 
     function resetPatientQueryWindowScroll() {
@@ -26995,6 +27272,8 @@
     let whatsappViewportResizeFrame = null;
 
     function resetWhatsAppWindowScroll() {
+      if (!document.body.classList.contains('whatsapp-view-active') && !document.body.classList.contains('whatsapp-mobile-chat-open')) return;
+      if (window.innerWidth >= 1024) return;
       if (window.scrollY !== 0 || document.documentElement.scrollTop !== 0 || document.body.scrollTop !== 0) {
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
         document.documentElement.scrollTop = 0;
@@ -27003,16 +27282,15 @@
     }
 
     function updateWhatsAppMobileViewport() {
-      if (!document.body.classList.contains('whatsapp-mobile-chat-open')) {
-        document.body.classList.remove('whatsapp-keyboard-open');
-        document.documentElement.style.removeProperty('--whatsapp-mobile-viewport-height');
-        return;
-      }
+      const whatsAppView = document.getElementById('view-whatsapp');
+      const appShell = document.getElementById('app-shell');
+      if (!whatsAppView || whatsAppView.classList.contains('hidden') || !appShell) return;
 
-      const isMobile = window.innerWidth < 768;
+      const isMobile = window.matchMedia('(max-width: 1023px)').matches;
       if (!isMobile) {
         document.body.classList.remove('whatsapp-keyboard-open');
         document.documentElement.style.removeProperty('--whatsapp-mobile-viewport-height');
+        whatsAppView.style.removeProperty('--whatsapp-mobile-viewport-height');
         return;
       }
 
@@ -27021,15 +27299,25 @@
       const viewportH = vv ? vv.height : windowH;
       const keyboardHeight = Math.max(0, windowH - viewportH);
       const isKeyboardOpen = keyboardHeight > 100;
+      const isChatOpen = document.body.classList.contains('whatsapp-mobile-chat-open');
 
-      document.body.classList.toggle('whatsapp-keyboard-open', isKeyboardOpen);
+      document.body.classList.toggle('whatsapp-keyboard-open', isKeyboardOpen && isChatOpen);
 
-      if (isKeyboardOpen && vv) {
+      const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+
+      if (isKeyboardOpen && isChatOpen && vv) {
         const targetHeight = Math.floor(vv.height);
         document.documentElement.style.setProperty('--whatsapp-mobile-viewport-height', `${targetHeight}px`);
+        whatsAppView.style.setProperty('--whatsapp-mobile-viewport-height', `${targetHeight}px`);
         resetWhatsAppWindowScroll();
       } else {
-        document.documentElement.style.removeProperty('--whatsapp-mobile-viewport-height');
+        const viewportBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+        const contentBottom = mobileViewContentBottom(appShell, viewportBottom);
+        const whatsAppTop = whatsAppView.getBoundingClientRect().top;
+        const availableHeight = Math.floor((contentBottom - whatsAppTop) / zoom);
+        const finalHeight = Math.max(112, availableHeight);
+        document.documentElement.style.setProperty('--whatsapp-mobile-viewport-height', `${finalHeight}px`);
+        whatsAppView.style.setProperty('--whatsapp-mobile-viewport-height', `${finalHeight}px`);
         resetWhatsAppWindowScroll();
       }
     }
@@ -27046,15 +27334,37 @@
       window.addEventListener('resize', scheduleWhatsAppMobileViewportUpdate, { passive: true });
       window.visualViewport?.addEventListener('resize', scheduleWhatsAppMobileViewportUpdate, { passive: true });
       window.visualViewport?.addEventListener('scroll', () => {
-        if (document.body.classList.contains('whatsapp-mobile-chat-open')) {
-          resetWhatsAppWindowScroll();
-        }
+        resetWhatsAppWindowScroll();
+        scheduleWhatsAppMobileViewportUpdate();
       }, { passive: true });
-      window.addEventListener('scroll', () => {
-        if (document.body.classList.contains('whatsapp-mobile-chat-open') && window.scrollY !== 0) {
-          resetWhatsAppWindowScroll();
+      window.addEventListener('scroll', resetWhatsAppWindowScroll, { passive: true });
+
+      // Prevent scrolling outside the conversation list or message thread on mobile/tablet viewports
+      document.addEventListener('touchmove', (e) => {
+        if (!document.body.classList.contains('whatsapp-view-active') && !document.body.classList.contains('whatsapp-mobile-chat-open')) return;
+        if (window.innerWidth >= 1024) return;
+        if (e.target.closest('#view-whatsapp')) {
+          const scrollable = e.target.closest('#whatsapp-conversations-list, #whatsapp-messages-container, #whatsapp-quick-chips, #whatsapp-reply-input');
+          if (!scrollable) {
+            if (e.cancelable) e.preventDefault();
+          }
         }
-      }, { passive: true });
+      }, { passive: false });
+
+      // Ensure focus on search input doesn't scroll the window upward
+      const searchInput = document.getElementById('whatsapp-search-input');
+      if (searchInput) {
+        searchInput.addEventListener('focus', () => {
+          requestAnimationFrame(resetWhatsAppWindowScroll);
+          setTimeout(resetWhatsAppWindowScroll, 60);
+          setTimeout(scheduleWhatsAppMobileViewportUpdate, 100);
+        });
+        searchInput.addEventListener('blur', () => {
+          requestAnimationFrame(resetWhatsAppWindowScroll);
+          setTimeout(resetWhatsAppWindowScroll, 60);
+          setTimeout(scheduleWhatsAppMobileViewportUpdate, 100);
+        });
+      }
     }
 
     function refreshAppointmentCurrentTimeLine(now = new Date()) {
@@ -32191,6 +32501,7 @@
       document.body.classList.remove('whatsapp-mobile-chat-open', 'whatsapp-keyboard-open');
       document.documentElement.style.removeProperty('--whatsapp-mobile-viewport-height');
       resetWhatsAppWindowScroll();
+      scheduleWhatsAppMobileViewportUpdate();
     }
 
     function compareWhatsAppMessages(a, b) {
