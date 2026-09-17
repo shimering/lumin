@@ -2231,12 +2231,13 @@
       #clinic-title { max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.875rem; }
       #clinic-subtitle { display: none; }
 
-      /* Mobile Header Trigger Pill (Dynamic Island style) */
+      /* Mobile Header Trigger Pill — anchored to upper-right corner */
       #mobile-header-trigger {
         position: fixed;
-        top: max(0.35rem, env(safe-area-inset-top));
-        left: 50%;
-        transform: translateX(-50%);
+        top: max(0.5rem, env(safe-area-inset-top));
+        right: 0.75rem;
+        left: auto;
+        transform: none;
         z-index: 38;
         display: inline-flex;
         align-items: center;
@@ -2262,7 +2263,7 @@
       }
 
       #mobile-header-trigger:active {
-        transform: translateX(-50%) scale(0.95);
+        transform: scale(0.95);
       }
 
       #mobile-header-trigger.is-hidden {
@@ -2416,6 +2417,15 @@
       #view-patients .grid.grid-cols-2 { gap: 0.5rem; }
       #view-patients .grid.grid-cols-2 > div { padding: 0.65rem; }
       #view-patients .grid.grid-cols-2 span.text-\[11px\] { font-size: 0.6rem; line-height: 0.85rem; }
+
+      /* Mobile: patients view fills all available vertical space above nav bar */
+      #view-patients:not(.hidden) {
+        height: calc(100dvh - var(--mobile-nav-height) - max(0.5rem, env(safe-area-inset-top)) - 0.75rem);
+        gap: 0.65rem;
+        overflow: hidden;
+      }
+      /* Lock outer scroll so only the patient list scrolls */
+      body.patients-view-active #app-main { overflow: hidden; }
       #view-patients .overflow-x-auto,
       #view-admin .overflow-x-auto,
       #view-chart .overflow-x-auto,
@@ -24080,6 +24090,7 @@
       syncNavMountLocation();
       window.location.hash = viewName;
       document.body.classList.toggle('whatsapp-view-active', viewName === 'whatsapp');
+      document.body.classList.toggle('patients-view-active', viewName === 'patients');
 
       if (viewName === 'dashboard') {
         await ensureAppointmentsLoaded();
@@ -27036,7 +27047,6 @@
 
     function normaliseAppointmentDoctorFilter(value) {
       if (currentUserAccess?.isDoctor) return currentUserAccess.userId;
-      if (appointmentShowMineOnly && currentUserAccess?.userId) return currentUserAccess.userId;
       return appointmentDoctorOptions().some(option => option.value === value) ? value : 'all';
     }
 
@@ -28876,8 +28886,9 @@
           </button>`;
       }).join('');
 
-      const offHoursBlocks = weekDates.flatMap((date, dayIndex) => {
-        const dayIntervals = getCalendarNonWorkingIntervalsForDate(date);
+      const activeDoctorIdForOffHours = normaliseAppointmentDoctorFilter(appointmentDoctorFilter);
+      const offHoursBlocks = activeDoctorIdForOffHours === 'all' ? '' : weekDates.flatMap((date, dayIndex) => {
+        const dayIntervals = getCalendarNonWorkingIntervalsForDate(date, activeDoctorIdForOffHours);
         const dayWidth = 100 / 7;
         const left = dayIndex * dayWidth;
         return dayIntervals.map(interval => {
@@ -29003,7 +29014,10 @@
         `;
       }).join('');
 
-      const nonWorkingIntervals = getCalendarNonWorkingIntervalsForDate(appointmentSelectedDate);
+      const activeDoctorIdForOffHours = normaliseAppointmentDoctorFilter(appointmentDoctorFilter);
+      const nonWorkingIntervals = activeDoctorIdForOffHours !== 'all'
+        ? getCalendarNonWorkingIntervalsForDate(appointmentSelectedDate, activeDoctorIdForOffHours)
+        : [];
       const offHoursBlocks = nonWorkingIntervals.map(interval => {
         const start = interval.start;
         const duration = interval.end - interval.start;
