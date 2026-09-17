@@ -2871,6 +2871,18 @@
       min-height: 0 !important;
       flex: 1 1 0% !important;
     }
+    #whatsapp-search-input {
+      padding-left: 2.5rem !important;
+      padding-right: 0.875rem !important;
+    }
+    html[dir="rtl"] #whatsapp-search-icon {
+      right: 0.875rem !important;
+      left: auto !important;
+    }
+    html[dir="rtl"] #whatsapp-search-input {
+      padding-right: 2.5rem !important;
+      padding-left: 0.875rem !important;
+    }
     .whatsapp-conv-item {
       transition: all 160ms cubic-bezier(0.4, 0, 0.2, 1);
       border: 1px solid transparent;
@@ -6041,8 +6053,8 @@
           <div class="p-3.5 border-b border-slate-200 bg-white space-y-2.5">
             <div class="flex items-center gap-2">
               <div class="relative flex-1">
-                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400"></i>
-                <input id="whatsapp-search-input" oninput="filterWhatsAppConversations(this.value)" placeholder="Search conversations..." class="w-full rounded-xl border border-slate-200 bg-slate-50/80 py-2 pl-9 pr-3 text-sm outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition" />
+                <i id="whatsapp-search-icon" data-lucide="search" class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400"></i>
+                <input id="whatsapp-search-input" oninput="filterWhatsAppConversations(this.value)" placeholder="Search conversations..." class="w-full rounded-xl border border-slate-200 bg-slate-50/80 py-2 pl-10 pr-3 text-sm outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition" />
               </div>
               <button type="button" onclick="promptNewWhatsAppChat()" class="flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-emerald-600 px-3 text-xs sm:text-sm font-bold text-white hover:bg-emerald-700 transition shadow-2xs active:scale-[0.98]" title="Start new WhatsApp chat with phone number">
                 <i data-lucide="plus" class="h-4 w-4"></i>
