@@ -2622,6 +2622,49 @@
     }
     #view-dashboard [data-dashboard-appointment-status] { justify-self: end; }
     #dashboard-doctor-filter { width: min(48%, 14rem); min-height: 2.5rem; }
+    .patient-phone-value-row {
+      display: flex;
+      min-width: 0;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+    .patient-phone-value-row > :first-child { min-width: 0; }
+    .patient-phone-actions,
+    .dashboard-mobile-contact-actions,
+    .dashboard-desktop-contact-actions {
+      align-items: center;
+      gap: 0.45rem;
+    }
+    .patient-phone-actions { display: inline-flex; flex: 0 0 auto; }
+    .dashboard-mobile-contact-actions { display: none; }
+    .dashboard-desktop-contact-actions { display: inline-flex; }
+    .phone-icon-action {
+      display: inline-flex;
+      width: 2.75rem;
+      height: 2.75rem;
+      min-width: 2.75rem;
+      min-height: 2.75rem;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border-radius: 0.75rem;
+      transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 120ms ease, box-shadow 150ms ease;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .phone-icon-action.is-whatsapp-holding {
+      transform: scale(0.92);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+    }
+    .phone-icon-action svg { width: 1rem; height: 1rem; }
+    .phone-icon-action[disabled],
+    .phone-icon-action[aria-disabled="true"] { cursor: not-allowed; }
+    @media (max-width: 767px) {
+      .dashboard-mobile-contact-actions { display: inline-flex; }
+      .dashboard-desktop-contact-actions { display: none !important; }
+    }
     @media (max-width: 639px) {
       #view-dashboard .dashboard-patient-name { font-size: calc(0.9rem + 2pt - var(--dashboard-card-font-reduction, 0pt)); }
     }
@@ -3143,6 +3186,388 @@
         height: calc(100dvh - 5.25rem - var(--mobile-nav-height));
         max-height: calc(100dvh - 5.25rem - var(--mobile-nav-height));
       }
+    }
+
+    /* WhatsApp settings: professional soft-surface / neomorphic workspace. */
+    #modal-whatsapp-settings {
+      --wa-settings-canvas: #edf2f8;
+      --wa-settings-surface: #f4f7fb;
+      --wa-settings-surface-strong: #ffffff;
+      --wa-settings-ink: #17233a;
+      --wa-settings-muted: #64748b;
+      --wa-settings-line: rgba(148, 163, 184, 0.22);
+      --wa-settings-green: #07966f;
+      --wa-settings-green-dark: #06765a;
+      --wa-settings-violet: #7367f0;
+      --wa-settings-raised: -10px -10px 24px rgba(255, 255, 255, 0.9), 10px 12px 28px rgba(84, 105, 138, 0.16);
+      --wa-settings-raised-small: -5px -5px 12px rgba(255, 255, 255, 0.92), 5px 6px 14px rgba(84, 105, 138, 0.14);
+      --wa-settings-inset: inset 3px 3px 8px rgba(84, 105, 138, 0.12), inset -3px -3px 8px rgba(255, 255, 255, 0.88);
+      padding: clamp(0.5rem, 2vw, 1.5rem);
+    }
+    #modal-whatsapp-settings .wa-settings-dialog {
+      display: flex;
+      width: min(100%, 64rem);
+      max-height: calc(100dvh - clamp(1rem, 4vw, 3rem));
+      min-height: 0;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.86);
+      border-radius: 2rem;
+      color: var(--wa-settings-ink);
+      background: var(--wa-settings-canvas);
+      box-shadow: 0 28px 70px rgba(15, 23, 42, 0.28), -1px -1px 0 rgba(255, 255, 255, 0.8);
+    }
+    .wa-settings-header {
+      display: flex;
+      flex: 0 0 auto;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.25rem;
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.9);
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(240, 244, 252, 0.82));
+      box-shadow: 0 6px 18px rgba(84, 105, 138, 0.08);
+    }
+    .wa-settings-heading {
+      display: flex;
+      min-width: 0;
+      align-items: center;
+      gap: 1rem;
+    }
+    .wa-settings-heading-icon {
+      display: inline-flex;
+      width: 3rem;
+      height: 3rem;
+      flex: 0 0 auto;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      border-radius: 1rem;
+      color: #ffffff;
+      background: linear-gradient(145deg, #14b88a, #087f61);
+      box-shadow: var(--wa-settings-raised-small), 0 8px 18px rgba(7, 150, 111, 0.18);
+    }
+    .wa-settings-heading-icon svg { width: 1.35rem; height: 1.35rem; }
+    .wa-settings-eyebrow {
+      display: block;
+      margin-bottom: 0.2rem;
+      color: var(--wa-settings-green-dark);
+      font-size: 0.625rem;
+      font-weight: 900;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+    .wa-settings-heading h3 {
+      margin: 0;
+      color: #17396a;
+      font-size: clamp(1.05rem, 2.3vw, 1.35rem);
+      font-weight: 900;
+      letter-spacing: -0.02em;
+    }
+    .wa-settings-heading p {
+      margin: 0.2rem 0 0;
+      color: var(--wa-settings-muted);
+      font-size: 0.75rem;
+      font-weight: 650;
+      line-height: 1.45;
+    }
+    .wa-settings-close {
+      display: inline-flex;
+      width: 2.75rem;
+      height: 2.75rem;
+      flex: 0 0 auto;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255, 255, 255, 0.82);
+      border-radius: 0.9rem;
+      color: #718096;
+      background: var(--wa-settings-surface);
+      box-shadow: var(--wa-settings-raised-small);
+      transition: color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+    }
+    .wa-settings-close:hover { color: #1e3a5f; transform: translateY(-1px); }
+    .wa-settings-close:active { transform: translateY(1px); box-shadow: var(--wa-settings-inset); }
+    .wa-settings-close svg { width: 1.2rem; height: 1.2rem; }
+    .wa-settings-form { display: flex; min-height: 0; flex: 1 1 auto; flex-direction: column; }
+    .wa-settings-scroll {
+      min-height: 0;
+      flex: 1 1 auto;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding: 1.4rem 1.5rem 1.6rem;
+      scrollbar-color: #b5c1d2 transparent;
+      scrollbar-width: thin;
+    }
+    .wa-settings-scroll::-webkit-scrollbar { width: 8px; }
+    .wa-settings-scroll::-webkit-scrollbar-track { background: transparent; }
+    .wa-settings-scroll::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: #b5c1d2; background-clip: padding-box; }
+    .wa-settings-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .wa-settings-panel,
+    .wa-settings-agent-card {
+      border: 1px solid rgba(255, 255, 255, 0.78);
+      background: var(--wa-settings-surface);
+      box-shadow: var(--wa-settings-raised);
+    }
+    .wa-settings-agent-card {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 1rem;
+      padding: 1.1rem 1.2rem;
+      border-radius: 1.5rem;
+    }
+    .wa-settings-agent-icon,
+    .wa-settings-panel-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255, 255, 255, 0.88);
+      color: var(--wa-settings-green-dark);
+      background: linear-gradient(145deg, #fafffd, #dceae7);
+      box-shadow: var(--wa-settings-raised-small);
+    }
+    .wa-settings-agent-icon { width: 2.65rem; height: 2.65rem; border-radius: 0.9rem; }
+    .wa-settings-panel-icon { width: 2.25rem; height: 2.25rem; flex: 0 0 auto; border-radius: 0.75rem; }
+    .wa-settings-agent-icon svg,
+    .wa-settings-panel-icon svg { width: 1rem; height: 1rem; }
+    .wa-settings-agent-copy { min-width: 0; }
+    .wa-settings-agent-copy h4 { margin: 0; color: var(--wa-settings-ink); font-size: 0.9rem; font-weight: 900; }
+    .wa-settings-agent-copy > p { margin: 0.25rem 0 0; color: var(--wa-settings-muted); font-size: 0.72rem; line-height: 1.5; }
+    #setting-whatsapp-enabled-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-top: 0.55rem;
+      padding: 0.3rem 0.65rem;
+      border-radius: 999px;
+      color: #64748b;
+      background: rgba(255, 255, 255, 0.64);
+      box-shadow: var(--wa-settings-inset);
+      font-size: 0.625rem;
+      font-weight: 850;
+      line-height: 1.3;
+    }
+    #setting-whatsapp-enabled-status::before {
+      width: 0.45rem;
+      height: 0.45rem;
+      flex: 0 0 auto;
+      border-radius: 999px;
+      background: #94a3b8;
+      box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.13);
+      content: '';
+    }
+    #setting-whatsapp-enabled-status[data-state="enabled"] { color: #06765a; }
+    #setting-whatsapp-enabled-status[data-state="enabled"]::before { background: #0aaa7f; box-shadow: 0 0 0 3px rgba(10, 170, 127, 0.14); }
+    #setting-whatsapp-enabled-status[data-state="disabled"] { color: #a16207; }
+    #setting-whatsapp-enabled-status[data-state="disabled"]::before { background: #d99818; box-shadow: 0 0 0 3px rgba(217, 152, 24, 0.14); }
+    #setting-whatsapp-enabled {
+      position: relative;
+      width: 4rem;
+      height: 2rem;
+      flex: 0 0 auto;
+      padding: 0;
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 999px;
+      background: #cbd5e1;
+      box-shadow: var(--wa-settings-inset);
+      transition: background 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+      cursor: pointer;
+      direction: ltr;
+    }
+    #setting-whatsapp-enabled[aria-checked="true"] {
+      border-color: rgba(7, 150, 111, 0.4);
+      background: linear-gradient(145deg, #13b889, #078160);
+      box-shadow: inset 3px 3px 7px rgba(2, 91, 68, 0.26), inset -2px -2px 6px rgba(71, 221, 180, 0.28), 0 6px 15px rgba(7, 150, 111, 0.18);
+    }
+    #setting-whatsapp-enabled:focus-visible { outline: 3px solid rgba(115, 103, 240, 0.28); outline-offset: 3px; }
+    #setting-whatsapp-enabled:disabled { cursor: wait; opacity: 0.55; }
+    .wa-settings-toggle-knob {
+      position: absolute;
+      top: 0.2rem;
+      left: 0.2rem;
+      width: 1.5rem;
+      height: 1.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      border-radius: 999px;
+      background: linear-gradient(145deg, #ffffff, #e8edf4);
+      box-shadow: 0 3px 8px rgba(51, 65, 85, 0.28), inset -1px -1px 2px rgba(148, 163, 184, 0.12);
+      transform: translateX(0);
+      transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+      pointer-events: none;
+    }
+    #setting-whatsapp-enabled[aria-checked="true"] .wa-settings-toggle-knob { transform: translateX(2rem); }
+    .wa-settings-panel {
+      min-width: 0;
+      padding: 1.1rem;
+      border-radius: 1.4rem;
+    }
+    .wa-settings-panel.is-wide { grid-column: 1 / -1; }
+    .wa-settings-panel-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.8rem;
+      margin-bottom: 0.9rem;
+    }
+    .wa-settings-panel-title { display: flex; min-width: 0; align-items: center; gap: 0.7rem; }
+    .wa-settings-panel-title h4 { margin: 0; color: var(--wa-settings-ink); font-size: 0.8rem; font-weight: 900; }
+    .wa-settings-panel-title p { margin: 0.15rem 0 0; color: var(--wa-settings-muted); font-size: 0.625rem; line-height: 1.35; }
+    .wa-settings-field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.85rem; }
+    .wa-settings-field { display: block; min-width: 0; }
+    .wa-settings-field.is-wide { grid-column: 1 / -1; }
+    .wa-settings-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.4rem;
+      color: #34435d;
+      font-size: 0.68rem;
+      font-weight: 850;
+    }
+    .wa-settings-label small { color: #8996a9; font-size: 0.58rem; font-weight: 700; }
+    #modal-whatsapp-settings .wa-settings-input {
+      box-sizing: border-box;
+      width: 100%;
+      min-height: 2.65rem;
+      padding: 0.7rem 0.85rem;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 0.9rem;
+      color: #22314b;
+      background: #edf2f8;
+      box-shadow: var(--wa-settings-inset);
+      font-size: 0.72rem;
+      outline: none;
+      transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+    }
+    #modal-whatsapp-settings .wa-settings-input:focus {
+      border-color: rgba(115, 103, 240, 0.45);
+      background: #f7f9fc;
+      box-shadow: inset 2px 2px 5px rgba(84, 105, 138, 0.09), inset -2px -2px 5px rgba(255, 255, 255, 0.86), 0 0 0 3px rgba(115, 103, 240, 0.12);
+    }
+    #modal-whatsapp-settings .wa-settings-input[readonly] { color: #52617a; cursor: text; }
+    #modal-whatsapp-settings textarea.wa-settings-input { min-height: 4.6rem; resize: vertical; line-height: 1.5; }
+    #modal-whatsapp-settings select.wa-settings-input { cursor: pointer; }
+    .wa-settings-dispatch-copy { margin: 0.55rem 0 0; color: var(--wa-settings-muted); font-size: 0.625rem; line-height: 1.45; }
+    .wa-settings-webhook-copy { margin: 0 0 0.7rem; color: #52617a; font-size: 0.67rem; line-height: 1.5; }
+    .wa-settings-webhook-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.65rem; }
+    .wa-settings-copy-button,
+    .wa-settings-refresh-button {
+      display: inline-flex;
+      min-height: 2.65rem;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      border: 1px solid rgba(255, 255, 255, 0.78);
+      border-radius: 0.9rem;
+      color: #3852a4;
+      background: linear-gradient(145deg, #f8faff, #e0e7f4);
+      box-shadow: var(--wa-settings-raised-small);
+      font-size: 0.65rem;
+      font-weight: 850;
+      transition: color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+    }
+    .wa-settings-copy-button { padding: 0.6rem 0.9rem; }
+    .wa-settings-copy-button:hover,
+    .wa-settings-refresh-button:hover { color: var(--wa-settings-violet); transform: translateY(-1px); }
+    .wa-settings-copy-button:active,
+    .wa-settings-refresh-button:active { transform: translateY(1px); box-shadow: var(--wa-settings-inset); }
+    .wa-settings-copy-button.is-copied { color: var(--wa-settings-green-dark); }
+    .wa-settings-copy-button svg,
+    .wa-settings-refresh-button svg { width: 0.85rem; height: 0.85rem; }
+    .wa-settings-refresh-button { min-height: 2rem; padding: 0.4rem 0.65rem; }
+    .wa-settings-storage-track {
+      height: 0.65rem;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #dbe3ee;
+      box-shadow: var(--wa-settings-inset);
+    }
+    #whatsapp-storage-progress {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #0aaa7f, #4fc6c0);
+      box-shadow: 0 2px 7px rgba(10, 170, 127, 0.24);
+      transition: width 500ms ease, background 180ms ease;
+    }
+    #whatsapp-storage-progress.is-warning { background: linear-gradient(90deg, #d99a16, #f5bd4e); }
+    #whatsapp-storage-progress.is-critical { background: linear-gradient(90deg, #dc4c64, #f17a8f); }
+    .wa-settings-storage-copy { margin: 0; color: var(--wa-settings-muted); font-size: 0.67rem; line-height: 1.5; }
+    .wa-settings-storage-meta { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-top: 0.55rem; color: #52617a; font-size: 0.65rem; font-weight: 800; }
+    .wa-settings-footer {
+      display: flex;
+      flex: 0 0 auto;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.9rem 1.5rem 1.1rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.92);
+      background: rgba(237, 242, 248, 0.94);
+      box-shadow: 0 -8px 20px rgba(84, 105, 138, 0.08);
+      backdrop-filter: blur(12px);
+    }
+    .wa-settings-footer-note { display: flex; align-items: center; gap: 0.45rem; color: #7a879a; font-size: 0.62rem; font-weight: 700; }
+    .wa-settings-footer-note svg { width: 0.85rem; height: 0.85rem; color: var(--wa-settings-green); }
+    .wa-settings-footer-actions { display: flex; align-items: center; gap: 0.75rem; }
+    .wa-settings-secondary-button,
+    .wa-settings-primary-button {
+      display: inline-flex;
+      min-height: 2.65rem;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+      padding: 0.65rem 1.15rem;
+      border-radius: 0.9rem;
+      font-size: 0.7rem;
+      font-weight: 900;
+      transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+    }
+    .wa-settings-secondary-button {
+      border: 1px solid rgba(255, 255, 255, 0.82);
+      color: #52617a;
+      background: var(--wa-settings-surface);
+      box-shadow: var(--wa-settings-raised-small);
+    }
+    .wa-settings-primary-button {
+      border: 1px solid rgba(126, 111, 247, 0.55);
+      color: #ffffff;
+      background: linear-gradient(145deg, #887cf8, #6559e7);
+      box-shadow: 0 10px 18px rgba(101, 89, 231, 0.26), inset 1px 1px 0 rgba(255, 255, 255, 0.28);
+    }
+    .wa-settings-secondary-button:hover,
+    .wa-settings-primary-button:hover { transform: translateY(-1px); }
+    .wa-settings-secondary-button:active { transform: translateY(1px); box-shadow: var(--wa-settings-inset); }
+    .wa-settings-primary-button:active { transform: translateY(1px); box-shadow: 0 5px 10px rgba(101, 89, 231, 0.22); }
+    .wa-settings-primary-button:disabled { cursor: wait; opacity: 0.58; }
+    .wa-settings-primary-button svg { width: 0.95rem; height: 0.95rem; }
+    @media (max-width: 767px) {
+      #modal-whatsapp-settings { align-items: stretch; padding: 0; }
+      #modal-whatsapp-settings .wa-settings-dialog { max-height: 100dvh; min-height: 100dvh; border-radius: 0; }
+      .wa-settings-header { padding: max(0.9rem, env(safe-area-inset-top)) 1rem 0.9rem; }
+      .wa-settings-heading { gap: 0.75rem; }
+      .wa-settings-heading-icon { width: 2.65rem; height: 2.65rem; }
+      .wa-settings-heading p { display: none; }
+      .wa-settings-close { width: 2.55rem; height: 2.55rem; }
+      .wa-settings-scroll { padding: 1rem 0.9rem 1.25rem; }
+      .wa-settings-agent-card { grid-template-columns: auto minmax(0, 1fr); padding: 1rem; }
+      #setting-whatsapp-enabled { grid-column: 1 / -1; justify-self: end; margin-top: -2.65rem; }
+      .wa-settings-grid { grid-template-columns: minmax(0, 1fr); gap: 0.9rem; }
+      .wa-settings-panel.is-wide { grid-column: auto; }
+      .wa-settings-field-grid { grid-template-columns: minmax(0, 1fr); }
+      .wa-settings-field.is-wide { grid-column: auto; }
+      .wa-settings-webhook-row { grid-template-columns: minmax(0, 1fr); }
+      .wa-settings-copy-button { width: 100%; }
+      .wa-settings-footer { padding: 0.75rem 0.9rem max(0.85rem, env(safe-area-inset-bottom)); }
+      .wa-settings-footer-note { display: none; }
+      .wa-settings-footer-actions { width: 100%; }
+      .wa-settings-secondary-button,
+      .wa-settings-primary-button { flex: 1 1 0; }
     }
   </style>
   <link rel="stylesheet" href="lumin-theme.css?v=11" />
@@ -4254,8 +4679,8 @@
             <div><h3 class="text-sm font-black text-slate-900">Basic information</h3><p class="mt-0.5 text-[11px] text-slate-400">Patient identity and contact details</p></div>
           </div>
           <dl class="mt-4 grid gap-3 sm:grid-cols-2">
-            <div class="rounded-xl border border-slate-100 bg-slate-50/80 p-4"><dt class="text-[10px] font-black uppercase tracking-wider text-slate-400">Primary phone</dt><dd id="profile-patient-phone" class="mt-1.5 break-words text-sm font-black text-slate-800">--</dd></div>
-            <div class="rounded-xl border border-slate-100 bg-slate-50/80 p-4"><dt class="text-[10px] font-black uppercase tracking-wider text-slate-400">Second phone</dt><dd id="profile-patient-secondary-phone" class="mt-1.5 break-words text-sm font-black text-slate-800">--</dd></div>
+            <div class="rounded-xl border border-slate-100 bg-slate-50/80 p-4"><dt class="text-[10px] font-black uppercase tracking-wider text-slate-400">Primary phone</dt><dd class="patient-phone-value-row mt-1.5 text-sm font-black text-slate-800"><span id="profile-patient-phone" class="break-words">--</span><span id="profile-patient-phone-actions" class="patient-phone-actions" aria-label="Primary phone actions"></span></dd></div>
+            <div class="rounded-xl border border-slate-100 bg-slate-50/80 p-4"><dt class="text-[10px] font-black uppercase tracking-wider text-slate-400">Second phone</dt><dd class="patient-phone-value-row mt-1.5 text-sm font-black text-slate-800"><span id="profile-patient-secondary-phone" class="break-words">--</span><span id="profile-patient-secondary-phone-actions" class="patient-phone-actions" aria-label="Second phone actions"></span></dd></div>
             <div class="rounded-xl border border-slate-100 bg-slate-50/80 p-4"><dt class="text-[10px] font-black uppercase tracking-wider text-slate-400">Age</dt><dd id="profile-patient-age" class="mt-1.5 text-sm font-black text-slate-800">--</dd></div>
             <div class="rounded-xl border border-slate-100 bg-slate-50/80 p-4"><dt class="text-[10px] font-black uppercase tracking-wider text-slate-400">Gender</dt><dd id="profile-patient-gender" class="mt-1.5 text-sm font-black text-slate-800">--</dd></div>
             <div class="rounded-xl border border-blue-100 bg-blue-50/70 p-4"><dt class="text-[10px] font-black uppercase tracking-wider text-blue-500">Patient number</dt><dd id="profile-patient-id" class="mt-1.5 text-sm font-black text-blue-800">--</dd></div>
@@ -5777,125 +6202,146 @@
 
   <!-- ================= MODAL: WHATSAPP & AI SETTINGS ================= -->
   <div id="modal-whatsapp-settings" onclick="if (event.target === this) closeWhatsAppSettingsModal()" class="fixed inset-0 z-[90] hidden items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
-    <div role="dialog" aria-modal="true" aria-labelledby="whatsapp-settings-modal-title" class="max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto rounded-3xl border border-emerald-100 bg-white shadow-2xl">
-      <div class="border-b border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-violet-50/70 p-5">
-        <div class="flex items-start justify-between gap-4">
-          <div>
-            <span class="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">WhatsApp Integration</span>
-            <h3 id="whatsapp-settings-modal-title" class="mt-1 text-lg font-black text-slate-900">AI Agent & WhatsApp Cloud API Setup</h3>
-            <p class="mt-1 text-xs font-bold text-slate-500">Configure Meta WhatsApp Cloud API credentials and Gemini AI booking rules.</p>
-          </div>
-          <button type="button" onclick="closeWhatsAppSettingsModal()" aria-label="Close settings" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-white hover:text-slate-700"><i data-lucide="x" class="h-5 w-5"></i></button>
-        </div>
-      </div>
-      <form id="whatsapp-settings-form" onsubmit="saveWhatsAppSettings(event)" class="space-y-4 p-5">
-        <div class="flex items-center justify-between gap-4 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4">
-          <div>
-            <span class="block text-xs font-black text-slate-900">Enable WhatsApp AI Agent</span>
-            <span class="mt-0.5 block text-[11px] text-slate-500">When enabled, incoming patient WhatsApp messages trigger Gemini AI appointment bookings.</span>
-            <span id="setting-whatsapp-enabled-status" class="mt-1 block text-[10px] font-bold text-slate-500">Loading current status...</span>
-          </div>
-          <button id="setting-whatsapp-enabled" type="button" role="switch" aria-checked="false" aria-label="Enable WhatsApp AI Agent" onclick="toggleWhatsAppAgentSetting()" class="relative h-6 w-11 shrink-0 rounded-full bg-slate-300 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:cursor-wait disabled:opacity-60">
-            <span id="setting-whatsapp-enabled-knob" class="pointer-events-none absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow-sm transition"></span>
-          </button>
-        </div>
-
-        <label class="block rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-          <div class="mb-2 flex items-center justify-between">
-            <span class="text-xs font-black text-slate-800">WhatsApp Dispatch Mode</span>
-            <span class="text-[10px] font-bold text-slate-400">Controls appointment cards &amp; quick actions</span>
-          </div>
-          <select id="setting-whatsapp-dispatch-mode" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20">
-            <option value="cloud_api">Internal: Send directly via Cloud API &amp; In-App Chat (Recommended)</option>
-            <option value="external">External: Open WhatsApp Web / App links</option>
-          </select>
-        </label>
-
-        <div class="rounded-2xl border border-blue-200 bg-blue-50/60 p-4 space-y-2">
-          <div class="flex items-center gap-2">
-            <i data-lucide="info" class="h-4 w-4 text-blue-600 shrink-0"></i>
-            <span class="text-xs font-black text-blue-900">Meta Webhook Configuration</span>
-          </div>
-          <p class="text-[11px] text-blue-700">Paste this URL into your Meta App dashboard under <strong>WhatsApp > Configuration > Callback URL</strong>:</p>
-          <div class="flex items-center gap-2">
-            <input id="setting-whatsapp-webhook-url" readonly value="https://pqbayjkypzfxvnksgwwf.supabase.co/functions/v1/whatsapp-webhook" class="flex-1 font-mono text-[11px] bg-white border border-blue-200 rounded-xl px-3 py-2 text-slate-700 select-all" />
-            <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('setting-whatsapp-webhook-url').value); alert('Webhook URL copied!');" class="rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700 transition">Copy</button>
+    <div role="dialog" aria-modal="true" aria-labelledby="whatsapp-settings-modal-title" class="wa-settings-dialog">
+      <header class="wa-settings-header">
+        <div class="wa-settings-heading">
+          <span class="wa-settings-heading-icon" aria-hidden="true"><i data-lucide="bot-message-square"></i></span>
+          <div class="min-w-0">
+            <span class="wa-settings-eyebrow">WhatsApp Integration</span>
+            <h3 id="whatsapp-settings-modal-title">AI Agent &amp; Cloud API</h3>
+            <p>Manage message delivery, Meta credentials, and AI booking behavior.</p>
           </div>
         </div>
+        <button type="button" onclick="closeWhatsAppSettingsModal()" aria-label="Close settings" class="wa-settings-close"><i data-lucide="x"></i></button>
+      </header>
 
-        <div class="grid gap-4 sm:grid-cols-2">
-          <label>
-            <span class="mb-1.5 block text-xs font-black text-slate-700">Phone Number ID</span>
-            <input id="setting-whatsapp-phone-id" placeholder="e.g. 109823456789012" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-mono outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
-          </label>
-          <label>
-            <span class="mb-1.5 block text-xs font-black text-slate-700">WhatsApp Business Account ID</span>
-            <input id="setting-whatsapp-waba-id" placeholder="e.g. 987654321098765" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-mono outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
-          </label>
-        </div>
-
-        <div class="grid gap-4 sm:grid-cols-2">
-          <label>
-            <span class="mb-1.5 block text-xs font-black text-slate-700">Webhook Verify Token</span>
-            <input id="setting-whatsapp-verify-token" placeholder="e.g. lumin_secret_token" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-mono outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
-          </label>
-          <label>
-            <span class="mb-1.5 block text-xs font-black text-slate-700">Google Gemini API Key</span>
-            <input id="setting-whatsapp-gemini-key" type="password" placeholder="AIzaSy..." class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-mono outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20" />
-          </label>
-        </div>
-
-        <label>
-          <span class="mb-1.5 flex items-center justify-between text-xs font-black text-slate-700">
-            <span>Gemini AI Model</span>
-            <span class="text-[10px] font-medium text-slate-400">Low-latency thinking + auto fallback</span>
-          </span>
-          <select id="setting-whatsapp-model" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20">
-            <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash Lite (⚡ Ultra Fast ~0.8s • Best for WhatsApp Booking - Recommended)</option>
-            <option value="gemini-flash-lite-latest">Gemini Flash Lite Latest (~0.9s • High Availability)</option>
-            <option value="gemini-3.5-flash">Gemini 3.5 Flash (Standard ~1.6s)</option>
-            <option value="gemini-3.6-flash">Gemini 3.6 Flash (Fast ~1s • Free-Tier Quota Limited)</option>
-            <option value="gemini-3.8-flash">Gemini 3.8 Flash (Latest • Deep Reasoning & Complex Scheduling)</option>
-          </select>
-        </label>
-
-        <label>
-          <span class="mb-1.5 block text-xs font-black text-slate-700">Meta Access Token</span>
-          <textarea id="setting-whatsapp-access-token" rows="2" placeholder="EAAG..." class="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs font-mono outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"></textarea>
-        </label>
-
-        <label>
-          <span class="mb-1.5 block text-xs font-black text-slate-700">AI Booking Agent Instructions</span>
-          <textarea id="setting-whatsapp-ai-prompt" rows="3" placeholder="You are Lumin Dental Clinic's friendly receptionist. Working hours: 10 AM to 8 PM, closed Friday..." class="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"></textarea>
-        </label>
-
-        <!-- WhatsApp Media Storage Meter (1 GB Free Tier) -->
-        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-2.5">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <i data-lucide="hard-drive" class="h-4 w-4 text-emerald-600"></i>
-              <span class="text-xs font-black text-slate-800">Supabase Media Storage (1 GB Free Tier)</span>
+      <form id="whatsapp-settings-form" onsubmit="saveWhatsAppSettings(event)" class="wa-settings-form">
+        <div class="wa-settings-scroll">
+          <section class="wa-settings-agent-card" aria-labelledby="whatsapp-agent-card-title">
+            <span class="wa-settings-agent-icon" aria-hidden="true"><i data-lucide="sparkles"></i></span>
+            <div class="wa-settings-agent-copy">
+              <h4 id="whatsapp-agent-card-title">WhatsApp AI Agent</h4>
+              <p>Allow Gemini to answer incoming messages and coordinate appointment bookings.</p>
+              <span id="setting-whatsapp-enabled-status" role="status" aria-live="polite">Loading current status...</span>
             </div>
-            <button type="button" onclick="refreshWhatsAppStorageUsage(true)" class="text-[10px] font-bold text-emerald-700 hover:text-emerald-800 transition flex items-center gap-1">
-              <i data-lucide="refresh-cw" class="h-3 w-3"></i> Refresh
+            <button id="setting-whatsapp-enabled" type="button" role="switch" aria-checked="false" aria-label="Enable WhatsApp AI Agent" onclick="toggleWhatsAppAgentSetting()">
+              <span id="setting-whatsapp-enabled-knob" class="wa-settings-toggle-knob"></span>
             </button>
-          </div>
-          <p class="text-[11px] text-slate-500">Audio voice notes, photos, and documents exchanged with patients are stored securely in Supabase Storage (<code class="font-mono text-[10px] bg-slate-200/80 px-1 py-0.5 rounded">whatsapp-media</code> bucket).</p>
-          <div class="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
-            <div id="whatsapp-storage-progress" class="bg-gradient-to-r from-emerald-500 to-teal-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
-          </div>
-          <div class="flex items-center justify-between text-[11px] font-bold">
-            <span id="whatsapp-storage-text" class="text-slate-700">Checking storage...</span>
-            <span id="whatsapp-storage-files" class="text-slate-400">0 files</span>
+          </section>
+
+          <div class="wa-settings-grid">
+            <section class="wa-settings-panel" aria-labelledby="whatsapp-dispatch-title">
+              <div class="wa-settings-panel-heading">
+                <div class="wa-settings-panel-title">
+                  <span class="wa-settings-panel-icon" aria-hidden="true"><i data-lucide="send"></i></span>
+                  <div><h4 id="whatsapp-dispatch-title">Dispatch mode</h4><p>Choose where conversations open.</p></div>
+                </div>
+              </div>
+              <label class="wa-settings-field">
+                <span class="wa-settings-label">Message delivery</span>
+                <select id="setting-whatsapp-dispatch-mode" class="wa-settings-input">
+                  <option value="cloud_api">Internal Cloud API &amp; in-app chat (Recommended)</option>
+                  <option value="external">External WhatsApp Web / App links</option>
+                </select>
+              </label>
+              <p class="wa-settings-dispatch-copy">This controls appointment cards, patient shortcuts, and quick actions.</p>
+            </section>
+
+            <section class="wa-settings-panel" aria-labelledby="whatsapp-webhook-title">
+              <div class="wa-settings-panel-heading">
+                <div class="wa-settings-panel-title">
+                  <span class="wa-settings-panel-icon" aria-hidden="true"><i data-lucide="webhook"></i></span>
+                  <div><h4 id="whatsapp-webhook-title">Meta webhook</h4><p>Callback URL for incoming messages.</p></div>
+                </div>
+              </div>
+              <p class="wa-settings-webhook-copy">Paste this URL under <strong>WhatsApp → Configuration → Callback URL</strong> in Meta.</p>
+              <div class="wa-settings-webhook-row">
+                <input id="setting-whatsapp-webhook-url" readonly value="https://pqbayjkypzfxvnksgwwf.supabase.co/functions/v1/whatsapp-webhook" class="wa-settings-input font-mono select-all" aria-label="WhatsApp webhook callback URL" />
+                <button type="button" onclick="copyWhatsAppWebhookUrl(this)" class="wa-settings-copy-button"><i data-lucide="copy"></i><span data-copy-label>Copy URL</span></button>
+              </div>
+            </section>
+
+            <section class="wa-settings-panel" aria-labelledby="whatsapp-meta-credentials-title">
+              <div class="wa-settings-panel-heading">
+                <div class="wa-settings-panel-title">
+                  <span class="wa-settings-panel-icon" aria-hidden="true"><i data-lucide="cloud-cog"></i></span>
+                  <div><h4 id="whatsapp-meta-credentials-title">Meta credentials</h4><p>Cloud API account and verification details.</p></div>
+                </div>
+              </div>
+              <div class="wa-settings-field-grid">
+                <label class="wa-settings-field">
+                  <span class="wa-settings-label">Phone Number ID</span>
+                  <input id="setting-whatsapp-phone-id" placeholder="109823456789012" class="wa-settings-input font-mono" />
+                </label>
+                <label class="wa-settings-field">
+                  <span class="wa-settings-label">Business Account ID</span>
+                  <input id="setting-whatsapp-waba-id" placeholder="987654321098765" class="wa-settings-input font-mono" />
+                </label>
+                <label class="wa-settings-field is-wide">
+                  <span class="wa-settings-label">Webhook Verify Token</span>
+                  <input id="setting-whatsapp-verify-token" placeholder="lumin_secret_token" class="wa-settings-input font-mono" autocomplete="off" />
+                </label>
+                <label class="wa-settings-field is-wide">
+                  <span class="wa-settings-label">Meta Access Token <small>Keep private</small></span>
+                  <textarea id="setting-whatsapp-access-token" rows="3" placeholder="EAAG..." class="wa-settings-input font-mono" autocomplete="off" spellcheck="false"></textarea>
+                </label>
+              </div>
+            </section>
+
+            <section class="wa-settings-panel" aria-labelledby="whatsapp-ai-configuration-title">
+              <div class="wa-settings-panel-heading">
+                <div class="wa-settings-panel-title">
+                  <span class="wa-settings-panel-icon" aria-hidden="true"><i data-lucide="brain-circuit"></i></span>
+                  <div><h4 id="whatsapp-ai-configuration-title">AI configuration</h4><p>Gemini access, model, and booking guidance.</p></div>
+                </div>
+              </div>
+              <div class="wa-settings-field-grid">
+                <label class="wa-settings-field is-wide">
+                  <span class="wa-settings-label">Google Gemini API Key <small>Encrypted setting</small></span>
+                  <input id="setting-whatsapp-gemini-key" type="password" placeholder="AIzaSy..." class="wa-settings-input font-mono" autocomplete="new-password" />
+                </label>
+                <label class="wa-settings-field is-wide">
+                  <span class="wa-settings-label">Gemini AI Model <small>Auto fallback enabled</small></span>
+                  <select id="setting-whatsapp-model" class="wa-settings-input">
+                    <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash Lite — fastest, recommended</option>
+                    <option value="gemini-flash-lite-latest">Gemini Flash Lite Latest — high availability</option>
+                    <option value="gemini-3.5-flash">Gemini 3.5 Flash — standard</option>
+                    <option value="gemini-3.6-flash">Gemini 3.6 Flash — fast, quota limited</option>
+                    <option value="gemini-3.8-flash">Gemini 3.8 Flash — deeper reasoning</option>
+                  </select>
+                </label>
+                <label class="wa-settings-field is-wide">
+                  <span class="wa-settings-label">Booking Agent Instructions</span>
+                  <textarea id="setting-whatsapp-ai-prompt" rows="4" placeholder="You are Lumin Dental Clinic's friendly receptionist. Include working hours, booking rules, and escalation guidance..." class="wa-settings-input"></textarea>
+                </label>
+              </div>
+            </section>
+
+            <section class="wa-settings-panel is-wide" aria-labelledby="whatsapp-storage-title">
+              <div class="wa-settings-panel-heading">
+                <div class="wa-settings-panel-title">
+                  <span class="wa-settings-panel-icon" aria-hidden="true"><i data-lucide="hard-drive"></i></span>
+                  <div><h4 id="whatsapp-storage-title">Media storage</h4><p>Supabase Storage · 1 GB free tier</p></div>
+                </div>
+                <button type="button" onclick="refreshWhatsAppStorageUsage(true)" class="wa-settings-refresh-button"><i data-lucide="refresh-cw"></i><span>Refresh</span></button>
+              </div>
+              <p class="wa-settings-storage-copy">Voice notes, photos, and documents exchanged with patients are stored securely in the <code class="font-mono">whatsapp-media</code> bucket.</p>
+              <div class="wa-settings-storage-track" aria-hidden="true"><div id="whatsapp-storage-progress" style="width: 0%"></div></div>
+              <div class="wa-settings-storage-meta">
+                <span id="whatsapp-storage-text">Checking storage...</span>
+                <span id="whatsapp-storage-files">0 files</span>
+              </div>
+            </section>
           </div>
         </div>
 
-        <div class="flex items-center justify-end gap-3 pt-2">
-          <button type="button" onclick="closeWhatsAppSettingsModal()" class="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition">Cancel</button>
-          <button type="submit" id="btn-save-whatsapp-settings" class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-black text-white hover:bg-emerald-700 shadow-sm transition">
-            <i data-lucide="check" class="h-4 w-4"></i> Save Settings
-          </button>
-        </div>
+        <footer class="wa-settings-footer">
+          <span class="wa-settings-footer-note"><i data-lucide="shield-check"></i>Credentials are saved to clinic settings.</span>
+          <div class="wa-settings-footer-actions">
+            <button type="button" onclick="closeWhatsAppSettingsModal()" class="wa-settings-secondary-button">Cancel</button>
+            <button type="submit" id="btn-save-whatsapp-settings" class="wa-settings-primary-button"><i data-lucide="check"></i><span>Save settings</span></button>
+          </div>
+        </footer>
       </form>
     </div>
   </div>
@@ -7008,6 +7454,8 @@
     let financeWhatsAppTemplateContext = null;
     let financeDeptWhatsAppPressGesture = null;
     let financeDeptWhatsAppSuppressClickUntil = 0;
+    let patientProfileWhatsAppTemplateContext = null;
+    let mobileWhatsAppPressGesture = null;
     let adminActiveTab = 'access';
     let clinicWhatsAppDispatchMode = 'cloud_api';
     let clinicWhatsAppAiEnabled = false;
@@ -7827,6 +8275,8 @@
       'Optional second number': 'رقم ثانٍ اختياري',
       'Primary phone': 'الهاتف الأساسي',
       'Second phone': 'الهاتف الثاني',
+      'Primary phone actions': 'إجراءات الهاتف الأساسي',
+      'Second phone actions': 'إجراءات الهاتف الثاني',
       'Address': 'العنوان',
       'Old database number': 'رقم قاعدة البيانات القديمة',
       'Street, area, city': 'الشارع، المنطقة، المدينة',
@@ -8687,7 +9137,7 @@
     }
 
     function canUseWhatsAppTemplates() {
-      return Boolean(currentUserAccess?.active && (hasPageAccess('appointments') || canViewFinanceDepts()));
+      return Boolean(currentUserAccess?.active && (hasPageAccess('patients') || hasPageAccess('appointments') || canViewFinanceDepts()));
     }
 
     function canModifyHr() {
@@ -22292,6 +22742,8 @@
       updatePatientWorkspaceNavigation(patient, 'profile');
       document.getElementById('profile-patient-phone').textContent = patient.phone || 'Not provided';
       document.getElementById('profile-patient-secondary-phone').textContent = patient.secondaryPhone || 'Not provided';
+      document.getElementById('profile-patient-phone-actions').innerHTML = patientPhoneActionsMarkup(patient, 'primary');
+      document.getElementById('profile-patient-secondary-phone-actions').innerHTML = patientPhoneActionsMarkup(patient, 'secondary');
       document.getElementById('profile-patient-age').textContent = patientAgeProfileLabel(patient);
       document.getElementById('profile-patient-gender').textContent = patient.gender || 'Not provided';
       document.getElementById('profile-patient-id').textContent = formatPatientNumber(patient);
@@ -25887,6 +26339,139 @@
       return digits;
     }
 
+    function isMobileWhatsAppLongPressMode() {
+      return window.matchMedia?.('(hover: none) and (pointer: coarse)').matches
+        || (navigator.maxTouchPoints > 0 && window.innerWidth <= 767);
+    }
+
+    function consumeMobileWhatsAppLongPressClick(event) {
+      const button = event?.currentTarget;
+      if (!button || Date.now() >= (button._whatsAppSuppressClickUntil || 0)) return false;
+      event.preventDefault();
+      event.stopPropagation();
+      button._whatsAppSuppressClickUntil = 0;
+      return true;
+    }
+
+    function cancelMobileWhatsAppPress() {
+      const gesture = mobileWhatsAppPressGesture;
+      if (!gesture) return;
+      window.clearTimeout(gesture.timer);
+      gesture.button?.classList.remove('is-whatsapp-holding');
+      mobileWhatsAppPressGesture = null;
+    }
+
+    function beginMobileWhatsAppPress(event) {
+      if (!isMobileWhatsAppLongPressMode() || event.button !== 0 || event.isPrimary === false) return;
+      cancelMobileWhatsAppPress();
+      const button = event.currentTarget;
+      const gesture = {
+        pointerId: event.pointerId,
+        button,
+        startX: event.clientX,
+        startY: event.clientY,
+        timer: null
+      };
+      gesture.timer = window.setTimeout(() => {
+        if (mobileWhatsAppPressGesture !== gesture || !button.isConnected) return;
+        mobileWhatsAppPressGesture = null;
+        button.classList.remove('is-whatsapp-holding');
+        button._whatsAppSuppressClickUntil = Date.now() + 800;
+        navigator.vibrate?.(20);
+        if (button.dataset.whatsappContact === 'patient-profile') {
+          void openPatientProfileWhatsAppTemplatePicker(button.dataset.patientId, button.dataset.phoneKind, button);
+        } else if (button.dataset.whatsappContact === 'appointment') {
+          void openWhatsAppTemplatePicker(button.dataset.whatsappAppointmentId, button);
+        }
+      }, 500);
+      mobileWhatsAppPressGesture = gesture;
+      button.classList.add('is-whatsapp-holding');
+      button.setPointerCapture?.(event.pointerId);
+    }
+
+    function moveMobileWhatsAppPress(event) {
+      const gesture = mobileWhatsAppPressGesture;
+      if (!gesture || gesture.pointerId !== event.pointerId) return;
+      if (Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY) > 12) cancelMobileWhatsAppPress();
+    }
+
+    function finishMobileWhatsAppPress(event) {
+      const gesture = mobileWhatsAppPressGesture;
+      if (!gesture || gesture.pointerId !== event.pointerId) return;
+      cancelMobileWhatsAppPress();
+    }
+
+    function handleMobileWhatsAppContextMenu(event) {
+      if (isMobileWhatsAppLongPressMode()) event.preventDefault();
+    }
+
+    function patientProfilePhoneContext(patientId, phoneKind = 'primary') {
+      const patient = patients.find(item => String(item.id) === String(patientId));
+      if (!patient) return null;
+      const resolvedPhoneKind = phoneKind === 'secondary' ? 'secondary' : 'primary';
+      const rawPhone = resolvedPhoneKind === 'secondary' ? patient.secondaryPhone : patient.phone;
+      return {
+        patient,
+        patientId: patient.id,
+        patientName: patient.name || '',
+        phoneKind: resolvedPhoneKind,
+        rawPhone,
+        phone: normaliseWhatsAppPhone(rawPhone)
+      };
+    }
+
+    function patientWhatsAppTemplateEntry(patient) {
+      const now = Date.now();
+      const relatedAppointments = appointments
+        .filter(entry => String(entry.patientId) === String(patient?.id) && canonicalAppointmentStatus(entry.status) !== 'Cancelled')
+        .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime());
+      const entry = relatedAppointments.find(item => new Date(item.startAt).getTime() >= now) || relatedAppointments.at(-1);
+      return entry
+        ? { ...entry, patient: patient.name || entry.patient, patientId: patient.id }
+        : { patient: patient?.name || '', patientId: patient?.id || null };
+    }
+
+    function patientPhoneActionsMarkup(patient, phoneKind = 'primary') {
+      const context = patientProfilePhoneContext(patient?.id, phoneKind);
+      const rawPhone = context?.rawPhone || '';
+      const callPhone = normaliseCallPhone(rawPhone);
+      const whatsappPhone = normaliseWhatsAppPhone(rawPhone);
+      const isAr = currentUiLanguage === 'ar';
+      const phoneLabel = phoneKind === 'secondary'
+        ? (isAr ? 'الهاتف الثاني' : 'second phone')
+        : (isAr ? 'الهاتف الأساسي' : 'primary phone');
+      const callLabel = isAr ? `اتصال على ${phoneLabel}` : `Call ${phoneLabel}`;
+      const whatsappLabel = isAr
+        ? `فتح محادثة واتساب فارغة مع ${patient?.name || ''} عبر ${phoneLabel}. اضغط مطولاً على الهاتف المحمول لاختيار قالب.`
+        : `Open an empty WhatsApp chat with ${patient?.name || ''} using the ${phoneLabel}. Press and hold on mobile to choose a template.`;
+      const disabledCallLabel = isAr ? `${phoneLabel} غير متوفر للاتصال` : `${phoneLabel} is unavailable for calls`;
+      const disabledWhatsAppLabel = isAr ? `${phoneLabel} غير متوفر لواتساب` : `${phoneLabel} is unavailable for WhatsApp`;
+      const callAction = callPhone
+        ? `<a href="tel:${escapeHtml(callPhone)}" class="phone-icon-action border border-blue-200 bg-white text-blue-700 shadow-xs hover:bg-blue-50" aria-label="${escapeHtml(callLabel)}" title="${escapeHtml(callLabel)}"><i data-lucide="phone-call"></i><span class="sr-only">${escapeHtml(callLabel)}</span></a>`
+        : `<button type="button" disabled class="phone-icon-action border border-slate-200 bg-white text-slate-300" aria-label="${escapeHtml(disabledCallLabel)}" title="${escapeHtml(disabledCallLabel)}"><i data-lucide="phone-off"></i></button>`;
+      const whatsappAction = whatsappPhone
+        ? `<button type="button" data-whatsapp-template-toggle data-whatsapp-contact="patient-profile" data-patient-id="${escapeHtml(patient.id)}" data-phone-kind="${phoneKind === 'secondary' ? 'secondary' : 'primary'}" onclick="openPatientProfileWhatsApp(event, this.dataset.patientId, this.dataset.phoneKind)" onpointerdown="beginMobileWhatsAppPress(event)" onpointermove="moveMobileWhatsAppPress(event)" onpointerup="finishMobileWhatsAppPress(event)" onpointercancel="cancelMobileWhatsAppPress()" onlostpointercapture="cancelMobileWhatsAppPress()" oncontextmenu="handleMobileWhatsAppContextMenu(event)" class="phone-icon-action border border-emerald-200 bg-white text-emerald-700 shadow-xs hover:bg-emerald-50" aria-haspopup="menu" aria-controls="whatsapp-template-dropdown" aria-expanded="false" aria-label="${escapeHtml(whatsappLabel)}" title="${escapeHtml(whatsappLabel)}"><i data-lucide="message-circle"></i><span class="sr-only">${escapeHtml(whatsappLabel)}</span></button>`
+        : `<button type="button" disabled class="phone-icon-action border border-slate-200 bg-white text-slate-300" aria-label="${escapeHtml(disabledWhatsAppLabel)}" title="${escapeHtml(disabledWhatsAppLabel)}"><i data-lucide="message-circle-off"></i></button>`;
+      return callAction + whatsappAction;
+    }
+
+    function openPatientProfileWhatsApp(event, patientId, phoneKind) {
+      if (consumeMobileWhatsAppLongPressClick(event) || !hasPageAccess('patients')) return;
+      const context = patientProfilePhoneContext(patientId, phoneKind);
+      if (!context?.phone) return;
+      closeWhatsAppTemplatePicker();
+      if (clinicWhatsAppDispatchMode === 'cloud_api') {
+        void openWhatsAppPatientConversation(context.phone, context.patientName, '');
+        return;
+      }
+      openWhatsAppLink(`https://api.whatsapp.com/send?phone=${context.phone}`);
+    }
+
+    function openMobileAppointmentWhatsApp(event, appointmentId) {
+      if (consumeMobileWhatsAppLongPressClick(event)) return;
+      openWhatsAppCustomMessage(appointmentId);
+    }
+
     function availableWhatsAppTemplates(context = 'appointment') {
       const activeTemplates = whatsappMessageTemplates
         .filter(template => template.active)
@@ -25976,6 +26561,21 @@
         </span>`;
     }
 
+    function dashboardMobileContactActionsMarkup(entry, callPhone, whatsappPhone) {
+      const isAr = currentUiLanguage === 'ar';
+      const callLabel = isAr ? `اتصال بـ ${entry.patient}` : `Call ${entry.patient}`;
+      const whatsappLabel = isAr
+        ? `فتح محادثة واتساب فارغة مع ${entry.patient}. اضغط مطولاً لاختيار قالب.`
+        : `Open an empty WhatsApp chat with ${entry.patient}. Press and hold to choose a template.`;
+      const callAction = callPhone
+        ? `<a href="tel:${escapeAppointmentText(callPhone)}" class="phone-icon-action border border-blue-200 bg-white text-blue-700 shadow-xs hover:bg-blue-50" aria-label="${escapeAppointmentText(callLabel)}" title="${escapeAppointmentText(callLabel)}"><i data-lucide="phone-call"></i><span class="sr-only">${escapeAppointmentText(callLabel)}</span></a>`
+        : `<button type="button" disabled class="phone-icon-action border border-slate-200 bg-white text-slate-300" aria-label="${isAr ? 'لا يوجد رقم هاتف' : 'No phone number'}" title="${isAr ? 'لا يوجد رقم هاتف' : 'No phone number'}"><i data-lucide="phone-off"></i></button>`;
+      const whatsappAction = whatsappPhone
+        ? `<button type="button" data-whatsapp-template-toggle data-whatsapp-contact="appointment" data-whatsapp-appointment-id="${escapeAppointmentText(entry.id)}" onclick="openMobileAppointmentWhatsApp(event, this.dataset.whatsappAppointmentId)" onpointerdown="beginMobileWhatsAppPress(event)" onpointermove="moveMobileWhatsAppPress(event)" onpointerup="finishMobileWhatsAppPress(event)" onpointercancel="cancelMobileWhatsAppPress()" onlostpointercapture="cancelMobileWhatsAppPress()" oncontextmenu="handleMobileWhatsAppContextMenu(event)" class="phone-icon-action border border-emerald-200 bg-white text-emerald-700 shadow-xs hover:bg-emerald-50" aria-haspopup="menu" aria-controls="whatsapp-template-dropdown" aria-expanded="false" aria-label="${escapeAppointmentText(whatsappLabel)}" title="${escapeAppointmentText(whatsappLabel)}"><i data-lucide="message-circle"></i><span class="sr-only">${escapeAppointmentText(whatsappLabel)}</span></button>`
+        : `<button type="button" disabled class="phone-icon-action border border-slate-200 bg-white text-slate-300" aria-label="${isAr ? 'لا يوجد رقم واتساب' : 'No WhatsApp number'}" title="${isAr ? 'لا يوجد رقم واتساب' : 'No WhatsApp number'}"><i data-lucide="message-circle-off"></i></button>`;
+      return `<div class="dashboard-mobile-contact-actions">${callAction}${whatsappAction}</div>`;
+    }
+
     async function openWhatsAppPatientConversation(phone, patientName = '', initialMessage = '') {
       if (!phone) return;
       const clean = normaliseWhatsAppPhone(phone) || String(phone).replace(/[^\d]/g, '');
@@ -26047,15 +26647,111 @@
       openWhatsAppLink(url);
     }
 
+    async function openPatientProfileWhatsAppTemplatePicker(patientId, phoneKind, anchor) {
+      if (!hasPageAccess('patients') || !anchor) return;
+      const context = patientProfilePhoneContext(patientId, phoneKind);
+      const dropdown = document.getElementById('whatsapp-template-dropdown');
+      if (!context?.phone || !dropdown) return;
+      closeWhatsAppTemplatePicker();
+      const requestId = ++whatsappTemplatePickerRequestId;
+      patientProfileWhatsAppTemplateContext = {
+        patientId: context.patientId,
+        patientName: context.patientName,
+        phoneKind: context.phoneKind,
+        phone: context.phone
+      };
+      whatsappTemplatePickerAnchor = anchor;
+      whatsappTemplatePickerScope = '#view-patient-profile';
+      anchor.setAttribute('aria-busy', 'true');
+      await loadWhatsAppTemplatesForMessaging();
+      if (requestId !== whatsappTemplatePickerRequestId) return;
+      const liveAnchor = refreshWhatsAppTemplatePickerAnchor();
+      if (!liveAnchor || patientProfileWhatsAppTemplateContext?.patientId !== context.patientId) return;
+      liveAnchor.removeAttribute('aria-busy');
+      dropdown.innerHTML = availableWhatsAppTemplates('finance').map(template => `
+        <button type="button" role="menuitem" onclick="sendPatientProfileWhatsAppTemplate('${escapeHtml(context.patientId)}', '${context.phoneKind}', '${escapeHtml(template.id)}')" class="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-emerald-500">
+          <span class="flex min-w-0 items-center gap-3"><span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700"><i data-lucide="message-square-text" class="h-4 w-4"></i></span><span dir="auto" class="truncate text-xs font-black text-slate-800">${escapeHtml(template.name)}</span></span>
+          <i data-lucide="chevron-${currentUiLanguage === 'ar' ? 'left' : 'right'}" class="h-4 w-4 shrink-0 text-slate-300"></i>
+        </button>`).join('');
+      dropdown.classList.remove('hidden');
+      liveAnchor.setAttribute('aria-expanded', 'true');
+      positionWhatsAppTemplateDropdown();
+      lucide.createIcons();
+      requestAnimationFrame(positionWhatsAppTemplateDropdown);
+    }
+
+    async function sendPatientProfileWhatsAppTemplate(patientId, phoneKind, templateId) {
+      const liveContext = patientProfilePhoneContext(patientId, phoneKind);
+      const pickerContext = patientProfileWhatsAppTemplateContext?.patientId === liveContext?.patientId
+        && patientProfileWhatsAppTemplateContext?.phoneKind === liveContext?.phoneKind
+        ? patientProfileWhatsAppTemplateContext
+        : null;
+      const phone = pickerContext?.phone || liveContext?.phone;
+      const template = availableWhatsAppTemplates('finance').find(item => String(item.id) === String(templateId));
+      if (!liveContext?.patient || !phone || !template) return;
+      const patientName = pickerContext?.patientName || liveContext.patientName;
+      const message = resolveWhatsAppMessageTemplate(template.body, patientWhatsAppTemplateEntry(liveContext.patient));
+      closeWhatsAppTemplatePicker();
+
+      if (clinicWhatsAppDispatchMode === 'cloud_api') {
+        try {
+          showAppointmentNotificationToast(
+            currentUiLanguage === 'ar' ? 'واتساب العيادة' : 'Clinic WhatsApp',
+            currentUiLanguage === 'ar' ? `جارٍ إرسال الرسالة إلى ${patientName}...` : `Sending message to ${patientName}...`
+          );
+          const { data, error } = await db.functions.invoke('whatsapp-webhook', {
+            body: {
+              action: 'send_manual_message',
+              phone,
+              patient_name: patientName,
+              patient_id: liveContext.patientId || null,
+              content: message
+            }
+          });
+          if (error || !data?.success) {
+            throw new Error(error?.message || data?.error || 'Failed to dispatch WhatsApp message via Cloud API');
+          }
+          showAppointmentNotificationToast(
+            currentUiLanguage === 'ar' ? 'تم الإرسال بنجاح' : 'Sent Successfully',
+            currentUiLanguage === 'ar' ? `تم إرسال رسالة الواتساب إلى ${patientName}` : `WhatsApp message delivered to ${patientName}`
+          );
+        } catch (err) {
+          console.error('Direct WhatsApp Cloud API send failed:', err);
+          const tryExternal = confirm(
+            currentUiLanguage === 'ar'
+              ? `تعذر الإرسال المباشر عبر Cloud API:\n${err.message}\n\nهل ترغب في فتح واتساب الخارجي بدلاً من ذلك؟`
+              : `Direct dispatch via Cloud API failed:\n${err.message}\n\nWould you like to open external WhatsApp instead?`
+          );
+          if (tryExternal) {
+            openWhatsAppLink(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`, message);
+          }
+        }
+        return;
+      }
+
+      openWhatsAppLink(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`, message);
+    }
+
     function refreshWhatsAppTemplatePickerAnchor() {
       if (!whatsappTemplatePickerAnchor) return null;
       const root = whatsappTemplatePickerScope ? document.querySelector(whatsappTemplatePickerScope) : null;
       const financeContext = financeWhatsAppTemplateContext;
-      const allowed = financeContext ? canViewFinanceDepts() : hasPageAccess('appointments');
+      const patientContext = patientProfileWhatsAppTemplateContext;
+      const allowed = financeContext
+        ? canViewFinanceDepts()
+        : patientContext
+          ? hasPageAccess('patients')
+          : hasPageAccess('appointments');
       const anchor = root && !root.closest('.hidden, [hidden]') && allowed
-        ? Array.from(root.querySelectorAll('[data-whatsapp-template-toggle]')).find(button => financeContext
-          ? button.dataset.patientId === financeContext.patientId
-          : button.dataset.whatsappAppointmentId === selectedWhatsAppAppointmentId)
+        ? Array.from(root.querySelectorAll('[data-whatsapp-template-toggle]')).find(button => {
+          if (button.disabled || button.closest('.hidden, [hidden]') || button.getClientRects().length === 0) return false;
+          if (financeContext) return button.dataset.patientId === financeContext.patientId;
+          if (patientContext) {
+            return button.dataset.patientId === patientContext.patientId
+              && button.dataset.phoneKind === patientContext.phoneKind;
+          }
+          return button.dataset.whatsappAppointmentId === selectedWhatsAppAppointmentId;
+        })
         : null;
       if (!anchor || anchor.disabled || anchor.closest('.hidden, [hidden]')) {
         closeWhatsAppTemplatePicker();
@@ -26066,6 +26762,15 @@
         const phone = normaliseWhatsAppPhone(group?.patientPhone);
         if (!group || !phone) { closeWhatsAppTemplatePicker(); return null; }
         financeWhatsAppTemplateContext = { patientId: group.patientId, patientName: group.patientName, phone };
+      } else if (patientContext) {
+        const context = patientProfilePhoneContext(patientContext.patientId, patientContext.phoneKind);
+        if (!context?.phone) { closeWhatsAppTemplatePicker(); return null; }
+        patientProfileWhatsAppTemplateContext = {
+          patientId: context.patientId,
+          patientName: context.patientName,
+          phoneKind: context.phoneKind,
+          phone: context.phone
+        };
       }
       const dropdown = document.getElementById('whatsapp-template-dropdown');
       const isOpen = !dropdown.classList.contains('hidden');
@@ -26173,6 +26878,7 @@
       anchor?.removeAttribute('aria-busy');
       selectedWhatsAppAppointmentId = null;
       financeWhatsAppTemplateContext = null;
+      patientProfileWhatsAppTemplateContext = null;
       whatsappTemplatePickerAnchor = null;
       whatsappTemplatePickerScope = null;
       if (restoreFocus && anchor?.isConnected) anchor.focus({ preventScroll: true });
@@ -26472,16 +27178,19 @@
                 <span data-dashboard-appointment-actions-divider aria-hidden="true" class="h-px flex-1 bg-slate-200 transition-colors group-hover:bg-blue-300"></span>
               </button>
               <div id="${escapeAppointmentText(actionsPanelId)}" data-dashboard-appointment-actions ${actionsExpanded ? '' : 'hidden'} class="mt-3 ${actionsExpanded ? '' : 'hidden'} flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-                ${callPhone ? `
-                  <a href="tel:${escapeAppointmentText(callPhone)}" class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-100">
-                    <i data-lucide="phone-call" class="h-3.5 w-3.5"></i> Call
-                  </a>
-                  ${whatsappPhone ? whatsAppSplitControlMarkup(entry, { variant: 'dashboard' }) : ''}
-                ` : `
-                  <span class="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-400">
-                    <i data-lucide="phone-off" class="h-3.5 w-3.5"></i> No phone number
-                  </span>
-                `}
+                ${dashboardMobileContactActionsMarkup(entry, callPhone, whatsappPhone)}
+                <div class="dashboard-desktop-contact-actions">
+                  ${callPhone ? `
+                    <a href="tel:${escapeAppointmentText(callPhone)}" class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-100">
+                      <i data-lucide="phone-call" class="h-3.5 w-3.5"></i> Call
+                    </a>
+                    ${whatsappPhone ? whatsAppSplitControlMarkup(entry, { variant: 'dashboard' }) : ''}
+                  ` : `
+                    <span class="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-400">
+                      <i data-lucide="phone-off" class="h-3.5 w-3.5"></i> No phone number
+                    </span>
+                  `}
+                </div>
                 ${canonicalAppointmentStatus(entry.status) !== 'Cancelled' ? `<button type="button" onclick="openDiagnosisFeeModal('${escapeAppointmentText(entry.id)}')" class="inline-flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-black text-cyan-700 transition hover:bg-cyan-100"><i data-lucide="badge-dollar-sign" class="h-3.5 w-3.5"></i> Diagnosis fee</button>` : ''}
                 <button type="button" onclick="openPatientInvoices('${entry.patientId}')" class="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-black text-violet-700 transition hover:bg-violet-100">
                   <i data-lucide="receipt-text" class="h-3.5 w-3.5"></i> Invoice
@@ -31106,19 +31815,16 @@
     function setWhatsAppAgentSetting(enabled) {
       const isEnabled = Boolean(enabled);
       const toggle = document.getElementById('setting-whatsapp-enabled');
-      const knob = document.getElementById('setting-whatsapp-enabled-knob');
       const status = document.getElementById('setting-whatsapp-enabled-status');
       if (toggle) {
         toggle.setAttribute('aria-checked', String(isEnabled));
-        toggle.classList.toggle('bg-emerald-600', isEnabled);
-        toggle.classList.toggle('bg-slate-300', !isEnabled);
+        toggle.title = isEnabled ? 'Disable WhatsApp AI Agent' : 'Enable WhatsApp AI Agent';
       }
-      knob?.classList.toggle('translate-x-5', isEnabled);
       if (status) {
         status.textContent = isEnabled
           ? 'Enabled — the AI agent may answer incoming messages.'
           : 'Disabled — incoming messages remain available for staff without an AI reply.';
-        status.className = `mt-1 block text-[10px] font-bold ${isEnabled ? 'text-emerald-700' : 'text-amber-700'}`;
+        status.dataset.state = isEnabled ? 'enabled' : 'disabled';
       }
     }
 
@@ -31139,7 +31845,10 @@
 
     async function loadWhatsAppSettingsIntoModal() {
       const enabledToggle = document.getElementById('setting-whatsapp-enabled');
-      if (enabledToggle) enabledToggle.disabled = true;
+      if (enabledToggle) {
+        enabledToggle.disabled = true;
+        enabledToggle.setAttribute('aria-busy', 'true');
+      }
 
       try {
         const { data, error } = await db.from('clinic_settings').select(
@@ -31162,7 +31871,36 @@
         document.getElementById('setting-whatsapp-ai-prompt').value = data.whatsapp_ai_instructions || '';
         return data;
       } finally {
-        if (enabledToggle) enabledToggle.disabled = false;
+        if (enabledToggle) {
+          enabledToggle.disabled = false;
+          enabledToggle.removeAttribute('aria-busy');
+        }
+      }
+    }
+
+    async function copyWhatsAppWebhookUrl(button) {
+      const input = document.getElementById('setting-whatsapp-webhook-url');
+      const label = button?.querySelector('[data-copy-label]');
+      if (!input || !button) return;
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(input.value);
+        } else {
+          input.focus();
+          input.select();
+          if (!document.execCommand('copy')) throw new Error('Copy command was rejected.');
+        }
+        button.classList.add('is-copied');
+        if (label) label.textContent = 'Copied';
+        window.setTimeout(() => {
+          if (!button.isConnected) return;
+          button.classList.remove('is-copied');
+          if (label) label.textContent = 'Copy URL';
+        }, 1800);
+      } catch (error) {
+        input.focus();
+        input.select();
+        showAppointmentNotificationToast('Webhook URL', 'Copy was blocked. The URL is selected so you can copy it manually.');
       }
     }
 
@@ -31190,13 +31928,8 @@
         }
         if (progressEl) {
           progressEl.style.width = `${percent}%`;
-          if (percent > 90) {
-            progressEl.className = 'bg-rose-500 h-2.5 rounded-full transition-all duration-500';
-          } else if (percent > 75) {
-            progressEl.className = 'bg-amber-500 h-2.5 rounded-full transition-all duration-500';
-          } else {
-            progressEl.className = 'bg-gradient-to-r from-emerald-500 to-teal-500 h-2.5 rounded-full transition-all duration-500';
-          }
+          progressEl.classList.toggle('is-warning', percent > 75 && percent <= 90);
+          progressEl.classList.toggle('is-critical', percent > 90);
         }
 
         if (showToast) {
