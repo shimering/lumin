@@ -3163,6 +3163,11 @@
       /* Full-bleed native mobile chat experience */
       body.whatsapp-mobile-chat-open {
         overflow: hidden !important;
+        position: relative !important;
+      }
+      body.whatsapp-mobile-chat-open #app-shell {
+        padding-bottom: 0 !important;
+        min-height: 0 !important;
       }
       body.whatsapp-mobile-chat-open #app-header {
         display: block !important;
@@ -3184,16 +3189,21 @@
       body.whatsapp-mobile-chat-open #app-primary-nav {
         display: flex !important;
       }
+      body.whatsapp-mobile-chat-open.whatsapp-keyboard-open #app-primary-nav {
+        display: none !important;
+      }
       body.whatsapp-mobile-chat-open #app-main {
         padding: 0 !important;
         margin: 0 !important;
-        height: calc(100dvh - var(--mobile-nav-height)) !important;
-        max-height: calc(100dvh - var(--mobile-nav-height)) !important;
+        height: var(--whatsapp-mobile-viewport-height, calc(100dvh - var(--mobile-nav-height))) !important;
+        max-height: var(--whatsapp-mobile-viewport-height, calc(100dvh - var(--mobile-nav-height))) !important;
+        min-height: 0 !important;
         overflow: hidden !important;
       }
       body.whatsapp-mobile-chat-open #view-whatsapp {
-        height: calc(100dvh - var(--mobile-nav-height)) !important;
-        max-height: calc(100dvh - var(--mobile-nav-height)) !important;
+        height: var(--whatsapp-mobile-viewport-height, calc(100dvh - var(--mobile-nav-height))) !important;
+        max-height: var(--whatsapp-mobile-viewport-height, calc(100dvh - var(--mobile-nav-height))) !important;
+        min-height: 0 !important;
         padding: 0 !important;
         margin: 0 !important;
         gap: 0 !important;
@@ -3203,8 +3213,8 @@
         display: none !important;
       }
       body.whatsapp-mobile-chat-open .whatsapp-chat-shell {
-        height: calc(100dvh - var(--mobile-nav-height)) !important;
-        max-height: calc(100dvh - var(--mobile-nav-height)) !important;
+        height: var(--whatsapp-mobile-viewport-height, calc(100dvh - var(--mobile-nav-height))) !important;
+        max-height: var(--whatsapp-mobile-viewport-height, calc(100dvh - var(--mobile-nav-height))) !important;
         min-height: 0 !important;
         border: none !important;
         border-radius: 0 !important;
@@ -3212,14 +3222,13 @@
       }
       body.whatsapp-mobile-chat-open #whatsapp-main-chat,
       body.whatsapp-mobile-chat-open #whatsapp-chat-active {
-        height: calc(100dvh - var(--mobile-nav-height)) !important;
-        max-height: calc(100dvh - var(--mobile-nav-height)) !important;
+        height: var(--whatsapp-mobile-viewport-height, calc(100dvh - var(--mobile-nav-height))) !important;
+        max-height: var(--whatsapp-mobile-viewport-height, calc(100dvh - var(--mobile-nav-height))) !important;
         min-height: 0 !important;
         border-radius: 0 !important;
       }
       #whatsapp-reply-panel {
         padding: 0.5rem 0.75rem !important;
-        padding-bottom: max(0.65rem, env(safe-area-inset-bottom)) !important;
         background-color: #ffffff !important;
         width: 100% !important;
         max-width: 100% !important;
@@ -6239,7 +6248,7 @@
 
                 <!-- Expanding Textarea Container -->
                 <div id="whatsapp-text-input-container" class="relative flex-1 min-w-0">
-                  <textarea id="whatsapp-reply-input" rows="1" dir="auto" oninput="autoResizeWhatsAppInput(this)" onkeydown="handleWhatsAppInputKeydown(event)" placeholder="Type a message..." class="w-full resize-none border-0 bg-transparent py-2 px-1.5 text-sm sm:text-base leading-relaxed text-slate-800 placeholder:text-slate-400 outline-none ring-0 focus:ring-0 max-h-32 overflow-y-auto block"></textarea>
+                  <textarea id="whatsapp-reply-input" rows="1" dir="auto" oninput="autoResizeWhatsAppInput(this)" onkeydown="handleWhatsAppInputKeydown(event)" onfocus="handleWhatsAppInputFocus()" onblur="handleWhatsAppInputBlur()" placeholder="Type a message..." class="w-full resize-none border-0 bg-transparent py-2 px-1.5 text-sm sm:text-base leading-relaxed text-slate-800 placeholder:text-slate-400 outline-none ring-0 focus:ring-0 max-h-32 overflow-y-auto block"></textarea>
                 </div>
 
                 <!-- Voice Recording Active Bar -->
@@ -23732,7 +23741,11 @@
       viewChart.classList.add('hidden');
       viewAppointments.classList.add('hidden');
       document.getElementById('view-whatsapp')?.classList.add('hidden');
-      if (viewName !== 'whatsapp') document.body.classList.remove('whatsapp-mobile-chat-open');
+      if (viewName !== 'whatsapp') {
+        document.body.classList.remove('whatsapp-mobile-chat-open', 'whatsapp-keyboard-open');
+        document.documentElement.style.removeProperty('--whatsapp-mobile-viewport-height');
+        resetWhatsAppWindowScroll();
+      }
       viewPrices?.classList.add('hidden');
       viewAdmin.classList.add('hidden');
       viewSettings.classList.add('hidden');
@@ -26214,6 +26227,71 @@
     function setupDashboardViewport() {
       window.addEventListener('resize', scheduleDashboardViewportUpdate, { passive: true });
       window.visualViewport?.addEventListener('resize', scheduleDashboardViewportUpdate, { passive: true });
+    }
+
+    let whatsappViewportResizeFrame = null;
+
+    function resetWhatsAppWindowScroll() {
+      if (window.scrollY !== 0 || document.documentElement.scrollTop !== 0 || document.body.scrollTop !== 0) {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      }
+    }
+
+    function updateWhatsAppMobileViewport() {
+      if (!document.body.classList.contains('whatsapp-mobile-chat-open')) {
+        document.body.classList.remove('whatsapp-keyboard-open');
+        document.documentElement.style.removeProperty('--whatsapp-mobile-viewport-height');
+        return;
+      }
+
+      const isMobile = window.innerWidth < 768;
+      if (!isMobile) {
+        document.body.classList.remove('whatsapp-keyboard-open');
+        document.documentElement.style.removeProperty('--whatsapp-mobile-viewport-height');
+        return;
+      }
+
+      const vv = window.visualViewport;
+      const windowH = window.innerHeight;
+      const viewportH = vv ? vv.height : windowH;
+      const keyboardHeight = Math.max(0, windowH - viewportH);
+      const isKeyboardOpen = keyboardHeight > 100;
+
+      document.body.classList.toggle('whatsapp-keyboard-open', isKeyboardOpen);
+
+      if (isKeyboardOpen && vv) {
+        const targetHeight = Math.floor(vv.height);
+        document.documentElement.style.setProperty('--whatsapp-mobile-viewport-height', `${targetHeight}px`);
+        resetWhatsAppWindowScroll();
+      } else {
+        document.documentElement.style.removeProperty('--whatsapp-mobile-viewport-height');
+        resetWhatsAppWindowScroll();
+      }
+    }
+
+    function scheduleWhatsAppMobileViewportUpdate() {
+      window.cancelAnimationFrame(whatsappViewportResizeFrame);
+      whatsappViewportResizeFrame = window.requestAnimationFrame(() => {
+        whatsappViewportResizeFrame = null;
+        updateWhatsAppMobileViewport();
+      });
+    }
+
+    function setupWhatsAppMobileViewport() {
+      window.addEventListener('resize', scheduleWhatsAppMobileViewportUpdate, { passive: true });
+      window.visualViewport?.addEventListener('resize', scheduleWhatsAppMobileViewportUpdate, { passive: true });
+      window.visualViewport?.addEventListener('scroll', () => {
+        if (document.body.classList.contains('whatsapp-mobile-chat-open')) {
+          resetWhatsAppWindowScroll();
+        }
+      }, { passive: true });
+      window.addEventListener('scroll', () => {
+        if (document.body.classList.contains('whatsapp-mobile-chat-open') && window.scrollY !== 0) {
+          resetWhatsAppWindowScroll();
+        }
+      }, { passive: true });
     }
 
     function refreshAppointmentCurrentTimeLine(now = new Date()) {
@@ -31043,6 +31121,10 @@
       activeWhatsAppConversationId = convId;
       activeWhatsAppConversation = whatsappConversations.find(c => c.id === convId) || null;
       document.body.classList.toggle('whatsapp-mobile-chat-open', window.innerWidth < 768);
+      if (window.innerWidth < 768) {
+        scheduleWhatsAppMobileViewportUpdate();
+        resetWhatsAppWindowScroll();
+      }
 
       document.querySelectorAll('.whatsapp-conv-item').forEach(el => el.classList.remove('active'));
       const activeBtn = document.querySelector(`.whatsapp-conv-item[onclick*="${convId}"]`);
@@ -31074,7 +31156,9 @@
     }
 
     function closeActiveWhatsAppChatOnMobile() {
-      document.body.classList.remove('whatsapp-mobile-chat-open');
+      document.body.classList.remove('whatsapp-mobile-chat-open', 'whatsapp-keyboard-open');
+      document.documentElement.style.removeProperty('--whatsapp-mobile-viewport-height');
+      resetWhatsAppWindowScroll();
     }
 
     function compareWhatsAppMessages(a, b) {
@@ -31440,6 +31524,18 @@
 
       input.value = '';
       autoResizeWhatsAppInput(input);
+      if (window.innerWidth < 768) {
+        resetWhatsAppWindowScroll();
+        scheduleWhatsAppMobileViewportUpdate();
+        setTimeout(() => {
+          resetWhatsAppWindowScroll();
+          scheduleWhatsAppMobileViewportUpdate();
+        }, 100);
+        setTimeout(() => {
+          resetWhatsAppWindowScroll();
+          scheduleWhatsAppMobileViewportUpdate();
+        }, 300);
+      }
 
       if (submitBtn) {
         submitBtn.disabled = true;
@@ -31803,6 +31899,41 @@
           event.preventDefault();
           void sendWhatsAppManualReply(event);
         }
+      }
+    }
+
+    function handleWhatsAppInputFocus() {
+      if (window.innerWidth < 768) {
+        scheduleWhatsAppMobileViewportUpdate();
+        setTimeout(() => {
+          resetWhatsAppWindowScroll();
+          scheduleWhatsAppMobileViewportUpdate();
+          const container = document.getElementById('whatsapp-messages-container');
+          if (container) container.scrollTop = container.scrollHeight;
+        }, 80);
+        setTimeout(() => {
+          resetWhatsAppWindowScroll();
+          scheduleWhatsAppMobileViewportUpdate();
+        }, 250);
+      }
+    }
+
+    function handleWhatsAppInputBlur() {
+      if (window.innerWidth < 768) {
+        resetWhatsAppWindowScroll();
+        scheduleWhatsAppMobileViewportUpdate();
+        setTimeout(() => {
+          resetWhatsAppWindowScroll();
+          scheduleWhatsAppMobileViewportUpdate();
+        }, 60);
+        setTimeout(() => {
+          resetWhatsAppWindowScroll();
+          scheduleWhatsAppMobileViewportUpdate();
+        }, 180);
+        setTimeout(() => {
+          resetWhatsAppWindowScroll();
+          scheduleWhatsAppMobileViewportUpdate();
+        }, 350);
       }
     }
 
@@ -32656,6 +32787,7 @@
       setupAppointmentCalendarViewport();
       setupPatientQueryViewport();
       setupDashboardViewport();
+      setupWhatsAppMobileViewport();
       document.getElementById('modal-appointment').addEventListener('click', event => {
         if (event.target.id === 'modal-appointment') closeAppointmentModal();
       });
