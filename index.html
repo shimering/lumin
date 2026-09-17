@@ -2420,12 +2420,20 @@
 
       /* Mobile: patients view fills all available vertical space above nav bar */
       #view-patients:not(.hidden) {
-        height: calc(100dvh - var(--mobile-nav-height) - max(0.5rem, env(safe-area-inset-top)) - 0.75rem);
+        height: var(--patient-query-viewport-height, calc(100dvh - var(--mobile-nav-height) - max(0.5rem, env(safe-area-inset-top)) - 0.5rem));
         gap: 0.65rem;
         overflow: hidden;
       }
-      /* Lock outer scroll so only the patient list scrolls */
-      body.patients-view-active #app-main { overflow: hidden; }
+      /* Lock the mobile shells so vertical gestures stay inside the patient/calendar cards. */
+      body.patient-query-active #app-shell,
+      body.appointments-calendar-active #app-shell {
+        height: 100dvh;
+        overflow: hidden;
+      }
+      body.patient-query-active #app-main,
+      body.appointments-calendar-active #app-main {
+        overflow: hidden;
+      }
       #view-patients .overflow-x-auto,
       #view-admin .overflow-x-auto,
       #view-chart .overflow-x-auto,
@@ -2906,16 +2914,54 @@
       white-space: nowrap;
     }
     @media (max-width: 767px) {
-      [data-appointments-calendar-card] {
+      #view-appointments:not(.hidden) {
         display: flex;
+        height: var(--appointment-page-viewport-height, calc(100dvh - var(--mobile-nav-height) - max(0.5rem, env(safe-area-inset-top)) - 0.5rem));
         min-height: 0;
         flex-direction: column;
+        gap: 0.65rem;
+        overflow: hidden;
+      }
+      #view-appointments:not(.hidden) > :not([hidden]) ~ :not([hidden]) { margin-top: 0; }
+      #view-appointments > [data-compact-appointments-header] { flex: 0 0 auto; }
+      [data-appointments-calendar-shell] {
+        min-height: 0;
+        flex: 1 1 auto;
+        overflow: hidden;
+      }
+      [data-appointments-calendar-card] {
+        display: flex;
+        height: 100%;
+        min-height: 0;
+        flex-direction: column;
+        overflow: hidden;
       }
       #appointments-month-view,
       #appointments-week-view,
       #appointments-day-view {
         order: 1;
         min-height: 0;
+      }
+      #appointments-month-view {
+        height: auto !important;
+        max-height: none !important;
+        flex: 1 1 auto;
+        overscroll-behavior: contain;
+      }
+      #appointments-week-view:not(.hidden),
+      #appointments-day-view:not(.hidden) {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      #appointments-week-scroll,
+      #appointments-day-timeline-scroll {
+        height: auto !important;
+        max-height: none !important;
+        min-height: 0;
+        flex: 1 1 auto;
+        overscroll-behavior: contain;
       }
       #appointments-calendar-toolbar {
         order: 2;
@@ -5323,7 +5369,7 @@
         </div>
       </div>
 
-      <div>
+      <div data-appointments-calendar-shell>
         <div data-appointments-calendar-card class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
           <div id="appointments-calendar-toolbar" data-compact-calendar-toolbar class="flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-2">
             <div class="flex min-w-0 items-center gap-2" aria-live="polite">
@@ -24090,7 +24136,6 @@
       syncNavMountLocation();
       window.location.hash = viewName;
       document.body.classList.toggle('whatsapp-view-active', viewName === 'whatsapp');
-      document.body.classList.toggle('patients-view-active', viewName === 'patients');
 
       if (viewName === 'dashboard') {
         await ensureAppointmentsLoaded();
@@ -26520,6 +26565,20 @@
       return (date.getDay() + 1) % 7;
     }
 
+    function mobileViewContentBottom(appShell, viewportBottom) {
+      const mobileNav = document.getElementById('app-primary-nav');
+      const navRect = mobileNav?.getBoundingClientRect();
+      const navIsVisible = mobileNav
+        && getComputedStyle(mobileNav).display !== 'none'
+        && navRect
+        && navRect.height > 0
+        && Number.isFinite(navRect.top);
+      if (navIsVisible) return Math.min(viewportBottom, navRect.top) - 8;
+
+      const mobileNavigationHeight = Number.parseFloat(getComputedStyle(appShell).paddingBottom) || 0;
+      return viewportBottom - mobileNavigationHeight - 8;
+    }
+
     function updateAppointmentCalendarViewportHeight() {
       const appointmentsView = document.getElementById('view-appointments');
       const toolbar = document.getElementById('appointments-calendar-toolbar');
@@ -26532,6 +26591,17 @@
         ? visualViewport.offsetTop + visualViewport.height
         : window.innerHeight;
       const mobileControlsBelow = window.matchMedia('(max-width: 767px)').matches;
+      const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+      if (mobileControlsBelow) {
+        const contentBottom = mobileViewContentBottom(appShell, viewportBottom);
+        const pageHeight = Math.floor((contentBottom - appointmentsView.getBoundingClientRect().top) / zoom);
+        appointmentsView.style.setProperty('--appointment-page-viewport-height', `${Math.max(112, pageHeight)}px`);
+        appointmentsView.style.removeProperty('--appointment-calendar-viewport-height');
+        updateAppointmentMonthCardVisibility();
+        return;
+      }
+
+      appointmentsView.style.removeProperty('--appointment-page-viewport-height');
       const activeCalendarView = [
         document.getElementById('appointments-month-view'),
         document.getElementById('appointments-week-view'),
@@ -26544,7 +26614,6 @@
       const mobileNavigationHeight = Number.parseFloat(getComputedStyle(appShell).paddingBottom) || 0;
       const mainBottomPadding = Number.parseFloat(getComputedStyle(main).paddingBottom) || 0;
       const bottomToolbarHeight = mobileControlsBelow ? toolbar.getBoundingClientRect().height : 0;
-      const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
       const availableHeight = Math.floor(
         ((viewportBottom - calendarTop - bottomToolbarHeight - 2) / zoom)
         - mobileNavigationHeight
@@ -26565,6 +26634,7 @@
     function setupAppointmentCalendarViewport() {
       window.addEventListener('resize', scheduleAppointmentCalendarViewportUpdate, { passive: true });
       window.visualViewport?.addEventListener('resize', scheduleAppointmentCalendarViewportUpdate, { passive: true });
+      window.visualViewport?.addEventListener('scroll', scheduleAppointmentCalendarViewportUpdate, { passive: true });
     }
 
     function updatePatientQueryViewportHeight() {
@@ -26577,9 +26647,17 @@
       const viewportBottom = visualViewport
         ? visualViewport.offsetTop + visualViewport.height
         : window.innerHeight;
+      const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+      const isMobile = window.matchMedia('(max-width: 767px)').matches;
+      if (isMobile) {
+        const contentBottom = mobileViewContentBottom(appShell, viewportBottom);
+        const availableHeight = Math.floor((contentBottom - patientView.getBoundingClientRect().top) / zoom);
+        patientView.style.setProperty('--patient-query-viewport-height', `${Math.max(112, availableHeight)}px`);
+        return;
+      }
+
       const mobileNavigationHeight = Number.parseFloat(getComputedStyle(appShell).paddingBottom) || 0;
       const mainBottomPadding = Number.parseFloat(getComputedStyle(main).paddingBottom) || 0;
-      const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
       const availableHeight = Math.floor(
         ((viewportBottom - patientView.getBoundingClientRect().top - 2) / zoom)
         - mobileNavigationHeight
@@ -26599,6 +26677,7 @@
     function setupPatientQueryViewport() {
       window.addEventListener('resize', schedulePatientQueryViewportUpdate, { passive: true });
       window.visualViewport?.addEventListener('resize', schedulePatientQueryViewportUpdate, { passive: true });
+      window.visualViewport?.addEventListener('scroll', schedulePatientQueryViewportUpdate, { passive: true });
     }
 
     function updateDashboardViewportHeight() {
