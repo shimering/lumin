@@ -108,7 +108,11 @@ Lumin is used extensively in dental clinics across **desktops, laptops, iPads, A
 ### B. Touch vs Pointer Ergonomics
 - **Touch Target Sizing**: All interactive buttons, tabs, tooth surface selectors, and dropdown triggers must meet Apple & Android touch guidelines: **minimum $44 \times 44$px** touch footprint.
 - **No Hover-Only Disclosures**: Never hide essential actions (edit, delete, WhatsApp, status change) behind `:hover` states on touch devices. Provide permanently visible action triggers or a dedicated touch-friendly `...` menu button.
-- **Input Zoom Prevention (iOS Safari)**: Ensure form inputs on mobile use `text-base` ($\ge 16$px) or avoid triggering aggressive mobile Safari viewport zoom when focused.
+- **Whole-Application Pinch Zoom Prevention**: The clinical application viewport must remain firmly locked against whole-page pinch-to-zoom across iOS Safari, iPadOS, Android Chrome, and touch laptops. This is maintained via:
+  - `<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />`
+  - `touch-action: pan-x pan-y;` on `html, body` (retaining full native single-finger scrolling).
+  - WebKit `gesturestart` cancellation and multi-touch `touchmove` safeguards in `initPreventAppPinchZoom()`.
+  - Component-level pinch gestures (e.g. X-ray lightbox inspection `#lightbox-viewport` or calendar hour-slot zoom) must be strictly confined to their local container (`style="touch-action: none;"`) without compromising page-level stability.
 - **Safe Area Inset Support**: Always respect device notches and home swipe bars:
   - `padding-bottom: max(1rem, env(safe-area-inset-bottom))` for sticky footers and bottom sheets.
   - `padding-top: env(safe-area-inset-top)` for full-screen fixed modals.

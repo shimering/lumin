@@ -40,6 +40,7 @@ Whenever designing, styling, or refactoring user interfaces in Lumin, strictly a
   - Safe area insets: Always include `env(safe-area-inset-bottom)` and `env(safe-area-inset-top)`.
 - **Touch Targets**: Strictly maintain $\ge 44 \times 44$px for all touchable controls, buttons, surface selectors, and checkboxes.
 - **No Hover-Only Triggers**: Never conceal critical actions behind hover-only states; always provide visible touch affordances.
+- **Whole-Application Pinch Zoom Prevention**: The application viewport is protected against whole-page pinch-to-zoom via `user-scalable=no`, `touch-action: pan-x pan-y` on `html, body`, and gesture cancellation in `initPreventAppPinchZoom()`. Any component-level multi-touch interaction (e.g. X-ray lightbox inspection `#lightbox-viewport` or calendar timeline slot pinch) must be localized (`touch-action: none;`) without removing root viewport protection.
 
 ## 5. Micro-Interactions & Icons
 - Every interactive element must include hover, active (`active:scale-[0.98]`), focus-visible (`focus-visible:ring-2`), and disabled states.

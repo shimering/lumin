@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#2563eb" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -33,6 +33,40 @@
       window.isLuminLaptopDevice = isLaptopDevice;
       document.documentElement.classList.toggle('is-laptop-device', isLaptopDevice());
     })();
+
+    (function initPreventAppPinchZoom() {
+      // 1. Prevent Safari WebKit proprietary gesture events (pinch/rotate viewport zoom) on iOS & iPadOS
+      const preventGesture = (e) => {
+        e.preventDefault();
+      };
+      document.addEventListener('gesturestart', preventGesture, { passive: false });
+      document.addEventListener('gesturechange', preventGesture, { passive: false });
+      document.addEventListener('gestureend', preventGesture, { passive: false });
+
+      // 2. Prevent multi-touch pinch zoom on touchmove
+      // Single-finger scrolling (e.touches.length === 1) is completely untouched.
+      // Components with dedicated pinch gestures (such as #lightbox-viewport or appointment calendar timeline)
+      // handle their internal scaling and already call preventDefault().
+      document.addEventListener('touchmove', (e) => {
+        if (e.touches && e.touches.length > 1) {
+          if (e.cancelable) {
+            e.preventDefault();
+          }
+        }
+      }, { passive: false });
+
+      // 3. Prevent trackpad / precision touchpad pinch-to-zoom (wheel + ctrlKey) on laptops & iPad Magic Keyboard
+      // Normal mousewheel scrolling is completely untouched.
+      // Mousewheel zoom inside the X-Ray/photo lightbox viewer (#lightbox-viewport) is preserved.
+      window.addEventListener('wheel', (e) => {
+        if (e.ctrlKey) {
+          if (e.target && e.target.closest && e.target.closest('#lightbox-viewport')) {
+            return;
+          }
+          e.preventDefault();
+        }
+      }, { passive: false });
+    })();
   </script>
   <!-- Precompiled utilities avoid compiling Tailwind in every browser session. -->
   <link rel="stylesheet" href="lumin-app.css" />
@@ -42,6 +76,11 @@
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   
   <style>
+    /* Lock viewport pinch-zoom on document root while retaining full native single-finger scrolling */
+    html, body {
+      touch-action: pan-x pan-y;
+    }
+
     .surface-poly {
       transition: fill 0.12s ease, stroke 0.12s ease, filter 0.12s ease;
       cursor: pointer;
@@ -6726,7 +6765,7 @@
       </div>
 
       <!-- Lightbox Image Viewport with pan & zoom confined inside the popup window -->
-      <div id="lightbox-viewport" class="relative flex-1 w-full bg-slate-950 overflow-hidden flex items-center justify-center select-none cursor-grab active:cursor-grabbing">
+      <div id="lightbox-viewport" class="relative flex-1 w-full bg-slate-950 overflow-hidden flex items-center justify-center select-none cursor-grab active:cursor-grabbing" style="touch-action: none;">
         <div id="lightbox-loading-spinner" class="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-full bg-white/95 border border-slate-200 px-3 py-1 text-[11px] font-bold text-slate-700 shadow-md pointer-events-none hidden transition duration-300">
           <svg class="h-3.5 w-3.5 animate-spin text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
           <span>Loading high-res...</span>
