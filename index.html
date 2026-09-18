@@ -568,28 +568,22 @@
     .finding-row {
       background: linear-gradient(90deg, var(--finding-status-soft), rgba(255, 255, 255, 0.96) 24%);
       backdrop-filter: blur(8px);
+      min-width: max-content;
+      flex-wrap: nowrap !important;
     }
-    .finding-row.is-editing-teeth,
-    .finding-row:has(.finding-tooth-editor:not(.hidden)) {
-      z-index: 60 !important;
-      position: relative !important;
-      overflow: visible !important;
-      backdrop-filter: none !important;
-      -webkit-backdrop-filter: none !important;
+    #chart-finding-tooth-editor-modal {
+      overscroll-behavior: contain;
     }
-    .finding-tooth-editor-backdrop {
-      position: fixed !important;
-      inset: 0 !important;
-      background: rgba(15, 23, 42, 0.45) !important;
-      backdrop-filter: blur(4px) !important;
-      -webkit-backdrop-filter: blur(4px) !important;
-      z-index: 65 !important;
-    }
-    .finding-tooth-editor {
-      z-index: 70 !important;
+    .finding-tooth-picker {
       display: flex !important;
       flex-direction: column !important;
-      overscroll-behavior: contain;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 3rem !important;
+      min-width: 3rem !important;
+      max-width: 3rem !important;
+      gap: 0.25rem !important;
+      flex-shrink: 0 !important;
     }
     .finding-tooth-editor-scroll {
       overflow-y: auto !important;
@@ -605,32 +599,6 @@
     .finding-tooth-editor-scroll::-webkit-scrollbar-thumb {
       background: #cbd5e1;
       border-radius: 999px;
-    }
-    @media (max-width: 899px) {
-      .finding-tooth-editor {
-        position: fixed !important;
-        inset: 0 !important;
-        margin: auto !important;
-        width: calc(100vw - 2rem) !important;
-        max-width: 23rem !important;
-        height: fit-content !important;
-        max-height: min(84vh, 34rem) !important;
-        z-index: 70 !important;
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4) !important;
-      }
-    }
-    @media (min-width: 900px) {
-      .finding-tooth-editor {
-        position: absolute !important;
-        left: 0 !important;
-        top: 100% !important;
-        margin-top: 0.5rem !important;
-        width: 22rem !important;
-        max-height: min(75vh, 28rem) !important;
-      }
-      .finding-tooth-editor-backdrop {
-        display: none !important;
-      }
     }
     .finding-row.is-selected {
       border-color: rgba(124, 58, 237, 0.48);
@@ -677,13 +645,6 @@
     }
     .finding-palmer-button[aria-disabled="true"] {
       cursor: not-allowed;
-    }
-    .finding-tooth-editor {
-      width: min(24rem, calc(100vw - 3rem));
-      max-height: min(27rem, calc(100vh - 8rem));
-      overflow-y: auto;
-      overscroll-behavior: contain;
-      touch-action: pan-y;
     }
     .finding-tooth-option {
       position: relative;
@@ -909,9 +870,9 @@
         box-sizing: border-box !important;
       }
       #findings-container .finding-row.is-batch-finding {
-        min-width: 72rem !important;
-        width: 72rem !important;
-        max-width: 72rem !important;
+        min-width: 68rem !important;
+        width: 68rem !important;
+        max-width: 68rem !important;
       }
       #findings-container .finding-row-summary {
         width: 18.5rem !important;
@@ -921,7 +882,12 @@
         box-sizing: border-box !important;
       }
       #findings-container .finding-tooth-picker {
-        flex-wrap: nowrap !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 3rem !important;
+        min-width: 3rem !important;
+        max-width: 3rem !important;
         flex-shrink: 0 !important;
       }
       #findings-container .finding-operation-heading {
@@ -7904,6 +7870,30 @@
   </div>
 
   <div id="chart-finding-note-popover" role="dialog" aria-modal="false" aria-label="Operation notes preview" onpointerenter="cancelChartFindingNotePreviewClose()" onpointerleave="scheduleChartFindingNotePreviewClose(event)" class="fixed z-[75] hidden w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-violet-200 bg-white shadow-2xl"></div>
+
+  <!-- ================= MODAL: GLOBAL FINDING TOOTH EDITOR ================= -->
+  <div id="chart-finding-tooth-editor-modal" role="dialog" aria-modal="true" aria-labelledby="chart-finding-tooth-editor-title" class="fixed inset-0 z-[85] hidden items-center justify-center p-3 sm:p-4">
+    <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="closeGlobalFindingToothEditor()"></div>
+    <div class="relative flex max-h-[85vh] w-[calc(100vw-1.5rem)] sm:w-full max-w-lg min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+      <div class="flex shrink-0 items-center justify-between border-b border-slate-100 p-3.5 sm:p-5">
+        <div>
+          <h3 id="chart-finding-tooth-editor-title" class="text-sm sm:text-base font-bold text-slate-900">Edit procedure teeth</h3>
+          <p id="chart-finding-tooth-editor-subtitle" class="mt-0.5 text-[11px] sm:text-xs font-semibold text-slate-500">Tap one or more teeth, then save.</p>
+        </div>
+        <button type="button" onclick="closeGlobalFindingToothEditor()" class="rounded-xl border border-slate-200 bg-white p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition" aria-label="Close tooth editor">
+          <i data-lucide="x" class="h-4 w-4"></i>
+        </button>
+      </div>
+      <div id="chart-finding-tooth-editor-scroll" class="finding-tooth-editor-scroll flex-1 overflow-y-auto overscroll-contain p-3.5 sm:p-5 space-y-4"></div>
+      <div class="flex shrink-0 items-center justify-between border-t border-slate-100 bg-slate-50/50 p-3 sm:p-4">
+        <p id="chart-finding-tooth-editor-summary" class="text-xs font-bold text-slate-600">1 tooth selected</p>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="closeGlobalFindingToothEditor()" class="rounded-xl border border-slate-200 bg-white px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs font-black text-slate-600 transition hover:bg-slate-50">Cancel</button>
+          <button id="chart-finding-tooth-editor-save-btn" type="button" onclick="saveGlobalFindingToothSelection()" class="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs font-black text-white shadow-sm transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-slate-300">Save teeth</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div id="appointment-card-popover-layer" class="appointment-card-popover-layer fixed inset-0 z-[87] hidden items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
     <div id="appointment-card-popover" role="dialog" aria-modal="true" aria-labelledby="appointment-card-popover-title" class="appointment-card-popover hidden rounded-3xl border border-blue-200 bg-white"></div>
@@ -25273,6 +25263,7 @@
           e.target.closest('#modal-dental-operation-delete') ||
           e.target.closest('#modal-chart-finding-notes') ||
           e.target.closest('#chart-finding-note-popover') ||
+          e.target.closest('#chart-finding-tooth-editor-modal') ||
           e.target.closest('#whatsapp-template-dropdown') ||
           e.target.closest('header') ||
           e.target.closest('#view-chart button') ||
@@ -25291,6 +25282,12 @@
 
       document.addEventListener('keydown', event => {
         if (event.key === 'Escape') {
+          const toothModal = document.getElementById('chart-finding-tooth-editor-modal');
+          if (toothModal && !toothModal.classList.contains('hidden')) {
+            event.preventDefault();
+            closeGlobalFindingToothEditor();
+            return;
+          }
           const procedureMenu = document.getElementById('chart-procedure-menu');
           if (procedureMenu && !procedureMenu.classList.contains('hidden')) {
             event.preventDefault();
@@ -26084,11 +26081,11 @@
       const renderArch = (label, choices) => `
         <fieldset>
           <legend class="mb-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">${label}</legend>
-          <div class="grid grid-cols-4 gap-1.5 sm:grid-cols-8">
+          <div class="grid grid-cols-4 gap-1 sm:gap-1.5 sm:grid-cols-8">
             ${choices.map(choice => `
-              <button type="button" role="checkbox" aria-checked="${selected.has(choice.toothId)}" data-finding-tooth-option data-tooth-id="${escapeHtml(choice.toothId)}" data-slot="${choice.slot}" onclick="toggleFindingToothEditorChoice(this)" class="finding-tooth-option inline-flex items-center justify-center rounded-lg" title="${escapeHtml(chartToothLabel(choice.toothId))}">
+              <button type="button" role="checkbox" aria-checked="${selected.has(choice.toothId)}" data-finding-tooth-option data-tooth-id="${escapeHtml(choice.toothId)}" data-slot="${choice.slot}" onclick="toggleFindingToothEditorChoice(this)" class="finding-tooth-option min-w-0 w-full inline-flex items-center justify-center rounded-lg" title="${escapeHtml(chartToothLabel(choice.toothId))}">
                 <span class="finding-tooth-option-check" aria-hidden="true">✓</span>
-                ${palmerNotationSVG(choice.toothId, choice.slot, 'h-7 w-9')}
+                ${palmerNotationSVG(choice.toothId, choice.slot, 'h-6 w-8 sm:h-7 sm:w-9')}
               </button>
             `).join('')}
           </div>
@@ -26096,211 +26093,209 @@
       return `${renderArch('Upper arch', arches.upper)}${renderArch('Lower arch', arches.lower)}`;
     }
 
-    function updateFindingToothEditorSummary(editor) {
-      if (!editor) return;
-      const selectedCount = editor.querySelectorAll('[data-finding-tooth-option][aria-checked="true"]').length;
-      const summary = editor.querySelector('[data-finding-tooth-selection-summary]');
-      const saveButton = editor.querySelector('[data-save-finding-teeth]');
+    function updateGlobalFindingToothEditorSummary() {
+      const modal = document.getElementById('chart-finding-tooth-editor-modal');
+      if (!modal) return;
+      const selectedCount = modal.querySelectorAll('[data-finding-tooth-option][aria-checked="true"]').length;
+      const summary = document.getElementById('chart-finding-tooth-editor-summary');
+      const saveBtn = document.getElementById('chart-finding-tooth-editor-save-btn');
       if (summary) {
         summary.textContent = !selectedCount
           ? 'Choose at least one tooth'
           : selectedCount === 1
             ? '1 tooth selected'
             : `${selectedCount} teeth selected`;
-        summary.classList.toggle('text-red-600', selectedCount === 0);
-        summary.classList.toggle('text-slate-500', selectedCount > 0);
+        summary.className = selectedCount === 0 ? 'text-xs font-bold text-rose-600' : 'text-xs font-bold text-slate-600';
       }
-      if (saveButton) saveButton.disabled = selectedCount === 0;
+      if (saveBtn) saveBtn.disabled = selectedCount === 0;
     }
 
-    function resetFindingToothEditor(editor) {
-      if (!editor) return;
-      const originalToothIds = new Set(String(editor.dataset.originalToothIds || '').split(',').filter(Boolean));
-      editor.querySelectorAll('[data-finding-tooth-option]').forEach(option => {
-        option.setAttribute('aria-checked', String(originalToothIds.has(String(option.dataset.toothId))));
-      });
-      updateFindingToothEditorSummary(editor);
-    }
+    function openFindingToothEditor(button) {
+      const patient = getActivePatient();
+      const modal = document.getElementById('chart-finding-tooth-editor-modal');
+      const scroll = document.getElementById('chart-finding-tooth-editor-scroll');
+      if (!patient || !modal || !scroll) return;
 
-    function closeFindingToothEditor(editor, options = {}) {
-      if (!editor) return;
-      if (options.reset !== false) resetFindingToothEditor(editor);
-      editor.classList.add('hidden');
-      const picker = editor.closest('.finding-tooth-picker');
-      picker?.querySelector('.finding-tooth-editor-backdrop')?.classList.add('hidden');
-      editor.closest('.finding-row')?.classList.remove('is-editing-teeth');
-      picker?.querySelectorAll('[data-finding-tooth-trigger]').forEach(trigger => {
-        trigger.setAttribute('aria-expanded', 'false');
-      });
-      if (options.restoreFocus) {
-        picker?.querySelector('[data-finding-tooth-trigger]')?.focus();
-      }
-    }
+      const findingIds = chartFindingIdsFromControl(button);
+      const currentToothIds = chartFindingToothIdsFromControl(button);
+      if (!findingIds.length) return;
 
-    function closeFindingToothEditors(exceptEditor = null) {
-      document.querySelectorAll('.finding-tooth-editor:not(.hidden)').forEach(editor => {
-        if (editor !== exceptEditor) closeFindingToothEditor(editor);
-      });
-      document.querySelectorAll('.finding-tooth-editor-backdrop:not(.hidden)').forEach(backdrop => {
-        if (!exceptEditor || backdrop.nextElementSibling !== exceptEditor) backdrop.classList.add('hidden');
-      });
-      document.querySelectorAll('.finding-row.is-editing-teeth').forEach(row => {
-        if (!exceptEditor || !row.contains(exceptEditor)) row.classList.remove('is-editing-teeth');
-      });
-    }
-
-    function toggleFindingToothEditor(button) {
-      const picker = button.closest('.finding-tooth-picker');
-      const editor = picker?.querySelector('.finding-tooth-editor');
-      if (!picker || !editor) return;
-      if (button.getAttribute('aria-disabled') === 'true') {
+      if (button.getAttribute('aria-disabled') === 'true' || findingIds.some(fid => invoicedFindingIds.has(fid))) {
         showAppointmentNotificationToast('Tooth editing locked', 'Delete the related invoice item before changing this procedure’s teeth.');
         return;
       }
-      const shouldOpen = editor.classList.contains('hidden');
-      closeFindingToothEditors(editor);
-      if (!shouldOpen) {
-        closeFindingToothEditor(editor, { restoreFocus: true });
-        return;
-      }
-      resetFindingToothEditor(editor);
-      picker.querySelector('.finding-tooth-editor-backdrop')?.classList.remove('hidden');
-      editor.classList.remove('hidden');
-      button.closest('.finding-row')?.classList.add('is-editing-teeth');
-      picker.querySelectorAll('[data-finding-tooth-trigger]').forEach(trigger => {
-        trigger.setAttribute('aria-expanded', 'true');
-      });
-      (editor.querySelector('[data-finding-tooth-option][aria-checked="true"]') || editor.querySelector('[data-finding-tooth-option]'))?.focus();
+
+      const card = button.closest('[data-finding-id]');
+      const operationCode = card?.dataset.operationCode;
+      const opTitle = operationCode ? dentalOperationLabel(operationCode) : 'procedure';
+      const titleEl = document.getElementById('chart-finding-tooth-editor-title');
+      const subtitleEl = document.getElementById('chart-finding-tooth-editor-subtitle');
+      if (titleEl) titleEl.textContent = `Edit teeth · ${opTitle}`;
+      if (subtitleEl) subtitleEl.textContent = 'Tap one or more teeth, then save.';
+
+      scroll.innerHTML = findingToothEditorOptionsMarkup(patient, currentToothIds);
+      modal.dataset.findingIds = findingIds.join(',');
+      modal.dataset.currentToothIds = currentToothIds.join(',');
+      modal.dataset.originalToothIds = currentToothIds.join(',');
+
+      updateGlobalFindingToothEditorSummary();
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      if (window.lucide) lucide.createIcons();
     }
 
     function toggleFindingToothEditorChoice(button) {
-      const editor = button.closest('.finding-tooth-editor');
-      if (!editor) return;
+      const modal = document.getElementById('chart-finding-tooth-editor-modal');
+      if (!modal) return;
       const shouldSelect = button.getAttribute('aria-checked') !== 'true';
       if (shouldSelect) {
-        editor.querySelectorAll(`[data-finding-tooth-option][data-slot="${button.dataset.slot}"]`).forEach(option => {
+        modal.querySelectorAll(`[data-finding-tooth-option][data-slot="${button.dataset.slot}"]`).forEach(option => {
           option.setAttribute('aria-checked', 'false');
         });
       }
       button.setAttribute('aria-checked', String(shouldSelect));
-      updateFindingToothEditorSummary(editor);
+      updateGlobalFindingToothEditorSummary();
     }
 
-    function cancelFindingToothEditor(control) {
-      const editor = control?.classList?.contains('finding-tooth-editor')
-        ? control
-        : control?.closest?.('.finding-tooth-editor')
-          || control?.closest?.('.finding-tooth-picker')?.querySelector('.finding-tooth-editor');
-      closeFindingToothEditor(editor, { restoreFocus: true });
+    function closeGlobalFindingToothEditor() {
+      const modal = document.getElementById('chart-finding-tooth-editor-modal');
+      if (!modal) return;
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
     }
 
-    async function saveFindingToothSelection(button) {
+    async function saveGlobalFindingToothSelection() {
+      const modal = document.getElementById('chart-finding-tooth-editor-modal');
+      if (!modal) return;
       const patient = getActivePatient();
-      const card = button.closest('[data-finding-id]');
-      const editor = button.closest('.finding-tooth-editor');
-      const findingIds = chartFindingIdsFromControl(button);
-      if (!patient || !card || !editor || !findingIds.length) return;
+      const findingIds = String(modal.dataset.findingIds || '').split(',').map(s => s.trim()).filter(Boolean);
+      const currentToothIds = String(modal.dataset.currentToothIds || '').split(',').map(s => s.trim()).filter(Boolean);
+      if (!patient || !findingIds.length) return;
+
       if (findingIds.some(findingId => invoicedFindingIds.has(findingId))) {
-        closeFindingToothEditor(editor, { restoreFocus: true });
+        closeGlobalFindingToothEditor();
         showAppointmentNotificationToast('Tooth editing locked', 'Delete the related invoice item before changing this procedure’s teeth.');
         return;
       }
 
-      const selectedToothIds = [...editor.querySelectorAll('[data-finding-tooth-option][aria-checked="true"]')]
+      const selectedToothIds = [...modal.querySelectorAll('[data-finding-tooth-option][aria-checked="true"]')]
         .map(option => String(option.dataset.toothId || ''))
         .filter(Boolean);
+
       if (!selectedToothIds.length) {
-        updateFindingToothEditorSummary(editor);
+        updateGlobalFindingToothEditorSummary();
         return;
       }
 
-      const currentToothIds = chartFindingToothIdsFromControl(button);
       const currentSet = new Set(currentToothIds);
       if (selectedToothIds.length === currentSet.size && selectedToothIds.every(toothId => currentSet.has(toothId))) {
-        closeFindingToothEditor(editor, { restoreFocus: true });
+        closeGlobalFindingToothEditor();
         return;
       }
 
-      const documentedGroup = collectDocumentedFindings(patient).find(finding => {
-        const groupIds = finding.findingIds || (finding.id ? [finding.id] : []);
-        return findingIds.some(findingId => groupIds.includes(findingId));
-      });
-      if (!documentedGroup) return;
-
-      const memberFindings = documentedGroup.memberFindings || [documentedGroup];
-      const membersByTooth = new Map(memberFindings.map(finding => [String(finding.toothId), finding]));
-      const templateFinding = memberFindings[0];
-      const nextBatchId = selectedToothIds.length > 1 ? (documentedGroup.batchId || createChartFindingId()) : null;
-      const previousChartState = JSON.parse(JSON.stringify(patient.chartState || {}));
-      const previousSelectedFindingIds = new Set(selectedFindingIds);
-      const preserveInvoiceSelection = findingIds.every(findingId => selectedFindingIds.has(findingId));
-      const nextFindingIds = [];
-
-      findingIds.forEach(findingId => {
-        deleteChartFindingById(patient, findingId);
-        selectedFindingIds.delete(findingId);
-      });
-
-      selectedToothIds.forEach(toothId => {
-        const existingFinding = membersByTooth.get(toothId);
-        const sourceFinding = existingFinding || templateFinding;
-        const storedFinding = chartFindingStorageRecord(
-          sourceFinding.code,
-          sourceFinding.status,
-          sourceFinding.createdAt,
-          existingFinding?.id || null,
-          sourceFinding.price,
-          nextBatchId,
-          sourceFinding.notes,
-          sourceFinding.billingMultiplier,
-          sourceFinding.doctorId,
-          sourceFinding.doctorName,
-          sourceFinding.completedAt,
-          sourceFinding.steps?.map(step => ({ ...step, payrollFindingId: existingFinding ? step.payrollFindingId : createChartFindingId() })),
-          chartFindingProcedureStepMeta(sourceFinding),
-          sourceFinding.beginDate
-        );
-        const toothData = getOrCreateChartTooth(patient, toothId);
-        if (documentedGroup.kind === 'whole') {
-          ensureWholeOperations(toothData).push(storedFinding);
-        } else {
-          const surfaces = sourceFinding.surfaces?.length ? sourceFinding.surfaces : templateFinding.surfaces;
-          surfaces.forEach(surface => {
-            storeChartSurfaceFindings(toothData, surface, [
-              ...chartSurfaceFindings(toothData.surfaces[surface]),
-              storedFinding
-            ]);
-          });
-        }
-        nextFindingIds.push(storedFinding.id);
-      });
-
-      const preservedFindingIds = new Set(nextFindingIds);
-      findingIds.forEach(findingId => {
-        if (!preservedFindingIds.has(findingId)) {
-          void deleteImplantProgressByFindingId(findingId);
-        }
-      });
-
-      if (preserveInvoiceSelection && Number(templateFinding.price) > 0) {
-        nextFindingIds.forEach(findingId => selectedFindingIds.add(findingId));
+      const saveBtn = document.getElementById('chart-finding-tooth-editor-save-btn');
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
       }
-      renderChartFindingTeeth([...currentToothIds, ...selectedToothIds]);
-      renderFindingsList();
-      const saved = await saveActivePatientChart();
-      if (!saved) {
-        patient.chartState = previousChartState;
-        selectedFindingIds = previousSelectedFindingIds;
+
+      try {
+        const documentedGroup = collectDocumentedFindings(patient).find(finding => {
+          const groupIds = finding.findingIds || (finding.id ? [finding.id] : []);
+          return findingIds.some(findingId => groupIds.includes(findingId));
+        });
+        if (!documentedGroup) return;
+
+        const memberFindings = documentedGroup.memberFindings || [documentedGroup];
+        const membersByTooth = new Map(memberFindings.map(finding => [String(finding.toothId), finding]));
+        const templateFinding = memberFindings[0];
+        const nextBatchId = selectedToothIds.length > 1 ? (documentedGroup.batchId || createChartFindingId()) : null;
+        const previousChartState = JSON.parse(JSON.stringify(patient.chartState || {}));
+        const previousSelectedFindingIds = new Set(selectedFindingIds);
+        const preserveInvoiceSelection = findingIds.every(findingId => selectedFindingIds.has(findingId));
+        const nextFindingIds = [];
+
+        findingIds.forEach(findingId => {
+          deleteChartFindingById(patient, findingId);
+          selectedFindingIds.delete(findingId);
+        });
+
+        selectedToothIds.forEach(toothId => {
+          const existingFinding = membersByTooth.get(toothId);
+          const sourceFinding = existingFinding || templateFinding;
+          const storedFinding = chartFindingStorageRecord(
+            sourceFinding.code,
+            sourceFinding.status,
+            sourceFinding.createdAt,
+            existingFinding?.id || null,
+            sourceFinding.price,
+            nextBatchId,
+            sourceFinding.notes,
+            sourceFinding.billingMultiplier,
+            sourceFinding.doctorId,
+            sourceFinding.doctorName,
+            sourceFinding.completedAt,
+            sourceFinding.steps?.map(step => ({ ...step, payrollFindingId: existingFinding ? step.payrollFindingId : createChartFindingId() })),
+            chartFindingProcedureStepMeta(sourceFinding),
+            sourceFinding.beginDate
+          );
+          const toothData = getOrCreateChartTooth(patient, toothId);
+          if (documentedGroup.kind === 'whole') {
+            ensureWholeOperations(toothData).push(storedFinding);
+          } else {
+            const surfaces = sourceFinding.surfaces?.length ? sourceFinding.surfaces : templateFinding.surfaces;
+            surfaces.forEach(surface => {
+              storeChartSurfaceFindings(toothData, surface, [
+                ...chartSurfaceFindings(toothData.surfaces[surface]),
+                storedFinding
+              ]);
+            });
+          }
+          nextFindingIds.push(storedFinding.id);
+        });
+
+        const preservedFindingIds = new Set(nextFindingIds);
+        findingIds.forEach(findingId => {
+          if (!preservedFindingIds.has(findingId)) {
+            void deleteImplantProgressByFindingId(findingId);
+          }
+        });
+
+        if (preserveInvoiceSelection && Number(templateFinding.price) > 0) {
+          nextFindingIds.forEach(findingId => selectedFindingIds.add(findingId));
+        }
         renderChartFindingTeeth([...currentToothIds, ...selectedToothIds]);
         renderFindingsList();
-        alert('Could not save the tooth changes. Your previous documented finding has been restored.');
-        return;
+        const saved = await saveActivePatientChart();
+        if (!saved) {
+          patient.chartState = previousChartState;
+          selectedFindingIds = previousSelectedFindingIds;
+          renderChartFindingTeeth([...currentToothIds, ...selectedToothIds]);
+          renderFindingsList();
+          alert('Could not save the tooth changes. Your previous documented finding has been restored.');
+          return;
+        }
+        closeGlobalFindingToothEditor();
+        showAppointmentNotificationToast(
+          'Procedure teeth updated',
+          selectedToothIds.length === 1 ? chartToothLabel(selectedToothIds[0]) : `${selectedToothIds.length} teeth selected`
+        );
+      } finally {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save teeth';
+        }
       }
-      showAppointmentNotificationToast(
-        'Procedure teeth updated',
-        selectedToothIds.length === 1 ? chartToothLabel(selectedToothIds[0]) : `${selectedToothIds.length} teeth selected`
-      );
     }
+
+    // Compatibility wrappers
+    function toggleFindingToothEditor(button) { openFindingToothEditor(button); }
+    function closeFindingToothEditor() { closeGlobalFindingToothEditor(); }
+    function closeFindingToothEditors() { closeGlobalFindingToothEditor(); }
+    function cancelFindingToothEditor() { closeGlobalFindingToothEditor(); }
+    function resetFindingToothEditor() { updateGlobalFindingToothEditorSummary(); }
+    function updateFindingToothEditorSummary() { updateGlobalFindingToothEditorSummary(); }
+    function saveFindingToothSelection(button) { void saveGlobalFindingToothSelection(); }
 
     function renderChartFindingTeeth(toothIds) {
       [...new Set(toothIds)].forEach(toothId => renderToothVisuals(toothId));
@@ -27264,8 +27259,7 @@
         const isCheckboxChecked = isFullyInvoiced || isSelected;
         const canSelect = Boolean(selectableMemberIds.length && !chartInvoiceStateLoading);
         const surfaceLabels = finding.surfaces.map(surface => surfaceClinicalName(finding.toothId, surface));
-        const visibleToothIds = toothIds.slice(0, 5);
-        const toothEditorOptions = isMouth ? '' : findingToothEditorOptionsMarkup(patient, toothIds);
+        const visibleToothIds = toothIds.slice(0, 3);
         const toothEditingLocked = isInvoiced;
         const toothEditorTitle = toothEditingLocked
           ? 'Delete the related invoice item before changing the procedure teeth'
@@ -27274,9 +27268,11 @@
           ? `<span class="finding-palmer-badge inline-flex h-8 w-12 shrink-0 items-center justify-center rounded-lg border border-cyan-200 bg-cyan-50 text-cyan-700 shadow-2xs" title="${currentUiLanguage === 'ar' ? 'كامل الفم' : 'Whole mouth'}" aria-label="${currentUiLanguage === 'ar' ? 'كامل الفم' : 'Whole mouth'}">${wholeMouthIconSVG('h-6 w-9')}</span>`
           : visibleToothIds.map(toothId => {
               const toothSlot = Number(SLOT_BY_PRIMARY_TOOTH[String(toothId).toUpperCase()] || toothId);
-              return `<button type="button" data-finding-tooth-trigger onclick="toggleFindingToothEditor(this)" aria-haspopup="dialog" aria-expanded="false" aria-disabled="${toothEditingLocked}" class="finding-palmer-badge finding-palmer-button inline-flex h-8 w-12 shrink-0 items-center justify-center rounded-lg" title="${escapeHtml(toothEditorTitle)}" aria-label="${escapeHtml(toothEditorTitle)}. Current tooth: ${escapeHtml(chartToothLabel(toothId))}">${palmerNotationSVG(toothId, toothSlot, 'h-7 w-10')}</button>`;
+              const badgeHeight = toothIds.length > 1 ? 'h-7' : 'h-8';
+              const svgSize = toothIds.length > 1 ? 'h-6 w-9' : 'h-7 w-10';
+              return `<button type="button" data-finding-tooth-trigger onclick="openFindingToothEditor(this)" aria-haspopup="dialog" aria-expanded="false" aria-disabled="${toothEditingLocked}" class="finding-palmer-badge finding-palmer-button inline-flex ${badgeHeight} w-12 shrink-0 items-center justify-center rounded-lg" title="${escapeHtml(toothEditorTitle)}" aria-label="${escapeHtml(toothEditorTitle)}. Current tooth: ${escapeHtml(chartToothLabel(toothId))}">${palmerNotationSVG(toothId, toothSlot, svgSize)}</button>`;
             }).join('') + (toothIds.length > visibleToothIds.length
-              ? `<button type="button" data-finding-tooth-trigger onclick="toggleFindingToothEditor(this)" aria-haspopup="dialog" aria-expanded="false" aria-disabled="${toothEditingLocked}" class="finding-palmer-button inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-violet-200 bg-violet-50 px-2 text-[10px] font-black text-violet-700" title="${escapeHtml(toothEditorTitle)}" aria-label="${escapeHtml(toothEditorTitle)}. ${toothIds.length - visibleToothIds.length} additional teeth">+${toothIds.length - visibleToothIds.length}</button>`
+              ? `<button type="button" data-finding-tooth-trigger onclick="openFindingToothEditor(this)" aria-haspopup="dialog" aria-expanded="false" aria-disabled="${toothEditingLocked}" class="finding-palmer-button inline-flex h-6 w-12 shrink-0 items-center justify-center rounded-lg border border-violet-200 bg-violet-50 text-[10px] font-black text-violet-700" title="${escapeHtml(toothEditorTitle)}" aria-label="${escapeHtml(toothEditorTitle)}. ${toothIds.length - visibleToothIds.length} additional teeth">+${toothIds.length - visibleToothIds.length}</button>`
               : '');
         const createdAtLabel = formatChartOperationCreatedAt(finding.createdAt);
         const createdAtDisplay = createdAtLabel
@@ -27351,43 +27347,20 @@
         const dataAttributes = `data-finding-ids="${escapeHtml(findingIds.join(','))}" data-tooth-ids="${escapeHtml(toothIds.join(','))}" onchange="updateFindingGroupStatusFromControl(this)"`;
         const findingIdentityAttributes = `data-finding-id="${escapeHtml(findingIds[0] || '')}" data-finding-ids="${escapeHtml(findingIds.join(','))}" data-finding-kind="${escapeHtml(finding.kind)}" data-batch-id="${escapeHtml(finding.batchId || '')}" data-tooth-id="${escapeHtml(finding.toothId)}" data-tooth-ids="${escapeHtml(toothIds.join(','))}" data-operation-code="${escapeHtml(finding.code)}" data-operation-status="${finding.status}" data-surfaces="${escapeHtml(finding.surfaces.join(','))}"`;
         return `
-          <article ${findingIdentityAttributes} onclick="toggleFindingCardSelection(event, this)" aria-selected="${isSelected}" class="finding-row ${procedureSteps.length ? 'has-procedure-steps' : ''} ${isSelected ? 'is-selected' : ''} ${isInvoiced ? 'is-invoiced' : ''} ${isBatch ? 'is-batch-finding' : ''} flex flex-row flex-wrap items-center gap-2.5 overflow-hidden rounded-xl border border-slate-200 border-l-4 px-3 py-2.5 shadow-sm transition hover:shadow-md" style="--finding-display-color:${displayColor};--finding-status-soft:${statusSoft};--finding-status-border:${statusBorder};border-left-color:${displayColor}">
+          <article ${findingIdentityAttributes} onclick="toggleFindingCardSelection(event, this)" aria-selected="${isSelected}" class="finding-row ${procedureSteps.length ? 'has-procedure-steps' : ''} ${isSelected ? 'is-selected' : ''} ${isInvoiced ? 'is-invoiced' : ''} ${isBatch ? 'is-batch-finding' : ''} flex flex-row flex-nowrap items-center gap-2.5 overflow-hidden rounded-xl border border-slate-200 border-l-4 px-3 py-2.5 shadow-sm transition hover:shadow-md" style="--finding-display-color:${displayColor};--finding-status-soft:${statusSoft};--finding-status-border:${statusBorder};border-left-color:${displayColor}">
             <div class="finding-row-summary flex min-w-0 flex-1 items-center gap-3">
               <input type="checkbox" class="finding-selection-checkbox ${isFullyInvoiced ? 'is-invoiced-checkbox' : ''} h-4 w-4 shrink-0 rounded border-slate-300 text-violet-600 focus:ring-violet-500" ${isCheckboxChecked ? 'checked' : ''} ${canSelect ? '' : 'disabled'} onchange="toggleFindingSelectionFromControl(this)" aria-label="${isFullyInvoiced ? 'Invoiced' : 'Select'} ${escapeHtml(dentalOperationLabel(finding.code))}${isFullyInvoiced ? '' : ' for invoicing'}" title="${isFullyInvoiced ? 'This operation is already invoiced' : !selectableMemberIds.length ? 'Add a price before selecting this operation' : isInvoiced ? 'Select the uninvoiced teeth in this batch' : 'Select for invoicing'}">
-              <div class="finding-tooth-picker relative flex max-w-64 shrink-0 flex-wrap items-center gap-1">
+              <div class="finding-tooth-picker flex flex-col shrink-0 items-center justify-center gap-1 w-12">
                 ${toothBadges}
-                ${isMouth ? '' : `<div class="finding-tooth-editor-backdrop hidden" onclick="cancelFindingToothEditor(this)"></div>
-                <div class="finding-tooth-editor hidden rounded-2xl border border-violet-200 bg-white p-3.5 text-left shadow-2xl" data-original-tooth-ids="${escapeHtml(toothIds.join(','))}" role="dialog" aria-label="Edit procedure teeth" onclick="event.stopPropagation()">
-                  <div class="mb-2.5 flex shrink-0 items-start justify-between gap-3">
-                    <div>
-                      <p class="text-xs font-black text-slate-800">Edit procedure teeth</p>
-                      <p class="mt-0.5 text-[10px] font-semibold text-slate-500">Tap one or more teeth, then save.</p>
-                    </div>
-                    <button type="button" onclick="cancelFindingToothEditor(this)" class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50" aria-label="Close tooth editor">×</button>
-                  </div>
-                  <div class="finding-tooth-editor-scroll flex-1 overflow-y-auto overscroll-contain pr-1 -mr-1 space-y-3">
-                    ${toothEditorOptions}
-                  </div>
-                  <div class="mt-2.5 flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 pt-2.5 bg-white">
-                    <p data-finding-tooth-selection-summary class="text-[10px] font-bold text-slate-500">${toothIds.length === 1 ? '1 tooth selected' : `${toothIds.length} teeth selected`}</p>
-                    <div class="flex items-center gap-1.5">
-                      <button type="button" onclick="cancelFindingToothEditor(this)" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-black text-slate-600 hover:bg-slate-50">Cancel</button>
-                      <button type="button" data-save-finding-teeth onclick="saveFindingToothSelection(this)" class="rounded-lg bg-violet-600 px-3 py-1.5 text-[10px] font-black text-white shadow-sm hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-slate-300">Save teeth</button>
-                    </div>
-                  </div>
-                </div>`}
               </div>
               <div class="finding-operation-details min-w-0 flex-1">
                 <div class="finding-operation-heading flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                   ${procedureSteps.length ? `<button type="button" onclick="toggleFindingProcedureSteps(this)" aria-expanded="${procedureStepsExpanded}" class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-cyan-200 bg-cyan-50 text-cyan-700 transition hover:bg-cyan-100" title="${procedureStepsExpanded ? 'Collapse' : 'Open'} procedure steps" aria-label="${procedureStepsExpanded ? 'Collapse' : 'Open'} ${escapeHtml(dentalOperationLabel(finding.code))} steps"><i data-lucide="${procedureStepsExpanded ? 'minus' : 'plus'}" class="h-3 w-3"></i></button>` : ''}
                   <h4 class="finding-operation-title text-xs sm:text-sm">${escapeHtml(dentalOperationLabel(finding.code))}</h4>
-                  ${isBatch ? `<span class="text-[10px] font-semibold text-slate-400">${toothIds.length} teeth · Batch</span>` : ''}
                   ${isFullyInvoiced ? '<span class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-emerald-700">Invoiced</span>' : isInvoiced ? '<span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-blue-700">Partly invoiced</span>' : findingPrice <= 0 ? '<span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-700">Set price</span>' : ''}
                 </div>
                 ${isMouth
                   ? '<p class="mt-0.5 truncate text-[11px] font-normal text-slate-500">Applied once to the complete mouth · tooth selection ignored</p>'
-                  : isBatch
-                  ? `<p class="mt-0.5 text-[11px] font-normal text-slate-500">Applied together to ${toothIds.length} teeth${isWhole ? '' : ` · ${escapeHtml(surfaceLabels.join(', '))} on each tooth`}. Use Separate to edit each tooth independently.</p>`
                   : isWhole
                     ? ''
                   : `<div class="finding-surface-controls mt-1 flex flex-wrap items-center gap-1" role="group" aria-label="Edit involved surfaces">
@@ -27395,7 +27368,7 @@
                     </div>`}
               </div>
             </div>
-            <div class="finding-row-actions flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
+            <div class="finding-row-actions flex flex-nowrap items-center gap-2">
               <div class="finding-dates-group ml-auto flex flex-col items-end justify-center gap-1 shrink-0">
                 ${createdAtMarkup}
                 ${beginDateMarkup}
@@ -27408,7 +27381,14 @@
                 <span class="border-r px-2 py-1.5 text-[9px] font-black ${isInvoiced ? 'border-slate-200 bg-slate-200 text-slate-500' : 'border-violet-100 bg-violet-50 text-violet-600'}">EGP</span>
                 <input type="number" min="0" step="0.01" value="${findingPrice}" onchange="updateFindingPriceFromControl(this)" ${isInvoiced ? 'disabled' : ''} class="w-20 bg-transparent px-2 py-1.5 text-right text-[11px] font-black outline-none ${isInvoiced ? 'cursor-not-allowed text-slate-400' : 'text-slate-700'}" aria-label="${isBatch ? 'Base price' : 'Price'} for ${escapeHtml(dentalOperationLabel(finding.code))}" aria-disabled="${isInvoiced}">
               </label>
-              ${isBatch ? `<label class="finding-batch-multiplier-control inline-flex items-center overflow-hidden rounded-lg border ${isInvoiced ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-70' : 'border-violet-200 bg-white/85 focus-within:ring-2 focus-within:ring-violet-500/20'}" title="${isInvoiced ? 'Delete this procedure from its invoice before changing the multiplier' : 'Choose how many times the base price is billed'}"><span class="border-r px-2 py-1.5 text-[11px] font-black ${isInvoiced ? 'border-slate-200 bg-slate-200 text-slate-500' : 'border-violet-100 bg-violet-50 text-violet-600'}">×</span><input type="number" min="1" max="999" step="1" inputmode="numeric" value="${billingMultiplier}" onchange="updateFindingBillingMultiplierFromControl(this)" ${isInvoiced ? 'disabled' : ''} class="w-14 bg-transparent px-2 py-1.5 text-right text-[11px] font-black outline-none ${isInvoiced ? 'cursor-not-allowed text-slate-400' : 'text-slate-700'}" aria-label="Billing multiplier for ${escapeHtml(dentalOperationLabel(finding.code))}" aria-disabled="${isInvoiced}"></label><span class="whitespace-nowrap text-[9px] font-bold text-slate-400">= ${escapeHtml(formatInvoiceMoney(totalPrice))} total</span>` : ''}
+              ${isBatch ? `
+                <div class="finding-batch-multiplier-group flex flex-col items-center justify-center shrink-0">
+                  <label class="finding-batch-multiplier-control inline-flex items-center overflow-hidden rounded-lg border ${isInvoiced ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-70' : 'border-violet-200 bg-white/85 focus-within:ring-2 focus-within:ring-violet-500/20'}" title="${isInvoiced ? 'Delete this procedure from its invoice before changing the multiplier' : 'Choose how many times the base price is billed'}">
+                    <span class="border-r px-1.5 py-1 text-[11px] font-black ${isInvoiced ? 'border-slate-200 bg-slate-200 text-slate-500' : 'border-violet-100 bg-violet-50 text-violet-600'}">×</span>
+                    <input type="number" min="1" max="999" step="1" inputmode="numeric" value="${billingMultiplier}" onchange="updateFindingBillingMultiplierFromControl(this)" ${isInvoiced ? 'disabled' : ''} class="w-11 bg-transparent px-1 py-1 text-center text-[11px] font-black outline-none ${isInvoiced ? 'cursor-not-allowed text-slate-400' : 'text-slate-700'}" aria-label="Billing multiplier for ${escapeHtml(dentalOperationLabel(finding.code))}" aria-disabled="${isInvoiced}">
+                  </label>
+                  <span class="mt-0.5 whitespace-nowrap text-[9.5px] font-black text-violet-700 tracking-tight">= ${escapeHtml(formatInvoiceMoney(totalPrice))}</span>
+                </div>` : ''}
               ${procedureSteps.length ? `<div class="finding-status-control flex shrink-0 items-center gap-1.5 rounded-lg border bg-white/80 px-2 py-1.5 sm:w-48" style="border-color:${statusBorder};color:${displayColor}" title="The procedure status is calculated from its steps">
                 <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${displayColor}"></span>
                 <span class="finding-status-select-mobile sm:hidden text-center font-black text-xs">${escapeHtml(status.key)}</span>
