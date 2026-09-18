@@ -870,9 +870,9 @@
         box-sizing: border-box !important;
       }
       #findings-container .finding-row.is-batch-finding {
-        min-width: 68rem !important;
-        width: 68rem !important;
-        max-width: 68rem !important;
+        min-width: 63.5rem !important;
+        width: 63.5rem !important;
+        max-width: 63.5rem !important;
       }
       #findings-container .finding-row-summary {
         width: 18.5rem !important;
@@ -957,15 +957,51 @@
         padding: 0.25rem 0.35rem !important;
         font-size: 9.5px !important;
       }
+      #findings-container .finding-pricing-group {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: flex-end !important;
+        justify-content: center !important;
+        flex-shrink: 0 !important;
+      }
       #findings-container .finding-price-control {
         width: 6rem !important;
         min-width: 6rem !important;
         max-width: 6rem !important;
         flex: 0 0 6rem !important;
       }
+      #findings-container .finding-row.is-batch-finding .finding-pricing-group,
+      #findings-container .finding-row.is-batch-finding .finding-price-control {
+        width: 6.85rem !important;
+        min-width: 6.85rem !important;
+        max-width: 6.85rem !important;
+        flex: 0 0 6.85rem !important;
+      }
       #findings-container .finding-price-control input {
         width: 3.25rem !important;
         font-size: 10px !important;
+      }
+      #findings-container .finding-batch-multiplier-row {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: flex-end !important;
+        gap: 0.25rem !important;
+        margin-top: 0.2rem !important;
+      }
+      #findings-container .finding-batch-multiplier-control {
+        display: inline-flex !important;
+        align-items: center !important;
+      }
+      #findings-container .finding-batch-multiplier-control input {
+        width: 1.65rem !important;
+        padding: 0.1rem 0.2rem !important;
+        font-size: 9.5px !important;
+        text-align: center !important;
+      }
+      #findings-container .finding-batch-multiplier-control span {
+        padding: 0.1rem 0.25rem !important;
+        font-size: 9.5px !important;
       }
       #findings-container .finding-status-control {
         width: 4rem !important;
@@ -25226,6 +25262,9 @@
           e.preventDefault();
           return;
         }
+        if (e.target.closest('#chart-finding-tooth-editor-modal')) {
+          return;
+        }
         if (!e.target.closest('.finding-tooth-picker')) closeFindingToothEditors();
         const clickPath = typeof e.composedPath === 'function' ? e.composedPath() : [];
         const clickedInsideChartSpecialtyMenu = clickPath.some(node => node?.id === 'chart-specialty-menu-shell')
@@ -26083,7 +26122,7 @@
           <legend class="mb-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">${label}</legend>
           <div class="grid grid-cols-4 gap-1 sm:gap-1.5 sm:grid-cols-8">
             ${choices.map(choice => `
-              <button type="button" role="checkbox" aria-checked="${selected.has(choice.toothId)}" data-finding-tooth-option data-tooth-id="${escapeHtml(choice.toothId)}" data-slot="${choice.slot}" onclick="toggleFindingToothEditorChoice(this)" class="finding-tooth-option min-w-0 w-full inline-flex items-center justify-center rounded-lg" title="${escapeHtml(chartToothLabel(choice.toothId))}">
+              <button type="button" role="checkbox" aria-checked="${selected.has(choice.toothId)}" data-finding-tooth-option data-tooth-id="${escapeHtml(choice.toothId)}" data-slot="${choice.slot}" onclick="toggleFindingToothEditorChoice(this, event)" class="finding-tooth-option min-w-0 w-full inline-flex items-center justify-center rounded-lg" title="${escapeHtml(chartToothLabel(choice.toothId))}">
                 <span class="finding-tooth-option-check" aria-hidden="true">✓</span>
                 ${palmerNotationSVG(choice.toothId, choice.slot, 'h-6 w-8 sm:h-7 sm:w-9')}
               </button>
@@ -26144,7 +26183,8 @@
       if (window.lucide) lucide.createIcons();
     }
 
-    function toggleFindingToothEditorChoice(button) {
+    function toggleFindingToothEditorChoice(button, event) {
+      if (event) event.stopPropagation();
       const modal = document.getElementById('chart-finding-tooth-editor-modal');
       if (!modal) return;
       const shouldSelect = button.getAttribute('aria-checked') !== 'true';
@@ -27377,18 +27417,20 @@
                 <span class="border-r border-cyan-100 bg-cyan-50 px-2 py-1.5 text-[9px] font-black text-cyan-700">${procedureSteps.length ? 'Fixed pay' : 'Doctor'}</span>
                 <select onchange="updateFindingDoctorFromControl(this)" class="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-[11px] font-bold text-slate-700 outline-none" aria-label="Assigned doctor for ${escapeHtml(dentalOperationLabel(finding.code))}">${chartDoctorSelectOptions(finding)}</select>
               </label>
-              <label class="finding-price-control inline-flex items-center overflow-hidden rounded-lg border ${isInvoiced ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-70' : 'border-violet-200 bg-white/85 focus-within:ring-2 focus-within:ring-violet-500/20'}" title="${isInvoiced ? 'Delete this procedure from its invoice before changing the price' : isBatch ? 'Edit the base price for this batch' : 'Edit operation price'}">
-                <span class="border-r px-2 py-1.5 text-[9px] font-black ${isInvoiced ? 'border-slate-200 bg-slate-200 text-slate-500' : 'border-violet-100 bg-violet-50 text-violet-600'}">EGP</span>
-                <input type="number" min="0" step="0.01" value="${findingPrice}" onchange="updateFindingPriceFromControl(this)" ${isInvoiced ? 'disabled' : ''} class="w-20 bg-transparent px-2 py-1.5 text-right text-[11px] font-black outline-none ${isInvoiced ? 'cursor-not-allowed text-slate-400' : 'text-slate-700'}" aria-label="${isBatch ? 'Base price' : 'Price'} for ${escapeHtml(dentalOperationLabel(finding.code))}" aria-disabled="${isInvoiced}">
-              </label>
-              ${isBatch ? `
-                <div class="finding-batch-multiplier-group flex flex-col items-center justify-center shrink-0">
-                  <label class="finding-batch-multiplier-control inline-flex items-center overflow-hidden rounded-lg border ${isInvoiced ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-70' : 'border-violet-200 bg-white/85 focus-within:ring-2 focus-within:ring-violet-500/20'}" title="${isInvoiced ? 'Delete this procedure from its invoice before changing the multiplier' : 'Choose how many times the base price is billed'}">
-                    <span class="border-r px-1.5 py-1 text-[11px] font-black ${isInvoiced ? 'border-slate-200 bg-slate-200 text-slate-500' : 'border-violet-100 bg-violet-50 text-violet-600'}">×</span>
-                    <input type="number" min="1" max="999" step="1" inputmode="numeric" value="${billingMultiplier}" onchange="updateFindingBillingMultiplierFromControl(this)" ${isInvoiced ? 'disabled' : ''} class="w-11 bg-transparent px-1 py-1 text-center text-[11px] font-black outline-none ${isInvoiced ? 'cursor-not-allowed text-slate-400' : 'text-slate-700'}" aria-label="Billing multiplier for ${escapeHtml(dentalOperationLabel(finding.code))}" aria-disabled="${isInvoiced}">
-                  </label>
-                  <span class="mt-0.5 whitespace-nowrap text-[9.5px] font-black text-violet-700 tracking-tight">= ${escapeHtml(formatInvoiceMoney(totalPrice))}</span>
-                </div>` : ''}
+              <div class="finding-pricing-group flex flex-col items-end justify-center shrink-0">
+                <label class="finding-price-control inline-flex items-center overflow-hidden rounded-lg border ${isInvoiced ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-70' : 'border-violet-200 bg-white/85 focus-within:ring-2 focus-within:ring-violet-500/20'}" title="${isInvoiced ? 'Delete this procedure from its invoice before changing the price' : isBatch ? 'Edit the base price for this batch' : 'Edit operation price'}">
+                  <span class="border-r px-2 py-1.5 text-[9px] font-black ${isInvoiced ? 'border-slate-200 bg-slate-200 text-slate-500' : 'border-violet-100 bg-violet-50 text-violet-600'}">EGP</span>
+                  <input type="number" min="0" step="0.01" value="${findingPrice}" onchange="updateFindingPriceFromControl(this)" ${isInvoiced ? 'disabled' : ''} class="w-20 bg-transparent px-2 py-1.5 text-right text-[11px] font-black outline-none ${isInvoiced ? 'cursor-not-allowed text-slate-400' : 'text-slate-700'}" aria-label="${isBatch ? 'Base price' : 'Price'} for ${escapeHtml(dentalOperationLabel(finding.code))}" aria-disabled="${isInvoiced}">
+                </label>
+                ${isBatch ? `
+                  <div class="finding-batch-multiplier-row mt-1 flex items-center justify-end gap-1.5 shrink-0">
+                    <label class="finding-batch-multiplier-control inline-flex items-center overflow-hidden rounded-md border ${isInvoiced ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-70' : 'border-violet-200 bg-white/85 focus-within:ring-2 focus-within:ring-violet-500/20'}" title="${isInvoiced ? 'Delete this procedure from its invoice before changing the multiplier' : 'Choose how many times the base price is billed'}">
+                      <span class="border-r px-1.5 py-0.5 text-[10px] font-black ${isInvoiced ? 'border-slate-200 bg-slate-200 text-slate-500' : 'border-violet-100 bg-violet-50 text-violet-600'}">×</span>
+                      <input type="number" min="1" max="999" step="1" inputmode="numeric" value="${billingMultiplier}" onchange="updateFindingBillingMultiplierFromControl(this)" ${isInvoiced ? 'disabled' : ''} class="w-8 bg-transparent px-1 py-0.5 text-center text-[10px] font-black outline-none ${isInvoiced ? 'cursor-not-allowed text-slate-400' : 'text-slate-700'}" aria-label="Billing multiplier for ${escapeHtml(dentalOperationLabel(finding.code))}" aria-disabled="${isInvoiced}">
+                    </label>
+                    <span class="whitespace-nowrap text-[10px] font-black text-violet-700 tracking-tight">= ${escapeHtml(formatInvoiceMoney(totalPrice))}</span>
+                  </div>` : ''}
+              </div>
               ${procedureSteps.length ? `<div class="finding-status-control flex shrink-0 items-center gap-1.5 rounded-lg border bg-white/80 px-2 py-1.5 sm:w-48" style="border-color:${statusBorder};color:${displayColor}" title="The procedure status is calculated from its steps">
                 <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${displayColor}"></span>
                 <span class="finding-status-select-mobile sm:hidden text-center font-black text-xs">${escapeHtml(status.key)}</span>
