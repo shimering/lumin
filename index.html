@@ -873,26 +873,7 @@
       }
     }
 
-    .finding-status-select-mobile {
-      display: inline-block;
-    }
-    .finding-status-select-desktop {
-      display: none;
-    }
-    @media (min-width: 768px) {
-      .finding-status-select-mobile {
-        display: none;
-      }
-      .finding-status-select-desktop {
-        display: inline-block;
-      }
-    }
     @media (max-width: 767.98px) {
-      #findings-container .finding-status-control,
-      #findings-container .finding-step-status-control {
-        width: auto !important;
-        flex: 0 0 auto !important;
-      }
       .procedure-step-clinical-row {
         grid-template-columns: auto minmax(0, 1fr) minmax(9rem, auto) auto;
       }
@@ -25589,9 +25570,9 @@
       if (statusFilter) statusFilter.value = documentedFindingsStatusFilter;
     }
 
-    function operationStatusSelectOptions(selectedStatus, compact = false) {
+    function operationStatusSelectOptions(selectedStatus) {
       return Object.values(OPERATION_STATUSES).map(status => `
-        <option value="${status.key}" ${status.key === selectedStatus ? 'selected' : ''}>${compact ? status.key : `${status.key} · ${status.label}`}</option>
+        <option value="${status.key}" ${status.key === selectedStatus ? 'selected' : ''}>${status.key} · ${status.label}</option>
       `).join('');
     }
 
@@ -26172,10 +26153,10 @@
       renderFindingsList();
     }
 
-    function chartProcedureStepStatusOptions(currentStatus, compact = false) {
+    function chartProcedureStepStatusOptions(currentStatus) {
       return ['P', 'In', 'C'].map(status => {
         const definition = operationStatusDefinition(status);
-        return `<option value="${status}" ${status === currentStatus ? 'selected' : ''}>${compact ? escapeHtml(definition.key) : `${escapeHtml(definition.key)} · ${escapeHtml(definition.label)}`}</option>`;
+        return `<option value="${status}" ${status === currentStatus ? 'selected' : ''}>${escapeHtml(definition.key)} · ${escapeHtml(definition.label)}</option>`;
       }).join('');
     }
 
@@ -27084,7 +27065,7 @@
               <span class="flex h-7 w-7 items-center justify-center rounded-lg ${step.status === 'C' ? 'bg-emerald-100 text-emerald-700' : step.status === 'In' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'} text-[10px] font-black">${step.status === 'C' ? '<i data-lucide="check" class="h-3.5 w-3.5"></i>' : index + 1}</span>
               <div class="min-w-0"><p class="truncate text-xs font-black text-slate-800">${escapeHtml(step.name)}</p><p class="mt-0.5 text-[9px] font-bold text-slate-400">${step.percentage}% · ${escapeHtml(formatInvoiceMoney(stepValue))} of this procedure</p></div>
               <label class="inline-flex min-w-0 items-center overflow-hidden rounded-lg border border-cyan-200 bg-white focus-within:ring-2 focus-within:ring-cyan-500/20"><span class="border-r border-cyan-100 bg-cyan-50 px-2 py-1.5 text-[9px] font-black text-cyan-700">Doctor</span><select data-procedure-step-id="${escapeHtml(step.id)}" onchange="updateFindingProcedureStepFromControl(this,'doctor')" class="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-[10px] font-bold text-slate-700 outline-none" aria-label="Doctor assigned to ${escapeHtml(step.name)}">${chartDoctorSelectOptions(step)}</select></label>
-              <label class="finding-step-status-control inline-flex min-w-0 items-center gap-1.5"><span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${stepStatus.color}"></span><select data-procedure-step-id="${escapeHtml(step.id)}" onchange="updateFindingProcedureStepFromControl(this,'status')" class="finding-status-select-mobile min-w-0 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[10px] font-black outline-none focus:ring-2 focus:ring-cyan-500/20" style="color:${stepStatus.color}" aria-label="Status of ${escapeHtml(step.name)}" title="${stepStatus.key} · ${stepStatus.label}">${chartProcedureStepStatusOptions(step.status, true)}</select><select data-procedure-step-id="${escapeHtml(step.id)}" onchange="updateFindingProcedureStepFromControl(this,'status')" class="finding-status-select-desktop min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[10px] font-black outline-none focus:ring-2 focus:ring-cyan-500/20" style="color:${stepStatus.color}" aria-label="Status of ${escapeHtml(step.name)}">${chartProcedureStepStatusOptions(step.status, false)}</select></label>
+              <label class="finding-step-status-control inline-flex min-w-0 items-center gap-1.5"><span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${stepStatus.color}"></span><select data-procedure-step-id="${escapeHtml(step.id)}" onchange="updateFindingProcedureStepFromControl(this,'status')" class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[10px] font-black outline-none focus:ring-2 focus:ring-cyan-500/20" style="color:${stepStatus.color}" aria-label="Status of ${escapeHtml(step.name)}">${chartProcedureStepStatusOptions(step.status)}</select></label>
             </div>`;
           }).join('')}</div>
           <p class="mt-2 text-[9px] font-semibold leading-4 text-slate-400">Percentage-based salary uses each completed step's share. Fixed per-procedure pay ignores the shares and uses the parent procedure after every step is complete.</p>
@@ -27244,24 +27225,15 @@
                 <input type="number" min="0" step="0.01" value="${findingPrice}" onchange="updateFindingPriceFromControl(this)" ${isInvoiced ? 'disabled' : ''} class="w-20 bg-transparent px-2 py-1.5 text-right text-[11px] font-black outline-none ${isInvoiced ? 'cursor-not-allowed text-slate-400' : 'text-slate-700'}" aria-label="${isBatch ? 'Base price' : 'Price'} for ${escapeHtml(dentalOperationLabel(finding.code))}" aria-disabled="${isInvoiced}">
               </label>
               ${isBatch ? `<label class="inline-flex items-center overflow-hidden rounded-lg border ${isInvoiced ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-70' : 'border-violet-200 bg-white/85 focus-within:ring-2 focus-within:ring-violet-500/20'}" title="${isInvoiced ? 'Delete this procedure from its invoice before changing the multiplier' : 'Choose how many times the base price is billed'}"><span class="border-r px-2 py-1.5 text-[11px] font-black ${isInvoiced ? 'border-slate-200 bg-slate-200 text-slate-500' : 'border-violet-100 bg-violet-50 text-violet-600'}">×</span><input type="number" min="1" max="999" step="1" inputmode="numeric" value="${billingMultiplier}" onchange="updateFindingBillingMultiplierFromControl(this)" ${isInvoiced ? 'disabled' : ''} class="w-14 bg-transparent px-2 py-1.5 text-right text-[11px] font-black outline-none ${isInvoiced ? 'cursor-not-allowed text-slate-400' : 'text-slate-700'}" aria-label="Billing multiplier for ${escapeHtml(dentalOperationLabel(finding.code))}" aria-disabled="${isInvoiced}"></label><span class="whitespace-nowrap text-[9px] font-bold text-slate-400">= ${escapeHtml(formatInvoiceMoney(totalPrice))} total</span>` : ''}
-              ${procedureSteps.length ? `<div class="finding-status-control flex min-w-0 items-center gap-1.5 sm:gap-2 rounded-lg border bg-white/80 px-2 sm:px-2.5 py-1.5 sm:w-48" style="border-color:${statusBorder};color:${displayColor}" title="The procedure status is calculated from its steps">
-                <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${displayColor}"></span>
-                <span class="min-w-0 flex-1 truncate text-[11px] font-black">
-                  <span class="finding-status-select-mobile font-black">${escapeHtml(status.key)}</span>
-                  <span class="finding-status-select-desktop">${completedProcedureSteps}/${procedureSteps.length} steps · ${escapeHtml(status.label)}</span>
-                </span>
-              </div>` : `<label class="finding-status-control flex min-w-0 items-center gap-1.5 sm:gap-2 sm:w-48">
+              ${procedureSteps.length ? `<div class="finding-status-control flex min-w-0 flex-1 items-center gap-2 rounded-lg border bg-white/80 px-2.5 py-1.5 sm:w-48" style="border-color:${statusBorder};color:${displayColor}" title="The procedure status is calculated from its steps"><span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${displayColor}"></span><span class="min-w-0 flex-1 truncate text-[11px] font-black">${completedProcedureSteps}/${procedureSteps.length} steps · ${escapeHtml(status.label)}</span></div>` : `<label class="finding-status-control flex min-w-0 flex-1 items-center gap-2 sm:w-48">
                 <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${displayColor}" title="${status.key} · ${status.label}"></span>
                 <span class="sr-only">Operation status</span>
-                <select ${dataAttributes} class="finding-status-select-mobile min-w-0 rounded-lg border bg-white/80 px-2 py-1.5 text-[11px] font-bold outline-none transition focus:ring-2 focus:ring-blue-500/20" style="border-color:${statusBorder};color:${displayColor}" title="Operation status: ${status.key} · ${status.label}">
-                  ${operationStatusSelectOptions(finding.status, true)}
-                </select>
-                <select ${dataAttributes} class="finding-status-select-desktop min-w-0 flex-1 rounded-lg border bg-white/80 px-2.5 py-1.5 text-[11px] font-bold outline-none transition focus:ring-2 focus:ring-blue-500/20" style="border-color:${statusBorder};color:${displayColor}">
-                  ${operationStatusSelectOptions(finding.status, false)}
+                <select ${dataAttributes} class="min-w-0 flex-1 rounded-lg border bg-white/80 px-2.5 py-1.5 text-[11px] font-bold outline-none transition focus:ring-2 focus:ring-blue-500/20" style="border-color:${statusBorder};color:${displayColor}">
+                  ${operationStatusSelectOptions(finding.status)}
                 </select>
               </label>`}
               ${isBatch ? '<button type="button" onclick="separateFindingBatch(this)" class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[10px] font-black text-violet-700 transition hover:border-violet-300 hover:bg-violet-100" aria-label="Separate this batch into one row per tooth" title="Create one independent documented row for each tooth"><i data-lucide="split" class="h-3 w-3"></i>Separate</button>' : ''}
-              <button type="button" data-finding-note-trigger aria-haspopup="dialog" aria-expanded="false" aria-controls="chart-finding-note-popover" onpointerenter="showChartFindingNotePreviewFromPointer(event, this)" onpointerleave="scheduleChartFindingNotePreviewClose(event)" onclick="toggleChartFindingNotePreview(event, this)" class="inline-flex h-7 ${findingNotes.length ? 'min-w-7 px-1.5' : 'w-7'} shrink-0 items-center justify-center gap-1 rounded-lg border text-[10px] font-black transition ${findingNotes.length ? 'border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-100' : 'border-slate-200 bg-white text-slate-500 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700'}" aria-label="${findingNotes.length ? `${findingNotes.length} note${findingNotes.length === 1 ? '' : 's'}` : 'Notes'} for ${escapeHtml(dentalOperationLabel(finding.code))}" title="${findingNotes.length ? `${findingNotes.length} note${findingNotes.length === 1 ? '' : 's'}` : 'Notes'} · ${escapeHtml(dentalOperationLabel(finding.code))}"><i data-lucide="sticky-note" class="h-3.5 w-3.5"></i>${findingNotes.length ? `<span>${findingNotes.length}</span>` : ''}</button>
+              <button type="button" data-finding-note-trigger aria-haspopup="dialog" aria-expanded="false" aria-controls="chart-finding-note-popover" onpointerenter="showChartFindingNotePreviewFromPointer(event, this)" onpointerleave="scheduleChartFindingNotePreviewClose(event)" onclick="toggleChartFindingNotePreview(event, this)" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[10px] font-black transition ${findingNotes.length ? 'border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-100' : 'border-slate-200 bg-white text-slate-500 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700'}" aria-label="Preview notes for ${escapeHtml(dentalOperationLabel(finding.code))}" title="Hover or tap to preview operation notes"><i data-lucide="sticky-note" class="h-3.5 w-3.5"></i>Notes${findingNotes.length ? ` ${findingNotes.length}` : ''}</button>
               <button type="button" onclick="deleteFindingFromControl(this)" class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:border-red-300 hover:bg-red-100" title="Delete ${escapeHtml(dentalOperationLabel(finding.code))}" aria-label="Delete ${escapeHtml(dentalOperationLabel(finding.code))}"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button>
             </div>
             ${procedureStepsMarkup}
