@@ -845,59 +845,63 @@
         touch-action: pan-x pan-y;
       }
       #findings-container .finding-row {
-        min-width: 54.5rem !important;
-        width: 54.5rem !important;
-        max-width: 54.5rem !important;
+        min-width: 58.5rem !important;
+        width: 58.5rem !important;
+        max-width: 58.5rem !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
         align-items: center !important;
         overflow: visible !important;
+        box-sizing: border-box !important;
       }
       #findings-container .finding-row.is-batch-finding {
-        min-width: 66rem !important;
-        width: 66rem !important;
-        max-width: 66rem !important;
+        min-width: 72rem !important;
+        width: 72rem !important;
+        max-width: 72rem !important;
       }
       #findings-container .finding-row-summary {
-        width: 20rem !important;
-        min-width: 20rem !important;
-        max-width: 20rem !important;
-        flex: 0 0 20rem !important;
+        width: 18.5rem !important;
+        min-width: 18.5rem !important;
+        max-width: 18.5rem !important;
+        flex: 0 0 18.5rem !important;
+        box-sizing: border-box !important;
       }
-      #findings-container .finding-tooth-picker,
-      #findings-container .finding-operation-heading,
-      #findings-container .finding-surface-controls {
+      #findings-container .finding-tooth-picker {
         flex-wrap: nowrap !important;
-      }
-      #findings-container .finding-operation-details {
-        min-width: 0 !important;
-        overflow: hidden !important;
+        flex-shrink: 0 !important;
       }
       #findings-container .finding-operation-heading {
+        flex-wrap: nowrap !important;
         overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
       }
       #findings-container .finding-operation-title {
         overflow: hidden !important;
         text-overflow: ellipsis !important;
         white-space: nowrap !important;
       }
+      #findings-container .finding-operation-details {
+        min-width: 0 !important;
+        overflow: hidden !important;
+      }
       #findings-container .finding-operation-details > p {
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
       }
+      #findings-container .finding-surface-controls {
+        flex-wrap: nowrap !important;
+      }
       #findings-container .finding-row-actions {
-        width: 32rem !important;
-        min-width: 32rem !important;
-        max-width: 32rem !important;
-        flex: 0 0 32rem !important;
+        width: 37.5rem !important;
+        min-width: 37.5rem !important;
+        max-width: 37.5rem !important;
+        flex: 0 0 37.5rem !important;
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
         align-items: center !important;
         gap: 0.5rem !important;
+        box-sizing: border-box !important;
       }
       #findings-container .finding-row.is-batch-finding .finding-row-actions {
         width: auto !important;
@@ -906,46 +910,65 @@
         flex: 1 0 auto !important;
       }
       #findings-container .finding-dates-group {
-        width: 5.5rem !important;
-        min-width: 5.5rem !important;
-        max-width: 5.5rem !important;
-        flex: 0 0 5.5rem !important;
+        width: 12.5rem !important;
+        min-width: 12.5rem !important;
+        max-width: 12.5rem !important;
+        flex: 0 0 12.5rem !important;
         margin-left: 0 !important;
-        text-align: right !important;
+        align-items: flex-end !important;
+        overflow: visible !important;
+      }
+      #findings-container .finding-date-control,
+      #findings-container .finding-begin-date-control {
+        width: 100% !important;
+        justify-content: flex-end !important;
       }
       #findings-container .finding-doctor-control {
-        width: 10rem !important;
-        min-width: 10rem !important;
-        max-width: 10rem !important;
-        flex: 0 0 10rem !important;
+        width: 8.5rem !important;
+        min-width: 8.5rem !important;
+        max-width: 8.5rem !important;
+        flex: 0 0 8.5rem !important;
+      }
+      #findings-container .finding-doctor-control span {
+        padding: 0.25rem 0.35rem !important;
+        font-size: 8px !important;
+      }
+      #findings-container .finding-doctor-control select {
+        padding: 0.25rem 0.35rem !important;
+        font-size: 9.5px !important;
       }
       #findings-container .finding-price-control {
-        width: 6.5rem !important;
-        min-width: 6.5rem !important;
-        max-width: 6.5rem !important;
-        flex: 0 0 6.5rem !important;
+        width: 6rem !important;
+        min-width: 6rem !important;
+        max-width: 6rem !important;
+        flex: 0 0 6rem !important;
+      }
+      #findings-container .finding-price-control input {
+        width: 3.25rem !important;
+        font-size: 10px !important;
       }
       #findings-container .finding-status-control {
-        width: 4.25rem !important;
-        min-width: 4.25rem !important;
-        max-width: 4.25rem !important;
-        flex: 0 0 4.25rem !important;
+        width: 4rem !important;
+        min-width: 4rem !important;
+        max-width: 4rem !important;
+        flex: 0 0 4rem !important;
         justify-content: center !important;
       }
       #findings-container .finding-status-select-mobile {
-        width: 2.75rem !important;
-        min-width: 2.75rem !important;
-        max-width: 2.75rem !important;
-        padding-left: 0.25rem !important;
-        padding-right: 0.25rem !important;
+        width: 2.6rem !important;
+        min-width: 2.6rem !important;
+        max-width: 2.6rem !important;
+        padding-left: 0.2rem !important;
+        padding-right: 0.2rem !important;
         text-align: center !important;
+        text-align-last: center !important;
       }
       #findings-container .finding-note-button {
-        width: 2.5rem !important;
-        min-width: 2.5rem !important;
-        max-width: 2.5rem !important;
+        width: 2.25rem !important;
+        min-width: 2.25rem !important;
+        max-width: 2.25rem !important;
         height: 2rem !important;
-        flex: 0 0 2.5rem !important;
+        flex: 0 0 2.25rem !important;
         padding: 0 !important;
         justify-content: center !important;
       }
