@@ -887,10 +887,14 @@
         display: inline-block;
       }
     }
-    @media (max-width: 767px) {
-      #findings-container .finding-status-control {
+    @media (max-width: 767.98px) {
+      #findings-container .finding-status-control,
+      #findings-container .finding-step-status-control {
         width: auto !important;
         flex: 0 0 auto !important;
+      }
+      .procedure-step-clinical-row {
+        grid-template-columns: auto minmax(0, 1fr) minmax(9rem, auto) auto;
       }
     }
 
@@ -26165,10 +26169,10 @@
       renderFindingsList();
     }
 
-    function chartProcedureStepStatusOptions(currentStatus) {
+    function chartProcedureStepStatusOptions(currentStatus, compact = false) {
       return ['P', 'In', 'C'].map(status => {
         const definition = operationStatusDefinition(status);
-        return `<option value="${status}" ${status === currentStatus ? 'selected' : ''}>${escapeHtml(definition.key)} · ${escapeHtml(definition.label)}</option>`;
+        return `<option value="${status}" ${status === currentStatus ? 'selected' : ''}>${compact ? escapeHtml(definition.key) : `${escapeHtml(definition.key)} · ${escapeHtml(definition.label)}`}</option>`;
       }).join('');
     }
 
@@ -27077,7 +27081,7 @@
               <span class="flex h-7 w-7 items-center justify-center rounded-lg ${step.status === 'C' ? 'bg-emerald-100 text-emerald-700' : step.status === 'In' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'} text-[10px] font-black">${step.status === 'C' ? '<i data-lucide="check" class="h-3.5 w-3.5"></i>' : index + 1}</span>
               <div class="min-w-0"><p class="truncate text-xs font-black text-slate-800">${escapeHtml(step.name)}</p><p class="mt-0.5 text-[9px] font-bold text-slate-400">${step.percentage}% · ${escapeHtml(formatInvoiceMoney(stepValue))} of this procedure</p></div>
               <label class="inline-flex min-w-0 items-center overflow-hidden rounded-lg border border-cyan-200 bg-white focus-within:ring-2 focus-within:ring-cyan-500/20"><span class="border-r border-cyan-100 bg-cyan-50 px-2 py-1.5 text-[9px] font-black text-cyan-700">Doctor</span><select data-procedure-step-id="${escapeHtml(step.id)}" onchange="updateFindingProcedureStepFromControl(this,'doctor')" class="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-[10px] font-bold text-slate-700 outline-none" aria-label="Doctor assigned to ${escapeHtml(step.name)}">${chartDoctorSelectOptions(step)}</select></label>
-              <label class="inline-flex min-w-0 items-center gap-1.5"><span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${stepStatus.color}"></span><select data-procedure-step-id="${escapeHtml(step.id)}" onchange="updateFindingProcedureStepFromControl(this,'status')" class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[10px] font-black outline-none focus:ring-2 focus:ring-cyan-500/20" style="color:${stepStatus.color}" aria-label="Status of ${escapeHtml(step.name)}">${chartProcedureStepStatusOptions(step.status)}</select></label>
+              <label class="finding-step-status-control inline-flex min-w-0 items-center gap-1.5"><span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${stepStatus.color}"></span><select data-procedure-step-id="${escapeHtml(step.id)}" onchange="updateFindingProcedureStepFromControl(this,'status')" class="finding-status-select-mobile min-w-0 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[10px] font-black outline-none focus:ring-2 focus:ring-cyan-500/20" style="color:${stepStatus.color}" aria-label="Status of ${escapeHtml(step.name)}" title="${stepStatus.key} · ${stepStatus.label}">${chartProcedureStepStatusOptions(step.status, true)}</select><select data-procedure-step-id="${escapeHtml(step.id)}" onchange="updateFindingProcedureStepFromControl(this,'status')" class="finding-status-select-desktop min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[10px] font-black outline-none focus:ring-2 focus:ring-cyan-500/20" style="color:${stepStatus.color}" aria-label="Status of ${escapeHtml(step.name)}">${chartProcedureStepStatusOptions(step.status, false)}</select></label>
             </div>`;
           }).join('')}</div>
           <p class="mt-2 text-[9px] font-semibold leading-4 text-slate-400">Percentage-based salary uses each completed step's share. Fixed per-procedure pay ignores the shares and uses the parent procedure after every step is complete.</p>
@@ -27240,7 +27244,7 @@
               ${procedureSteps.length ? `<div class="finding-status-control flex min-w-0 items-center gap-1.5 sm:gap-2 rounded-lg border bg-white/80 px-2 sm:px-2.5 py-1.5 sm:w-48" style="border-color:${statusBorder};color:${displayColor}" title="The procedure status is calculated from its steps">
                 <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${displayColor}"></span>
                 <span class="min-w-0 flex-1 truncate text-[11px] font-black">
-                  <span class="finding-status-select-mobile">${completedProcedureSteps}/${procedureSteps.length} · ${escapeHtml(status.key)}</span>
+                  <span class="finding-status-select-mobile font-black">${escapeHtml(status.key)}</span>
                   <span class="finding-status-select-desktop">${completedProcedureSteps}/${procedureSteps.length} steps · ${escapeHtml(status.label)}</span>
                 </span>
               </div>` : `<label class="finding-status-control flex min-w-0 items-center gap-1.5 sm:gap-2 sm:w-48">
