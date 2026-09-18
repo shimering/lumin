@@ -830,46 +830,56 @@
 
     @media (max-width: 899px) {
       #findings-container {
-        overflow-x: auto;
+        overflow-x: auto !important;
         overscroll-behavior-inline: contain;
         -webkit-overflow-scrolling: touch;
         touch-action: pan-x pan-y;
       }
       #findings-container .finding-row {
-        min-width: 72rem;
-        flex-direction: row;
-        flex-wrap: nowrap;
-        align-items: center;
+        min-width: max-content !important;
+        width: max-content !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        overflow: visible !important;
       }
       #findings-container .finding-row-summary {
-        min-width: 31rem;
-        flex: 1 0 31rem;
+        min-width: max-content !important;
+        flex: 0 0 auto !important;
       }
       #findings-container .finding-tooth-picker,
       #findings-container .finding-operation-heading,
       #findings-container .finding-surface-controls,
       #findings-container .finding-row-actions {
-        flex-wrap: nowrap;
+        flex-wrap: nowrap !important;
       }
       #findings-container .finding-operation-details {
-        min-width: 20rem;
+        min-width: max-content !important;
       }
       #findings-container .finding-operation-details > p {
-        white-space: nowrap;
+        white-space: nowrap !important;
       }
       #findings-container .finding-row-actions {
-        width: auto;
-        flex: 0 0 auto;
+        width: max-content !important;
+        flex: 0 0 auto !important;
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
       }
       #findings-container .finding-status-control {
-        width: 12rem;
-        flex: 0 0 12rem;
+        width: auto !important;
+        flex: 0 0 auto !important;
       }
       #findings-container .finding-row.has-procedure-steps {
-        flex-wrap: wrap;
+        flex-wrap: wrap !important;
       }
       #findings-container .finding-row.has-procedure-steps [data-procedure-steps-panel] {
-        flex: 0 0 100%;
+        flex: 0 0 100% !important;
+      }
+      #findings-container .finding-dates-group {
+        margin-left: 0 !important;
       }
     }
 
