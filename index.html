@@ -12420,6 +12420,7 @@
           code: String(value.code || value.operation || value.value || 'none'),
           status: steps.length ? chartFindingStatusFromSteps(steps, value.status) : normaliseOperationStatus(value.status, 'E'),
           createdAt: normaliseChartCreatedAt(value.createdAt || value.created_at),
+          beginDate: normaliseChartCreatedAt(value.beginDate || value.begin_date || value.startedAt || value.started_at),
           completedAt: normaliseChartCreatedAt(value.completedAt || value.completed_at),
           id: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value.id || '')) ? String(value.id) : null,
           price: Number.isFinite(price) && price >= 0 ? price : null,
@@ -12436,7 +12437,7 @@
           procedureStepPercentage: isProcedureStep ? Math.max(0, Math.min(100, Number(value.procedureStepPercentage || value.procedure_step_percentage) || 0)) : 0
         };
       }
-      return { code: String(value || 'none'), status: 'E', createdAt: null, completedAt: null, id: null, price: null, batchId: null, billingMultiplier: null, doctorId: null, doctorName: '', notes: [], steps: [], isProcedureStep: false, parentFindingId: null, procedureStepId: '', procedureStepName: '', procedureStepPercentage: 0 };
+      return { code: String(value || 'none'), status: 'E', createdAt: null, beginDate: null, completedAt: null, id: null, price: null, batchId: null, billingMultiplier: null, doctorId: null, doctorName: '', notes: [], steps: [], isProcedureStep: false, parentFindingId: null, procedureStepId: '', procedureStepName: '', procedureStepPercentage: 0 };
     }
 
     function createChartFindingId() {
@@ -12496,7 +12497,7 @@
       } : null;
     }
 
-    function chartFindingStorageRecord(code, status, createdAt = null, id = null, price = null, batchId = null, notes = null, billingMultiplier = null, doctorId = null, doctorName = '', completedAt = null, steps = null, procedureStepMeta = null) {
+    function chartFindingStorageRecord(code, status, createdAt = null, id = null, price = null, batchId = null, notes = null, billingMultiplier = null, doctorId = null, doctorName = '', completedAt = null, steps = null, procedureStepMeta = null, beginDate = null) {
       const hasExplicitPrice = price !== null && price !== undefined && String(price).trim() !== '';
       const numericPrice = hasExplicitPrice ? Number(price) : Number.NaN;
       const normalisedSteps = normaliseChartFindingSteps(steps);
@@ -12508,6 +12509,8 @@
       };
       const normalisedCreatedAt = normaliseChartCreatedAt(createdAt);
       if (normalisedCreatedAt) record.createdAt = normalisedCreatedAt;
+      const normalisedBeginDate = normaliseChartCreatedAt(beginDate);
+      if (normalisedBeginDate) record.beginDate = normalisedBeginDate;
       const normalisedCompletedAt = normaliseChartCreatedAt(completedAt);
       const stepCompletedAt = record.status === 'C'
         ? normalisedSteps.map(step => step.completedAt).filter(Boolean).sort().at(-1) || null
@@ -12575,7 +12578,8 @@
           finding.doctorName,
           finding.completedAt,
           finding.steps,
-          chartFindingProcedureStepMeta(finding)
+          chartFindingProcedureStepMeta(finding),
+          finding.beginDate
         ));
       if (records.length) toothData.surfaces[surface] = records;
       else delete toothData.surfaces[surface];
@@ -12600,7 +12604,7 @@
 
     function ensureWholeOperations(toothData) {
       toothData.wholeOperations = chartWholeFindings(toothData).map(finding => (
-        chartFindingStorageRecord(finding.code, finding.status, finding.createdAt, finding.id, finding.price, finding.batchId, finding.notes, finding.billingMultiplier, finding.doctorId, finding.doctorName, finding.completedAt, finding.steps, chartFindingProcedureStepMeta(finding))
+        chartFindingStorageRecord(finding.code, finding.status, finding.createdAt, finding.id, finding.price, finding.batchId, finding.notes, finding.billingMultiplier, finding.doctorId, finding.doctorName, finding.completedAt, finding.steps, chartFindingProcedureStepMeta(finding), finding.beginDate)
       ));
       toothData.status = 'none';
       return toothData.wholeOperations;
@@ -12616,7 +12620,7 @@
     function ensureMouthOperations(patient) {
       const meta = ensureChartMeta(patient);
       meta.mouthOperations = chartMouthFindings(patient).map(finding => (
-        chartFindingStorageRecord(finding.code, finding.status, finding.createdAt, finding.id, finding.price, null, finding.notes, null, finding.doctorId, finding.doctorName, finding.completedAt, finding.steps, chartFindingProcedureStepMeta(finding))
+        chartFindingStorageRecord(finding.code, finding.status, finding.createdAt, finding.id, finding.price, null, finding.notes, null, finding.doctorId, finding.doctorName, finding.completedAt, finding.steps, chartFindingProcedureStepMeta(finding), finding.beginDate)
       ));
       return meta.mouthOperations;
     }
@@ -12639,7 +12643,8 @@
           finding.doctorName,
           finding.completedAt,
           finding.steps,
-          chartFindingProcedureStepMeta(finding)
+          chartFindingProcedureStepMeta(finding),
+          finding.beginDate
         ));
       if (records.length) meta.mouthOperations = records;
       else delete meta.mouthOperations;
@@ -12695,7 +12700,8 @@
             finding.doctorName,
             finding.completedAt,
             finding.steps,
-            chartFindingProcedureStepMeta(finding)
+            chartFindingProcedureStepMeta(finding),
+            finding.beginDate
           ));
         });
         toothData.surfaces = nextSurfaces;
@@ -12742,7 +12748,8 @@
                 procedureStepId: step.id,
                 procedureStepName: step.name,
                 procedureStepPercentage: step.percentage
-              }
+              },
+              member.beginDate
             ));
           });
         });
@@ -19748,10 +19755,21 @@
 
         const rowClass = isCompleted ? 'bg-slate-50/70 text-slate-400 hover:bg-slate-100/70' : 'hover:bg-cyan-50/20';
 
+        let displayProcDate = record.procedure_date || '—';
+        if (patient && patient.chartState && record.finding_id) {
+          Object.entries(patient.chartState).forEach(([tId, toothData]) => {
+            if (tId === CHART_META_KEY || !toothData || typeof toothData !== 'object') return;
+            const f = ensureWholeOperations(toothData).find(x => x.id === record.finding_id);
+            if (f && f.beginDate) {
+              displayProcDate = String(f.beginDate).slice(0, 10);
+            }
+          });
+        }
+
         return `
           <tr class="${rowClass} transition border-b border-slate-100/80">
             <td class="px-4 py-3 whitespace-nowrap text-xs font-bold text-slate-700">
-              ${escapeHtml(record.procedure_date || '—')}
+              ${escapeHtml(displayProcDate)}
             </td>
             <td class="px-4 py-3 whitespace-nowrap">
               <div class="flex flex-col">
@@ -20002,6 +20020,30 @@
           if (error) throw error;
         }
 
+        if (findingId && patientId) {
+          const patientObj = (patients || []).find(p => p.id === patientId);
+          if (patientObj && patientObj.chartState) {
+            let chartUpdated = false;
+            Object.entries(patientObj.chartState).forEach(([tId, toothData]) => {
+              if (tId === CHART_META_KEY || !toothData || typeof toothData !== 'object') return;
+              ensureWholeOperations(toothData).forEach(f => {
+                if (f.id === findingId) {
+                  f.beginDate = procedureDate ? new Date(procedureDate).toISOString() : f.beginDate;
+                  chartUpdated = true;
+                }
+              });
+            });
+            if (chartUpdated) {
+              if (patientObj.id === getActivePatient()?.id) {
+                renderFindingsList();
+                void saveActivePatientChart();
+              } else {
+                void db.from('patients').update({ chart_state: patientObj.chartState }).eq('id', patientObj.id);
+              }
+            }
+          }
+        }
+
         closeImplantModal();
         await refreshImplantProgress({ force: true });
         showAppointmentNotificationToast(
@@ -20201,7 +20243,8 @@
       const nextStatus = normaliseOperationStatus(finding.status, 'E');
 
       if (nextStatus === 'In' || nextStatus === 'C') {
-        const procedureDate = finding.createdAt ? String(finding.createdAt).slice(0, 10) : new Date().toISOString().slice(0, 10);
+        const rawBeginDate = finding.beginDate || (finding.status === 'In' || finding.status === 'C' ? (finding.createdAt || new Date().toISOString()) : null);
+        const procedureDate = rawBeginDate ? String(rawBeginDate).slice(0, 10) : (finding.createdAt ? String(finding.createdAt).slice(0, 10) : new Date().toISOString().slice(0, 10));
         const deliveryDate = addMonthsToDate(procedureDate, 4);
         const implantType = op?.code === 'dz_implantation_i9'
           ? 'Economic (dual)'
@@ -20226,7 +20269,7 @@
           payload.implant_size = existing.implant_size || payload.implant_size;
           payload.healing_collar = existing.healing_collar ?? false;
           payload.delivery_date = existing.delivery_date || payload.delivery_date;
-          payload.procedure_date = existing.procedure_date || payload.procedure_date;
+          payload.procedure_date = procedureDate || existing.procedure_date;
           payload.notes = existing.notes || '';
         }
 
@@ -25201,6 +25244,7 @@
         ? Math.max(0, Number(catalogPrice) || 0)
         : chartFindingDefaultPrice(condition);
       const createdAt = new Date().toISOString();
+      const beginDate = (normalisedStatus === 'In' || normalisedStatus === 'C') ? createdAt : null;
       const batchId = targets.length > 1 ? createChartFindingId() : null;
 
       targets.forEach(target => {
@@ -25217,7 +25261,9 @@
           null,
           '',
           null,
-          createChartFindingSteps(procedureSteps, normalisedStatus)
+          createChartFindingSteps(procedureSteps, normalisedStatus),
+          null,
+          beginDate
         );
         target.surfaces.forEach(surface => {
           storeChartSurfaceFindings(toothData, surface, [
@@ -25247,13 +25293,15 @@
       if (!patient) return false;
 
       const createdAt = new Date().toISOString();
+      const normalisedStatus = normaliseOperationStatus(operationStatus, 'P');
+      const beginDate = (normalisedStatus === 'In' || normalisedStatus === 'C') ? createdAt : null;
       const batchId = targets.length > 1 ? createChartFindingId() : null;
       targets.forEach(target => {
         const toothData = getOrCreateChartTooth(patient, target.tooth);
         const wholeOperations = ensureWholeOperations(toothData);
         const record = chartFindingStorageRecord(
           operationCode,
-          normaliseOperationStatus(operationStatus, 'P'),
+          normalisedStatus,
           createdAt,
           null,
           catalogPrice,
@@ -25263,7 +25311,9 @@
           null,
           '',
           null,
-          createChartFindingSteps(procedureSteps, operationStatus)
+          createChartFindingSteps(procedureSteps, operationStatus),
+          null,
+          beginDate
         );
         wholeOperations.push(record);
         renderToothVisuals(target.tooth);
@@ -25283,10 +25333,13 @@
       const patient = getActivePatient();
       if (!patient) return false;
 
+      const createdAt = new Date().toISOString();
+      const normalisedStatus = normaliseOperationStatus(operationStatus, 'P');
+      const beginDate = (normalisedStatus === 'In' || normalisedStatus === 'C') ? createdAt : null;
       ensureMouthOperations(patient).push(chartFindingStorageRecord(
         operationCode,
-        normaliseOperationStatus(operationStatus, 'P'),
-        new Date().toISOString(),
+        normalisedStatus,
+        createdAt,
         null,
         catalogPrice,
         null,
@@ -25295,7 +25348,9 @@
         null,
         '',
         null,
-        createChartFindingSteps(procedureSteps, operationStatus)
+        createChartFindingSteps(procedureSteps, operationStatus),
+        null,
+        beginDate
       ));
       updateClinicalOperationPreview();
       renderFindingsList();
@@ -25499,12 +25554,23 @@
       const nextStatus = normaliseOperationStatus(control.value, 'E');
       const toothData = getOrCreateChartTooth(patient, toothId);
       const wholeOperations = ensureWholeOperations(toothData);
-      const prevStatus = wholeOperations[operationIndex].status;
-      wholeOperations[operationIndex].status = nextStatus;
+      const op = wholeOperations[operationIndex];
+      if (!op) return;
+      const prevStatus = op.status;
+      const nowIso = new Date().toISOString();
+      if (nextStatus === 'In') {
+        op.beginDate = nowIso;
+      } else if (nextStatus === 'P') {
+        op.beginDate = null;
+      }
+      if (nextStatus === 'C' && prevStatus !== 'C') {
+        op.completedAt = nowIso;
+      }
+      op.status = nextStatus;
       renderToothVisuals(toothId);
       renderFindingsList();
       await saveActivePatientChart();
-      await syncImplantProgressFromChartOperation(patient, toothId, wholeOperations[operationIndex], prevStatus);
+      await syncImplantProgressFromChartOperation(patient, toothId, op, prevStatus);
     }
 
     async function updateSurfaceOperationStatusFromControl(control) {
@@ -25516,10 +25582,17 @@
       const surfaces = String(control.dataset.surfaces || '').split(',').filter(Boolean);
       if (!findingId) return;
       const toothData = getOrCreateChartTooth(patient, toothId);
+      const nowIso = new Date().toISOString();
       surfaces.forEach(surface => {
-        const findings = chartSurfaceFindings(toothData.surfaces[surface]).map(finding => (
-          finding.id === findingId ? { ...finding, status: nextStatus } : finding
-        ));
+        const findings = chartSurfaceFindings(toothData.surfaces[surface]).map(finding => {
+          if (finding.id !== findingId) return finding;
+          return {
+            ...finding,
+            status: nextStatus,
+            beginDate: nextStatus === 'In' ? nowIso : (nextStatus === 'P' ? null : finding.beginDate),
+            completedAt: nextStatus === 'C' && finding.status !== 'C' ? nowIso : (nextStatus === 'C' ? finding.completedAt : null)
+          };
+        });
         storeChartSurfaceFindings(toothData, surface, findings);
       });
       renderToothVisuals(toothId);
@@ -25558,7 +25631,15 @@
           null,
           findingId,
           chartFindingDefaultPrice(operationCode),
-          null
+          null,
+          null,
+          null,
+          null,
+          '',
+          null,
+          null,
+          null,
+          (operationStatus === 'In' || operationStatus === 'C') ? new Date().toISOString() : null
         );
         storeChartSurfaceFindings(toothData, surface, [...currentFindings, finding]);
       }
@@ -25621,7 +25702,7 @@
 
       const timestamp = Date.parse(input.value);
       if (!Number.isFinite(timestamp)) {
-        alert('Please choose a valid creation date and time.');
+        alert(currentUiLanguage === 'ar' ? 'يرجى اختيار تاريخ ووقت صحيحين.' : 'Please choose a valid planning date and time.');
         input.focus();
         return;
       }
@@ -25632,6 +25713,54 @@
       renderChartFindingTeeth(chartFindingToothIdsFromControl(button));
       renderFindingsList();
       await saveActivePatientChart();
+    }
+
+    function openFindingBeginDateEditor(button) {
+      const control = button.closest('.finding-begin-date-control');
+      if (!control) return;
+      control.querySelector('.finding-begin-date-display')?.classList.add('hidden');
+      const editor = control.querySelector('.finding-begin-date-editor');
+      editor?.classList.remove('hidden');
+      editor?.classList.add('inline-flex');
+      editor?.querySelector('input')?.focus();
+    }
+
+    function cancelFindingBeginDateEditor(button) {
+      const control = button.closest('.finding-begin-date-control');
+      if (!control) return;
+      const editor = control.querySelector('.finding-begin-date-editor');
+      editor?.classList.add('hidden');
+      editor?.classList.remove('inline-flex');
+      control.querySelector('.finding-begin-date-display')?.classList.remove('hidden');
+    }
+
+    async function updateFindingBeginDateFromControl(button) {
+      const patient = getActivePatient();
+      const card = button.closest('[data-finding-id]');
+      const input = card?.querySelector('.finding-begin-date-input');
+      if (!patient || !card || !input) return;
+
+      const timestamp = Date.parse(input.value);
+      if (!Number.isFinite(timestamp)) {
+        alert(currentUiLanguage === 'ar' ? 'يرجى اختيار تاريخ ووقت صحيحين لبدء الإجراء.' : 'Please choose a valid begin date and time.');
+        input.focus();
+        return;
+      }
+
+      const beginDate = new Date(timestamp).toISOString();
+      const findingIds = chartFindingIdsFromControl(button);
+      if (!updateChartFindingsByIds(patient, findingIds, finding => ({ ...finding, beginDate }))) return;
+      renderChartFindingTeeth(chartFindingToothIdsFromControl(button));
+      renderFindingsList();
+      await saveActivePatientChart();
+
+      findingIds.forEach(fid => {
+        Object.entries(patient.chartState || {}).forEach(([toothId, toothData]) => {
+          if (toothId === CHART_META_KEY || !toothData || typeof toothData !== 'object') return;
+          const match = ensureWholeOperations(toothData).find(f => f.id === fid);
+          if (match) void syncImplantProgressFromChartOperation(patient, toothId, match, null);
+        });
+      });
     }
 
     async function deleteFindingFromControl(button) {
@@ -25691,7 +25820,8 @@
             nextFinding.doctorName,
             nextFinding.completedAt,
             nextFinding.steps,
-            chartFindingProcedureStepMeta(nextFinding)
+            chartFindingProcedureStepMeta(nextFinding),
+            nextFinding.beginDate
           );
           updated = true;
         });
@@ -25913,7 +26043,8 @@
           sourceFinding.doctorName,
           sourceFinding.completedAt,
           sourceFinding.steps?.map(step => ({ ...step, payrollFindingId: existingFinding ? step.payrollFindingId : createChartFindingId() })),
-          chartFindingProcedureStepMeta(sourceFinding)
+          chartFindingProcedureStepMeta(sourceFinding),
+          sourceFinding.beginDate
         );
         const toothData = getOrCreateChartTooth(patient, toothId);
         if (documentedGroup.kind === 'whole') {
@@ -26028,10 +26159,12 @@
           };
         });
         const status = chartFindingStatusFromSteps(steps, finding.status);
+        const isChangingToInProgress = status === 'In' && finding.status !== 'In';
         return {
           ...finding,
           steps,
           status,
+          beginDate: isChangingToInProgress ? changedAt : (status === 'P' ? null : finding.beginDate),
           completedAt: status === 'C' ? (finding.status === 'C' ? finding.completedAt : changedAt) : null
         };
       });
@@ -26517,11 +26650,16 @@
       if (!patient || !findingIds.length) return;
       const nextStatus = normaliseOperationStatus(control.value, 'E');
       const completedAt = new Date().toISOString();
-      if (!updateChartFindingsByIds(patient, findingIds, finding => ({
-        ...finding,
-        status: nextStatus,
-        completedAt: nextStatus === 'C' && finding.status !== 'C' ? completedAt : finding.completedAt
-      }))) return;
+      const nowIso = new Date().toISOString();
+      if (!updateChartFindingsByIds(patient, findingIds, finding => {
+        const isChoosingInProgress = nextStatus === 'In';
+        return {
+          ...finding,
+          status: nextStatus,
+          beginDate: isChoosingInProgress ? nowIso : (nextStatus === 'P' ? null : finding.beginDate),
+          completedAt: nextStatus === 'C' && finding.status !== 'C' ? completedAt : (nextStatus === 'C' ? finding.completedAt : null)
+        };
+      })) return;
       renderChartFindingTeeth(chartFindingToothIdsFromControl(control));
       renderFindingsList();
       await saveActivePatientChart();
@@ -26721,6 +26859,7 @@
           code: finding.code,
           status: finding.status,
           createdAt: finding.createdAt,
+          beginDate: finding.beginDate,
           completedAt: finding.completedAt,
           price: finding.price ?? chartFindingDefaultPrice(finding.code),
           batchId: null,
@@ -26745,6 +26884,7 @@
             code: finding.code,
             status: finding.status,
             createdAt: finding.createdAt,
+            beginDate: finding.beginDate,
             completedAt: finding.completedAt,
             price: finding.price ?? chartFindingDefaultPrice(finding.code),
             batchId: finding.batchId,
@@ -26770,6 +26910,7 @@
                 code: finding.code,
                 status: finding.status,
                 createdAt: finding.createdAt,
+                beginDate: finding.beginDate,
                 completedAt: finding.completedAt,
                 price: finding.price ?? chartFindingDefaultPrice(finding.code),
                 batchId: finding.batchId,
@@ -26785,6 +26926,9 @@
             if (!group.surfaces.includes(surface)) group.surfaces.push(surface);
             if (finding.createdAt && (!group.createdAt || finding.createdAt < group.createdAt)) {
               group.createdAt = finding.createdAt;
+            }
+            if (finding.beginDate && (!group.beginDate || finding.beginDate < group.beginDate)) {
+              group.beginDate = finding.beginDate;
             }
           });
         });
@@ -26822,6 +26966,7 @@
         if (finding.id && !batch.findingIds.includes(finding.id)) batch.findingIds.push(finding.id);
         batch.totalPrice = chartFindingBatchTotal(batch, batch.memberFindings.length);
         batch.createdAt = !batch.createdAt || (finding.createdAt && finding.createdAt < batch.createdAt) ? finding.createdAt : batch.createdAt;
+        batch.beginDate = !batch.beginDate || (finding.beginDate && finding.beginDate < batch.beginDate) ? finding.beginDate : batch.beginDate;
       });
 
       return groupedFindings.sort((a, b) => {
@@ -26921,20 +27066,42 @@
               : '');
         const createdAtLabel = formatChartOperationCreatedAt(finding.createdAt);
         const createdAtDisplay = createdAtLabel
-          ? `<time datetime="${escapeHtml(finding.createdAt)}" class="inline-flex items-center gap-1 rounded-lg border border-violet-100 bg-white/70 px-2 py-1 text-[9px] font-black text-slate-600" title="Operation creation date"><i data-lucide="calendar-days" class="h-3 w-3 text-violet-500"></i>${escapeHtml(createdAtLabel)}</time>`
+          ? `<time datetime="${escapeHtml(finding.createdAt)}" class="inline-flex items-center gap-1 rounded-lg border border-violet-100 bg-white/70 px-2 py-1 text-[9px] font-black text-slate-600" title="Planning date"><span class="text-[8px] font-black uppercase text-violet-600">Plan</span><i data-lucide="calendar" class="h-3 w-3 text-violet-500"></i>${escapeHtml(createdAtLabel)}</time>`
           : '<span class="inline-flex items-center rounded-lg border border-slate-100 bg-white/70 px-2 py-1 text-[9px] font-semibold text-slate-300" title="This operation was saved before creation-date tracking was added">Date unavailable</span>';
         const createdAtMarkup = `
-          <span class="finding-date-control ml-auto inline-flex max-w-full items-center justify-end">
-            <span class="finding-date-display inline-flex items-center gap-1.5">
+          <span class="finding-date-control inline-flex max-w-full items-center justify-end">
+            <span class="finding-date-display inline-flex items-center gap-1">
               ${createdAtDisplay}
-              <button type="button" onclick="openFindingDateEditor(this)" class="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-100/65 px-2 py-1 text-[9px] font-black text-violet-700 transition hover:bg-violet-100" aria-label="Edit operation creation date"><i data-lucide="pencil" class="h-2.5 w-2.5"></i> Edit date</button>
+              <button type="button" onclick="openFindingDateEditor(this)" class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-violet-200 bg-violet-100/65 text-violet-700 transition hover:bg-violet-100" title="Edit planning date" aria-label="Edit planning date"><i data-lucide="pencil" class="h-3 w-3"></i></button>
             </span>
             <span class="finding-date-editor hidden max-w-full items-center gap-1">
-              <input type="datetime-local" value="${chartOperationDateInputValue(finding.createdAt)}" class="finding-date-input w-44 rounded-lg border border-violet-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/15" aria-label="Operation creation date and time">
+              <input type="datetime-local" value="${chartOperationDateInputValue(finding.createdAt)}" class="finding-date-input w-44 rounded-lg border border-violet-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/15" aria-label="Operation planning date and time">
               <button type="button" data-save-date onclick="updateFindingCreatedAtFromControl(this)" class="rounded-lg bg-violet-600 px-2 py-1 text-[9px] font-black text-white hover:bg-violet-700">Save</button>
               <button type="button" onclick="cancelFindingDateEditor(this)" class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[9px] font-black text-slate-500 hover:bg-slate-50">Cancel</button>
             </span>
           </span>`;
+
+        const showBeginDate = finding.status !== 'P' && Boolean(finding.beginDate || finding.status === 'In' || finding.status === 'C');
+        const rawBeginDate = finding.beginDate || (finding.status !== 'P' ? finding.createdAt : null);
+        let beginDateMarkup = '';
+        if (showBeginDate && rawBeginDate) {
+          const beginDateLabel = formatChartOperationCreatedAt(rawBeginDate);
+          const beginDateDisplay = beginDateLabel
+            ? `<time datetime="${escapeHtml(rawBeginDate)}" class="inline-flex items-center gap-1 rounded-lg border border-blue-100 bg-white/70 px-2 py-1 text-[9px] font-black text-slate-600" title="Treatment begin date"><span class="text-[8px] font-black uppercase text-blue-600">Begin</span><i data-lucide="clock" class="h-3 w-3 text-blue-500"></i>${escapeHtml(beginDateLabel)}</time>`
+            : '<span class="inline-flex items-center rounded-lg border border-slate-100 bg-white/70 px-2 py-1 text-[9px] font-semibold text-slate-300">Date unavailable</span>';
+          beginDateMarkup = `
+            <span class="finding-begin-date-control inline-flex max-w-full items-center justify-end">
+              <span class="finding-begin-date-display inline-flex items-center gap-1">
+                ${beginDateDisplay}
+                <button type="button" onclick="openFindingBeginDateEditor(this)" class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-700 transition hover:bg-blue-100" title="Edit begin date" aria-label="Edit begin date"><i data-lucide="pencil" class="h-3 w-3"></i></button>
+              </span>
+              <span class="finding-begin-date-editor hidden max-w-full items-center gap-1">
+                <input type="datetime-local" value="${chartOperationDateInputValue(rawBeginDate)}" class="finding-begin-date-input w-44 rounded-lg border border-blue-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15" aria-label="Procedure begin date and time">
+                <button type="button" data-save-date onclick="updateFindingBeginDateFromControl(this)" class="rounded-lg bg-blue-600 px-2 py-1 text-[9px] font-black text-white hover:bg-blue-700">Save</button>
+                <button type="button" onclick="cancelFindingBeginDateEditor(this)" class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[9px] font-black text-slate-500 hover:bg-slate-50">Cancel</button>
+              </span>
+            </span>`;
+        }
         const surfaceToggleButtons = isMouth || isWhole || isBatch ? '' : FINDING_SURFACE_TOGGLE_ORDER.map(surface => {
           const selected = finding.surfaces.includes(surface);
           const surfaceName = surfaceClinicalName(finding.toothId, surface);
@@ -26989,7 +27156,10 @@
               </div>
             </div>
             <div class="finding-row-actions flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
-              ${createdAtMarkup}
+              <div class="finding-dates-group ml-auto flex flex-wrap items-center gap-1.5">
+                ${createdAtMarkup}
+                ${beginDateMarkup}
+              </div>
               <label class="inline-flex min-w-44 items-center overflow-hidden rounded-lg border border-cyan-200 bg-white/85 focus-within:ring-2 focus-within:ring-cyan-500/20" title="${procedureSteps.length ? 'Used only for fixed per-procedure compensation after every step is complete' : 'Assign the completed procedure to a doctor for HR salary calculation'}">
                 <span class="border-r border-cyan-100 bg-cyan-50 px-2 py-1.5 text-[9px] font-black text-cyan-700">${procedureSteps.length ? 'Fixed pay' : 'Doctor'}</span>
                 <select onchange="updateFindingDoctorFromControl(this)" class="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-[11px] font-bold text-slate-700 outline-none" aria-label="Assigned doctor for ${escapeHtml(dentalOperationLabel(finding.code))}">${chartDoctorSelectOptions(finding)}</select>
@@ -27008,11 +27178,12 @@
               </label>`}
               ${isBatch ? '<button type="button" onclick="separateFindingBatch(this)" class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[10px] font-black text-violet-700 transition hover:border-violet-300 hover:bg-violet-100" aria-label="Separate this batch into one row per tooth" title="Create one independent documented row for each tooth"><i data-lucide="split" class="h-3 w-3"></i>Separate</button>' : ''}
               <button type="button" data-finding-note-trigger aria-haspopup="dialog" aria-expanded="false" aria-controls="chart-finding-note-popover" onpointerenter="showChartFindingNotePreviewFromPointer(event, this)" onpointerleave="scheduleChartFindingNotePreviewClose(event)" onclick="toggleChartFindingNotePreview(event, this)" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[10px] font-black transition ${findingNotes.length ? 'border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-100' : 'border-slate-200 bg-white text-slate-500 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700'}" aria-label="Preview notes for ${escapeHtml(dentalOperationLabel(finding.code))}" title="Hover or tap to preview operation notes"><i data-lucide="sticky-note" class="h-3.5 w-3.5"></i>Notes${findingNotes.length ? ` ${findingNotes.length}` : ''}</button>
-              <button type="button" onclick="deleteFindingFromControl(this)" class="inline-flex shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-black text-red-600 transition hover:border-red-300 hover:bg-red-100" aria-label="Delete ${escapeHtml(dentalOperationLabel(finding.code))}">Delete</button>
+              <button type="button" onclick="deleteFindingFromControl(this)" class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:border-red-300 hover:bg-red-100" title="Delete ${escapeHtml(dentalOperationLabel(finding.code))}" aria-label="Delete ${escapeHtml(dentalOperationLabel(finding.code))}"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button>
             </div>
             ${procedureStepsMarkup}
           </article>`;
       }).join('');
+      if (window.lucide) lucide.createIcons();
     }
 
     // ================= APPOINTMENTS CALENDAR =================
