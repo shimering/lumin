@@ -27066,13 +27066,13 @@
               : '');
         const createdAtLabel = formatChartOperationCreatedAt(finding.createdAt);
         const createdAtDisplay = createdAtLabel
-          ? `<time datetime="${escapeHtml(finding.createdAt)}" class="inline-flex items-center gap-1 rounded-lg border border-violet-100 bg-white/70 px-2 py-1 text-[9px] font-black text-slate-600" title="Planning date"><span class="text-[8px] font-black uppercase text-violet-600">Plan</span><i data-lucide="calendar" class="h-3 w-3 text-violet-500"></i>${escapeHtml(createdAtLabel)}</time>`
-          : '<span class="inline-flex items-center rounded-lg border border-slate-100 bg-white/70 px-2 py-1 text-[9px] font-semibold text-slate-300" title="This operation was saved before creation-date tracking was added">Date unavailable</span>';
+          ? `<time datetime="${escapeHtml(finding.createdAt)}" class="inline-flex items-center gap-1 rounded-lg border border-violet-100 bg-white/80 px-2 py-0.5 text-[9px] font-black text-slate-600 shadow-2xs" title="Planning date"><span class="w-8 shrink-0 text-[8px] font-black uppercase text-violet-600">Plan</span><i data-lucide="calendar" class="h-3 w-3 text-violet-500 shrink-0"></i><span class="truncate">${escapeHtml(createdAtLabel)}</span></time>`
+          : '<span class="inline-flex items-center gap-1 rounded-lg border border-slate-100 bg-white/70 px-2 py-0.5 text-[9px] font-semibold text-slate-300" title="This operation was saved before creation-date tracking was added"><span class="w-8 shrink-0 text-[8px] font-bold uppercase text-slate-400">Plan</span><span class="truncate">Date unavailable</span></span>';
         const createdAtMarkup = `
           <span class="finding-date-control inline-flex max-w-full items-center justify-end">
             <span class="finding-date-display inline-flex items-center gap-1">
               ${createdAtDisplay}
-              <button type="button" onclick="openFindingDateEditor(this)" class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-violet-200 bg-violet-100/65 text-violet-700 transition hover:bg-violet-100" title="Edit planning date" aria-label="Edit planning date"><i data-lucide="pencil" class="h-3 w-3"></i></button>
+              <button type="button" onclick="openFindingDateEditor(this)" class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-violet-200 bg-violet-100/65 text-violet-700 transition hover:bg-violet-100" title="Edit planning date" aria-label="Edit planning date"><i data-lucide="pencil" class="h-2.5 w-2.5"></i></button>
             </span>
             <span class="finding-date-editor hidden max-w-full items-center gap-1">
               <input type="datetime-local" value="${chartOperationDateInputValue(finding.createdAt)}" class="finding-date-input w-44 rounded-lg border border-violet-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/15" aria-label="Operation planning date and time">
@@ -27081,22 +27081,48 @@
             </span>
           </span>`;
 
-        const showBeginDate = finding.status !== 'P' && Boolean(finding.beginDate || finding.status === 'In' || finding.status === 'C');
-        const rawBeginDate = finding.beginDate || (finding.status !== 'P' ? finding.createdAt : null);
+        const isPlanning = finding.status === 'P';
+        const isExisted = finding.status === 'E';
+        const rawBeginDate = finding.beginDate || (!isPlanning && !isExisted ? finding.createdAt : null);
+        const beginDateLabel = rawBeginDate ? formatChartOperationCreatedAt(rawBeginDate) : '';
+
         let beginDateMarkup = '';
-        if (showBeginDate && rawBeginDate) {
-          const beginDateLabel = formatChartOperationCreatedAt(rawBeginDate);
-          const beginDateDisplay = beginDateLabel
-            ? `<time datetime="${escapeHtml(rawBeginDate)}" class="inline-flex items-center gap-1 rounded-lg border border-blue-100 bg-white/70 px-2 py-1 text-[9px] font-black text-slate-600" title="Treatment begin date"><span class="text-[8px] font-black uppercase text-blue-600">Begin</span><i data-lucide="clock" class="h-3 w-3 text-blue-500"></i>${escapeHtml(beginDateLabel)}</time>`
-            : '<span class="inline-flex items-center rounded-lg border border-slate-100 bg-white/70 px-2 py-1 text-[9px] font-semibold text-slate-300">Date unavailable</span>';
+        if (isPlanning) {
+          const displayLabel = beginDateLabel || (currentUiLanguage === 'ar' ? 'لم يبدأ' : 'Not started');
           beginDateMarkup = `
             <span class="finding-begin-date-control inline-flex max-w-full items-center justify-end">
               <span class="finding-begin-date-display inline-flex items-center gap-1">
-                ${beginDateDisplay}
-                <button type="button" onclick="openFindingBeginDateEditor(this)" class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-700 transition hover:bg-blue-100" title="Edit begin date" aria-label="Edit begin date"><i data-lucide="pencil" class="h-3 w-3"></i></button>
+                <time datetime="${escapeHtml(rawBeginDate || '')}" class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-100/80 px-2 py-0.5 text-[9px] font-bold text-slate-400" title="Treatment begin date — Planning stage (not started)">
+                  <span class="w-8 shrink-0 text-[8px] font-bold uppercase text-slate-400">Begin</span>
+                  <i data-lucide="clock" class="h-3 w-3 text-slate-400 shrink-0"></i>
+                  <span class="truncate">${escapeHtml(displayLabel)}</span>
+                </time>
+                <button type="button" onclick="openFindingBeginDateEditor(this)" class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-100 text-slate-400 transition hover:border-slate-300 hover:bg-white hover:text-slate-600" title="Set begin date" aria-label="Set begin date">
+                  <i data-lucide="pencil" class="h-2.5 w-2.5"></i>
+                </button>
               </span>
               <span class="finding-begin-date-editor hidden max-w-full items-center gap-1">
-                <input type="datetime-local" value="${chartOperationDateInputValue(rawBeginDate)}" class="finding-begin-date-input w-44 rounded-lg border border-blue-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15" aria-label="Procedure begin date and time">
+                <input type="datetime-local" value="${chartOperationDateInputValue(rawBeginDate || new Date().toISOString())}" class="finding-begin-date-input w-44 rounded-lg border border-blue-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15" aria-label="Procedure begin date and time">
+                <button type="button" data-save-date onclick="updateFindingBeginDateFromControl(this)" class="rounded-lg bg-blue-600 px-2 py-1 text-[9px] font-black text-white hover:bg-blue-700">Save</button>
+                <button type="button" onclick="cancelFindingBeginDateEditor(this)" class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[9px] font-black text-slate-500 hover:bg-slate-50">Cancel</button>
+              </span>
+            </span>`;
+        } else if (!isExisted || rawBeginDate) {
+          const displayLabel = beginDateLabel || (currentUiLanguage === 'ar' ? 'تاريخ غير متوفر' : 'Date unavailable');
+          beginDateMarkup = `
+            <span class="finding-begin-date-control inline-flex max-w-full items-center justify-end">
+              <span class="finding-begin-date-display inline-flex items-center gap-1">
+                <time datetime="${escapeHtml(rawBeginDate || '')}" class="inline-flex items-center gap-1 rounded-lg border border-blue-100 bg-white/80 px-2 py-0.5 text-[9px] font-black text-slate-600 shadow-2xs" title="Treatment begin date">
+                  <span class="w-8 shrink-0 text-[8px] font-black uppercase text-blue-600">Begin</span>
+                  <i data-lucide="clock" class="h-3 w-3 text-blue-500 shrink-0"></i>
+                  <span class="truncate">${escapeHtml(displayLabel)}</span>
+                </time>
+                <button type="button" onclick="openFindingBeginDateEditor(this)" class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-blue-200 bg-blue-50 text-blue-700 transition hover:bg-blue-100" title="Edit begin date" aria-label="Edit begin date">
+                  <i data-lucide="pencil" class="h-2.5 w-2.5"></i>
+                </button>
+              </span>
+              <span class="finding-begin-date-editor hidden max-w-full items-center gap-1">
+                <input type="datetime-local" value="${chartOperationDateInputValue(rawBeginDate || new Date().toISOString())}" class="finding-begin-date-input w-44 rounded-lg border border-blue-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15" aria-label="Procedure begin date and time">
                 <button type="button" data-save-date onclick="updateFindingBeginDateFromControl(this)" class="rounded-lg bg-blue-600 px-2 py-1 text-[9px] font-black text-white hover:bg-blue-700">Save</button>
                 <button type="button" onclick="cancelFindingBeginDateEditor(this)" class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[9px] font-black text-slate-500 hover:bg-slate-50">Cancel</button>
               </span>
@@ -27156,7 +27182,7 @@
               </div>
             </div>
             <div class="finding-row-actions flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
-              <div class="finding-dates-group ml-auto flex flex-wrap items-center gap-1.5">
+              <div class="finding-dates-group ml-auto flex flex-col items-end justify-center gap-1 shrink-0">
                 ${createdAtMarkup}
                 ${beginDateMarkup}
               </div>
