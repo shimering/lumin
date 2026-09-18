@@ -3461,14 +3461,6 @@
       #app-shell .app-page-title { font-size: 1rem; }
       .app-page-icon { width: 2rem; height: 2rem; }
       #btn-new-appointment > span { display: none; }
-      [data-compact-appointments-header] label > span:first-child {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        overflow: hidden;
-        clip-path: inset(50%);
-        white-space: nowrap;
-      }
     }
     html.lumin-app-scaled { zoom: var(--lumin-app-scale, 1); }
     html.lumin-app-scaled body { min-height: var(--lumin-app-viewport-height, 100vh); }
@@ -5722,13 +5714,8 @@
       <div data-compact-appointments-header class="app-page-bar flex items-center justify-between">
         <div class="app-page-heading"><span class="app-page-icon" aria-hidden="true"><i data-lucide="calendar-days"></i></span><h2 class="app-page-title">Appointments</h2></div>
         <div class="flex shrink-0 items-center gap-1.5">
-          <div id="appointment-doctor-filter-wrap" class="relative inline-flex items-center">
-            <select id="appointment-doctor-filter" onchange="setAppointmentDoctorFilter(this.value)" aria-label="Filter appointments by doctor" class="min-w-0 max-w-[130px] sm:max-w-none rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="all">All doctors</option>
-            </select>
-          </div>
-          <label id="appointment-mine-only-toggle-wrap" class="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-600" title="Switch between your assigned appointments and the full clinic schedule">
-            <span class="sm:hidden">Mine</span><span class="hidden sm:inline">My appointments only</span>
+          <label id="appointment-mine-only-toggle-wrap" class="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-100" title="Switch between your assigned appointments and the full clinic schedule">
+            <span class="sm:hidden">Mine only</span><span class="hidden sm:inline">My appointments only</span>
             <span class="relative inline-flex items-center">
               <input id="appointment-mine-only-toggle" type="checkbox" onchange="setAppointmentMineOnly(this.checked)" class="peer sr-only" />
               <span class="h-5 w-9 rounded-full bg-slate-300 transition peer-checked:bg-blue-600 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2"></span>
@@ -8515,6 +8502,11 @@
     let appointmentSelectedDate = new Date(appointmentToday);
     let dashboardSelectedDate = new Date(appointmentToday);
     let dashboardDoctorFilter = 'all';
+    let dashboardDoctorFilterExplicitlySet = false;
+
+    function defaultDashboardDoctorFilter() {
+      return (currentUserAccess?.isDoctor && currentUserAccess.userId) ? currentUserAccess.userId : 'all';
+    }
     let expandedDashboardAppointmentId = null;
     let appointments = [];
     let patientAppointmentRecords = [];
@@ -9151,6 +9143,7 @@
       'Practice schedule': 'جدول العيادة',
       'Choose a day to review its schedule or add a new appointment.': 'اختر يومًا لمراجعة جدوله أو إضافة موعد جديد.',
       'My appointments only': 'مواعيدي فقط',
+      'Mine only': 'مواعيدي فقط',
       'Mine': 'مواعيدي',
       'Switch between your assigned appointments and the full clinic schedule': 'التبديل بين مواعيدك والجدول الكامل للعيادة',
       'New Appointment': 'موعد جديد',
@@ -10849,6 +10842,7 @@
         doctorWorkingSchedules.clear();
         doctorWorkingSchedulesLoaded = false;
         dashboardSelectedDate = new Date(appointmentToday);
+        dashboardDoctorFilterExplicitlySet = false;
         dashboardDoctorFilter = 'all';
         expandedDashboardAppointmentId = null;
         useTwelveHourTime = false;
@@ -10876,7 +10870,8 @@
         doctorWorkingSchedules.clear();
         doctorWorkingSchedulesLoaded = false;
         dashboardSelectedDate = new Date(appointmentToday);
-        dashboardDoctorFilter = 'all';
+        dashboardDoctorFilterExplicitlySet = false;
+        dashboardDoctorFilter = defaultDashboardDoctorFilter();
         expandedDashboardAppointmentId = null;
         await fetchClinicSettings(false);
         await fetchLoyaltySettings().catch(error => console.warn('Could not load loyalty settings:', error.message));
@@ -27973,26 +27968,18 @@
     function normaliseAppointmentDoctorFilter(value) {
       if (value === 'all') return 'all';
       if (value === 'unassigned') return 'unassigned';
+      if (currentUserAccess?.userId && value === currentUserAccess.userId) return value;
       return appointmentDoctorOptions().some(option => option.value === value) ? value : 'all';
     }
 
     function renderAppointmentDoctorFilter() {
       const options = appointmentDoctorOptions();
       appointmentDoctorFilter = normaliseAppointmentDoctorFilter(appointmentDoctorFilter);
-      const select = document.getElementById('appointment-doctor-filter');
-      const wrap = document.getElementById('appointment-doctor-filter-wrap');
       const mineOnlyWrap = document.getElementById('appointment-mine-only-toggle-wrap');
 
-      if (wrap) wrap.classList.remove('hidden');
       if (mineOnlyWrap) {
-        const canShowMine = Boolean(currentUserAccess?.userId && (currentUserAccess.isDoctor || options.some(o => o.value === currentUserAccess.userId)));
+        const canShowMine = Boolean(currentUserAccess?.userId);
         mineOnlyWrap.classList.toggle('hidden', !canShowMine);
-      }
-
-      if (select) {
-        const allOption = `<option value="all">${currentUiLanguage === 'ar' ? 'كل الأطباء' : 'All doctors'}</option>`;
-        setStableHtml(select, allOption + options.map(option => `<option value="${escapeAppointmentText(option.value)}">${escapeAppointmentText(option.label)}</option>`).join(''));
-        select.value = appointmentDoctorFilter;
       }
       return options.find(option => option.value === appointmentDoctorFilter) || null;
     }
@@ -28007,6 +27994,12 @@
     function dashboardDoctorOptions() {
       if (!currentUserAccess?.userId) return [];
       const doctors = new Map();
+      if (currentUserAccess.isDoctor && currentUserAccess.userId) {
+        doctors.set(currentUserAccess.userId, {
+          value: currentUserAccess.userId,
+          label: currentUserAccess.fullName || (currentUiLanguage === 'ar' ? 'طبيبي' : 'Doctor')
+        });
+      }
       appointmentStaff.filter(staff => staff.canReceiveAppointments).forEach(staff => {
         doctors.set(staff.userId, { value: staff.userId, label: staff.fullName });
       });
@@ -28025,7 +28018,10 @@
     function normaliseDashboardDoctorFilter(value) {
       if (value === 'all') return 'all';
       if (value === 'unassigned') return 'unassigned';
-      return dashboardDoctorOptions().some(option => option.value === value) ? value : 'all';
+      if (currentUserAccess?.isDoctor && value === currentUserAccess.userId) return value;
+      const options = dashboardDoctorOptions();
+      if (options.some(option => option.value === value)) return value;
+      return defaultDashboardDoctorFilter();
     }
 
     // Keep existing nodes (and native open selects) when a background read is unchanged.
@@ -28038,6 +28034,9 @@
 
     function renderDashboardDoctorFilter() {
       const options = dashboardDoctorOptions();
+      if (!dashboardDoctorFilterExplicitlySet) {
+        dashboardDoctorFilter = defaultDashboardDoctorFilter();
+      }
       dashboardDoctorFilter = normaliseDashboardDoctorFilter(dashboardDoctorFilter);
       const select = document.getElementById('dashboard-doctor-filter');
       if (select) {
@@ -28051,6 +28050,7 @@
 
     function setDashboardDoctorFilter(value) {
       if (!currentUserAccess || !hasPageAccess('dashboard')) return;
+      dashboardDoctorFilterExplicitlySet = true;
       dashboardDoctorFilter = normaliseDashboardDoctorFilter(value);
       expandedDashboardAppointmentId = null;
       renderDashboard();
