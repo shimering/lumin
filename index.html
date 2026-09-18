@@ -569,6 +569,15 @@
       background: linear-gradient(90deg, var(--finding-status-soft), rgba(255, 255, 255, 0.96) 24%);
       backdrop-filter: blur(8px);
     }
+    .finding-row.is-editing-teeth,
+    .finding-row:has(.finding-tooth-editor:not(.hidden)) {
+      z-index: 60 !important;
+      position: relative !important;
+      overflow: visible !important;
+    }
+    .finding-tooth-editor {
+      z-index: 70 !important;
+    }
     .finding-row.is-selected {
       border-color: rgba(124, 58, 237, 0.48);
       background: linear-gradient(90deg, rgba(124, 58, 237, 0.12), rgba(255, 255, 255, 0.98) 30%);
@@ -836,50 +845,123 @@
         touch-action: pan-x pan-y;
       }
       #findings-container .finding-row {
-        min-width: max-content !important;
-        width: max-content !important;
+        min-width: 54.5rem !important;
+        width: 54.5rem !important;
+        max-width: 54.5rem !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
         align-items: center !important;
         overflow: visible !important;
       }
+      #findings-container .finding-row.is-batch-finding {
+        min-width: 66rem !important;
+        width: 66rem !important;
+        max-width: 66rem !important;
+      }
       #findings-container .finding-row-summary {
-        min-width: max-content !important;
-        flex: 0 0 auto !important;
+        width: 20rem !important;
+        min-width: 20rem !important;
+        max-width: 20rem !important;
+        flex: 0 0 20rem !important;
       }
       #findings-container .finding-tooth-picker,
       #findings-container .finding-operation-heading,
-      #findings-container .finding-surface-controls,
-      #findings-container .finding-row-actions {
+      #findings-container .finding-surface-controls {
         flex-wrap: nowrap !important;
       }
       #findings-container .finding-operation-details {
-        min-width: max-content !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+      }
+      #findings-container .finding-operation-heading {
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+      }
+      #findings-container .finding-operation-title {
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
       }
       #findings-container .finding-operation-details > p {
         white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
       }
       #findings-container .finding-row-actions {
-        width: max-content !important;
-        flex: 0 0 auto !important;
+        width: 32rem !important;
+        min-width: 32rem !important;
+        max-width: 32rem !important;
+        flex: 0 0 32rem !important;
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
         align-items: center !important;
         gap: 0.5rem !important;
       }
-      #findings-container .finding-status-control {
+      #findings-container .finding-row.is-batch-finding .finding-row-actions {
         width: auto !important;
-        flex: 0 0 auto !important;
+        min-width: auto !important;
+        max-width: none !important;
+        flex: 1 0 auto !important;
+      }
+      #findings-container .finding-dates-group {
+        width: 5.5rem !important;
+        min-width: 5.5rem !important;
+        max-width: 5.5rem !important;
+        flex: 0 0 5.5rem !important;
+        margin-left: 0 !important;
+        text-align: right !important;
+      }
+      #findings-container .finding-doctor-control {
+        width: 10rem !important;
+        min-width: 10rem !important;
+        max-width: 10rem !important;
+        flex: 0 0 10rem !important;
+      }
+      #findings-container .finding-price-control {
+        width: 6.5rem !important;
+        min-width: 6.5rem !important;
+        max-width: 6.5rem !important;
+        flex: 0 0 6.5rem !important;
+      }
+      #findings-container .finding-status-control {
+        width: 4.25rem !important;
+        min-width: 4.25rem !important;
+        max-width: 4.25rem !important;
+        flex: 0 0 4.25rem !important;
+        justify-content: center !important;
+      }
+      #findings-container .finding-status-select-mobile {
+        width: 2.75rem !important;
+        min-width: 2.75rem !important;
+        max-width: 2.75rem !important;
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+        text-align: center !important;
+      }
+      #findings-container .finding-note-button {
+        width: 2.5rem !important;
+        min-width: 2.5rem !important;
+        max-width: 2.5rem !important;
+        height: 2rem !important;
+        flex: 0 0 2.5rem !important;
+        padding: 0 !important;
+        justify-content: center !important;
+      }
+      #findings-container .finding-delete-button {
+        width: 1.75rem !important;
+        min-width: 1.75rem !important;
+        max-width: 1.75rem !important;
+        height: 1.75rem !important;
+        flex: 0 0 1.75rem !important;
+        justify-content: center !important;
       }
       #findings-container .finding-row.has-procedure-steps {
         flex-wrap: wrap !important;
       }
       #findings-container .finding-row.has-procedure-steps [data-procedure-steps-panel] {
         flex: 0 0 100% !important;
-      }
-      #findings-container .finding-dates-group {
-        margin-left: 0 !important;
       }
     }
 
@@ -25580,9 +25662,9 @@
       if (statusFilter) statusFilter.value = documentedFindingsStatusFilter;
     }
 
-    function operationStatusSelectOptions(selectedStatus) {
+    function operationStatusSelectOptions(selectedStatus, short = false) {
       return Object.values(OPERATION_STATUSES).map(status => `
-        <option value="${status.key}" ${status.key === selectedStatus ? 'selected' : ''}>${status.key} · ${status.label}</option>
+        <option value="${status.key}" ${status.key === selectedStatus ? 'selected' : ''}>${short ? status.key : `${status.key} · ${status.label}`}</option>
       `).join('');
     }
 
@@ -25967,6 +26049,7 @@
       if (!editor) return;
       if (options.reset !== false) resetFindingToothEditor(editor);
       editor.classList.add('hidden');
+      editor.closest('.finding-row')?.classList.remove('is-editing-teeth');
       editor.closest('.finding-tooth-picker')?.querySelectorAll('[data-finding-tooth-trigger]').forEach(trigger => {
         trigger.setAttribute('aria-expanded', 'false');
       });
@@ -25978,6 +26061,9 @@
     function closeFindingToothEditors(exceptEditor = null) {
       document.querySelectorAll('.finding-tooth-editor:not(.hidden)').forEach(editor => {
         if (editor !== exceptEditor) closeFindingToothEditor(editor);
+      });
+      document.querySelectorAll('.finding-row.is-editing-teeth').forEach(row => {
+        if (!exceptEditor || !row.contains(exceptEditor)) row.classList.remove('is-editing-teeth');
       });
     }
 
@@ -25997,6 +26083,7 @@
       }
       resetFindingToothEditor(editor);
       editor.classList.remove('hidden');
+      button.closest('.finding-row')?.classList.add('is-editing-teeth');
       picker.querySelectorAll('[data-finding-tooth-trigger]').forEach(trigger => {
         trigger.setAttribute('aria-expanded', 'true');
       });
@@ -27177,7 +27264,7 @@
         const dataAttributes = `data-finding-ids="${escapeHtml(findingIds.join(','))}" data-tooth-ids="${escapeHtml(toothIds.join(','))}" onchange="updateFindingGroupStatusFromControl(this)"`;
         const findingIdentityAttributes = `data-finding-id="${escapeHtml(findingIds[0] || '')}" data-finding-ids="${escapeHtml(findingIds.join(','))}" data-finding-kind="${escapeHtml(finding.kind)}" data-batch-id="${escapeHtml(finding.batchId || '')}" data-tooth-id="${escapeHtml(finding.toothId)}" data-tooth-ids="${escapeHtml(toothIds.join(','))}" data-operation-code="${escapeHtml(finding.code)}" data-operation-status="${finding.status}" data-surfaces="${escapeHtml(finding.surfaces.join(','))}"`;
         return `
-          <article ${findingIdentityAttributes} onclick="toggleFindingCardSelection(event, this)" aria-selected="${isSelected}" class="finding-row ${procedureSteps.length ? 'has-procedure-steps' : ''} ${isSelected ? 'is-selected' : ''} ${isInvoiced ? 'is-invoiced' : ''} flex flex-row flex-wrap items-center gap-2.5 overflow-hidden rounded-xl border border-slate-200 border-l-4 px-3 py-2.5 shadow-sm transition hover:shadow-md" style="--finding-display-color:${displayColor};--finding-status-soft:${statusSoft};--finding-status-border:${statusBorder};border-left-color:${displayColor}">
+          <article ${findingIdentityAttributes} onclick="toggleFindingCardSelection(event, this)" aria-selected="${isSelected}" class="finding-row ${procedureSteps.length ? 'has-procedure-steps' : ''} ${isSelected ? 'is-selected' : ''} ${isInvoiced ? 'is-invoiced' : ''} ${isBatch ? 'is-batch-finding' : ''} flex flex-row flex-wrap items-center gap-2.5 overflow-hidden rounded-xl border border-slate-200 border-l-4 px-3 py-2.5 shadow-sm transition hover:shadow-md" style="--finding-display-color:${displayColor};--finding-status-soft:${statusSoft};--finding-status-border:${statusBorder};border-left-color:${displayColor}">
             <div class="finding-row-summary flex min-w-0 flex-1 items-center gap-3">
               <input type="checkbox" class="finding-selection-checkbox ${isFullyInvoiced ? 'is-invoiced-checkbox' : ''} h-4 w-4 shrink-0 rounded border-slate-300 text-violet-600 focus:ring-violet-500" ${isCheckboxChecked ? 'checked' : ''} ${canSelect ? '' : 'disabled'} onchange="toggleFindingSelectionFromControl(this)" aria-label="${isFullyInvoiced ? 'Invoiced' : 'Select'} ${escapeHtml(dentalOperationLabel(finding.code))}${isFullyInvoiced ? '' : ' for invoicing'}" title="${isFullyInvoiced ? 'This operation is already invoiced' : !selectableMemberIds.length ? 'Add a price before selecting this operation' : isInvoiced ? 'Select the uninvoiced teeth in this batch' : 'Select for invoicing'}">
               <div class="finding-tooth-picker relative flex max-w-64 shrink-0 flex-wrap items-center gap-1">
@@ -27226,25 +27313,36 @@
                 ${createdAtMarkup}
                 ${beginDateMarkup}
               </div>
-              <label class="inline-flex min-w-44 items-center overflow-hidden rounded-lg border border-cyan-200 bg-white/85 focus-within:ring-2 focus-within:ring-cyan-500/20" title="${procedureSteps.length ? 'Used only for fixed per-procedure compensation after every step is complete' : 'Assign the completed procedure to a doctor for HR salary calculation'}">
+              <label class="finding-doctor-control inline-flex min-w-44 items-center overflow-hidden rounded-lg border border-cyan-200 bg-white/85 focus-within:ring-2 focus-within:ring-cyan-500/20" title="${procedureSteps.length ? 'Used only for fixed per-procedure compensation after every step is complete' : 'Assign the completed procedure to a doctor for HR salary calculation'}">
                 <span class="border-r border-cyan-100 bg-cyan-50 px-2 py-1.5 text-[9px] font-black text-cyan-700">${procedureSteps.length ? 'Fixed pay' : 'Doctor'}</span>
                 <select onchange="updateFindingDoctorFromControl(this)" class="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-[11px] font-bold text-slate-700 outline-none" aria-label="Assigned doctor for ${escapeHtml(dentalOperationLabel(finding.code))}">${chartDoctorSelectOptions(finding)}</select>
               </label>
-              <label class="inline-flex items-center overflow-hidden rounded-lg border ${isInvoiced ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-70' : 'border-violet-200 bg-white/85 focus-within:ring-2 focus-within:ring-violet-500/20'}" title="${isInvoiced ? 'Delete this procedure from its invoice before changing the price' : isBatch ? 'Edit the base price for this batch' : 'Edit operation price'}">
+              <label class="finding-price-control inline-flex items-center overflow-hidden rounded-lg border ${isInvoiced ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-70' : 'border-violet-200 bg-white/85 focus-within:ring-2 focus-within:ring-violet-500/20'}" title="${isInvoiced ? 'Delete this procedure from its invoice before changing the price' : isBatch ? 'Edit the base price for this batch' : 'Edit operation price'}">
                 <span class="border-r px-2 py-1.5 text-[9px] font-black ${isInvoiced ? 'border-slate-200 bg-slate-200 text-slate-500' : 'border-violet-100 bg-violet-50 text-violet-600'}">EGP</span>
                 <input type="number" min="0" step="0.01" value="${findingPrice}" onchange="updateFindingPriceFromControl(this)" ${isInvoiced ? 'disabled' : ''} class="w-20 bg-transparent px-2 py-1.5 text-right text-[11px] font-black outline-none ${isInvoiced ? 'cursor-not-allowed text-slate-400' : 'text-slate-700'}" aria-label="${isBatch ? 'Base price' : 'Price'} for ${escapeHtml(dentalOperationLabel(finding.code))}" aria-disabled="${isInvoiced}">
               </label>
-              ${isBatch ? `<label class="inline-flex items-center overflow-hidden rounded-lg border ${isInvoiced ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-70' : 'border-violet-200 bg-white/85 focus-within:ring-2 focus-within:ring-violet-500/20'}" title="${isInvoiced ? 'Delete this procedure from its invoice before changing the multiplier' : 'Choose how many times the base price is billed'}"><span class="border-r px-2 py-1.5 text-[11px] font-black ${isInvoiced ? 'border-slate-200 bg-slate-200 text-slate-500' : 'border-violet-100 bg-violet-50 text-violet-600'}">×</span><input type="number" min="1" max="999" step="1" inputmode="numeric" value="${billingMultiplier}" onchange="updateFindingBillingMultiplierFromControl(this)" ${isInvoiced ? 'disabled' : ''} class="w-14 bg-transparent px-2 py-1.5 text-right text-[11px] font-black outline-none ${isInvoiced ? 'cursor-not-allowed text-slate-400' : 'text-slate-700'}" aria-label="Billing multiplier for ${escapeHtml(dentalOperationLabel(finding.code))}" aria-disabled="${isInvoiced}"></label><span class="whitespace-nowrap text-[9px] font-bold text-slate-400">= ${escapeHtml(formatInvoiceMoney(totalPrice))} total</span>` : ''}
-              ${procedureSteps.length ? `<div class="finding-status-control flex min-w-0 flex-1 items-center gap-2 rounded-lg border bg-white/80 px-2.5 py-1.5 sm:w-48" style="border-color:${statusBorder};color:${displayColor}" title="The procedure status is calculated from its steps"><span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${displayColor}"></span><span class="min-w-0 flex-1 truncate text-[11px] font-black">${completedProcedureSteps}/${procedureSteps.length} steps · ${escapeHtml(status.label)}</span></div>` : `<label class="finding-status-control flex min-w-0 flex-1 items-center gap-2 sm:w-48">
+              ${isBatch ? `<label class="finding-batch-multiplier-control inline-flex items-center overflow-hidden rounded-lg border ${isInvoiced ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-70' : 'border-violet-200 bg-white/85 focus-within:ring-2 focus-within:ring-violet-500/20'}" title="${isInvoiced ? 'Delete this procedure from its invoice before changing the multiplier' : 'Choose how many times the base price is billed'}"><span class="border-r px-2 py-1.5 text-[11px] font-black ${isInvoiced ? 'border-slate-200 bg-slate-200 text-slate-500' : 'border-violet-100 bg-violet-50 text-violet-600'}">×</span><input type="number" min="1" max="999" step="1" inputmode="numeric" value="${billingMultiplier}" onchange="updateFindingBillingMultiplierFromControl(this)" ${isInvoiced ? 'disabled' : ''} class="w-14 bg-transparent px-2 py-1.5 text-right text-[11px] font-black outline-none ${isInvoiced ? 'cursor-not-allowed text-slate-400' : 'text-slate-700'}" aria-label="Billing multiplier for ${escapeHtml(dentalOperationLabel(finding.code))}" aria-disabled="${isInvoiced}"></label><span class="whitespace-nowrap text-[9px] font-bold text-slate-400">= ${escapeHtml(formatInvoiceMoney(totalPrice))} total</span>` : ''}
+              ${procedureSteps.length ? `<div class="finding-status-control flex shrink-0 items-center gap-1.5 rounded-lg border bg-white/80 px-2 py-1.5 sm:w-48" style="border-color:${statusBorder};color:${displayColor}" title="The procedure status is calculated from its steps">
+                <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${displayColor}"></span>
+                <span class="finding-status-select-mobile sm:hidden text-center font-black text-xs">${escapeHtml(status.key)}</span>
+                <span class="finding-status-select-desktop hidden sm:inline min-w-0 flex-1 truncate text-[11px] font-black">${completedProcedureSteps}/${procedureSteps.length} steps · ${escapeHtml(status.label)}</span>
+              </div>` : `<label class="finding-status-control flex shrink-0 items-center gap-1.5 sm:w-48">
                 <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${displayColor}" title="${status.key} · ${status.label}"></span>
                 <span class="sr-only">Operation status</span>
-                <select ${dataAttributes} class="min-w-0 flex-1 rounded-lg border bg-white/80 px-2.5 py-1.5 text-[11px] font-bold outline-none transition focus:ring-2 focus:ring-blue-500/20" style="border-color:${statusBorder};color:${displayColor}">
-                  ${operationStatusSelectOptions(finding.status)}
+                <select ${dataAttributes} class="finding-status-select-mobile sm:hidden rounded-lg border bg-white/80 px-1 py-1.5 text-xs font-black outline-none transition focus:ring-2 focus:ring-blue-500/20 text-center" style="border-color:${statusBorder};color:${displayColor}" aria-label="Status: ${status.key} · ${status.label}">
+                  ${operationStatusSelectOptions(finding.status, true)}
+                </select>
+                <select ${dataAttributes} class="finding-status-select-desktop hidden sm:block min-w-0 flex-1 rounded-lg border bg-white/80 px-2.5 py-1.5 text-[11px] font-bold outline-none transition focus:ring-2 focus:ring-blue-500/20" style="border-color:${statusBorder};color:${displayColor}">
+                  ${operationStatusSelectOptions(finding.status, false)}
                 </select>
               </label>`}
               ${isBatch ? '<button type="button" onclick="separateFindingBatch(this)" class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[10px] font-black text-violet-700 transition hover:border-violet-300 hover:bg-violet-100" aria-label="Separate this batch into one row per tooth" title="Create one independent documented row for each tooth"><i data-lucide="split" class="h-3 w-3"></i>Separate</button>' : ''}
-              <button type="button" data-finding-note-trigger aria-haspopup="dialog" aria-expanded="false" aria-controls="chart-finding-note-popover" onpointerenter="showChartFindingNotePreviewFromPointer(event, this)" onpointerleave="scheduleChartFindingNotePreviewClose(event)" onclick="toggleChartFindingNotePreview(event, this)" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[10px] font-black transition ${findingNotes.length ? 'border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-100' : 'border-slate-200 bg-white text-slate-500 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700'}" aria-label="Preview notes for ${escapeHtml(dentalOperationLabel(finding.code))}" title="Hover or tap to preview operation notes"><i data-lucide="sticky-note" class="h-3.5 w-3.5"></i>Notes${findingNotes.length ? ` ${findingNotes.length}` : ''}</button>
-              <button type="button" onclick="deleteFindingFromControl(this)" class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:border-red-300 hover:bg-red-100" title="Delete ${escapeHtml(dentalOperationLabel(finding.code))}" aria-label="Delete ${escapeHtml(dentalOperationLabel(finding.code))}"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button>
+              <button type="button" data-finding-note-trigger aria-haspopup="dialog" aria-expanded="false" aria-controls="chart-finding-note-popover" onpointerenter="showChartFindingNotePreviewFromPointer(event, this)" onpointerleave="scheduleChartFindingNotePreviewClose(event)" onclick="toggleChartFindingNotePreview(event, this)" class="finding-note-button inline-flex h-8 ${findingNotes.length ? 'px-2' : 'w-8'} sm:h-auto sm:w-auto sm:px-2.5 sm:py-1.5 shrink-0 items-center justify-center gap-1 rounded-lg border text-[10px] font-black transition ${findingNotes.length ? 'border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-100' : 'border-slate-200 bg-white text-slate-500 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700'}" aria-label="${findingNotes.length ? `${findingNotes.length} note${findingNotes.length === 1 ? '' : 's'}` : 'Notes'} for ${escapeHtml(dentalOperationLabel(finding.code))}" title="${findingNotes.length ? `${findingNotes.length} note${findingNotes.length === 1 ? '' : 's'}` : 'Notes'} · ${escapeHtml(dentalOperationLabel(finding.code))}">
+                <i data-lucide="sticky-note" class="h-3.5 w-3.5 shrink-0"></i>
+                <span class="finding-note-text hidden sm:inline">Notes</span>
+                ${findingNotes.length ? `<span class="finding-note-count text-[9px] font-black">${findingNotes.length}</span>` : ''}
+              </button>
+              <button type="button" onclick="deleteFindingFromControl(this)" class="finding-delete-button inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:border-red-300 hover:bg-red-100" title="Delete ${escapeHtml(dentalOperationLabel(finding.code))}" aria-label="Delete ${escapeHtml(dentalOperationLabel(finding.code))}"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button>
             </div>
             ${procedureStepsMarkup}
           </article>`;
