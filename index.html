@@ -574,9 +574,63 @@
       z-index: 60 !important;
       position: relative !important;
       overflow: visible !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+    .finding-tooth-editor-backdrop {
+      position: fixed !important;
+      inset: 0 !important;
+      background: rgba(15, 23, 42, 0.45) !important;
+      backdrop-filter: blur(4px) !important;
+      -webkit-backdrop-filter: blur(4px) !important;
+      z-index: 65 !important;
     }
     .finding-tooth-editor {
       z-index: 70 !important;
+      display: flex !important;
+      flex-direction: column !important;
+      overscroll-behavior: contain;
+    }
+    .finding-tooth-editor-scroll {
+      overflow-y: auto !important;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y !important;
+      overscroll-behavior: contain;
+      scrollbar-width: thin;
+      scrollbar-color: #cbd5e1 transparent;
+    }
+    .finding-tooth-editor-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+    .finding-tooth-editor-scroll::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 999px;
+    }
+    @media (max-width: 899px) {
+      .finding-tooth-editor {
+        position: fixed !important;
+        inset: 0 !important;
+        margin: auto !important;
+        width: calc(100vw - 2rem) !important;
+        max-width: 23rem !important;
+        height: fit-content !important;
+        max-height: min(84vh, 34rem) !important;
+        z-index: 70 !important;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4) !important;
+      }
+    }
+    @media (min-width: 900px) {
+      .finding-tooth-editor {
+        position: absolute !important;
+        left: 0 !important;
+        top: 100% !important;
+        margin-top: 0.5rem !important;
+        width: 22rem !important;
+        max-height: min(75vh, 28rem) !important;
+      }
+      .finding-tooth-editor-backdrop {
+        display: none !important;
+      }
     }
     .finding-row.is-selected {
       border-color: rgba(124, 58, 237, 0.48);
@@ -26072,18 +26126,23 @@
       if (!editor) return;
       if (options.reset !== false) resetFindingToothEditor(editor);
       editor.classList.add('hidden');
+      const picker = editor.closest('.finding-tooth-picker');
+      picker?.querySelector('.finding-tooth-editor-backdrop')?.classList.add('hidden');
       editor.closest('.finding-row')?.classList.remove('is-editing-teeth');
-      editor.closest('.finding-tooth-picker')?.querySelectorAll('[data-finding-tooth-trigger]').forEach(trigger => {
+      picker?.querySelectorAll('[data-finding-tooth-trigger]').forEach(trigger => {
         trigger.setAttribute('aria-expanded', 'false');
       });
       if (options.restoreFocus) {
-        editor.closest('.finding-tooth-picker')?.querySelector('[data-finding-tooth-trigger]')?.focus();
+        picker?.querySelector('[data-finding-tooth-trigger]')?.focus();
       }
     }
 
     function closeFindingToothEditors(exceptEditor = null) {
       document.querySelectorAll('.finding-tooth-editor:not(.hidden)').forEach(editor => {
         if (editor !== exceptEditor) closeFindingToothEditor(editor);
+      });
+      document.querySelectorAll('.finding-tooth-editor-backdrop:not(.hidden)').forEach(backdrop => {
+        if (!exceptEditor || backdrop.nextElementSibling !== exceptEditor) backdrop.classList.add('hidden');
       });
       document.querySelectorAll('.finding-row.is-editing-teeth').forEach(row => {
         if (!exceptEditor || !row.contains(exceptEditor)) row.classList.remove('is-editing-teeth');
@@ -26105,6 +26164,7 @@
         return;
       }
       resetFindingToothEditor(editor);
+      picker.querySelector('.finding-tooth-editor-backdrop')?.classList.remove('hidden');
       editor.classList.remove('hidden');
       button.closest('.finding-row')?.classList.add('is-editing-teeth');
       picker.querySelectorAll('[data-finding-tooth-trigger]').forEach(trigger => {
@@ -26126,8 +26186,12 @@
       updateFindingToothEditorSummary(editor);
     }
 
-    function cancelFindingToothEditor(button) {
-      closeFindingToothEditor(button.closest('.finding-tooth-editor'), { restoreFocus: true });
+    function cancelFindingToothEditor(control) {
+      const editor = control?.classList?.contains('finding-tooth-editor')
+        ? control
+        : control?.closest?.('.finding-tooth-editor')
+          || control?.closest?.('.finding-tooth-picker')?.querySelector('.finding-tooth-editor');
+      closeFindingToothEditor(editor, { restoreFocus: true });
     }
 
     async function saveFindingToothSelection(button) {
@@ -27292,18 +27356,19 @@
               <input type="checkbox" class="finding-selection-checkbox ${isFullyInvoiced ? 'is-invoiced-checkbox' : ''} h-4 w-4 shrink-0 rounded border-slate-300 text-violet-600 focus:ring-violet-500" ${isCheckboxChecked ? 'checked' : ''} ${canSelect ? '' : 'disabled'} onchange="toggleFindingSelectionFromControl(this)" aria-label="${isFullyInvoiced ? 'Invoiced' : 'Select'} ${escapeHtml(dentalOperationLabel(finding.code))}${isFullyInvoiced ? '' : ' for invoicing'}" title="${isFullyInvoiced ? 'This operation is already invoiced' : !selectableMemberIds.length ? 'Add a price before selecting this operation' : isInvoiced ? 'Select the uninvoiced teeth in this batch' : 'Select for invoicing'}">
               <div class="finding-tooth-picker relative flex max-w-64 shrink-0 flex-wrap items-center gap-1">
                 ${toothBadges}
-                ${isMouth ? '' : `<div class="finding-tooth-editor hidden absolute left-0 top-full z-50 mt-2 rounded-xl border border-violet-200 bg-white p-3 text-left shadow-2xl" data-original-tooth-ids="${escapeHtml(toothIds.join(','))}" role="dialog" aria-label="Edit procedure teeth" onclick="event.stopPropagation()">
-                  <div class="mb-3 flex items-start justify-between gap-3">
+                ${isMouth ? '' : `<div class="finding-tooth-editor-backdrop hidden" onclick="cancelFindingToothEditor(this)"></div>
+                <div class="finding-tooth-editor hidden rounded-2xl border border-violet-200 bg-white p-3.5 text-left shadow-2xl" data-original-tooth-ids="${escapeHtml(toothIds.join(','))}" role="dialog" aria-label="Edit procedure teeth" onclick="event.stopPropagation()">
+                  <div class="mb-2.5 flex shrink-0 items-start justify-between gap-3">
                     <div>
                       <p class="text-xs font-black text-slate-800">Edit procedure teeth</p>
                       <p class="mt-0.5 text-[10px] font-semibold text-slate-500">Tap one or more teeth, then save.</p>
                     </div>
-                    <button type="button" onclick="cancelFindingToothEditor(this)" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50" aria-label="Close tooth editor">×</button>
+                    <button type="button" onclick="cancelFindingToothEditor(this)" class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50" aria-label="Close tooth editor">×</button>
                   </div>
-                  <div class="space-y-3">
+                  <div class="finding-tooth-editor-scroll flex-1 overflow-y-auto overscroll-contain pr-1 -mr-1 space-y-3">
                     ${toothEditorOptions}
                   </div>
-                  <div class="mt-3 flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                  <div class="mt-2.5 flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 pt-2.5 bg-white">
                     <p data-finding-tooth-selection-summary class="text-[10px] font-bold text-slate-500">${toothIds.length === 1 ? '1 tooth selected' : `${toothIds.length} teeth selected`}</p>
                     <div class="flex items-center gap-1.5">
                       <button type="button" onclick="cancelFindingToothEditor(this)" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-black text-slate-600 hover:bg-slate-50">Cancel</button>
@@ -27316,7 +27381,7 @@
                 <div class="finding-operation-heading flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                   ${procedureSteps.length ? `<button type="button" onclick="toggleFindingProcedureSteps(this)" aria-expanded="${procedureStepsExpanded}" class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-cyan-200 bg-cyan-50 text-cyan-700 transition hover:bg-cyan-100" title="${procedureStepsExpanded ? 'Collapse' : 'Open'} procedure steps" aria-label="${procedureStepsExpanded ? 'Collapse' : 'Open'} ${escapeHtml(dentalOperationLabel(finding.code))} steps"><i data-lucide="${procedureStepsExpanded ? 'minus' : 'plus'}" class="h-3 w-3"></i></button>` : ''}
                   <h4 class="finding-operation-title text-xs sm:text-sm">${escapeHtml(dentalOperationLabel(finding.code))}</h4>
-                  ${isMouth ? '' : `<span class="text-[10px] font-semibold text-slate-400">${isBatch ? `${toothIds.length} teeth · Batch` : isWhole ? 'Whole tooth' : `${surfaceLabels.length} surface${surfaceLabels.length === 1 ? '' : 's'}`}</span>`}
+                  ${isBatch ? `<span class="text-[10px] font-semibold text-slate-400">${toothIds.length} teeth · Batch</span>` : ''}
                   ${isFullyInvoiced ? '<span class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-emerald-700">Invoiced</span>' : isInvoiced ? '<span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-blue-700">Partly invoiced</span>' : findingPrice <= 0 ? '<span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-700">Set price</span>' : ''}
                 </div>
                 ${isMouth
@@ -27324,9 +27389,8 @@
                   : isBatch
                   ? `<p class="mt-0.5 text-[11px] font-normal text-slate-500">Applied together to ${toothIds.length} teeth${isWhole ? '' : ` · ${escapeHtml(surfaceLabels.join(', '))} on each tooth`}. Use Separate to edit each tooth independently.</p>`
                   : isWhole
-                    ? '<p class="mt-0.5 truncate text-[11px] font-normal text-slate-500">Applied to the complete tooth</p>'
-                  : `<div class="finding-surface-controls mt-1.5 flex flex-wrap items-center gap-1" role="group" aria-label="Edit involved surfaces">
-                      <span class="mr-0.5 text-[10px] font-semibold text-slate-400">Surfaces</span>
+                    ? ''
+                  : `<div class="finding-surface-controls mt-1 flex flex-wrap items-center gap-1" role="group" aria-label="Edit involved surfaces">
                       ${surfaceToggleButtons}
                     </div>`}
               </div>
