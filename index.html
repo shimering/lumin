@@ -828,7 +828,7 @@
       .chart-midline::after { display: none; }
     }
 
-    @media (min-width: 768px) and (max-width: 899px) {
+    @media (max-width: 899px) {
       #findings-container {
         overflow-x: auto;
         overscroll-behavior-inline: contain;
@@ -888,117 +888,13 @@
       }
     }
     @media (max-width: 767.98px) {
-      #findings-container {
-        overflow-x: hidden !important;
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
-      }
-      #findings-container .finding-row {
-        min-width: 0 !important;
-        width: 100% !important;
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: stretch !important;
-        gap: 0.625rem !important;
-        padding: 0.75rem !important;
-      }
-      #findings-container .finding-row-summary {
-        min-width: 0 !important;
-        width: 100% !important;
-        flex: 0 0 auto !important;
-        display: flex !important;
-        flex-direction: row !important;
-        align-items: flex-start !important;
-        gap: 0.5rem !important;
-      }
-      #findings-container .finding-operation-details {
-        min-width: 0 !important;
-        flex: 1 1 0% !important;
-      }
-      #findings-container .finding-operation-heading {
-        flex-wrap: wrap !important;
-        gap: 0.25rem 0.5rem !important;
-      }
-      #findings-container .finding-operation-details > p {
-        white-space: normal !important;
-      }
-      #findings-container .finding-surface-controls {
-        flex-wrap: wrap !important;
-        margin-top: 0.35rem !important;
-      }
-      #findings-container .finding-row-actions {
-        width: 100% !important;
-        flex: 0 0 auto !important;
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: wrap !important;
-        align-items: center !important;
-        justify-content: flex-start !important;
-        gap: 0.5rem !important;
-        border-top: 1px solid #f1f5f9;
-        padding-top: 0.5rem;
-      }
-      #findings-container .finding-status-control {
-        order: 1 !important;
+      #findings-container .finding-status-control,
+      #findings-container .finding-step-status-control {
         width: auto !important;
         flex: 0 0 auto !important;
-      }
-      #findings-container button[data-finding-note-trigger] {
-        order: 2 !important;
-        flex: 0 0 auto !important;
-      }
-      #findings-container .finding-row-actions > label:has(input[type="number"]) {
-        order: 3 !important;
-        flex: 0 0 auto !important;
-      }
-      #findings-container button[onclick*="deleteFindingFromControl"] {
-        order: 4 !important;
-        flex: 0 0 auto !important;
-        margin-inline-start: auto !important;
-      }
-      #findings-container .finding-row-actions > label.min-w-44 {
-        order: 5 !important;
-        min-width: 0 !important;
-        width: 100% !important;
-        flex: 1 1 100% !important;
-      }
-      #findings-container .finding-dates-group {
-        order: 6 !important;
-        margin-left: 0 !important;
-        width: 100% !important;
-        display: flex !important;
-        flex-direction: row !important;
-        justify-content: flex-start !important;
-        flex-wrap: wrap !important;
-        gap: 0.35rem !important;
-        padding-top: 0.15rem;
       }
       .procedure-step-clinical-row {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        align-items: center !important;
-        justify-content: space-between !important;
-        gap: 0.5rem !important;
-      }
-      .procedure-step-clinical-row > span:first-child {
-        order: 1 !important;
-        flex-shrink: 0 !important;
-      }
-      .procedure-step-clinical-row > div.min-w-0 {
-        order: 2 !important;
-        flex: 1 1 8rem !important;
-        min-width: 0 !important;
-      }
-      .procedure-step-clinical-row > label.finding-step-status-control {
-        order: 3 !important;
-        flex-shrink: 0 !important;
-        margin-inline-start: auto !important;
-        width: auto !important;
-      }
-      .procedure-step-clinical-row > label.overflow-hidden {
-        order: 4 !important;
-        width: 100% !important;
-        flex: 1 1 100% !important;
+        grid-template-columns: auto minmax(0, 1fr) minmax(9rem, auto) auto;
       }
     }
 
