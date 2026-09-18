@@ -516,6 +516,13 @@
       text-anchor: middle;
       dominant-baseline: middle;
     }
+    .whole-mouth-symbol {
+      display: block;
+      width: 2.25rem;
+      height: 1.5rem;
+      overflow: visible;
+      color: inherit;
+    }
     .tooth-number-badge {
       display: inline-flex;
       align-items: center;
@@ -15995,6 +16002,25 @@
         </svg>`;
     }
 
+    function wholeMouthIconSVG(className = '') {
+      const label = currentUiLanguage === 'ar' ? 'كامل الفم' : 'Whole mouth';
+      return `
+        <svg viewBox="0 0 40 28" class="whole-mouth-symbol ${escapeHtml(className)}" role="img" aria-label="${escapeHtml(label)}" focusable="false" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <title>${escapeHtml(label)}</title>
+          <path d="M 5 14 C 9 7.5, 14 7, 20 8.5 C 26 7, 31 7.5, 35 14 C 31 22.5, 26 23, 20 23 C 14 23, 9 22.5, 5 14 Z" fill="#ffffff" stroke-width="1.8" />
+          <path d="M 6.5 14 Q 20 14.5 33.5 14" stroke-width="1.4" />
+          <line x1="11.5" y1="10.8" x2="11.5" y2="14" stroke-width="1.3" />
+          <line x1="16" y1="8.2" x2="16" y2="14" stroke-width="1.3" />
+          <line x1="20" y1="8.5" x2="20" y2="14" stroke-width="1.4" />
+          <line x1="24" y1="8.2" x2="24" y2="14" stroke-width="1.3" />
+          <line x1="28.5" y1="10.8" x2="28.5" y2="14" stroke-width="1.3" />
+          <line x1="13.5" y1="14" x2="13.5" y2="18.8" stroke-width="1.3" />
+          <line x1="17.5" y1="14" x2="17.5" y2="21.5" stroke-width="1.3" />
+          <line x1="22.5" y1="14" x2="22.5" y2="21.5" stroke-width="1.3" />
+          <line x1="26.5" y1="14" x2="26.5" y2="18.8" stroke-width="1.3" />
+        </svg>`;
+    }
+
     function chartToothLabel(toothId) {
       const id = String(toothId || '');
       const slot = Number(SLOT_BY_PRIMARY_TOOTH[id.toUpperCase()] || id);
@@ -22649,7 +22675,7 @@
       const dentition = isMouth ? 'Whole mouth' : item.toothId ? (isPrimaryToothId(item.toothId) ? 'Deciduous tooth' : 'Permanent tooth') : 'No tooth';
       const toothMeta = item.toothId ? dentition + (quadrant.abbreviation ? ' · ' + quadrant.abbreviation : '') : dentition;
       const palmerBadge = isMouth
-        ? '<span class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-2 text-[9px] font-black text-cyan-700"><i data-lucide="circle-dot" class="h-3.5 w-3.5"></i>Whole mouth</span>'
+        ? `<span class="inline-flex h-8 w-12 shrink-0 items-center justify-center rounded-lg border border-cyan-200 bg-cyan-50 text-cyan-700 shadow-2xs" title="${currentUiLanguage === 'ar' ? 'كامل الفم' : 'Whole mouth'}" aria-label="${currentUiLanguage === 'ar' ? 'كامل الفم' : 'Whole mouth'}">${wholeMouthIconSVG('h-6 w-9')}</span>`
         : item.toothId
         ? '<span class="inline-flex h-8 w-12 shrink-0 items-center justify-center rounded-lg border border-violet-200/80 bg-white/75 text-violet-700 shadow-sm backdrop-blur-sm" title="' + escapeHtml(chartToothLabel(item.toothId)) + '">' + palmerNotationSVG(item.toothId, toothSlot, 'h-7 w-10') + '</span>'
         : '<span class="inline-flex h-8 w-12 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white/75 text-[9px] font-black text-slate-400">No tooth</span>';
@@ -27057,7 +27083,7 @@
           ? 'Delete the related invoice item before changing the procedure teeth'
           : `Edit the teeth for ${dentalOperationLabel(finding.code)}`;
         const toothBadges = isMouth
-          ? '<span class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 text-[9px] font-black text-cyan-700"><i data-lucide="circle-dot" class="h-3.5 w-3.5"></i>Whole mouth</span>'
+          ? `<span class="finding-palmer-badge inline-flex h-8 w-12 shrink-0 items-center justify-center rounded-lg border border-cyan-200 bg-cyan-50 text-cyan-700 shadow-2xs" title="${currentUiLanguage === 'ar' ? 'كامل الفم' : 'Whole mouth'}" aria-label="${currentUiLanguage === 'ar' ? 'كامل الفم' : 'Whole mouth'}">${wholeMouthIconSVG('h-6 w-9')}</span>`
           : visibleToothIds.map(toothId => {
               const toothSlot = Number(SLOT_BY_PRIMARY_TOOTH[String(toothId).toUpperCase()] || toothId);
               return `<button type="button" data-finding-tooth-trigger onclick="toggleFindingToothEditor(this)" aria-haspopup="dialog" aria-expanded="false" aria-disabled="${toothEditingLocked}" class="finding-palmer-badge finding-palmer-button inline-flex h-8 w-12 shrink-0 items-center justify-center rounded-lg" title="${escapeHtml(toothEditorTitle)}" aria-label="${escapeHtml(toothEditorTitle)}. Current tooth: ${escapeHtml(chartToothLabel(toothId))}">${palmerNotationSVG(toothId, toothSlot, 'h-7 w-10')}</button>`;
@@ -27166,7 +27192,7 @@
                 <div class="finding-operation-heading flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                   ${procedureSteps.length ? `<button type="button" onclick="toggleFindingProcedureSteps(this)" aria-expanded="${procedureStepsExpanded}" class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-cyan-200 bg-cyan-50 text-cyan-700 transition hover:bg-cyan-100" title="${procedureStepsExpanded ? 'Collapse' : 'Open'} procedure steps" aria-label="${procedureStepsExpanded ? 'Collapse' : 'Open'} ${escapeHtml(dentalOperationLabel(finding.code))} steps"><i data-lucide="${procedureStepsExpanded ? 'minus' : 'plus'}" class="h-3 w-3"></i></button>` : ''}
                   <h4 class="finding-operation-title text-xs sm:text-sm">${escapeHtml(dentalOperationLabel(finding.code))}</h4>
-                  <span class="text-[10px] font-semibold text-slate-400">${isMouth ? 'Whole mouth' : isBatch ? `${toothIds.length} teeth · Batch` : isWhole ? 'Whole tooth' : `${surfaceLabels.length} surface${surfaceLabels.length === 1 ? '' : 's'}`}</span>
+                  ${isMouth ? '' : `<span class="text-[10px] font-semibold text-slate-400">${isBatch ? `${toothIds.length} teeth · Batch` : isWhole ? 'Whole tooth' : `${surfaceLabels.length} surface${surfaceLabels.length === 1 ? '' : 's'}`}</span>`}
                   ${isFullyInvoiced ? '<span class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-emerald-700">Invoiced</span>' : isInvoiced ? '<span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-blue-700">Partly invoiced</span>' : findingPrice <= 0 ? '<span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-700">Set price</span>' : ''}
                 </div>
                 ${isMouth
