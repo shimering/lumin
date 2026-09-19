@@ -28784,6 +28784,49 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       return ids;
     }
 
+    function resolveVoiceToothUniversal(input) {
+      if (!input && input !== 0) return '';
+      let s = String(input).trim().toUpperCase().replace(/^(TOOTH|TOOTH#|#|T|S)/, '').trim();
+
+      // Already universal 1..32
+      const num = parseInt(s, 10);
+      if (!isNaN(num) && num >= 1 && num <= 32 && String(num) === s) {
+        return String(num);
+      }
+      // Primary A..T
+      if (/^[A-T]$/.test(s)) {
+        return s;
+      }
+
+      // Palmer notation: UR1..UR8, UL1..UL8, LL1..LL8, LR1..LR8
+      const palmerMap = {
+        UR1: '8', UR2: '7', UR3: '6', UR4: '5', UR5: '4', UR6: '3', UR7: '2', UR8: '1',
+        UL1: '9', UL2: '10', UL3: '11', UL4: '12', UL5: '13', UL6: '14', UL7: '15', UL8: '16',
+        LL1: '24', LL2: '23', LL3: '22', LL4: '21', LL5: '20', LL6: '19', LL7: '18', LL8: '17',
+        LR1: '25', LR2: '26', LR3: '27', LR4: '28', LR5: '29', LR6: '30', LR7: '31', LR8: '32',
+        URA: 'A', URB: 'B', URC: 'C', URD: 'D', URE: 'E',
+        ULA: 'F', ULB: 'G', ULC: 'H', ULD: 'I', ULE: 'J',
+        LLA: 'K', LLB: 'L', LLC: 'M', LLD: 'N', LLE: 'O',
+        LRA: 'P', LRB: 'Q', LRC: 'R', LRS: 'S', LRT: 'T'
+      };
+      if (palmerMap[s]) return palmerMap[s];
+
+      // FDI 2-digit: 11..48, 51..85
+      const fdiMap = {
+        '18': '1', '17': '2', '16': '3', '15': '4', '14': '5', '13': '6', '12': '7', '11': '8',
+        '21': '9', '22': '10', '23': '11', '24': '12', '25': '13', '26': '14', '27': '15', '28': '16',
+        '38': '17', '37': '18', '36': '19', '35': '20', '34': '21', '33': '22', '32': '23', '31': '24',
+        '41': '25', '42': '26', '43': '27', '44': '28', '45': '29', '46': '30', '47': '31', '48': '32',
+        '55': 'A', '54': 'B', '53': 'C', '52': 'D', '51': 'E',
+        '61': 'F', '62': 'G', '63': 'H', '64': 'I', '65': 'J',
+        '75': 'K', '74': 'L', '73': 'M', '72': 'N', '71': 'O',
+        '81': 'P', '82': 'Q', '83': 'R', '84': 'S', '85': 'T'
+      };
+      if (fdiMap[s]) return fdiMap[s];
+
+      return s;
+    }
+
     async function executeVoiceChartActions(payload) {
       updateVoiceAssistantUI('idle');
 
@@ -28809,35 +28852,53 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         const opCode = String(action.operation_code || '').trim().toLowerCase();
         const opName = String(action.operation_name || '').trim().toLowerCase();
 
-        // Best match in active operations
+        // Robust matching across code, name, and semantic keywords
         const operation = (dentalOperations || []).find(op => op.code.toLowerCase() === opCode)
-                       || (dentalOperations || []).find(op => op.code.toLowerCase().includes(opCode))
-                       || (dentalOperations || []).find(op => op.name.toLowerCase().includes(opName))
-                       || (dentalOperations || []).find(op => op.code === 'composite' || op.code === 'caries');
+                       || (dentalOperations || []).find(op => op.name.toLowerCase() === opName)
+                       || (dentalOperations || []).find(op => op.code.toLowerCase().includes(opCode) || opCode.includes(op.code.toLowerCase()))
+                       || (dentalOperations || []).find(op => op.name.toLowerCase().includes(opName) || opName.includes(op.name.toLowerCase()))
+                       || (dentalOperations || []).find(op => {
+                         const combined = `${op.code} ${op.name}`.toLowerCase();
+                         if (/rct|endo|root|عصب/.test(opCode + opName) && /rct|endo|root/.test(combined)) return true;
+                         if (/extract|خلع|قلع/.test(opCode + opName) && /extract/.test(combined)) return true;
+                         if (/crown|طربوش|تاج|zirconia/.test(opCode + opName) && /crown|zirconia/.test(combined)) return true;
+                         if (/scaling|clean|تنظيف|جير/.test(opCode + opName) && /scaling|proph/.test(combined)) return true;
+                         if (/caries|decay|تسوس|نخر/.test(opCode + opName) && /caries|decay/.test(combined)) return true;
+                         if (/composite|filling|حشو/.test(opCode + opName) && /composite|restoration/.test(combined)) return true;
+                         return false;
+                       })
+                       || (dentalOperations || []).find(op => op.code === 'composite' || op.code === 'caries')
+                       || (dentalOperations || [])[0];
 
         if (!operation) {
           console.warn('Voice agent could not find operation:', action.operation_code);
           continue;
         }
 
-        const toothId = String(action.tooth_universal || '').trim();
+        const toothId = resolveVoiceToothUniversal(action.tooth_universal);
         const status = normaliseOperationStatus(action.status || 'P', 'P');
         const beforeIds = captureAllPatientFindingIds(patient);
 
-        if (action.scope === 'surface' && toothId) {
+        // Determine scope by checking catalog's actionScope first
+        const isMouth = operation.actionScope === 'mouth' || action.scope === 'mouth' || (!toothId && operation.actionScope !== 'surface' && operation.actionScope !== 'whole');
+        const isWhole = !isMouth && (operation.actionScope === 'whole' || operation.actionScope === 'tooth' || action.scope === 'tooth');
+        const isSurface = !isMouth && !isWhole;
+
+        if (isSurface && toothId) {
           const clinicalSurfaces = Array.isArray(action.surfaces) && action.surfaces.length ? action.surfaces : ['O'];
-          const targetZones = CHART_SURFACES.filter(zone => {
+          let targetZones = CHART_SURFACES.filter(zone => {
             const abbr = surfaceAbbreviation(toothId, zone);
-            return clinicalSurfaces.includes(abbr);
+            return clinicalSurfaces.includes(abbr) || (abbr === 'I' && clinicalSurfaces.includes('O')) || (abbr === 'O' && clinicalSurfaces.includes('I'));
           });
-          if (targetZones.length) {
-            setChartSelectionTargets([{ tooth: toothId, surfaces: targetZones }]);
-            applySurfaceCondition(operation.code, status, operation.price, operation.steps);
+          if (!targetZones.length) {
+            targetZones = ['center'];
           }
-        } else if (action.scope === 'tooth' && toothId) {
+          setChartSelectionTargets([{ tooth: toothId, surfaces: targetZones }]);
+          applySurfaceCondition(operation.code, status, operation.price, operation.steps);
+        } else if (isWhole && toothId) {
           setChartSelectionTargets([{ tooth: toothId, surfaces: [] }]);
           applyToothStatus(operation.code, status, operation.price, operation.steps);
-        } else if (action.scope === 'mouth') {
+        } else if (isMouth) {
           applyMouthOperation(operation.code, status, operation.price, operation.steps);
         }
 
@@ -28849,7 +28910,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         appliedSummaries.push(`${operation.name} (${toothLabel})`);
       }
 
-      if (appliedFindingIds.length > 0) {
+      if (appliedSummaries.length > 0) {
         luminVoiceLastActionUndo = {
           patientId: patient.id,
           findingIds: appliedFindingIds,
