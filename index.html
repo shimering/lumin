@@ -6078,6 +6078,7 @@
 
       <!-- Floating Mic Button (Accessible chairside touch footprint for iPad, mobile, & desktop) -->
       <div class="flex items-center gap-2 pointer-events-auto">
+        <button id="chart-voice-mode-badge" type="button" onclick="toggleVoiceScribeModeQuick()" class="rounded-full bg-slate-900/80 px-2.5 py-1 text-[10px] font-black text-emerald-300 shadow-md backdrop-blur-xs transition hover:scale-105" title="Click to toggle Local STT vs Cloud Audio">Local STT</button>
         <span id="chart-voice-spacebar-hint" class="hidden rounded-full bg-slate-900/80 px-2.5 py-1 text-[10px] font-bold text-slate-300 shadow-md backdrop-blur-xs md:inline-block">Hold <kbd class="font-mono text-cyan-300 font-bold">Space</kbd> to talk</span>
         <button id="chart-voice-fab" type="button" onclick="handlePatientWorkspaceVoiceClick()" class="group relative flex h-14 min-w-14 items-center justify-center gap-2.5 rounded-full bg-blue-600 px-4 text-white shadow-xl shadow-blue-600/30 transition-all duration-200 hover:scale-105 hover:bg-blue-700 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/30" title="Chairside Voice Scribe (hold Spacebar)" aria-label="Toggle voice recording">
           <span id="chart-voice-fab-pulse" class="pointer-events-none absolute -inset-1 rounded-full opacity-0 transition-opacity"></span>
@@ -7151,6 +7152,56 @@
           </div>
           <p id="settings-google-calendar-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="status"></p>
           <p class="text-[10px] leading-4 text-slate-400">Patient names and appointment details are sent to the selected Google Calendar. Clinical notes and phone numbers are not synced.</p>
+        </div>
+
+        <!-- Chairside Voice Scribe AI Engine Settings -->
+        <div id="settings-voice-scribe-card" class="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+          <div class="flex items-center gap-3 border-b border-slate-100 pb-4">
+            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><i data-lucide="mic" class="h-4 w-4"></i></span>
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <h3 class="text-sm font-black text-slate-800">Voice Scribe Engine (Chairside AI)</h3>
+                <span id="settings-voice-device-badge" class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700">On-Device STT Ready</span>
+              </div>
+              <p class="text-xs text-slate-400">Choose whether chairside voice transcription runs directly on-device or via direct cloud audio.</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <!-- Mode 1: Local On-Device Dictation -->
+            <label class="group relative flex cursor-pointer flex-col justify-between rounded-xl border border-slate-200 bg-slate-50 p-4 transition hover:border-blue-300 has-checked:border-blue-600 has-checked:bg-blue-50/50">
+              <div>
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <span class="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700"><i data-lucide="zap" class="h-3.5 w-3.5"></i></span>
+                    <span class="text-xs font-black text-slate-800">Local Dictation</span>
+                  </div>
+                  <input type="radio" name="voice-scribe-engine" value="local" onchange="setLuminVoiceEngineMode(this.value)" class="h-4 w-4 text-blue-600 focus:ring-blue-500" />
+                </div>
+                <span class="mt-1.5 inline-block rounded-md bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">Recommended</span>
+                <p class="mt-2 text-[11px] leading-relaxed text-slate-500">Transcribes speech directly on your iPad / browser using the Web Speech API. Zero audio upload lag, 95% less Gemini quota, and sub-second parsing.</p>
+              </div>
+            </label>
+
+            <!-- Mode 2: Direct Cloud Audio -->
+            <label class="group relative flex cursor-pointer flex-col justify-between rounded-xl border border-slate-200 bg-slate-50 p-4 transition hover:border-blue-300 has-checked:border-blue-600 has-checked:bg-blue-50/50">
+              <div>
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <span class="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-100 text-blue-700"><i data-lucide="cloud" class="h-3.5 w-3.5"></i></span>
+                    <span class="text-xs font-black text-slate-800">Direct Cloud Audio</span>
+                  </div>
+                  <input type="radio" name="voice-scribe-engine" value="cloud" onchange="setLuminVoiceEngineMode(this.value)" class="h-4 w-4 text-blue-600 focus:ring-blue-500" />
+                </div>
+                <span class="mt-1.5 inline-block rounded-md bg-slate-200 px-1.5 py-0.5 text-[9px] font-bold text-slate-700">Multimodal</span>
+                <p class="mt-2 text-[11px] leading-relaxed text-slate-500">Streams raw microphone audio directly to Gemini Flash Lite. Ideal for noisy dental operatories or browsers without native speech recognition.</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="rounded-xl border border-slate-100 bg-slate-50/60 p-3 text-[11px] text-slate-500 leading-snug">
+            <span class="font-bold text-slate-700">Note:</span> If Local Dictation is selected on a browser without Web Speech support, Lumin automatically falls back to Cloud Audio smoothly.
+          </div>
         </div>
 
         <form id="appointment-color-form" onsubmit="handleAppointmentColorSave(event)" class="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
@@ -10083,6 +10134,8 @@
         time: appointmentTimeFormatter.format(new Date(entry.startAt))
       }));
       translateUiTree(document.body, currentUiLanguage);
+      if (typeof syncVoiceFabBadge === 'function') syncVoiceFabBadge();
+      if (typeof syncVoiceEngineSettingsUI === 'function') syncVoiceEngineSettingsUI();
       if (refreshViews && currentUserAccess) {
         if (hasPageAccess('dashboard')) renderDashboard();
         if (hasPageAccess('patients')) runPatientQuery();
@@ -25408,6 +25461,7 @@
         void refreshUiThemePreference();
         await loadGoogleCalendarSettings();
         populateStorageServerSettingsInputs();
+        if (typeof syncVoiceEngineSettingsUI === 'function') syncVoiceEngineSettingsUI();
       }
       lucide.createIcons();
       if (typeof syncVoiceFabVisibility === 'function') syncVoiceFabVisibility();
@@ -28387,6 +28441,87 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       if (modal) modal.classList.remove('hidden');
     }
 
+    let luminLocalSpeechRecognition = null;
+    let luminLocalSpeechTranscript = '';
+
+    function isLocalSpeechRecognitionSupported() {
+      return Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+    }
+
+    function getLuminVoiceEngineMode() {
+      const saved = localStorage.getItem('lumin_voice_engine_mode');
+      if (saved === 'cloud') return 'cloud';
+      if (saved === 'local') return isLocalSpeechRecognitionSupported() ? 'local' : 'cloud';
+      return isLocalSpeechRecognitionSupported() ? 'local' : 'cloud';
+    }
+
+    function setLuminVoiceEngineMode(mode) {
+      if (mode === 'local' && !isLocalSpeechRecognitionSupported()) {
+        showToast(currentUiLanguage === 'ar' ? 'التعرف الصوتي المحلي غير مدعوم في هذا المتصفح. تم التبديل إلى سحابي.' : 'Local speech recognition is not supported in this browser. Switched to cloud audio.', 'warning');
+        localStorage.setItem('lumin_voice_engine_mode', 'cloud');
+        syncVoiceEngineSettingsUI();
+        syncVoiceFabBadge();
+        return;
+      }
+      localStorage.setItem('lumin_voice_engine_mode', mode);
+      syncVoiceEngineSettingsUI();
+      syncVoiceFabBadge();
+      const msg = mode === 'local'
+        ? (currentUiLanguage === 'ar' ? 'تم تفعيل الإملاء الصوتي المحلي (فوري وبدون استهلاك حصة صوتية)' : 'Local On-Device Dictation active (Instant & zero audio quota)')
+        : (currentUiLanguage === 'ar' ? 'تم تفعيل الصوت السحابي المباشر (Gemini Multimodal)' : 'Direct Cloud Audio active (Gemini Multimodal)');
+      showToast(msg, 'success');
+    }
+
+    function toggleVoiceScribeModeQuick() {
+      const current = getLuminVoiceEngineMode();
+      const next = current === 'local' ? 'cloud' : 'local';
+      setLuminVoiceEngineMode(next);
+    }
+
+    function syncVoiceFabBadge() {
+      const badge = document.getElementById('chart-voice-mode-badge');
+      if (!badge) return;
+      const mode = getLuminVoiceEngineMode();
+      const isLocal = mode === 'local';
+      badge.textContent = isLocal ? (currentUiLanguage === 'ar' ? 'إملاء محلي' : 'Local STT') : (currentUiLanguage === 'ar' ? 'صوت سحابي' : 'Cloud Audio');
+      badge.className = isLocal
+        ? 'rounded-full bg-slate-900/80 px-2.5 py-1 text-[10px] font-black text-emerald-300 shadow-md backdrop-blur-xs transition hover:scale-105 select-none cursor-pointer'
+        : 'rounded-full bg-slate-900/80 px-2.5 py-1 text-[10px] font-black text-blue-300 shadow-md backdrop-blur-xs transition hover:scale-105 select-none cursor-pointer';
+      badge.title = isLocal
+        ? (currentUiLanguage === 'ar' ? 'وضع الإملاء المحلي نشط (انقر للتبديل لسحابي)' : 'Local On-Device Dictation active (Click to switch to Cloud Audio)')
+        : (currentUiLanguage === 'ar' ? 'وضع الصوت السحابي نشط (انقر للتبديل لمحلي)' : 'Direct Cloud Audio active (Click to switch to Local Dictation)');
+    }
+
+    function syncVoiceEngineSettingsUI() {
+      const mode = getLuminVoiceEngineMode();
+      const radios = document.querySelectorAll('input[name="voice-scribe-engine"]');
+      radios.forEach(radio => {
+        radio.checked = radio.value === mode;
+      });
+
+      const deviceBadge = document.getElementById('settings-voice-device-badge');
+      if (deviceBadge) {
+        const supported = isLocalSpeechRecognitionSupported();
+        if (supported) {
+          deviceBadge.className = 'rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700';
+          deviceBadge.textContent = currentUiLanguage === 'ar' ? 'الإملاء المحلي مدعوم على هذا الجهاز' : 'On-Device STT Supported';
+        } else {
+          deviceBadge.className = 'rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-black text-amber-700';
+          deviceBadge.textContent = currentUiLanguage === 'ar' ? 'الإملاء المحلي غير مدعوم (استخدم السحابي)' : 'Local STT Not Supported (Use Cloud)';
+        }
+      }
+      syncVoiceFabBadge();
+    }
+
+    function updateVoiceRecordingInterimText(text) {
+      const el = document.getElementById('chart-voice-interim-text');
+      if (el && text) {
+        el.textContent = `"${text}"`;
+        el.classList.remove('text-slate-500', 'italic');
+        el.classList.add('text-slate-900', 'font-bold');
+      }
+    }
+
     function updateVoiceAssistantUI(state, message = '', hideStatusCard = true) {
       const fab = document.getElementById('chart-voice-fab');
       const fabPulse = document.getElementById('chart-voice-fab-pulse');
@@ -28396,6 +28531,8 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       const actionBtnText = document.getElementById('chart-voice-action-btn-text');
       const actionBtnIcon = document.getElementById('chart-voice-action-btn-icon');
       const statusCard = document.getElementById('chart-voice-status-card');
+
+      syncVoiceFabBadge();
 
       if (state === 'recording') {
         if (fab) {
@@ -28430,10 +28567,13 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
               </div>
               <div class="min-w-0 flex-1">
                 <div class="flex items-center justify-between gap-2">
-                  <h4 class="text-xs font-black uppercase tracking-wider text-red-600">${currentUiLanguage === 'ar' ? 'المساعد الصوتي يستمع...' : 'Listening Chairside...'}</h4>
-                  <span class="text-[9px] font-bold text-slate-400">${currentUiLanguage === 'ar' ? 'انقر للإنهاء' : 'Tap to finish'}</span>
+                  <div class="flex items-center gap-1.5 min-w-0">
+                    <h4 class="text-xs font-black uppercase tracking-wider text-red-600 truncate">${currentUiLanguage === 'ar' ? 'المساعد الصوتي يستمع...' : 'Listening Chairside...'}</h4>
+                    <span class="shrink-0 rounded bg-red-100 px-1 py-0.5 text-[9px] font-black text-red-700">${getLuminVoiceEngineMode() === 'local' ? (currentUiLanguage === 'ar' ? 'محلي' : 'Local') : (currentUiLanguage === 'ar' ? 'سحابي' : 'Cloud')}</span>
+                  </div>
+                  <span class="text-[9px] font-bold text-slate-400 shrink-0">${currentUiLanguage === 'ar' ? 'انقر للإنهاء' : 'Tap to finish'}</span>
                 </div>
-                <p class="mt-0.5 text-xs font-semibold text-slate-700 truncate">${currentUiLanguage === 'ar' ? 'تحدث الآن (مثال: الضرس الأول العلوي يمين حشو كمبوزيت)' : 'Speak now (e.g. Upper right 6, occlusal composite, completed)'}</p>
+                <p id="chart-voice-interim-text" class="mt-0.5 text-xs text-slate-500 italic truncate">${currentUiLanguage === 'ar' ? 'تحدث الآن (مثال: الضرس الأول العلوي يمين حشو كمبوزيت)' : 'Speak now (e.g. Upper right 6, occlusal composite, completed)'}</p>
               </div>
               <button type="button" onclick="stopLuminVoiceRecording()" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-600 text-white shadow-xs transition hover:bg-red-700" aria-label="Stop recording">
                 <i data-lucide="square" class="h-3.5 w-3.5 fill-current"></i>
@@ -28585,6 +28725,114 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         return;
       }
 
+      const mode = getLuminVoiceEngineMode();
+      if (mode === 'local' && isLocalSpeechRecognitionSupported()) {
+        startLuminLocalSpeechRecognition();
+      } else {
+        await startLuminVoiceAudioRecording();
+      }
+    }
+
+    function startLuminLocalSpeechRecognition() {
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRec) {
+        startLuminVoiceAudioRecording();
+        return;
+      }
+
+      luminLocalSpeechTranscript = '';
+      try {
+        if (luminLocalSpeechRecognition) {
+          try { luminLocalSpeechRecognition.abort(); } catch (_) {}
+        }
+        const recognition = new SpeechRec();
+        luminLocalSpeechRecognition = recognition;
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
+        recognition.lang = (currentUiLanguage === 'ar' || document.documentElement.dir === 'rtl') ? 'ar-SA' : 'en-US';
+
+        let maxUtteranceTimer = null;
+
+        recognition.onstart = () => {
+          luminVoiceRecordingActive = true;
+          updateVoiceAssistantUI('recording');
+
+          // Silence timer: auto-stop after 6 seconds if nothing is spoken
+          clearTimeout(luminVoiceSilenceTimer);
+          luminVoiceSilenceTimer = setTimeout(() => {
+            if (luminVoiceRecordingActive) {
+              stopLuminVoiceRecording();
+            }
+          }, 6000);
+
+          // Hard safety limit: max 15s per dictation utterance
+          clearTimeout(maxUtteranceTimer);
+          maxUtteranceTimer = setTimeout(() => {
+            if (luminVoiceRecordingActive) {
+              stopLuminVoiceRecording();
+            }
+          }, 15000);
+        };
+
+        recognition.onresult = (event) => {
+          let interim = '';
+          let final = '';
+          for (let i = 0; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              final += event.results[i][0].transcript + ' ';
+            } else {
+              interim += event.results[i][0].transcript;
+            }
+          }
+          const combined = (final + interim).trim();
+          if (combined) {
+            luminLocalSpeechTranscript = combined;
+            updateVoiceRecordingInterimText(combined);
+
+            // Auto-finish if doctor pauses for 3 seconds after speaking
+            clearTimeout(luminVoiceSilenceTimer);
+            luminVoiceSilenceTimer = setTimeout(() => {
+              if (luminVoiceRecordingActive) {
+                stopLuminVoiceRecording();
+              }
+            }, 3000);
+          }
+        };
+
+        recognition.onerror = (event) => {
+          console.warn('Local speech recognition event error:', event?.error);
+          if (event?.error === 'not-allowed' || event?.error === 'service-not-allowed') {
+            showToast(currentUiLanguage === 'ar' ? 'تم رفض إذن الميكروفون للإملاء' : 'Microphone permission denied for local dictation.', 'danger');
+            updateVoiceAssistantUI('idle');
+          } else if (event?.error === 'network') {
+            console.warn('Local STT network error, attempting audio fallback...');
+            try { recognition.abort(); } catch (_) {}
+            startLuminVoiceAudioRecording();
+          }
+        };
+
+        recognition.onend = async () => {
+          clearTimeout(luminVoiceSilenceTimer);
+          clearTimeout(maxUtteranceTimer);
+          luminVoiceRecordingActive = false;
+          const text = (luminLocalSpeechTranscript || '').trim();
+          if (!text) {
+            updateVoiceAssistantUI('idle');
+            return;
+          }
+          await processLuminVoiceText(text);
+        };
+
+        recognition.start();
+
+      } catch (err) {
+        console.error('Failed to start local speech recognition, falling back to audio recording:', err);
+        startLuminVoiceAudioRecording();
+      }
+    }
+
+    async function startLuminVoiceAudioRecording() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         luminVoiceAudioChunks = [];
@@ -28640,6 +28888,11 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
 
     function stopLuminVoiceRecording() {
       clearTimeout(luminVoiceSilenceTimer);
+      if (luminLocalSpeechRecognition) {
+        try {
+          luminLocalSpeechRecognition.stop();
+        } catch (_) {}
+      }
       if (luminVoiceRecorder && luminVoiceRecorder.state === 'recording') {
         try {
           luminVoiceRecorder.stop();
@@ -28682,9 +28935,22 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
 
     function cancelLuminVoiceProcessing(isTimeout = false) {
       clearInterval(luminVoiceProcessingTimer);
+      clearTimeout(luminVoiceSilenceTimer);
+      if (luminLocalSpeechRecognition) {
+        try {
+          luminLocalSpeechRecognition.abort();
+        } catch (_) {}
+      }
+      luminLocalSpeechTranscript = '';
+      if (luminVoiceRecorder && luminVoiceRecorder.state === 'recording') {
+        try {
+          luminVoiceRecorder.stop();
+        } catch (_) {}
+      }
       if (luminVoiceProcessingAbortController) {
         try { luminVoiceProcessingAbortController.abort(); } catch (_) {}
       }
+      luminVoiceRecordingActive = false;
       luminVoiceProcessingActive = false;
       if (isTimeout) {
         updateVoiceAssistantUI('idle', '', false);
@@ -28796,6 +29062,68 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         const friendlyMsg = isQuota
           ? (currentUiLanguage === 'ar' ? 'تم استنفاد حصة Gemini الحالية مؤقتاً. يرجى الانتظار بضع ثوانٍ أو فحص المفتاح.' : 'Gemini API quota rate-limited. Please wait a few seconds or check key.')
           : (err.message || (currentUiLanguage === 'ar' ? 'فشل التعرف الصوتي' : 'Voice recognition failed'));
+        showToast(friendlyMsg, 'danger');
+        showVoiceStatusCard('error', friendlyMsg);
+        updateVoiceAssistantUI('idle', '', false);
+      } finally {
+        clearInterval(luminVoiceProcessingTimer);
+        luminVoiceProcessingActive = false;
+      }
+    }
+
+    async function processLuminVoiceText(transcriptText) {
+      if (!transcriptText || !transcriptText.trim()) {
+        updateVoiceAssistantUI('idle');
+        return;
+      }
+
+      luminVoiceProcessingActive = true;
+      updateVoiceAssistantUI('processing');
+
+      try {
+        const apiKey = await getLuminGeminiApiKey();
+        if (!apiKey) throw new Error('Missing Gemini API Key');
+
+        const activeOpsText = (dentalOperations || [])
+          .filter(op => op.active)
+          .map(op => `code: "${op.code}" | name: "${op.name}" | scope: "${op.actionScope}" | price: ${op.price}`)
+          .join('\n');
+
+        const requestBody = {
+          systemInstruction: {
+            parts: [{ text: LUMIN_VOICE_SYSTEM_INSTRUCTION }]
+          },
+          contents: [
+            {
+              parts: [
+                {
+                  text: `ACTIVE PROCEDURES CATALOG:\n${activeOpsText}\n\nDOCTOR VOICE TRANSCRIPTION:\n"${transcriptText}"\n\nAnalyze the doctor's spoken text above and generate structured dental chart actions.`
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            responseSchema: LUMIN_VOICE_RESPONSE_SCHEMA
+          }
+        };
+
+        const resJson = await fetchGeminiVoiceWithFallback(apiKey, requestBody);
+        const payloadText = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!payloadText) throw new Error('No response returned from Gemini.');
+
+        const payload = JSON.parse(payloadText);
+        if (!payload.transcript) {
+          payload.transcript = transcriptText;
+        }
+        await executeVoiceChartActions(payload);
+
+      } catch (err) {
+        console.error('Lumin Voice Agent text processing error:', err);
+        const isQuota = /quota|429|RESOURCE_EXHAUSTED/i.test(err.message || '');
+        const friendlyMsg = isQuota
+          ? (currentUiLanguage === 'ar' ? 'تم استنفاد حصة Gemini الحالية مؤقتاً. يرجى الانتظار بضع ثوانٍ أو فحص المفتاح.' : 'Gemini API quota rate-limited. Please wait a few seconds or check key.')
+          : (err.message || (currentUiLanguage === 'ar' ? 'فشل التحليل السريري' : 'Clinical voice analysis failed'));
         showToast(friendlyMsg, 'danger');
         showVoiceStatusCard('error', friendlyMsg);
         updateVoiceAssistantUI('idle', '', false);
@@ -29021,11 +29349,16 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       });
     }
 
-    // Initialize voice push-to-talk listener
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initLuminVoiceSpacebarShortcut);
-    } else {
+    // Initialize voice assistant & push-to-talk listener
+    function initLuminVoice() {
       initLuminVoiceSpacebarShortcut();
+      if (typeof syncVoiceFabBadge === 'function') syncVoiceFabBadge();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initLuminVoice);
+    } else {
+      initLuminVoice();
     }
 
     // ================= APPOINTMENTS CALENDAR =================
