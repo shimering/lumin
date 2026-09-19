@@ -561,6 +561,10 @@
       font-family: "Aptos", "Segoe UI Variable Text", "Inter", system-ui, sans-serif;
       scrollbar-color: #cbd5e1 transparent;
       scrollbar-width: thin;
+      overflow-x: auto !important;
+      overscroll-behavior-inline: contain;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-x pan-y;
     }
     .clinical-findings-list::-webkit-scrollbar { height: 6px; }
     .clinical-findings-list::-webkit-scrollbar-track { border-radius: 999px; background: transparent; }
@@ -1047,52 +1051,81 @@
 
     #findings-container .finding-row.has-ortho-visits,
     .finding-row.has-ortho-visits {
-      min-width: 0 !important;
+      min-width: max-content !important;
       width: 100% !important;
-      max-width: 100% !important;
       flex-direction: column !important;
       align-items: stretch !important;
       box-sizing: border-box !important;
-      overflow: hidden !important;
-      padding: 0.75rem !important;
+      overflow: visible !important;
+      padding: 0.625rem 0.75rem !important;
+    }
+    #findings-container .finding-row.has-ortho-visits .finding-row-main,
+    .finding-row.has-ortho-visits .finding-row-main {
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: nowrap !important;
+      align-items: center !important;
+      gap: 0.75rem !important;
+      width: 100% !important;
+      min-width: max-content !important;
     }
     #findings-container .finding-row.has-ortho-visits .finding-row-summary,
     .finding-row.has-ortho-visits .finding-row-summary {
-      width: 100% !important;
-      max-width: 100% !important;
-      min-width: 0 !important;
+      width: auto !important;
+      min-width: auto !important;
+      max-width: none !important;
       height: auto !important;
       min-height: 0 !important;
       max-height: none !important;
       flex: 0 0 auto !important;
       display: flex !important;
-      flex-wrap: wrap !important;
+      flex-direction: row !important;
+      flex-wrap: nowrap !important;
       align-items: center !important;
-      justify-content: space-between !important;
+      gap: 0.75rem !important;
+    }
+    #findings-container .finding-row.has-ortho-visits .finding-operation-details,
+    .finding-row.has-ortho-visits .finding-operation-details {
+      min-width: 0 !important;
+      overflow: visible !important;
+      flex: 0 0 auto !important;
+    }
+    #findings-container .finding-row.has-ortho-visits .finding-operation-heading,
+    .finding-row.has-ortho-visits .finding-operation-heading {
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: nowrap !important;
+      align-items: center !important;
       gap: 0.5rem !important;
+      white-space: nowrap !important;
+    }
+    #findings-container .finding-row.has-ortho-visits .finding-operation-title,
+    .finding-row.has-ortho-visits .finding-operation-title {
+      white-space: nowrap !important;
+      font-weight: 700 !important;
     }
     #findings-container .finding-row.has-ortho-visits .finding-row-actions,
     .finding-row.has-ortho-visits .finding-row-actions {
-      width: 100% !important;
-      max-width: 100% !important;
-      min-width: 0 !important;
+      width: auto !important;
+      min-width: auto !important;
+      max-width: none !important;
       height: auto !important;
       min-height: 0 !important;
       max-height: none !important;
       flex: 0 0 auto !important;
       display: flex !important;
-      flex-wrap: wrap !important;
+      flex-direction: row !important;
+      flex-wrap: nowrap !important;
       align-items: center !important;
-      justify-content: flex-end !important;
       gap: 0.5rem !important;
-      padding-top: 0.5rem !important;
-      border-top: 1px dashed #e2e8f0 !important;
+      padding-top: 0 !important;
+      border-top: 0 !important;
+      margin-left: auto !important;
     }
     #findings-container .finding-row.has-ortho-visits [data-ortho-visits-panel],
     .finding-row.has-ortho-visits [data-ortho-visits-panel] {
       width: 100% !important;
-      max-width: 100% !important;
-      min-width: 0 !important;
+      min-width: 100% !important;
       box-sizing: border-box !important;
       margin-top: 0.5rem !important;
       border-radius: 0.75rem !important;
@@ -27972,6 +28005,7 @@
         const findingIdentityAttributes = `data-finding-id="${escapeHtml(findingIds[0] || '')}" data-finding-ids="${escapeHtml(findingIds.join(','))}" data-finding-kind="${escapeHtml(finding.kind)}" data-batch-id="${escapeHtml(finding.batchId || '')}" data-tooth-id="${escapeHtml(finding.toothId)}" data-tooth-ids="${escapeHtml(toothIds.join(','))}" data-operation-code="${escapeHtml(finding.code)}" data-operation-status="${finding.status}" data-surfaces="${escapeHtml(finding.surfaces.join(','))}"`;
         return `
           <article ${findingIdentityAttributes} onclick="toggleFindingCardSelection(event, this)" aria-selected="${isSelected}" class="finding-row ${procedureSteps.length ? 'has-procedure-steps' : ''} ${isOrthoPackage ? 'has-ortho-visits' : ''} ${isSelected ? 'is-selected' : ''} ${isInvoiced ? 'is-invoiced' : ''} ${isBatch ? 'is-batch-finding' : ''} flex flex-row ${(procedureSteps.length || isOrthoPackage) ? 'flex-wrap' : 'flex-nowrap'} items-center gap-2.5 overflow-hidden rounded-xl border border-slate-200 border-l-4 px-3 py-2.5 shadow-sm transition hover:shadow-md" style="--finding-display-color:${displayColor};--finding-status-soft:${statusSoft};--finding-status-border:${statusBorder};border-left-color:${displayColor}">
+            ${isOrthoPackage ? '<div class="finding-row-main flex flex-row flex-nowrap items-center gap-2.5 w-full">' : ''}
             <div class="finding-row-summary flex min-w-0 flex-1 items-center gap-3">
               ${isOrthoPackage ? `
                 <div class="flex h-4 w-4 shrink-0 items-center justify-center text-indigo-600" title="${currentUiLanguage === 'ar' ? 'باقة زيارات متعددة (تفوتر بالزيارة)' : 'Multi-visit package (invoiced per visit)'}">
@@ -27984,37 +28018,33 @@
                 ${toothBadges}
               </div>
               <div class="finding-operation-details min-w-0 flex-1">
-                <div class="finding-operation-heading flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <div class="finding-operation-heading flex flex-nowrap items-center gap-2">
                   ${procedureSteps.length ? `<button type="button" onclick="toggleFindingProcedureSteps(this)" aria-expanded="${procedureStepsExpanded}" class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-cyan-200 bg-cyan-50 text-cyan-700 transition hover:bg-cyan-100" title="${procedureStepsExpanded ? 'Collapse' : 'Open'} procedure steps" aria-label="${procedureStepsExpanded ? 'Collapse' : 'Open'} ${escapeHtml(dentalOperationLabel(finding.code))} steps"><i data-lucide="${procedureStepsExpanded ? 'minus' : 'plus'}" class="h-3 w-3"></i></button>` : ''}
-                  <h4 class="finding-operation-title text-xs sm:text-sm">${escapeHtml(dentalOperationLabel(finding.code))}</h4>
+                  <h4 class="finding-operation-title text-xs sm:text-sm font-bold text-slate-900 whitespace-nowrap">${escapeHtml(dentalOperationLabel(finding.code))}</h4>
                   ${isOrthoPackage ? `
-                    <span class="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-indigo-700"><i data-lucide="package" class="h-2.5 w-2.5"></i>${currentUiLanguage === 'ar' ? 'باقة متعددة الزيارات' : 'Multi-Visit Package'}</span>
-                    ${isOrthoFullyInvoiced ? '<span class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-emerald-700">' + (currentUiLanguage === 'ar' ? 'مكتملة الفوترة' : 'All visits invoiced') + '</span>' : isOrthoPartlyInvoiced ? '<span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-blue-700">' + invoicedVisitsCount + '/' + orthoVisits.length + ' ' + (currentUiLanguage === 'ar' ? 'زيارات مفوترة' : 'visits invoiced') + '</span>' : findingPrice <= 0 ? '<span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-700">' + (currentUiLanguage === 'ar' ? 'تحديد سعر الباقة' : 'Set package fee') + '</span>' : ''}
+                    ${isOrthoFullyInvoiced ? '<span class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-emerald-700 whitespace-nowrap">' + (currentUiLanguage === 'ar' ? 'مكتملة الفوترة' : 'All visits invoiced') + '</span>' : isOrthoPartlyInvoiced ? '<span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-blue-700 whitespace-nowrap">' + invoicedVisitsCount + '/' + orthoVisits.length + ' ' + (currentUiLanguage === 'ar' ? 'زيارات مفوترة' : 'visits invoiced') + '</span>' : findingPrice <= 0 ? '<span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-700 whitespace-nowrap">' + (currentUiLanguage === 'ar' ? 'تحديد سعر الباقة' : 'Set package fee') + '</span>' : ''}
+                    <button type="button" onclick="toggleOrthoVisitsCollapse('${escapeHtml(finding.id)}')" aria-expanded="${!isOrthoCollapsed}" class="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 transition hover:bg-indigo-100 whitespace-nowrap" title="${isOrthoCollapsed ? (currentUiLanguage === 'ar' ? 'إظهار الزيارات' : 'Expand visits') : (currentUiLanguage === 'ar' ? 'إخفاء الزيارات' : 'Collapse visits')}">
+                      <i data-lucide="${isOrthoCollapsed ? 'chevron-right' : 'chevron-down'}" class="h-3.5 w-3.5"></i>
+                      <span>${orthoVisits.length} ${currentUiLanguage === 'ar' ? (orthoVisits.length === 1 ? 'زيارة' : 'زيارات') : (orthoVisits.length === 1 ? 'visit' : 'visits')}</span>
+                    </button>
+                    <button type="button" onclick="addOrthoVisit(this)" class="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-600 px-2 py-0.5 text-[11px] font-bold text-white transition hover:bg-indigo-700 active:scale-[0.98] shadow-2xs whitespace-nowrap">
+                      <i data-lucide="plus" class="h-3 w-3"></i>
+                      <span>${currentUiLanguage === 'ar' ? 'إضافة زيارة' : 'Add Visit'}</span>
+                    </button>
                   ` : `
                     ${isFullyInvoiced ? '<span class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-emerald-700">Invoiced</span>' : isInvoiced ? '<span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-blue-700">Partly invoiced</span>' : findingPrice <= 0 ? '<span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-700">Set price</span>' : ''}
                   `}
                 </div>
-                ${isOrthoPackage ? `
-                  <div class="mt-1 flex flex-wrap items-center gap-2">
-                    <button type="button" onclick="toggleOrthoVisitsCollapse('${escapeHtml(finding.id)}')" aria-expanded="${!isOrthoCollapsed}" class="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 transition hover:bg-indigo-100" title="${isOrthoCollapsed ? (currentUiLanguage === 'ar' ? 'إظهار الزيارات' : 'Expand visits') : (currentUiLanguage === 'ar' ? 'إخفاء الزيارات' : 'Collapse visits')}">
-                      <i data-lucide="${isOrthoCollapsed ? 'chevron-right' : 'chevron-down'}" class="h-3.5 w-3.5"></i>
-                      <span>${orthoVisits.length} ${currentUiLanguage === 'ar' ? (orthoVisits.length === 1 ? 'زيارة' : 'زيارات') : (orthoVisits.length === 1 ? 'visit' : 'visits')}</span>
-                    </button>
-                    <button type="button" onclick="addOrthoVisit(this)" class="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-600 px-2 py-0.5 text-[11px] font-bold text-white transition hover:bg-indigo-700 active:scale-[0.98] shadow-2xs">
-                      <i data-lucide="plus" class="h-3 w-3"></i>
-                      <span>${currentUiLanguage === 'ar' ? 'إضافة زيارة' : 'Add Visit'}</span>
-                    </button>
-                  </div>
-                ` : isMouth
+                ${!isOrthoPackage && isMouth
                   ? '<p class="mt-0.5 truncate text-[11px] font-normal text-slate-500">Applied once to the complete mouth · tooth selection ignored</p>'
-                  : isWhole
+                  : !isOrthoPackage && isWhole
                     ? ''
-                  : `<div class="finding-surface-controls mt-1 flex flex-wrap items-center gap-1" role="group" aria-label="Edit involved surfaces">
+                  : !isOrthoPackage ? `<div class="finding-surface-controls mt-1 flex flex-wrap items-center gap-1" role="group" aria-label="Edit involved surfaces">
                       ${surfaceToggleButtons}
-                    </div>`}
+                    </div>` : ''}
               </div>
             </div>
-            <div class="finding-row-actions flex ${isOrthoPackage ? 'flex-wrap justify-end' : 'flex-nowrap'} items-center gap-2">
+            <div class="finding-row-actions flex flex-nowrap items-center gap-2 shrink-0 ml-auto">
               <div class="finding-dates-group ${isOrthoPackage ? '' : 'ml-auto'} flex flex-col items-end justify-center gap-1 shrink-0">
                 ${createdAtMarkup}
                 ${beginDateMarkup}
@@ -28085,6 +28115,7 @@
                 <button type="button" onclick="deleteFindingFromControl(this)" class="finding-delete-button inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:border-red-300 hover:bg-red-100" title="Delete ${escapeHtml(dentalOperationLabel(finding.code))}" aria-label="Delete ${escapeHtml(dentalOperationLabel(finding.code))}"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button>
               `}
             </div>
+            ${isOrthoPackage ? '</div>' : ''}
             ${procedureStepsMarkup}
             ${orthoVisitsMarkup}
           </article>`;
