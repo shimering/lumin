@@ -12041,6 +12041,39 @@
       setTimeout(() => toast.remove(), 6500);
     }
 
+    function showToast(message, type = 'info', title = '') {
+      if (!message) return;
+      const container = document.getElementById('appointment-notification-toasts');
+      if (!container) {
+        console.log(`[Toast ${type}] ${title ? title + ': ' : ''}${message}`);
+        return;
+      }
+      const toast = document.createElement('article');
+      const borderClass = type === 'danger' ? 'border-red-200' : type === 'warning' ? 'border-amber-200' : type === 'success' ? 'border-emerald-200' : 'border-blue-200';
+      const bgClass = type === 'danger' ? 'bg-red-50 text-red-600' : type === 'warning' ? 'bg-amber-50 text-amber-600' : type === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600';
+      const iconName = type === 'danger' ? 'alert-triangle' : type === 'warning' ? 'alert-circle' : type === 'success' ? 'check-circle' : 'info';
+      const displayTitle = title || (type === 'danger' ? (currentUiLanguage === 'ar' ? 'تنبيه' : 'Alert') : type === 'warning' ? (currentUiLanguage === 'ar' ? 'تحذير' : 'Warning') : type === 'success' ? (currentUiLanguage === 'ar' ? 'تم بنجاح' : 'Success') : (currentUiLanguage === 'ar' ? 'إشعار' : 'Notice'));
+
+      toast.className = `appointment-notification-toast pointer-events-auto rounded-2xl border ${borderClass} bg-white p-4 shadow-xl transition-all duration-200`;
+      toast.innerHTML = `
+        <div class="flex items-start gap-3">
+          <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${bgClass}"><i data-lucide="${iconName}" class="h-4 w-4"></i></span>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-black text-slate-800">${escapeHtml(displayTitle)}</p>
+            <p class="mt-1 text-xs leading-5 text-slate-600">${escapeHtml(message)}</p>
+          </div>
+          <button type="button" onclick="this.closest('.appointment-notification-toast')?.remove()" class="text-slate-400 hover:text-slate-600" aria-label="Close">
+            <i data-lucide="x" class="h-3.5 w-3.5"></i>
+          </button>
+        </div>
+      `;
+      container.appendChild(toast);
+      if (window.lucide) lucide.createIcons();
+      setTimeout(() => {
+        if (toast.isConnected) toast.remove();
+      }, 6000);
+    }
+
     function showAppointmentBrowserNotification(title, body, tag) {
       if (!appointmentNotificationsEnabled()) return;
       if (appointmentNotificationHostState.ready && appointmentNotificationHostState.supported) return;
@@ -25806,10 +25839,10 @@
     }
 
     // Apply surface condition to all currently selected surfaces
-    function applySurfaceCondition(condition, operationStatus = activeClinicalOperationStatus, catalogPrice = null, procedureSteps = []) {
+    function applySurfaceCondition(condition, operationStatus = activeClinicalOperationStatus, catalogPrice = null, procedureSteps = [], silent = false) {
       const targets = chartSelectionTargets().filter(target => target.surfaces.length > 0);
       if (!targets.length) {
-        alert('Please click on one or more tooth surfaces first.');
+        if (!silent) alert('Please click on one or more tooth surfaces first.');
         return false;
       }
 
@@ -25859,10 +25892,10 @@
     }
 
     // Apply a whole-tooth operation with its workflow status.
-    function applyToothStatus(operationCode, operationStatus = activeClinicalOperationStatus, catalogPrice = null, procedureSteps = []) {
+    function applyToothStatus(operationCode, operationStatus = activeClinicalOperationStatus, catalogPrice = null, procedureSteps = [], silent = false) {
       const targets = chartSelectionTargets();
       if (!targets.length) {
-        alert('Please select one or more teeth first.');
+        if (!silent) alert('Please select one or more teeth first.');
         return false;
       }
 
@@ -28354,7 +28387,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       if (modal) modal.classList.remove('hidden');
     }
 
-    function updateVoiceAssistantUI(state, message = '') {
+    function updateVoiceAssistantUI(state, message = '', hideStatusCard = true) {
       const fab = document.getElementById('chart-voice-fab');
       const fabPulse = document.getElementById('chart-voice-fab-pulse');
       const fabIcon = document.getElementById('chart-voice-fab-icon');
@@ -28475,7 +28508,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         if (actionBtnText) actionBtnText.textContent = currentUiLanguage === 'ar' ? 'صوت' : 'Voice';
         if (actionBtnIcon) actionBtnIcon.setAttribute('data-lucide', 'mic');
 
-        if (state === 'idle' && statusCard) {
+        if (state === 'idle' && statusCard && hideStatusCard) {
           statusCard.classList.add('hidden');
         }
       }
@@ -28653,17 +28686,18 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         try { luminVoiceProcessingAbortController.abort(); } catch (_) {}
       }
       luminVoiceProcessingActive = false;
-      updateVoiceAssistantUI('idle');
       if (isTimeout) {
-        showVoiceStatusCard('error', currentUiLanguage === 'ar' ? 'استغرق التحليل وقتاً طويلاً (أكثر من 14 ثانية). يرجى التحدث مرة أخرى.' : 'Analysis timed out (14s). Please speak again.');
+        updateVoiceAssistantUI('idle', '', false);
+        showVoiceStatusCard('error', currentUiLanguage === 'ar' ? 'استغرق التحليل وقتاً طويلاً. يرجى التحدث مرة أخرى.' : 'Analysis timed out. Please speak again.');
       } else {
+        updateVoiceAssistantUI('idle', '', true);
         showToast(currentUiLanguage === 'ar' ? 'تم إلغاء التحليل الصوتي' : 'Voice analysis cancelled', 'info');
       }
     }
 
     async function fetchGeminiVoiceWithFallback(apiKey, requestBody) {
-      // Prioritize gemini-flash-latest (proven 2s latency), then gemini-3.6-flash
-      const candidateModels = ['gemini-flash-latest', 'gemini-3.6-flash'];
+      // Prioritize fast, high-quota models: gemini-3.5-flash-lite (sub-second), gemini-flash-lite-latest, gemini-3.7-flash
+      const candidateModels = ['gemini-3.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-3.7-flash'];
       let lastError = null;
 
       for (const model of candidateModels) {
@@ -28745,10 +28779,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
           ],
           generationConfig: {
             responseMimeType: 'application/json',
-            responseSchema: LUMIN_VOICE_RESPONSE_SCHEMA,
-            thinkingConfig: {
-              thinkingBudget: 0
-            }
+            responseSchema: LUMIN_VOICE_RESPONSE_SCHEMA
           }
         };
 
@@ -28761,9 +28792,13 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
 
       } catch (err) {
         console.error('Lumin Voice Agent error:', err);
-        showToast(err.message || 'Voice recognition error', 'danger');
-        showVoiceStatusCard('error', err.message || 'Voice recognition failed');
-        updateVoiceAssistantUI('idle');
+        const isQuota = /quota|429|RESOURCE_EXHAUSTED/i.test(err.message || '');
+        const friendlyMsg = isQuota
+          ? (currentUiLanguage === 'ar' ? 'تم استنفاد حصة Gemini الحالية مؤقتاً. يرجى الانتظار بضع ثوانٍ أو فحص المفتاح.' : 'Gemini API quota rate-limited. Please wait a few seconds or check key.')
+          : (err.message || (currentUiLanguage === 'ar' ? 'فشل التعرف الصوتي' : 'Voice recognition failed'));
+        showToast(friendlyMsg, 'danger');
+        showVoiceStatusCard('error', friendlyMsg);
+        updateVoiceAssistantUI('idle', '', false);
       } finally {
         clearInterval(luminVoiceProcessingTimer);
         luminVoiceProcessingActive = false;
@@ -28828,9 +28863,8 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     }
 
     async function executeVoiceChartActions(payload) {
-      updateVoiceAssistantUI('idle');
-
       if (!payload || payload.intent === 'IGNORE' || !payload.actions?.length) {
+        updateVoiceAssistantUI('idle', '', false);
         if (payload?.intent === 'IGNORE') {
           showVoiceStatusCard('ignored', currentUiLanguage === 'ar' ? 'تم تجاهل الحديث غير السريري' : 'Non-clinical speech ignored');
         } else {
@@ -28841,7 +28875,8 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
 
       const patient = getActivePatient();
       if (!patient) {
-        showToast('No active patient open', 'warning');
+        updateVoiceAssistantUI('idle', '', false);
+        showToast(currentUiLanguage === 'ar' ? 'يرجى فتح ملف مريض أولاً' : 'No active patient open', 'warning');
         return;
       }
 
@@ -28894,10 +28929,10 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
             targetZones = ['center'];
           }
           setChartSelectionTargets([{ tooth: toothId, surfaces: targetZones }]);
-          applySurfaceCondition(operation.code, status, operation.price, operation.steps);
+          applySurfaceCondition(operation.code, status, operation.price, operation.steps, true);
         } else if (isWhole && toothId) {
           setChartSelectionTargets([{ tooth: toothId, surfaces: [] }]);
-          applyToothStatus(operation.code, status, operation.price, operation.steps);
+          applyToothStatus(operation.code, status, operation.price, operation.steps, true);
         } else if (isMouth) {
           applyMouthOperation(operation.code, status, operation.price, operation.steps);
         }
@@ -28909,6 +28944,8 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         const toothLabel = toothId ? chartToothLabel(toothId) : (currentUiLanguage === 'ar' ? 'كامل الفم' : 'Whole mouth');
         appliedSummaries.push(`${operation.name} (${toothLabel})`);
       }
+
+      updateVoiceAssistantUI('idle', '', false);
 
       if (appliedSummaries.length > 0) {
         luminVoiceLastActionUndo = {
@@ -28950,7 +28987,6 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     function speakVoiceFeedback(text) {
       if (!('speechSynthesis' in window) || !text) return;
       try {
-        window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = currentUiLanguage === 'ar' ? 'ar-EG' : 'en-US';
         utterance.rate = 1.05;
