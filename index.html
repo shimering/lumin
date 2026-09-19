@@ -28320,8 +28320,10 @@
     let luminVoiceRecorder = null;
     let luminVoiceAudioChunks = [];
     let luminVoiceRecordingActive = false;
+    let luminVoiceStarting = false;
     let luminVoiceProcessingActive = false;
     let luminVoiceSilenceTimer = null;
+    let luminVoiceMaxTimer = null;
     let luminVoiceLastActionUndo = null;
     let luminVoiceCardTimer = null;
     let clinicGeminiApiKeyCached = '';
@@ -28443,6 +28445,27 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
 
     let luminLocalSpeechRecognition = null;
     let luminLocalSpeechTranscript = '';
+
+    function cleanupLocalSpeechRecognition(abortInstance = false) {
+      clearTimeout(luminVoiceSilenceTimer);
+      clearTimeout(luminVoiceMaxTimer);
+      luminVoiceStarting = false;
+      if (luminLocalSpeechRecognition) {
+        const rec = luminLocalSpeechRecognition;
+        luminLocalSpeechRecognition = null;
+        rec.onstart = null;
+        rec.onresult = null;
+        rec.onerror = null;
+        rec.onend = null;
+        rec.onaudiostart = null;
+        rec.onaudioend = null;
+        rec.onspeechstart = null;
+        rec.onspeechend = null;
+        if (abortInstance) {
+          try { rec.abort(); } catch (_) {}
+        }
+      }
+    }
 
     function isLocalSpeechRecognitionSupported() {
       return Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
@@ -28714,6 +28737,9 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     }
 
     async function startLuminVoiceRecording() {
+      if (luminVoiceStarting || luminVoiceRecordingActive || luminVoiceProcessingActive) {
+        return;
+      }
       const patient = getActivePatient();
       if (!patient) {
         showToast(currentUiLanguage === 'ar' ? 'يرجى فتح مخطط مريض أولاً' : 'Please open a patient chart first', 'warning');
@@ -28733,32 +28759,44 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       }
     }
 
-    function startLuminLocalSpeechRecognition() {
+    function startLuminLocalSpeechRecognition(retryCount = 0) {
       const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRec) {
         startLuminVoiceAudioRecording();
         return;
       }
 
+      // Cancel any active speech synthesis so it releases the microphone & audio session
+      if ('speechSynthesis' in window) {
+        try { window.speechSynthesis.cancel(); } catch (_) {}
+      }
+
+      // Teardown any previous instance cleanly with listeners detached
+      cleanupLocalSpeechRecognition(true);
+
+      luminVoiceStarting = true;
+      luminVoiceRecordingActive = true;
       luminLocalSpeechTranscript = '';
+      clearTimeout(luminVoiceSilenceTimer);
+      clearTimeout(luminVoiceMaxTimer);
+      updateVoiceAssistantUI('recording');
+
       try {
-        if (luminLocalSpeechRecognition) {
-          try { luminLocalSpeechRecognition.abort(); } catch (_) {}
-        }
         const recognition = new SpeechRec();
         luminLocalSpeechRecognition = recognition;
+
         recognition.continuous = true;
         recognition.interimResults = true;
         recognition.maxAlternatives = 1;
         recognition.lang = (currentUiLanguage === 'ar' || document.documentElement.dir === 'rtl') ? 'ar-SA' : 'en-US';
 
-        let maxUtteranceTimer = null;
+        let localTranscript = '';
 
         recognition.onstart = () => {
+          luminVoiceStarting = false;
           luminVoiceRecordingActive = true;
-          updateVoiceAssistantUI('recording');
 
-          // Silence timer: auto-stop after 6 seconds if nothing is spoken
+          // 6s silence timeout: if doctor never speaks, automatically stop
           clearTimeout(luminVoiceSilenceTimer);
           luminVoiceSilenceTimer = setTimeout(() => {
             if (luminVoiceRecordingActive) {
@@ -28766,9 +28804,9 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
             }
           }, 6000);
 
-          // Hard safety limit: max 15s per dictation utterance
-          clearTimeout(maxUtteranceTimer);
-          maxUtteranceTimer = setTimeout(() => {
+          // 15s max timeout per utterance
+          clearTimeout(luminVoiceMaxTimer);
+          luminVoiceMaxTimer = setTimeout(() => {
             if (luminVoiceRecordingActive) {
               stopLuminVoiceRecording();
             }
@@ -28787,36 +28825,57 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
           }
           const combined = (final + interim).trim();
           if (combined) {
+            localTranscript = combined;
             luminLocalSpeechTranscript = combined;
             updateVoiceRecordingInterimText(combined);
 
-            // Auto-finish if doctor pauses for 3 seconds after speaking
+            // Auto-finish if doctor pauses for 2.8s after speaking
             clearTimeout(luminVoiceSilenceTimer);
             luminVoiceSilenceTimer = setTimeout(() => {
               if (luminVoiceRecordingActive) {
                 stopLuminVoiceRecording();
               }
-            }, 3000);
+            }, 2800);
           }
         };
 
         recognition.onerror = (event) => {
           console.warn('Local speech recognition event error:', event?.error);
+          luminVoiceStarting = false;
           if (event?.error === 'not-allowed' || event?.error === 'service-not-allowed') {
             showToast(currentUiLanguage === 'ar' ? 'تم رفض إذن الميكروفون للإملاء' : 'Microphone permission denied for local dictation.', 'danger');
+            cleanupLocalSpeechRecognition(true);
+            luminVoiceRecordingActive = false;
             updateVoiceAssistantUI('idle');
           } else if (event?.error === 'network') {
             console.warn('Local STT network error, attempting audio fallback...');
-            try { recognition.abort(); } catch (_) {}
+            cleanupLocalSpeechRecognition(true);
+            luminVoiceRecordingActive = false;
             startLuminVoiceAudioRecording();
+          } else if (event?.error === 'no-speech') {
+            // No speech detected, will finish via onend cleanly
           }
         };
 
         recognition.onend = async () => {
           clearTimeout(luminVoiceSilenceTimer);
-          clearTimeout(maxUtteranceTimer);
+          clearTimeout(luminVoiceMaxTimer);
+          luminVoiceStarting = false;
           luminVoiceRecordingActive = false;
-          const text = (luminLocalSpeechTranscript || '').trim();
+
+          // Cleanly detach handlers so this instance never fires again
+          if (luminLocalSpeechRecognition === recognition) {
+            luminLocalSpeechRecognition = null;
+          }
+          recognition.onstart = null;
+          recognition.onresult = null;
+          recognition.onerror = null;
+          recognition.onend = null;
+
+          const text = (localTranscript || luminLocalSpeechTranscript || '').trim();
+          localTranscript = '';
+          luminLocalSpeechTranscript = '';
+
           if (!text) {
             updateVoiceAssistantUI('idle');
             return;
@@ -28827,7 +28886,18 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         recognition.start();
 
       } catch (err) {
+        luminVoiceStarting = false;
+        // If the browser audio hardware was still releasing the previous session, retry once after 250ms
+        if ((err.name === 'InvalidStateError' || String(err).includes('already started')) && retryCount < 2) {
+          console.warn('Speech recognition busy, retrying in 250ms...');
+          cleanupLocalSpeechRecognition(true);
+          setTimeout(() => {
+            startLuminLocalSpeechRecognition(retryCount + 1);
+          }, 250);
+          return;
+        }
         console.error('Failed to start local speech recognition, falling back to audio recording:', err);
+        cleanupLocalSpeechRecognition(true);
         startLuminVoiceAudioRecording();
       }
     }
@@ -28888,10 +28958,17 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
 
     function stopLuminVoiceRecording() {
       clearTimeout(luminVoiceSilenceTimer);
+      clearTimeout(luminVoiceMaxTimer);
+      luminVoiceStarting = false;
       if (luminLocalSpeechRecognition) {
+        const rec = luminLocalSpeechRecognition;
         try {
-          luminLocalSpeechRecognition.stop();
-        } catch (_) {}
+          rec.stop();
+        } catch (_) {
+          cleanupLocalSpeechRecognition(true);
+          luminVoiceRecordingActive = false;
+          updateVoiceAssistantUI('idle');
+        }
       }
       if (luminVoiceRecorder && luminVoiceRecorder.state === 'recording') {
         try {
@@ -28903,7 +28980,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     function toggleLuminVoiceRecording() {
       if (luminVoiceRecordingActive) {
         stopLuminVoiceRecording();
-      } else if (!luminVoiceProcessingActive) {
+      } else if (!luminVoiceProcessingActive && !luminVoiceStarting) {
         startLuminVoiceRecording();
       }
     }
@@ -28936,11 +29013,9 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     function cancelLuminVoiceProcessing(isTimeout = false) {
       clearInterval(luminVoiceProcessingTimer);
       clearTimeout(luminVoiceSilenceTimer);
-      if (luminLocalSpeechRecognition) {
-        try {
-          luminLocalSpeechRecognition.abort();
-        } catch (_) {}
-      }
+      clearTimeout(luminVoiceMaxTimer);
+      luminVoiceStarting = false;
+      cleanupLocalSpeechRecognition(true);
       luminLocalSpeechTranscript = '';
       if (luminVoiceRecorder && luminVoiceRecorder.state === 'recording') {
         try {
@@ -29315,9 +29390,16 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     function speakVoiceFeedback(text) {
       if (!('speechSynthesis' in window) || !text) return;
       try {
+        window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = currentUiLanguage === 'ar' ? 'ar-EG' : 'en-US';
         utterance.rate = 1.05;
+        utterance.onend = () => {
+          try { window.speechSynthesis.cancel(); } catch (_) {}
+        };
+        utterance.onerror = () => {
+          try { window.speechSynthesis.cancel(); } catch (_) {}
+        };
         window.speechSynthesis.speak(utterance);
       } catch (_) {}
     }
@@ -29331,7 +29413,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) return;
 
         e.preventDefault();
-        if (!luminVoiceRecordingActive && !luminVoiceProcessingActive) {
+        if (!luminVoiceRecordingActive && !luminVoiceProcessingActive && !luminVoiceStarting) {
           startLuminVoiceRecording();
         }
       });
