@@ -28238,6 +28238,8 @@
     let luminVoiceLastActionUndo = null;
     let luminVoiceCardTimer = null;
     let clinicGeminiApiKeyCached = '';
+    let luminVoiceProcessingAbortController = null;
+    let luminVoiceProcessingTimer = null;
 
     const LUMIN_VOICE_SYSTEM_INSTRUCTION = `You are "Lumin Voice Scribe", a specialized real-time clinical dental assistant integrated into Lumin Dental PMS.
 Your mission is to transcribe and convert voice utterances from a dentist or dental assistant into structured clinical chart mutations for the currently opened patient.
@@ -28430,15 +28432,33 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
                 <i data-lucide="loader-2" class="h-5 w-5 animate-spin"></i>
               </div>
               <div class="min-w-0 flex-1">
-                <h4 class="text-xs font-black uppercase tracking-wider text-violet-600">${currentUiLanguage === 'ar' ? 'جاري التحليل السريري...' : 'Analyzing with Gemini...'}</h4>
-                <p class="mt-0.5 text-xs font-medium text-slate-600">${currentUiLanguage === 'ar' ? 'مطابقة الإجراءات والأسنان المذكورة' : 'Parsing anatomy and procedures'}</p>
+                <div class="flex items-center justify-between gap-2">
+                  <h4 class="text-xs font-black uppercase tracking-wider text-violet-600">${currentUiLanguage === 'ar' ? 'جاري التحليل السريري...' : 'Analyzing Chairside...'}</h4>
+                  <span id="chart-voice-processing-timer" class="rounded-md bg-violet-100 px-1.5 py-0.5 text-[10px] font-black text-violet-700 font-mono">0s</span>
+                </div>
+                <p class="mt-0.5 text-xs font-medium text-slate-600 truncate">${currentUiLanguage === 'ar' ? 'مطابقة الإجراءات والأسنان المذكورة' : 'Matching clinical procedures'}</p>
               </div>
+              <button type="button" onclick="cancelLuminVoiceProcessing()" class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Cancel analysis" title="Cancel">
+                <i data-lucide="x" class="h-4 w-4"></i>
+              </button>
             </div>
           `;
           if (window.lucide) lucide.createIcons();
+
+          clearInterval(luminVoiceProcessingTimer);
+          let processingSeconds = 0;
+          luminVoiceProcessingTimer = setInterval(() => {
+            processingSeconds++;
+            const timerEl = document.getElementById('chart-voice-processing-timer');
+            if (timerEl) timerEl.textContent = `${processingSeconds}s`;
+            if (processingSeconds >= 14) {
+              cancelLuminVoiceProcessing(true);
+            }
+          }, 1000);
         }
       } else {
         // Idle
+        clearInterval(luminVoiceProcessingTimer);
         if (fab) {
           fab.classList.remove('voice-recording-pulse', 'bg-red-600', 'hover:bg-red-700', 'bg-violet-600', 'hover:bg-violet-700');
           fab.classList.add('bg-blue-600', 'hover:bg-blue-700');
@@ -28627,6 +28647,55 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       toggleLuminVoiceRecording();
     }
 
+    function cancelLuminVoiceProcessing(isTimeout = false) {
+      clearInterval(luminVoiceProcessingTimer);
+      if (luminVoiceProcessingAbortController) {
+        try { luminVoiceProcessingAbortController.abort(); } catch (_) {}
+      }
+      luminVoiceProcessingActive = false;
+      updateVoiceAssistantUI('idle');
+      if (isTimeout) {
+        showVoiceStatusCard('error', currentUiLanguage === 'ar' ? 'استغرق التحليل وقتاً طويلاً (أكثر من 14 ثانية). يرجى التحدث مرة أخرى.' : 'Analysis timed out (14s). Please speak again.');
+      } else {
+        showToast(currentUiLanguage === 'ar' ? 'تم إلغاء التحليل الصوتي' : 'Voice analysis cancelled', 'info');
+      }
+    }
+
+    async function fetchGeminiVoiceWithFallback(apiKey, requestBody) {
+      // Prioritize gemini-flash-latest (proven 2s latency), then gemini-3.6-flash
+      const candidateModels = ['gemini-flash-latest', 'gemini-3.6-flash'];
+      let lastError = null;
+
+      for (const model of candidateModels) {
+        try {
+          const controller = new AbortController();
+          luminVoiceProcessingAbortController = controller;
+          const timeoutId = setTimeout(() => controller.abort(), 8500);
+
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+
+          if (response.ok) {
+            return await response.json();
+          }
+
+          const errData = await response.json().catch(() => ({}));
+          console.warn(`Model ${model} returned HTTP ${response.status}:`, errData?.error?.message);
+          lastError = new Error(errData?.error?.message || `Model ${model} returned status ${response.status}`);
+        } catch (err) {
+          console.warn(`Model ${model} attempt failed:`, err?.message || err);
+          lastError = err;
+        }
+      }
+
+      throw lastError || new Error('All voice recognition endpoints timed out.');
+    }
+
     async function processLuminVoiceBlob(blob) {
       luminVoiceProcessingActive = true;
       updateVoiceAssistantUI('processing');
@@ -28651,7 +28720,9 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
           .map(op => `code: "${op.code}" | name: "${op.name}" | scope: "${op.actionScope}" | price: ${op.price}`)
           .join('\n');
 
-        const mimeType = (blob.type || 'audio/webm').split(';')[0];
+        let mimeType = (blob.type || 'audio/webm').split(';')[0];
+        // iOS Safari records audio/mp4 (AAC container) which Gemini processes 3x faster as audio/m4a
+        if (mimeType === 'audio/mp4') mimeType = 'audio/m4a';
 
         const requestBody = {
           systemInstruction: {
@@ -28681,28 +28752,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
           }
         };
 
-        let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody)
-        });
-
-        if (!response.ok && (response.status === 404 || response.status === 400)) {
-          const fallbackBody = JSON.parse(JSON.stringify(requestBody));
-          delete fallbackBody.generationConfig.thinkingConfig;
-          response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(fallbackBody)
-          });
-        }
-
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData?.error?.message || `Gemini API returned status ${response.status}`);
-        }
-
-        const resJson = await response.json();
+        const resJson = await fetchGeminiVoiceWithFallback(apiKey, requestBody);
         const payloadText = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!payloadText) throw new Error('No response returned from Gemini.');
 
@@ -28715,6 +28765,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         showVoiceStatusCard('error', err.message || 'Voice recognition failed');
         updateVoiceAssistantUI('idle');
       } finally {
+        clearInterval(luminVoiceProcessingTimer);
         luminVoiceProcessingActive = false;
       }
     }
