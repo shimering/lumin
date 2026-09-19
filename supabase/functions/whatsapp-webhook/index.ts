@@ -19,15 +19,43 @@ function getSupabaseClient() {
   return createClient(supabaseUrl, supabaseKey);
 }
 
+// Check if an identifier is a WhatsApp Business-Scoped User ID (BSUID) or username-protected ID
+function isBsuid(val: string): boolean {
+  if (!val || typeof val !== "string") return false;
+  const s = val.trim();
+  return /^[A-Za-z]{2}\.\d+$/i.test(s);
+}
+
 // Clean phone numbers to standard international format (digits only, e.g. 9647701234567)
 function cleanPhone(raw: string): string {
+  if (isBsuid(raw)) return String(raw).trim();
   return String(raw || "").replace(/[^\d]/g, "");
 }
 
 // Format phone for local matching (extract last 9-10 digits)
 function getPhoneTail(phone: string): string {
+  if (isBsuid(phone)) return String(phone).trim();
   const cleaned = cleanPhone(phone);
   return cleaned.length > 9 ? cleaned.slice(-9) : cleaned;
+}
+
+// Extract sender identifier from wamid (e.g. wamid.HBgTRUcu... -> EG.1016355928130143)
+function extractIdentifierFromWamid(wamid: string): string | null {
+  if (!wamid || typeof wamid !== "string" || !wamid.startsWith("wamid.HBg")) return null;
+  try {
+    const parts = wamid.split(".");
+    if (!parts[1]) return null;
+    const b64 = parts[1].replace(/^HBg[A-Za-z0-9]/, "");
+    if (!b64) return null;
+    const decoded = atob(b64);
+    const bsuidMatch = decoded.match(/([A-Za-z]{2}\.\d+)/);
+    if (bsuidMatch) return bsuidMatch[1];
+    const phoneMatch = decoded.match(/(\d{9,15})/);
+    if (phoneMatch) return phoneMatch[1];
+  } catch {
+    // ignore decode error
+  }
+  return null;
 }
 
 // Fetch WhatsApp and Gemini credentials from clinic_settings or environment
@@ -62,8 +90,14 @@ async function sendMetaWhatsAppMessage(
   text: string,
   contextMessageId?: string | null
 ) {
-  if (!phoneId || !accessToken || !toPhone || !text) {
-    console.warn("sendMetaWhatsAppMessage: missing required parameter", { phoneId: Boolean(phoneId), accessToken: Boolean(accessToken), toPhone: Boolean(toPhone) });
+  const isTargetBsuid = isBsuid(toPhone);
+  const clean = isTargetBsuid ? toPhone.trim() : cleanPhone(toPhone);
+  if (!phoneId || !accessToken || !clean || !text) {
+    console.warn("sendMetaWhatsAppMessage: missing required parameter", {
+      phoneId: Boolean(phoneId),
+      accessToken: Boolean(accessToken),
+      toPhone: Boolean(clean),
+    });
     return null;
   }
 
@@ -71,10 +105,15 @@ async function sendMetaWhatsAppMessage(
   const payload: any = {
     messaging_product: "whatsapp",
     recipient_type: "individual",
-    to: cleanPhone(toPhone),
     type: "text",
     text: { body: text },
   };
+
+  if (isTargetBsuid) {
+    payload.recipient = clean;
+  } else {
+    payload.to = clean;
+  }
 
   if (contextMessageId) {
     payload.context = { message_id: contextMessageId };
@@ -105,33 +144,42 @@ async function sendMetaWhatsAppReaction(
   messageId: string,
   emoji: string | null
 ) {
-  if (!phoneId || !accessToken || !toPhone || !messageId) {
+  const isTargetBsuid = isBsuid(toPhone);
+  const clean = isTargetBsuid ? toPhone.trim() : cleanPhone(toPhone);
+  if (!phoneId || !accessToken || !clean || !messageId) {
     console.warn("sendMetaWhatsAppReaction: missing required parameter", {
       phoneId: Boolean(phoneId),
       accessToken: Boolean(accessToken),
-      toPhone: Boolean(toPhone),
+      toPhone: Boolean(clean),
       messageId: Boolean(messageId),
     });
     return null;
   }
 
   const url = `https://graph.facebook.com/v21.0/${phoneId}/messages`;
+  const reactionPayload: any = {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    type: "reaction",
+    reaction: {
+      message_id: messageId,
+      emoji: emoji || "",
+    },
+  };
+
+  if (isTargetBsuid) {
+    reactionPayload.recipient = clean;
+  } else {
+    reactionPayload.to = clean;
+  }
+
   const res = await fetch(url, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      recipient_type: "individual",
-      to: cleanPhone(toPhone),
-      type: "reaction",
-      reaction: {
-        message_id: messageId,
-        emoji: emoji || "",
-      },
-    }),
+    body: JSON.stringify(reactionPayload),
   });
 
   const data = await res.json();
@@ -149,11 +197,13 @@ async function sendMetaWhatsAppAudioMessage(
   toPhone: string,
   audioUrl: string
 ) {
-  if (!phoneId || !accessToken || !toPhone || !audioUrl) {
+  const isTargetBsuid = isBsuid(toPhone);
+  const clean = isTargetBsuid ? toPhone.trim() : cleanPhone(toPhone);
+  if (!phoneId || !accessToken || !clean || !audioUrl) {
     console.warn("sendMetaWhatsAppAudioMessage: missing required parameter", {
       phoneId: Boolean(phoneId),
       accessToken: Boolean(accessToken),
-      toPhone: Boolean(toPhone),
+      toPhone: Boolean(clean),
       audioUrl: Boolean(audioUrl),
     });
     return null;
@@ -166,19 +216,26 @@ async function sendMetaWhatsAppAudioMessage(
     audioPayload.voice = true;
   }
 
+  const payload: any = {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    type: "audio",
+    audio: audioPayload,
+  };
+
+  if (isTargetBsuid) {
+    payload.recipient = clean;
+  } else {
+    payload.to = clean;
+  }
+
   const res = await fetch(url, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      recipient_type: "individual",
-      to: cleanPhone(toPhone),
-      type: "audio",
-      audio: audioPayload,
-    }),
+    body: JSON.stringify(payload),
   });
 
   const data = await res.json();
@@ -198,11 +255,13 @@ async function sendMetaWhatsAppTemplate(
   languageCode: string = "ar",
   components?: any[]
 ) {
-  if (!phoneId || !accessToken || !toPhone || !templateName) {
+  const isTargetBsuid = isBsuid(toPhone);
+  const clean = isTargetBsuid ? toPhone.trim() : cleanPhone(toPhone);
+  if (!phoneId || !accessToken || !clean || !templateName) {
     console.warn("sendMetaWhatsAppTemplate: missing required parameter", {
       phoneId: Boolean(phoneId),
       accessToken: Boolean(accessToken),
-      toPhone: Boolean(toPhone),
+      toPhone: Boolean(clean),
       templateName: Boolean(templateName),
     });
     return null;
@@ -223,10 +282,15 @@ async function sendMetaWhatsAppTemplate(
   const payload: any = {
     messaging_product: "whatsapp",
     recipient_type: "individual",
-    to: cleanPhone(toPhone),
     type: "template",
     template: templateObj,
   };
+
+  if (isTargetBsuid) {
+    payload.recipient = clean;
+  } else {
+    payload.to = clean;
+  }
 
   const res = await fetch(url, {
     method: "POST",
@@ -964,12 +1028,16 @@ async function handleGeminiToolCall(
     // 1. Find or create patient
     let patientId = conversation.patient_id;
     if (!patientId) {
-      const tail = getPhoneTail(conversation.phone);
-      const { data: existingPatient } = await supabase
-        .from("patients")
-        .select("id, name")
-        .or(`phone.eq.${conversation.phone},phone.ilike.%${tail}`)
-        .maybeSingle();
+      let existingPatient = null;
+      if (!isBsuid(conversation.phone) && conversation.phone) {
+        const tail = getPhoneTail(conversation.phone);
+        const { data } = await supabase
+          .from("patients")
+          .select("id, name")
+          .or(`phone.eq.${conversation.phone},phone.ilike.%${tail}`)
+          .maybeSingle();
+        existingPatient = data;
+      }
 
       if (existingPatient) {
         patientId = existingPatient.id;
@@ -983,7 +1051,7 @@ async function handleGeminiToolCall(
             name: patient_name || conversation.patient_name,
             first_name: firstName,
             last_name: lastName,
-            phone: conversation.phone,
+            phone: isBsuid(conversation.phone) ? "" : conversation.phone,
           })
           .select("id")
           .single();
@@ -1381,6 +1449,7 @@ Rules:
    - Once booked, provide a clear, warm confirmation message summarizing the date, time, doctor, and service.
 3. If the patient has severe medical emergencies, pain that requires immediate triage, or requests to speak to a person, call \`request_human_support\` and politely inform the patient that our clinic team will reply shortly.
 4. Keep your responses concise, friendly, and formatted nicely for WhatsApp (use *bold* and bullet points sparingly). Do not use long markdown tables.
+${isBsuid(conversation?.phone) ? "\n5. SPECIAL PATIENT NOTICE (MASKED WHATSAPP USERNAME): This patient is contacting via a masked WhatsApp Username (their phone number is protected). During the conversation, politely ask them to provide their mobile phone number so the clinic reception can confirm their reservation and contact them if needed." : ""}
 
 ${customInstructions ? `Additional clinic instructions & doctor shift rules: ${customInstructions}` : ""}`;
 
@@ -1523,23 +1592,26 @@ Deno.serve(async (req: Request) => {
           }
           conv = data;
         } else if (phone) {
-          const clean = cleanPhone(phone);
+          const targetIsBsuid = isBsuid(phone);
+          const clean = targetIsBsuid ? phone.trim() : cleanPhone(phone);
           const tail = getPhoneTail(clean);
 
           // Try to find existing conversation
-          const { data: existingConv } = await supabase
-            .from("whatsapp_conversations")
-            .select("*")
-            .or(`phone.eq.${clean},phone.ilike.%${tail}`)
-            .maybeSingle();
+          let query = supabase.from("whatsapp_conversations").select("*");
+          if (targetIsBsuid) {
+            query = query.eq("phone", clean);
+          } else {
+            query = query.or(`phone.eq.${clean},phone.ilike.%${tail}`);
+          }
+          const { data: existingConv } = await query.maybeSingle();
 
           if (existingConv) {
             conv = existingConv;
           } else {
             // Find or link patient if exists
             let linkedPatientId = patient_id || null;
-            let linkedPatientName = patient_name || `+${clean}`;
-            if (!linkedPatientId) {
+            let linkedPatientName = patient_name || (targetIsBsuid ? "WhatsApp User" : `+${clean}`);
+            if (!linkedPatientId && !targetIsBsuid) {
               const { data: p } = await supabase
                 .from("patients")
                 .select("id, name")
@@ -1785,20 +1857,23 @@ Deno.serve(async (req: Request) => {
         }
 
         if (!conv && phone) {
-          const clean = cleanPhone(phone);
-          const tail = clean.slice(-8);
-          const { data: existingConv } = await supabase
-            .from("whatsapp_conversations")
-            .select("*")
-            .or(`phone.eq.${clean},phone.ilike.%${tail}`)
-            .maybeSingle();
+          const targetIsBsuid = isBsuid(phone);
+          const clean = targetIsBsuid ? phone.trim() : cleanPhone(phone);
+          const tail = getPhoneTail(clean);
+          let query = supabase.from("whatsapp_conversations").select("*");
+          if (targetIsBsuid) {
+            query = query.eq("phone", clean);
+          } else {
+            query = query.or(`phone.eq.${clean},phone.ilike.%${tail}`);
+          }
+          const { data: existingConv } = await query.maybeSingle();
 
           if (existingConv) {
             conv = existingConv;
           } else {
             let linkedPatientId = patient_id || null;
-            let linkedPatientName = patient_name || `+${clean}`;
-            if (!linkedPatientId) {
+            let linkedPatientName = patient_name || (targetIsBsuid ? "WhatsApp User" : `+${clean}`);
+            if (!linkedPatientId && !targetIsBsuid) {
               const { data: p } = await supabase
                 .from("patients")
                 .select("id, name")
@@ -1928,10 +2003,32 @@ Deno.serve(async (req: Request) => {
                   continue;
                 }
 
-                const fromPhone = cleanPhone(incoming.from);
                 const messageId = incoming.id;
-                const contact = (value.contacts || []).find((c: any) => c.wa_id === incoming.from) || {};
-                const contactName = contact.profile?.name || `+${fromPhone}`;
+                const contact = (value.contacts || []).find((c: any) => c.wa_id === incoming.from || (incoming.from && c.wa_id?.includes(incoming.from))) || value.contacts?.[0] || {};
+
+                let resolvedIdentifier = "";
+                if (isBsuid(incoming.from)) {
+                  resolvedIdentifier = incoming.from.trim();
+                } else if (isBsuid(incoming.user_id)) {
+                  resolvedIdentifier = incoming.user_id.trim();
+                } else if (isBsuid(contact.user_id)) {
+                  resolvedIdentifier = contact.user_id.trim();
+                } else if (isBsuid(contact.wa_id)) {
+                  resolvedIdentifier = contact.wa_id.trim();
+                } else {
+                  const cleaned = cleanPhone(incoming.from || contact.wa_id);
+                  if (cleaned) {
+                    resolvedIdentifier = cleaned;
+                  } else {
+                    const fromWamid = extractIdentifierFromWamid(messageId);
+                    if (fromWamid) {
+                      resolvedIdentifier = fromWamid;
+                    }
+                  }
+                }
+                const fromPhone = resolvedIdentifier;
+                const isMaskedProfile = isBsuid(fromPhone);
+                const contactName = contact.profile?.name || (isMaskedProfile ? "WhatsApp User" : `+${fromPhone}`);
 
                 let messageType = "text";
                 let textContent = "";
@@ -2016,15 +2113,22 @@ Deno.serve(async (req: Request) => {
                   .maybeSingle();
 
                 if (!conv) {
-                  const tail = getPhoneTail(fromPhone);
-                  const { data: patient } = await supabase
-                    .from("patients")
-                    .select("id, name")
-                    .or(`phone.eq.${fromPhone},phone.ilike.%${tail}`)
-                    .maybeSingle();
+                  let patientName = contactName;
+                  let patientId = null;
 
-                  const patientName = patient?.name || contactName;
-                  const patientId = patient?.id || null;
+                  if (!isMaskedProfile && fromPhone) {
+                    const tail = getPhoneTail(fromPhone);
+                    const { data: patient } = await supabase
+                      .from("patients")
+                      .select("id, name")
+                      .or(`phone.eq.${fromPhone},phone.ilike.%${tail}`)
+                      .maybeSingle();
+
+                    if (patient) {
+                      patientName = patient.name || contactName;
+                      patientId = patient.id || null;
+                    }
+                  }
 
                   const { data: newConv, error: insertConvErr } = await supabase
                     .from("whatsapp_conversations")

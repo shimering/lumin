@@ -470,6 +470,53 @@
       to { opacity: 1; transform: translateY(0) scale(1); }
     }
 
+    /* Chairside Voice Control Agent Styles */
+    @keyframes voice-pulse-ring {
+      0% { transform: scale(0.96); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 16px rgba(239, 68, 68, 0); }
+      100% { transform: scale(0.96); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+    @keyframes voice-wave-bar {
+      0%, 100% { height: 6px; }
+      50% { height: 22px; }
+    }
+    .voice-recording-pulse {
+      animation: voice-pulse-ring 1.4s infinite cubic-bezier(0.45, 0.05, 0.55, 0.95);
+      background-color: #dc2626 !important;
+    }
+    .voice-wave-bar-1 { animation: voice-wave-bar 1.1s ease-in-out infinite 0.1s; }
+    .voice-wave-bar-2 { animation: voice-wave-bar 0.9s ease-in-out infinite 0.25s; }
+    .voice-wave-bar-3 { animation: voice-wave-bar 1.3s ease-in-out infinite 0.4s; }
+    .voice-wave-bar-4 { animation: voice-wave-bar 0.8s ease-in-out infinite 0.15s; }
+    .voice-wave-bar-5 { animation: voice-wave-bar 1.0s ease-in-out infinite 0.3s; }
+
+    /* Responsive, Mobile & iPad Safe Positioning for Chairside Voice FAB */
+    #chart-voice-fab-container {
+      position: fixed;
+      bottom: calc(var(--mobile-nav-height, 0px) + 1.25rem);
+      right: 1.25rem;
+      z-index: 85;
+    }
+    @media (min-width: 1024px) {
+      #chart-voice-fab-container {
+        bottom: 2rem;
+        right: 2rem;
+      }
+    }
+    html[dir="rtl"] #chart-voice-fab-container {
+      right: auto;
+      left: 1.25rem;
+    }
+    @media (min-width: 1024px) {
+      html[dir="rtl"] #chart-voice-fab-container {
+        left: 2rem;
+      }
+    }
+    @media print {
+      #chart-voice-fab-container { display: none !important; }
+    }
+
+
     /* Multi-surface selection ring keeps the underlying operation-status color visible. */
     .surface-selected {
       filter: brightness(1.04) saturate(1.05) drop-shadow(0 0 3px rgba(37, 99, 235, 0.72)) !important;
@@ -5650,6 +5697,10 @@
           <h2 class="patient-workspace-name min-w-0 truncate text-lg font-black tracking-tight text-white sm:text-xl">Patient</h2>
         </div>
         <div class="flex shrink-0 items-center justify-end gap-2">
+          <button id="patient-workspace-voice-btn" type="button" onclick="handlePatientWorkspaceVoiceClick()" class="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 px-3 text-xs font-black text-white shadow-sm transition hover:from-blue-700 hover:to-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 active:scale-95" title="Voice Scribe: Dictate procedures to this patient's chart" aria-label="Start voice dictation for this patient">
+            <i data-lucide="mic" class="h-3.5 w-3.5"></i>
+            <span>Voice Scribe</span>
+          </button>
           <button type="button" data-patient-workspace-action="payments" onclick="renderPatientPayments()" class="hidden h-9 items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-3 text-xs font-black text-white transition hover:bg-white/20"><i data-lucide="refresh-cw" class="h-3.5 w-3.5"></i> Refresh</button>
           <button id="profile-edit-patient-button" type="button" onclick="openEditPatientModal(activeWorkspacePatientId)" class="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-white px-3 text-xs font-black text-blue-900 shadow-sm transition hover:bg-cyan-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
             <i data-lucide="user-pen" class="h-3.5 w-3.5"></i> Edit
@@ -5908,9 +5959,15 @@
                     </span>
                   </div>
                 </div>
-                <button onclick="clearSelectedTooth()" class="shrink-0 rounded-lg border border-white/10 p-1.5 text-slate-300 transition hover:border-red-400/50 hover:bg-red-500/20 hover:text-red-200" title="Clear all findings from the selected tooth" aria-label="Clear selected tooth findings">
-                  <i data-lucide="trash-2" class="h-4 w-4"></i>
-                </button>
+                <div class="flex items-center gap-2 shrink-0">
+                  <button id="chart-voice-action-btn" type="button" onclick="toggleLuminVoiceRecording()" class="inline-flex items-center gap-1.5 rounded-lg bg-cyan-950/40 px-2.5 py-1 text-xs font-black text-cyan-200 transition hover:bg-cyan-900/60 hover:text-white" style="border: 1px solid rgba(34, 211, 238, 0.4);" title="Voice scribe: Dictate procedures (or hold Spacebar)" aria-label="Start voice dictation">
+                    <i id="chart-voice-action-btn-icon" data-lucide="mic" class="h-3.5 w-3.5"></i>
+                    <span id="chart-voice-action-btn-text" class="hidden sm:inline">Voice</span>
+                  </button>
+                  <button onclick="clearSelectedTooth()" class="shrink-0 rounded-lg p-1.5 text-slate-300 transition hover:bg-red-500/20 hover:text-red-200" style="border: 1px solid rgba(255, 255, 255, 0.1);" title="Clear all findings from the selected tooth" aria-label="Clear selected tooth findings">
+                    <i data-lucide="trash-2" class="h-4 w-4"></i>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -6011,6 +6068,50 @@
         <span>Add invoice</span>
       </button>
     </section>
+
+    <!-- Chairside Floating Voice Assistant Control & Feedback Card (Positioned safely above iPad & mobile nav bars) -->
+    <div id="chart-voice-fab-container" class="hidden fixed flex flex-col items-end gap-2.5 pointer-events-none" style="z-index: 90;">
+      <!-- Live Voice Status / Confirmation Toast with Undo -->
+      <div id="chart-voice-status-card" class="hidden pointer-events-auto max-w-sm rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xl transition-all duration-200 sm:max-w-md" role="status" aria-live="polite">
+        <!-- Dynamic contents rendered by renderVoiceStatusCard() -->
+      </div>
+
+      <!-- Floating Mic Button (Accessible chairside touch footprint for iPad, mobile, & desktop) -->
+      <div class="flex items-center gap-2 pointer-events-auto">
+        <span id="chart-voice-spacebar-hint" class="hidden rounded-full bg-slate-900/80 px-2.5 py-1 text-[10px] font-bold text-slate-300 shadow-md backdrop-blur-xs md:inline-block">Hold <kbd class="font-mono text-cyan-300 font-bold">Space</kbd> to talk</span>
+        <button id="chart-voice-fab" type="button" onclick="handlePatientWorkspaceVoiceClick()" class="group relative flex h-14 min-w-14 items-center justify-center gap-2.5 rounded-full bg-blue-600 px-4 text-white shadow-xl shadow-blue-600/30 transition-all duration-200 hover:scale-105 hover:bg-blue-700 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/30" title="Chairside Voice Scribe (hold Spacebar)" aria-label="Toggle voice recording">
+          <span id="chart-voice-fab-pulse" class="pointer-events-none absolute -inset-1 rounded-full opacity-0 transition-opacity"></span>
+          <i id="chart-voice-fab-icon" data-lucide="mic" class="relative z-10 h-6 w-6 shrink-0"></i>
+          <span id="chart-voice-fab-label" class="relative z-10 font-bold text-xs">Voice Scribe</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Missing Gemini API Key Help Modal -->
+    <div id="chart-voice-key-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs" role="dialog" aria-modal="true" aria-labelledby="chart-voice-key-modal-title">
+      <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+        <div class="flex items-center gap-3">
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+            <i data-lucide="sparkles" class="h-5 w-5"></i>
+          </div>
+          <div>
+            <h3 id="chart-voice-key-modal-title" class="text-base font-bold text-slate-900">Google Gemini API Key Required</h3>
+            <p class="text-xs text-slate-500">Free chairside voice control requires a Google Gemini key</p>
+          </div>
+        </div>
+        <div class="mt-4 space-y-3 text-xs text-slate-600 leading-relaxed">
+          <p>Lumin Voice Scribe runs for <strong>free</strong> using Google Gemini 2.5 Flash via Google AI Studio.</p>
+          <ol class="list-decimal pl-5 space-y-1.5 font-medium">
+            <li>Get your free API key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline font-bold">Google AI Studio</a>.</li>
+            <li>Go to Lumin <strong>Settings &rarr; AI Configuration</strong> and paste the key.</li>
+          </ol>
+        </div>
+        <div class="mt-6 flex items-center justify-end gap-2.5">
+          <button type="button" onclick="document.getElementById('chart-voice-key-modal').classList.add('hidden')" class="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50">Cancel</button>
+          <button type="button" onclick="document.getElementById('chart-voice-key-modal').classList.add('hidden'); if(typeof openSettingsPage === 'function') openSettingsPage();" class="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700">Go to Settings</button>
+        </div>
+      </div>
+    </div>
 
     <!-- ================= VIEW 3: APPOINTMENTS ================= -->
     <section id="view-appointments" class="hidden space-y-3">
@@ -23239,6 +23340,7 @@
       const fallbackView = hasPageAccess('patients') ? 'patients' : firstAuthorizedView();
       const returnView = patientWorkspaceOriginView(patientWorkspaceReturnView) || fallbackView;
       if (returnView) switchView(returnView);
+      if (typeof syncVoiceFabVisibility === 'function') syncVoiceFabVisibility();
     }
 
     function openPatientInvoices(patientId, returnView = null) {
@@ -23404,6 +23506,7 @@
         element.classList.toggle('inline-flex', isVisible);
       });
       document.getElementById('profile-edit-patient-button')?.classList.toggle('hidden', !hasPageAccess('patients'));
+      document.getElementById('patient-workspace-voice-btn')?.classList.toggle('hidden', !hasPageAccess('chart'));
       document.querySelectorAll('[data-patient-workspace-tab]').forEach(button => {
         const allowed = button.dataset.patientWorkspaceTab === 'loyalty'
           ? canViewPatientLoyalty()
@@ -23428,6 +23531,7 @@
       });
       translateUiTree(document.getElementById('patient-workspace-header'), currentUiLanguage);
       syncLoyaltyVisibility();
+      if (typeof syncVoiceFabVisibility === 'function') syncVoiceFabVisibility();
     }
 
     // ================= PATIENT MEDIA & LOCAL STORAGE SERVER =================
@@ -25273,6 +25377,7 @@
         populateStorageServerSettingsInputs();
       }
       lucide.createIcons();
+      if (typeof syncVoiceFabVisibility === 'function') syncVoiceFabVisibility();
     }
 
     async function openPatientChart(patientId, returnView = null) {
@@ -25683,7 +25788,8 @@
     }
 
     function getActivePatient() {
-      return patients.find(p => p.id === activePatientId);
+      const targetId = activePatientId || activeWorkspacePatientId || (typeof patientWorkspaceId === 'function' ? patientWorkspaceId() : null);
+      return patients.find(p => p.id === targetId);
     }
 
     function getOrCreateChartTooth(patient, toothId) {
@@ -28121,6 +28227,644 @@
           </article>`;
       }).join('');
       if (window.lucide) lucide.createIcons();
+    }
+
+    // ================= CHAIRSIDE VOICE CONTROL AI AGENT =================
+    let luminVoiceRecorder = null;
+    let luminVoiceAudioChunks = [];
+    let luminVoiceRecordingActive = false;
+    let luminVoiceProcessingActive = false;
+    let luminVoiceSilenceTimer = null;
+    let luminVoiceLastActionUndo = null;
+    let luminVoiceCardTimer = null;
+    let clinicGeminiApiKeyCached = '';
+
+    const LUMIN_VOICE_SYSTEM_INSTRUCTION = `You are "Lumin Voice Scribe", a specialized real-time clinical dental assistant integrated into Lumin Dental PMS.
+Your mission is to transcribe and convert voice utterances from a dentist or dental assistant into structured clinical chart mutations for the currently opened patient.
+
+### DOMAIN RULES:
+1. ANATOMICAL & TOOTH NOTATION RESOLUTION:
+   Map any tooth reference to Lumin's internal Universal Tooth Number ('1'-'32') and Primary ('A'-'T'):
+   - Palmer / Anatomical Quadrants (teeth 1..8 from midline):
+     - Upper Right (UR): UR1=8, UR2=7, UR3=6, UR4=5, UR5=4, UR6=3, UR7=2, UR8=1
+     - Upper Left (UL):  UL1=9, UL2=10, UL3=11, UL4=12, UL5=13, UL6=14, UL7=15, UL8=16
+     - Lower Left (LL):  LL1=24, LL2=23, LL3=22, LL4=21, LL5=20, LL6=19, LL7=18, LL8=17
+     - Lower Right (LR): LR1=25, LR2=26, LR3=27, LR4=28, LR5=29, LR6=30, LR7=31, LR8=32
+     (e.g., "Upper right 6" = Universal "3"; "Lower left 6" = Universal "19"; "Upper left 1" = Universal "9")
+   - FDI 2-digit:
+     - 18..11 -> 1..8 (18=1, 17=2, 16=3, 15=4, 14=5, 13=6, 12=7, 11=8)
+     - 21..28 -> 9..16 (21=9, 22=10, 23=11, 24=12, 25=13, 26=14, 27=15, 28=16)
+     - 38..31 -> 17..24 (38=17, 37=18, 36=19, 35=20, 34=21, 33=22, 32=23, 31=24)
+     - 41..48 -> 25..32 (41=25, 42=26, 43=27, 44=28, 45=29, 46=30, 47=31, 48=32)
+   - Deciduous / Primary:
+     - 55..51 (UR A-E) -> A..E (55=A, 54=B, 53=C, 52=D, 51=E)
+     - 61..65 (UL F-J) -> F..J (61=F, 62=G, 63=H, 64=I, 65=J)
+     - 75..71 (LL K-O) -> K..O (75=K, 74=L, 73=M, 72=N, 71=O)
+     - 81..85 (LR P-T) -> P..T (81=P, 82=Q, 83=R, 84=S, 85=T)
+   - Arabic names:
+     - "الضرس الأول العلوي يمين" -> UR6 -> Universal "3"
+     - "الضرس الأول السفلي يمين" -> LR6 -> Universal "30"
+     - "الضرس الأول السفلي شمال" -> LL6 -> Universal "19"
+     - "الضرس الأول العلوي شمال" -> UL6 -> Universal "14"
+     - "سن 46" -> FDI 46 / LR6 -> Universal "30"
+     - "سن 16" -> FDI 16 / UR6 -> Universal "3"
+
+2. TOOTH SURFACES:
+   Extract all mentioned surfaces:
+   - 'M': Mesial
+   - 'O': Occlusal (or 'I' for Incisal on anterior teeth 6..11, 22..27)
+   - 'D': Distal
+   - 'B': Buccal / Facial / Vestibular
+   - 'L': Lingual / Palatal
+   Shorthand: "MOD" -> ["M", "O", "D"], "MO" -> ["M", "O"], "DO" -> ["D", "O"].
+
+3. OPERATION MATCHING & SCOPE:
+   Match the procedure to the closest operation in the clinic's catalog:
+   - 'surface': Restorations (Composite, Amalgam, GIC), Inlay, Onlay, Caries/Decay, Sealant, Fracture.
+   - 'tooth': Root Canal (RCT/Endo), Extraction, Crown (Ceramic, Zirconia, PFM, Gold), Post & Core, Implant, Veneer.
+   - 'mouth': Full Mouth Scaling & Polishing, Whitening/Bleaching, Orthodontic Aligners, Nightguard.
+
+4. WORKFLOW STATUS:
+   - 'P': Planned / Needs treatment / Treatment plan / Caries detected. Default if unstated.
+   - 'In': In Progress / Started / Underway / First session.
+   - 'C': Completed / Done / Finished / Filled today.
+   - 'E': Existing / Previous / Already present.
+
+5. INTENT & SAFETY:
+   - If the speech is chit-chat or talking to the patient ("rinse your mouth", "open wider"), set intent="IGNORE".
+   - If multiple teeth or procedures are dictated in one breath, emit an entry for each in 'actions'.
+   - Provide a concise 'spoken_feedback' string (and 'spoken_feedback_ar' if in Arabic) confirming the recorded action.`;
+
+    const LUMIN_VOICE_RESPONSE_SCHEMA = {
+      type: "OBJECT",
+      properties: {
+        intent: {
+          type: "STRING",
+          enum: ["ADD_PROCEDURES", "CLEAR_TOOTH", "IGNORE"]
+        },
+        actions: {
+          type: "ARRAY",
+          items: {
+            type: "OBJECT",
+            properties: {
+              tooth_universal: { type: "STRING" },
+              tooth_label: { type: "STRING" },
+              scope: { type: "STRING", enum: ["surface", "tooth", "mouth"] },
+              surfaces: {
+                type: "ARRAY",
+                items: { type: "STRING", enum: ["M", "O", "D", "B", "L", "I"] }
+              },
+              operation_code: { type: "STRING" },
+              operation_name: { type: "STRING" },
+              status: { type: "STRING", enum: ["P", "In", "C", "E"] }
+            },
+            required: ["scope", "operation_code", "status"]
+          }
+        },
+        spoken_feedback: { type: "STRING" },
+        spoken_feedback_ar: { type: "STRING" },
+        confidence: { type: "NUMBER" }
+      },
+      required: ["intent", "actions", "spoken_feedback", "confidence"]
+    };
+
+    async function getLuminGeminiApiKey() {
+      if (clinicGeminiApiKeyCached) return clinicGeminiApiKeyCached;
+      try {
+        const inputKey = String(document.getElementById('setting-whatsapp-gemini-key')?.value || '').trim();
+        if (inputKey) {
+          clinicGeminiApiKeyCached = inputKey;
+          return inputKey;
+        }
+        const { data } = await db.from('clinic_settings').select('gemini_api_key').eq('id', 1).maybeSingle();
+        if (data?.gemini_api_key) {
+          clinicGeminiApiKeyCached = String(data.gemini_api_key).trim();
+          return clinicGeminiApiKeyCached;
+        }
+      } catch (err) {
+        console.warn('Could not load Gemini API key from clinic settings:', err);
+      }
+      return '';
+    }
+
+    function showLuminVoiceApiKeyModal() {
+      const modal = document.getElementById('chart-voice-key-modal');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function updateVoiceAssistantUI(state, message = '') {
+      const fab = document.getElementById('chart-voice-fab');
+      const fabPulse = document.getElementById('chart-voice-fab-pulse');
+      const fabIcon = document.getElementById('chart-voice-fab-icon');
+      const fabLabel = document.getElementById('chart-voice-fab-label');
+      const actionBtn = document.getElementById('chart-voice-action-btn');
+      const actionBtnText = document.getElementById('chart-voice-action-btn-text');
+      const actionBtnIcon = document.getElementById('chart-voice-action-btn-icon');
+      const statusCard = document.getElementById('chart-voice-status-card');
+
+      if (state === 'recording') {
+        if (fab) {
+          fab.classList.add('voice-recording-pulse');
+          fab.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+          fab.classList.add('bg-red-600', 'hover:bg-red-700');
+        }
+        if (fabPulse) fabPulse.classList.remove('opacity-0');
+        if (fabIcon) fabIcon.setAttribute('data-lucide', 'mic');
+        if (fabLabel) fabLabel.textContent = currentUiLanguage === 'ar' ? 'جاري الاستماع...' : 'Listening...';
+
+        if (actionBtn) {
+          actionBtn.style.backgroundColor = '#dc2626';
+          actionBtn.style.borderColor = '#ef4444';
+          actionBtn.classList.add('text-white');
+        }
+        if (actionBtnText) actionBtnText.textContent = currentUiLanguage === 'ar' ? 'استماع...' : 'Listening...';
+        if (actionBtnIcon) actionBtnIcon.setAttribute('data-lucide', 'mic');
+
+        if (statusCard) {
+          statusCard.classList.remove('hidden');
+          statusCard.innerHTML = `
+            <div class="flex items-center gap-3">
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                <span class="flex items-end gap-0.5 h-4">
+                  <span class="w-1 bg-red-500 rounded-full voice-wave-bar-1"></span>
+                  <span class="w-1 bg-red-500 rounded-full voice-wave-bar-2"></span>
+                  <span class="w-1 bg-red-500 rounded-full voice-wave-bar-3"></span>
+                  <span class="w-1 bg-red-500 rounded-full voice-wave-bar-4"></span>
+                  <span class="w-1 bg-red-500 rounded-full voice-wave-bar-5"></span>
+                </span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center justify-between gap-2">
+                  <h4 class="text-xs font-black uppercase tracking-wider text-red-600">${currentUiLanguage === 'ar' ? 'المساعد الصوتي يستمع...' : 'Listening Chairside...'}</h4>
+                  <span class="text-[9px] font-bold text-slate-400">${currentUiLanguage === 'ar' ? 'انقر للإنهاء' : 'Tap to finish'}</span>
+                </div>
+                <p class="mt-0.5 text-xs font-semibold text-slate-700 truncate">${currentUiLanguage === 'ar' ? 'تحدث الآن (مثال: الضرس الأول العلوي يمين حشو كمبوزيت)' : 'Speak now (e.g. Upper right 6, occlusal composite, completed)'}</p>
+              </div>
+              <button type="button" onclick="stopLuminVoiceRecording()" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-600 text-white shadow-xs transition hover:bg-red-700" aria-label="Stop recording">
+                <i data-lucide="square" class="h-3.5 w-3.5 fill-current"></i>
+              </button>
+            </div>
+          `;
+          if (window.lucide) lucide.createIcons();
+        }
+      } else if (state === 'processing') {
+        if (fab) {
+          fab.classList.remove('voice-recording-pulse', 'bg-red-600', 'hover:bg-red-700');
+          fab.classList.add('bg-violet-600', 'hover:bg-violet-700');
+        }
+        if (fabPulse) fabPulse.classList.add('opacity-0');
+        if (fabIcon) fabIcon.setAttribute('data-lucide', 'loader-2');
+        if (fabLabel) fabLabel.textContent = currentUiLanguage === 'ar' ? 'جاري التحليل...' : 'Analyzing...';
+
+        if (actionBtn) {
+          actionBtn.style.backgroundColor = '#7c3aed';
+          actionBtn.style.borderColor = '#8b5cf6';
+        }
+        if (actionBtnText) actionBtnText.textContent = currentUiLanguage === 'ar' ? 'معالجة...' : 'Analyzing...';
+
+        if (statusCard) {
+          statusCard.classList.remove('hidden');
+          statusCard.innerHTML = `
+            <div class="flex items-center gap-3">
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+                <i data-lucide="loader-2" class="h-5 w-5 animate-spin"></i>
+              </div>
+              <div class="min-w-0 flex-1">
+                <h4 class="text-xs font-black uppercase tracking-wider text-violet-600">${currentUiLanguage === 'ar' ? 'جاري التحليل السريري...' : 'Analyzing with Gemini...'}</h4>
+                <p class="mt-0.5 text-xs font-medium text-slate-600">${currentUiLanguage === 'ar' ? 'مطابقة الإجراءات والأسنان المذكورة' : 'Parsing anatomy and procedures'}</p>
+              </div>
+            </div>
+          `;
+          if (window.lucide) lucide.createIcons();
+        }
+      } else {
+        // Idle
+        if (fab) {
+          fab.classList.remove('voice-recording-pulse', 'bg-red-600', 'hover:bg-red-700', 'bg-violet-600', 'hover:bg-violet-700');
+          fab.classList.add('bg-blue-600', 'hover:bg-blue-700');
+        }
+        if (fabPulse) fabPulse.classList.add('opacity-0');
+        if (fabIcon) fabIcon.setAttribute('data-lucide', 'mic');
+        if (fabLabel) fabLabel.textContent = currentUiLanguage === 'ar' ? 'مساعد الصوت' : 'Voice Scribe';
+
+        if (actionBtn) {
+          actionBtn.style.backgroundColor = '';
+          actionBtn.style.borderColor = '';
+          actionBtn.classList.remove('text-white');
+        }
+        if (actionBtnText) actionBtnText.textContent = currentUiLanguage === 'ar' ? 'صوت' : 'Voice';
+        if (actionBtnIcon) actionBtnIcon.setAttribute('data-lucide', 'mic');
+
+        if (state === 'idle' && statusCard) {
+          statusCard.classList.add('hidden');
+        }
+      }
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function showVoiceStatusCard(type, text, allowUndo = false) {
+      const statusCard = document.getElementById('chart-voice-status-card');
+      if (!statusCard) return;
+
+      clearTimeout(luminVoiceCardTimer);
+      statusCard.classList.remove('hidden');
+
+      const isSuccess = type === 'success';
+      const isIgnored = type === 'ignored';
+      const isError = type === 'error';
+
+      const iconName = isSuccess ? 'check-circle-2' : isIgnored ? 'message-square-off' : isError ? 'alert-circle' : 'info';
+      const iconColor = isSuccess ? 'text-emerald-600 bg-emerald-50' : isIgnored ? 'text-slate-500 bg-slate-100' : isError ? 'text-red-600 bg-red-50' : 'text-blue-600 bg-blue-50';
+      const titleColor = isSuccess ? 'text-emerald-700' : isIgnored ? 'text-slate-600' : isError ? 'text-red-700' : 'text-blue-700';
+      const titleText = isSuccess 
+        ? (currentUiLanguage === 'ar' ? 'تم تسجيل الإجراء' : 'Procedure Documented')
+        : isIgnored 
+          ? (currentUiLanguage === 'ar' ? 'حديث غير سريري' : 'Non-Clinical Speech')
+          : (currentUiLanguage === 'ar' ? 'خطأ' : 'Notice');
+
+      statusCard.innerHTML = `
+        <div class="flex items-start gap-3">
+          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${iconColor}">
+            <i data-lucide="${iconName}" class="h-5 w-5"></i>
+          </div>
+          <div class="min-w-0 flex-1 pt-0.5">
+            <h4 class="text-xs font-black uppercase tracking-wider ${titleColor}">${titleText}</h4>
+            <p class="mt-0.5 text-xs font-bold text-slate-800 leading-snug">${escapeHtml(text)}</p>
+            ${allowUndo ? `
+              <div class="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2">
+                <span class="text-[9px] font-semibold text-slate-400">${currentUiLanguage === 'ar' ? 'تراجع متاح لمدة 6 ثوانٍ' : 'Auto-closing in 6s'}</span>
+                <button type="button" onclick="undoLastVoiceChartAction()" class="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-black text-amber-800 shadow-2xs transition hover:bg-amber-100 active:scale-95">
+                  <i data-lucide="undo-2" class="h-3 w-3"></i>
+                  <span>${currentUiLanguage === 'ar' ? 'تراجع' : 'Undo'}</span>
+                </button>
+              </div>
+            ` : ''}
+          </div>
+          <button type="button" onclick="hideVoiceStatusCard()" class="shrink-0 p-1 text-slate-400 hover:text-slate-600" aria-label="Close">
+            <i data-lucide="x" class="h-3.5 w-3.5"></i>
+          </button>
+        </div>
+      `;
+
+      if (window.lucide) lucide.createIcons();
+
+      // Auto-hide after 6 seconds
+      luminVoiceCardTimer = setTimeout(() => {
+        hideVoiceStatusCard();
+      }, 6500);
+    }
+
+    function hideVoiceStatusCard() {
+      clearTimeout(luminVoiceCardTimer);
+      const statusCard = document.getElementById('chart-voice-status-card');
+      if (statusCard) statusCard.classList.add('hidden');
+    }
+
+    async function startLuminVoiceRecording() {
+      const patient = getActivePatient();
+      if (!patient) {
+        showToast(currentUiLanguage === 'ar' ? 'يرجى فتح مخطط مريض أولاً' : 'Please open a patient chart first', 'warning');
+        return;
+      }
+      const apiKey = await getLuminGeminiApiKey();
+      if (!apiKey) {
+        showLuminVoiceApiKeyModal();
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        luminVoiceAudioChunks = [];
+
+        let mimeType = 'audio/webm;codecs=opus';
+        if (!window.MediaRecorder || typeof MediaRecorder.isTypeSupported !== 'function') {
+          mimeType = '';
+        } else if (!MediaRecorder.isTypeSupported(mimeType)) {
+          mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : (MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '');
+        }
+
+        luminVoiceRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+
+        luminVoiceRecorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) luminVoiceAudioChunks.push(event.data);
+        };
+
+        luminVoiceRecorder.onstart = () => {
+          luminVoiceRecordingActive = true;
+          updateVoiceAssistantUI('recording');
+        };
+
+        luminVoiceRecorder.onstop = async () => {
+          luminVoiceRecordingActive = false;
+          try {
+            stream.getTracks().forEach(track => track.stop());
+          } catch (_) {}
+
+          if (!luminVoiceAudioChunks.length) {
+            updateVoiceAssistantUI('idle');
+            return;
+          }
+          const recordedBlob = new Blob(luminVoiceAudioChunks, { type: luminVoiceRecorder.mimeType || 'audio/webm' });
+          await processLuminVoiceBlob(recordedBlob);
+        };
+
+        luminVoiceRecorder.start();
+
+        // Safety timeout: max 12 seconds per dictation utterance
+        clearTimeout(luminVoiceSilenceTimer);
+        luminVoiceSilenceTimer = setTimeout(() => {
+          if (luminVoiceRecordingActive && luminVoiceRecorder?.state === 'recording') {
+            stopLuminVoiceRecording();
+          }
+        }, 12000);
+
+      } catch (err) {
+        console.error('Microphone access failed:', err);
+        showToast(currentUiLanguage === 'ar' ? 'تعذر الوصول للميكروفون. يرجى السماح بالوصول.' : 'Microphone access denied or unavailable.', 'danger');
+        updateVoiceAssistantUI('idle');
+      }
+    }
+
+    function stopLuminVoiceRecording() {
+      clearTimeout(luminVoiceSilenceTimer);
+      if (luminVoiceRecorder && luminVoiceRecorder.state === 'recording') {
+        try {
+          luminVoiceRecorder.stop();
+        } catch (_) {}
+      }
+    }
+
+    function toggleLuminVoiceRecording() {
+      if (luminVoiceRecordingActive) {
+        stopLuminVoiceRecording();
+      } else if (!luminVoiceProcessingActive) {
+        startLuminVoiceRecording();
+      }
+    }
+
+    function syncVoiceFabVisibility() {
+      const fabContainer = document.getElementById('chart-voice-fab-container');
+      if (!fabContainer) return;
+      const patientId = typeof patientWorkspaceId === 'function' ? patientWorkspaceId() : (activePatientId || activeWorkspacePatientId);
+      const workspaceHeader = document.getElementById('patient-workspace-header');
+      const viewChart = document.getElementById('view-chart');
+      const isWorkspaceOpen = Boolean(patientId) && workspaceHeader && !workspaceHeader.classList.contains('hidden');
+      const isChartOpen = Boolean(patientId) && viewChart && !viewChart.classList.contains('hidden');
+      const shouldShow = Boolean(patientId) && (isWorkspaceOpen || isChartOpen);
+      fabContainer.classList.toggle('hidden', !shouldShow);
+    }
+
+    async function handlePatientWorkspaceVoiceClick() {
+      const patientId = typeof patientWorkspaceId === 'function' ? patientWorkspaceId() : (activePatientId || activeWorkspacePatientId);
+      if (!patientId) {
+        showToast(currentUiLanguage === 'ar' ? 'يرجى فتح ملف مريض أولاً' : 'Please open a patient first', 'warning');
+        return;
+      }
+      const viewChart = document.getElementById('view-chart');
+      if (!viewChart || viewChart.classList.contains('hidden')) {
+        await openPatientChart(patientId);
+      }
+      toggleLuminVoiceRecording();
+    }
+
+    async function processLuminVoiceBlob(blob) {
+      luminVoiceProcessingActive = true;
+      updateVoiceAssistantUI('processing');
+
+      try {
+        const apiKey = await getLuminGeminiApiKey();
+        if (!apiKey) throw new Error('Missing Gemini API Key');
+
+        const base64Audio = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const res = String(reader.result || '');
+            const commaIndex = res.indexOf(',');
+            resolve(commaIndex >= 0 ? res.slice(commaIndex + 1) : res);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+
+        const activeOpsText = (dentalOperations || [])
+          .filter(op => op.active)
+          .map(op => `code: "${op.code}" | name: "${op.name}" | scope: "${op.actionScope}" | price: ${op.price}`)
+          .join('\n');
+
+        const mimeType = (blob.type || 'audio/webm').split(';')[0];
+
+        const requestBody = {
+          systemInstruction: {
+            parts: [{ text: LUMIN_VOICE_SYSTEM_INSTRUCTION }]
+          },
+          contents: [
+            {
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: mimeType,
+                    data: base64Audio
+                  }
+                },
+                {
+                  text: `ACTIVE PROCEDURES CATALOG:\n${activeOpsText}\n\nTranscribe doctor audio and generate structured dental chart actions.`
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            responseSchema: LUMIN_VOICE_RESPONSE_SCHEMA
+          }
+        };
+
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData?.error?.message || `Gemini API returned status ${response.status}`);
+        }
+
+        const resJson = await response.json();
+        const payloadText = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!payloadText) throw new Error('No response returned from Gemini.');
+
+        const payload = JSON.parse(payloadText);
+        await executeVoiceChartActions(payload);
+
+      } catch (err) {
+        console.error('Lumin Voice Agent error:', err);
+        showToast(err.message || 'Voice recognition error', 'danger');
+        showVoiceStatusCard('error', err.message || 'Voice recognition failed');
+        updateVoiceAssistantUI('idle');
+      } finally {
+        luminVoiceProcessingActive = false;
+      }
+    }
+
+    function captureAllPatientFindingIds(patient) {
+      if (!patient) return [];
+      const ids = [];
+      (chartMouthFindings(patient) || []).forEach(f => { if (f.id) ids.push(f.id); });
+      Object.entries(patient.chartState || {}).forEach(([toothId, toothData]) => {
+        if (toothId === CHART_META_KEY || !toothData || typeof toothData !== 'object') return;
+        (ensureWholeOperations(toothData) || []).forEach(f => { if (f.id) ids.push(f.id); });
+        Object.keys(toothData.surfaces || {}).forEach(surface => {
+          (chartSurfaceFindings(toothData.surfaces[surface]) || []).forEach(f => { if (f.id) ids.push(f.id); });
+        });
+      });
+      return ids;
+    }
+
+    async function executeVoiceChartActions(payload) {
+      updateVoiceAssistantUI('idle');
+
+      if (!payload || payload.intent === 'IGNORE' || !payload.actions?.length) {
+        if (payload?.intent === 'IGNORE') {
+          showVoiceStatusCard('ignored', currentUiLanguage === 'ar' ? 'تم تجاهل الحديث غير السريري' : 'Non-clinical speech ignored');
+        } else {
+          showVoiceStatusCard('ignored', currentUiLanguage === 'ar' ? 'لم يتم التعرف على إجراء سريري' : 'No clinical procedure recognized');
+        }
+        return;
+      }
+
+      const patient = getActivePatient();
+      if (!patient) {
+        showToast('No active patient open', 'warning');
+        return;
+      }
+
+      const appliedFindingIds = [];
+      const appliedSummaries = [];
+
+      for (const action of payload.actions) {
+        const opCode = String(action.operation_code || '').trim().toLowerCase();
+        const opName = String(action.operation_name || '').trim().toLowerCase();
+
+        // Best match in active operations
+        const operation = (dentalOperations || []).find(op => op.code.toLowerCase() === opCode)
+                       || (dentalOperations || []).find(op => op.code.toLowerCase().includes(opCode))
+                       || (dentalOperations || []).find(op => op.name.toLowerCase().includes(opName))
+                       || (dentalOperations || []).find(op => op.code === 'composite' || op.code === 'caries');
+
+        if (!operation) {
+          console.warn('Voice agent could not find operation:', action.operation_code);
+          continue;
+        }
+
+        const toothId = String(action.tooth_universal || '').trim();
+        const status = normaliseOperationStatus(action.status || 'P', 'P');
+        const beforeIds = captureAllPatientFindingIds(patient);
+
+        if (action.scope === 'surface' && toothId) {
+          const clinicalSurfaces = Array.isArray(action.surfaces) && action.surfaces.length ? action.surfaces : ['O'];
+          const targetZones = CHART_SURFACES.filter(zone => {
+            const abbr = surfaceAbbreviation(toothId, zone);
+            return clinicalSurfaces.includes(abbr);
+          });
+          if (targetZones.length) {
+            setChartSelectionTargets([{ tooth: toothId, surfaces: targetZones }]);
+            applySurfaceCondition(operation.code, status, operation.price, operation.steps);
+          }
+        } else if (action.scope === 'tooth' && toothId) {
+          setChartSelectionTargets([{ tooth: toothId, surfaces: [] }]);
+          applyToothStatus(operation.code, status, operation.price, operation.steps);
+        } else if (action.scope === 'mouth') {
+          applyMouthOperation(operation.code, status, operation.price, operation.steps);
+        }
+
+        const afterIds = captureAllPatientFindingIds(patient);
+        const newIds = afterIds.filter(id => !beforeIds.includes(id));
+        appliedFindingIds.push(...newIds);
+
+        const toothLabel = toothId ? chartToothLabel(toothId) : (currentUiLanguage === 'ar' ? 'كامل الفم' : 'Whole mouth');
+        appliedSummaries.push(`${operation.name} (${toothLabel})`);
+      }
+
+      if (appliedFindingIds.length > 0) {
+        luminVoiceLastActionUndo = {
+          patientId: patient.id,
+          findingIds: appliedFindingIds,
+          summary: appliedSummaries.join(', ')
+        };
+
+        const feedback = currentUiLanguage === 'ar' && payload.spoken_feedback_ar
+          ? payload.spoken_feedback_ar
+          : payload.spoken_feedback;
+
+        showVoiceStatusCard('success', feedback || appliedSummaries.join(', '), true);
+        speakVoiceFeedback(feedback || appliedSummaries.join(', '));
+      } else {
+        showVoiceStatusCard('error', currentUiLanguage === 'ar' ? 'تعذر تطبيق الإجراء على المخطط' : 'Could not apply procedure to chart');
+      }
+    }
+
+    function undoLastVoiceChartAction() {
+      if (!luminVoiceLastActionUndo || !luminVoiceLastActionUndo.findingIds?.length) return;
+      const patient = getActivePatient();
+      if (!patient || patient.id !== luminVoiceLastActionUndo.patientId) return;
+
+      const findingIds = luminVoiceLastActionUndo.findingIds;
+      findingIds.forEach(id => {
+        deleteChartFindingById(patient, id);
+      });
+
+      document.querySelectorAll('[data-tooth-card]').forEach(card => renderToothVisuals(card.dataset.toothCard));
+      renderFindingsList();
+      saveActivePatientChart();
+
+      showToast(currentUiLanguage === 'ar' ? 'تم التراجع عن الإجراء الصوتي' : 'Undid last voice procedure', 'info');
+      luminVoiceLastActionUndo = null;
+      hideVoiceStatusCard();
+    }
+
+    function speakVoiceFeedback(text) {
+      if (!('speechSynthesis' in window) || !text) return;
+      try {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = currentUiLanguage === 'ar' ? 'ar-EG' : 'en-US';
+        utterance.rate = 1.05;
+        window.speechSynthesis.speak(utterance);
+      } catch (_) {}
+    }
+
+    function initLuminVoiceSpacebarShortcut() {
+      window.addEventListener('keydown', (e) => {
+        if (e.code !== 'Space' || e.repeat) return;
+        const chartView = document.getElementById('view-chart');
+        if (!chartView || chartView.classList.contains('hidden')) return;
+        const activeEl = document.activeElement;
+        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) return;
+
+        e.preventDefault();
+        if (!luminVoiceRecordingActive && !luminVoiceProcessingActive) {
+          startLuminVoiceRecording();
+        }
+      });
+
+      window.addEventListener('keyup', (e) => {
+        if (e.code !== 'Space') return;
+        const chartView = document.getElementById('view-chart');
+        if (!chartView || chartView.classList.contains('hidden')) return;
+        const activeEl = document.activeElement;
+        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) return;
+
+        if (luminVoiceRecordingActive) {
+          stopLuminVoiceRecording();
+        }
+      });
+    }
+
+    // Initialize voice push-to-talk listener
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initLuminVoiceSpacebarShortcut);
+    } else {
+      initLuminVoiceSpacebarShortcut();
     }
 
     // ================= APPOINTMENTS CALENDAR =================
