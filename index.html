@@ -1036,23 +1036,72 @@
         flex: 0 0 1.75rem !important;
         justify-content: center !important;
       }
-      #findings-container .finding-row.has-procedure-steps,
-      #findings-container .finding-row.has-ortho-visits {
+      #findings-container .finding-row.has-procedure-steps {
         flex-wrap: wrap !important;
       }
-      #findings-container .finding-row.has-procedure-steps [data-procedure-steps-panel],
-      #findings-container .finding-row.has-ortho-visits [data-ortho-visits-panel] {
+      #findings-container .finding-row.has-procedure-steps [data-procedure-steps-panel] {
         flex: 0 0 100% !important;
         width: 100% !important;
       }
     }
 
+    #findings-container .finding-row.has-ortho-visits,
     .finding-row.has-ortho-visits {
-      flex-wrap: wrap !important;
-    }
-    .finding-row.has-ortho-visits [data-ortho-visits-panel] {
-      flex: 0 0 100% !important;
+      min-width: 0 !important;
       width: 100% !important;
+      max-width: 100% !important;
+      flex-direction: column !important;
+      align-items: stretch !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+      padding: 0.75rem !important;
+    }
+    #findings-container .finding-row.has-ortho-visits .finding-row-summary,
+    .finding-row.has-ortho-visits .finding-row-summary {
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+      height: auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      flex: 0 0 auto !important;
+      display: flex !important;
+      flex-wrap: wrap !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 0.5rem !important;
+    }
+    #findings-container .finding-row.has-ortho-visits .finding-row-actions,
+    .finding-row.has-ortho-visits .finding-row-actions {
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+      height: auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      flex: 0 0 auto !important;
+      display: flex !important;
+      flex-wrap: wrap !important;
+      align-items: center !important;
+      justify-content: flex-end !important;
+      gap: 0.5rem !important;
+      padding-top: 0.5rem !important;
+      border-top: 1px dashed #e2e8f0 !important;
+    }
+    #findings-container .finding-row.has-ortho-visits [data-ortho-visits-panel],
+    .finding-row.has-ortho-visits [data-ortho-visits-panel] {
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+      box-sizing: border-box !important;
+      margin-top: 0.5rem !important;
+      border-radius: 0.75rem !important;
+    }
+    .ortho-visit-card {
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+      box-sizing: border-box !important;
     }
 
     @media (max-width: 767.98px) {
@@ -27965,8 +28014,8 @@
                     </div>`}
               </div>
             </div>
-            <div class="finding-row-actions flex flex-nowrap items-center gap-2">
-              <div class="finding-dates-group ml-auto flex flex-col items-end justify-center gap-1 shrink-0">
+            <div class="finding-row-actions flex ${isOrthoPackage ? 'flex-wrap justify-end' : 'flex-nowrap'} items-center gap-2">
+              <div class="finding-dates-group ${isOrthoPackage ? '' : 'ml-auto'} flex flex-col items-end justify-center gap-1 shrink-0">
                 ${createdAtMarkup}
                 ${beginDateMarkup}
               </div>
