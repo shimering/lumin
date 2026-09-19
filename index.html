@@ -1036,12 +1036,23 @@
         flex: 0 0 1.75rem !important;
         justify-content: center !important;
       }
-      #findings-container .finding-row.has-procedure-steps {
+      #findings-container .finding-row.has-procedure-steps,
+      #findings-container .finding-row.has-ortho-visits {
         flex-wrap: wrap !important;
       }
-      #findings-container .finding-row.has-procedure-steps [data-procedure-steps-panel] {
+      #findings-container .finding-row.has-procedure-steps [data-procedure-steps-panel],
+      #findings-container .finding-row.has-ortho-visits [data-ortho-visits-panel] {
         flex: 0 0 100% !important;
+        width: 100% !important;
       }
+    }
+
+    .finding-row.has-ortho-visits {
+      flex-wrap: wrap !important;
+    }
+    .finding-row.has-ortho-visits [data-ortho-visits-panel] {
+      flex: 0 0 100% !important;
+      width: 100% !important;
     }
 
     @media (max-width: 767.98px) {
@@ -1493,8 +1504,8 @@
     #modal-appointment {
       overflow-y: auto;
       overscroll-behavior: contain;
-      padding-top: max(1rem, env(safe-area-inset-top));
-      padding-bottom: max(1rem, env(safe-area-inset-bottom));
+      -webkit-overflow-scrolling: touch;
+      padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
     }
     #modal-appointment > div {
       display: flex;
@@ -1502,25 +1513,26 @@
       min-height: 0;
       flex-direction: column;
       overflow: hidden;
+      margin: auto;
     }
-    #modal-appointment > div > div { flex-shrink: 0; }
+    #modal-appointment > div > div:first-child { flex-shrink: 0; }
     #appointment-form {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
+    }
+    #appointment-form-body {
+      flex: 1 1 auto;
       min-height: 0;
       overflow-y: auto;
       overscroll-behavior: contain;
       scrollbar-gutter: stable;
+      -webkit-overflow-scrolling: touch;
     }
-    #appointment-form > div:last-child {
-      position: sticky;
-      z-index: 20;
-      bottom: 0;
-      margin-right: -1.25rem;
-      margin-bottom: -1.25rem;
-      margin-left: -1.25rem;
-      padding: 0.9rem 1.25rem max(0.9rem, env(safe-area-inset-bottom));
-      background: rgba(255, 255, 255, 0.96);
-      box-shadow: 0 -10px 24px -20px rgba(15, 23, 42, 0.45);
-      backdrop-filter: blur(12px);
+    #appointment-form-footer {
+      flex-shrink: 0;
     }
     .appointment-month-event {
       cursor: grab;
@@ -3174,7 +3186,6 @@
       #view-settings form > button[type="submit"] { width: 100%; min-height: 2.75rem; justify-content: center; }
 
       #modal-new-patient,
-      #modal-appointment,
       #modal-payment,
       #modal-expense-payment,
       #modal-invoice-date,
@@ -3182,7 +3193,6 @@
       #modal-hr-staff-settings,
       #modal-hr-adjustment { align-items: flex-end; padding: 0; }
       #modal-new-patient > div,
-      #modal-appointment > div,
       #modal-payment > div,
       #modal-expense-payment > div,
       #modal-invoice-date > div,
@@ -3195,13 +3205,6 @@
         border-radius: 1.25rem 1.25rem 0 0;
         padding-bottom: env(safe-area-inset-bottom);
       }
-      #modal-appointment > div {
-        display: flex;
-        min-height: 0;
-        flex-direction: column;
-        overflow: hidden;
-        padding-bottom: 0;
-      }
       #modal-hr-staff-settings > div,
       #modal-hr-adjustment > div {
         max-height: calc(100dvh - env(safe-area-inset-top) - 0.5rem);
@@ -3213,42 +3216,101 @@
         padding-bottom: env(safe-area-inset-bottom);
       }
       #modal-new-patient > div > div,
-      #modal-appointment > div > div,
       #modal-payment > div > div,
       #modal-expense-payment > div > div,
       #modal-invoice-date > div > div { position: sticky; z-index: 2; top: 0; padding: 1rem; background: white; }
-      #modal-new-patient > div > div > button,
-      #modal-appointment > div > div > button { display: flex; width: 2.75rem; height: 2.75rem; align-items: center; justify-content: center; }
+      #modal-new-patient > div > div > button { display: flex; width: 2.75rem; height: 2.75rem; align-items: center; justify-content: center; }
       #modal-new-patient form,
-      #modal-appointment form,
       #modal-payment form,
       #modal-expense-payment form,
       #modal-invoice-date form { padding: 1rem; }
-      #modal-appointment form {
-        min-height: 0;
-        overflow-y: auto;
-        padding-bottom: 1rem;
-      }
-      #modal-new-patient form .grid-cols-2,
-      #modal-appointment form .grid-cols-2 { grid-template-columns: 1fr; }
+      #modal-new-patient form .grid-cols-2 { grid-template-columns: 1fr; }
       #modal-new-patient form > div:last-child,
-      #modal-appointment form > div:last-child,
       #modal-payment form > div:last-child,
       #modal-expense-payment form > div:last-child,
       #modal-invoice-date form > div:last-child { align-items: stretch; flex-direction: column-reverse; }
       #modal-new-patient form > div:last-child button,
-      #modal-appointment form > div:last-child button,
       #modal-payment form > div:last-child button,
       #modal-expense-payment form > div:last-child button,
       #modal-invoice-date form > div:last-child button { width: 100%; min-height: 2.75rem; }
-      #modal-appointment form > div:last-child {
-        bottom: 0;
-        margin-right: -1rem;
-        margin-bottom: -1rem;
-        margin-left: -1rem;
-        padding: 0.85rem 1rem max(0.85rem, env(safe-area-inset-bottom));
+
+      /* Appointment Modal: Responsive Floating Dialog with Clean Outer Padding and Ergonomic Footer */
+      #modal-appointment {
+        align-items: center !important;
+        justify-content: center !important;
+        padding: max(0.875rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right)) max(0.875rem, env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left)) !important;
       }
-      #modal-appointment form > div:last-child > div { width: 100%; flex-direction: column-reverse; }
+      #modal-appointment > div {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        max-width: 28rem !important;
+        max-height: calc(100dvh - 1.75rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+        min-height: 0 !important;
+        margin: auto !important;
+        border-radius: 1.25rem !important;
+        border: 1px solid #e2e8f0 !important;
+        background: #ffffff !important;
+        box-shadow: 0 20px 30px -10px rgba(15, 23, 42, 0.25), 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
+        overflow: hidden !important;
+      }
+      #modal-appointment > div > div:first-child {
+        position: relative;
+        flex-shrink: 0;
+        background: #ffffff;
+        border-bottom: 1px solid #f1f5f9;
+        padding: 0.875rem 1.125rem;
+      }
+      #modal-appointment > div > div:first-child button {
+        display: flex;
+        width: 2.25rem;
+        height: 2.25rem;
+        align-items: center;
+        justify-content: center;
+      }
+      #appointment-form {
+        display: flex !important;
+        flex-direction: column !important;
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+        padding: 0 !important;
+      }
+      #appointment-form-body {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        padding: 0.875rem 1.125rem !important;
+      }
+      #appointment-form-footer {
+        flex-shrink: 0 !important;
+        padding: 0.75rem 1.125rem max(0.75rem, env(safe-area-inset-bottom)) !important;
+        background: #f8fafc !important;
+        border-top: 1px solid #f1f5f9 !important;
+      }
+      #appointment-modal-actions {
+        display: flex;
+        flex-direction: column-reverse;
+        gap: 0.5rem;
+      }
+      #appointment-modal-actions > div {
+        display: flex;
+        width: 100%;
+        gap: 0.5rem;
+      }
+      #appointment-modal-actions > div > button {
+        flex: 1;
+        min-height: 2.5rem;
+      }
+      #btn-delete-appointment:not(.hidden) {
+        display: flex !important;
+        width: 100%;
+        min-height: 2.35rem;
+        justify-content: center;
+        align-items: center;
+      }
     }
 
     @media (max-width: 420px) {
@@ -6636,6 +6698,19 @@
                 </div>
               </div>
             </div>
+            <div class="overflow-hidden rounded-2xl border border-indigo-200 bg-indigo-50/35">
+              <label class="flex cursor-pointer items-center justify-between gap-4 px-4 py-3.5">
+                <span>
+                  <span class="block text-xs font-black text-slate-800">Multi-visit procedure (Ortho package)</span>
+                  <span class="mt-1 block text-[10px] font-semibold leading-4 text-slate-500">Enable package pricing with indented child visit rows, dedicated visit dates, inline notes, and visit-based invoicing.</span>
+                </span>
+                <span class="relative inline-flex shrink-0 items-center">
+                  <input id="admin-operation-is-ortho-package" type="checkbox" class="peer sr-only" />
+                  <span class="h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-indigo-600"></span>
+                  <span class="pointer-events-none absolute left-1 h-4 w-4 rounded-full bg-white shadow-sm transition peer-checked:translate-x-5"></span>
+                </span>
+              </label>
+            </div>
             <p id="admin-operation-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="status"></p>
             <div class="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
               <button id="admin-operation-cancel-button" type="button" onclick="resetDentalOperationForm()" class="hidden rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 hover:bg-slate-50">Cancel editing</button>
@@ -7936,96 +8011,104 @@
   </div>
 
   <!-- ================= MODAL: NEW APPOINTMENT ================= -->
-  <div id="modal-appointment" role="dialog" aria-modal="true" aria-labelledby="appointment-modal-title" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs hidden items-center justify-center p-4">
-    <div class="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-      <div class="p-5 border-b border-slate-100 flex justify-between items-center">
-        <div>
-          <span id="appointment-modal-eyebrow" class="text-[11px] font-bold uppercase tracking-wider text-blue-600">New appointment</span>
-          <h3 id="appointment-modal-title" class="mt-1 text-base font-bold text-slate-900">Schedule a visit</h3>
+  <div id="modal-appointment" role="dialog" aria-modal="true" aria-labelledby="appointment-modal-title" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs hidden items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto">
+    <div class="bg-white w-full max-w-md rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col my-auto transition-all animate-in fade-in zoom-in-95 duration-150">
+      <div class="px-4 py-3.5 sm:px-5 sm:py-4 border-b border-slate-100 flex justify-between items-center shrink-0 bg-white">
+        <div class="min-w-0 pr-2 rtl:pr-0 rtl:pl-2">
+          <span id="appointment-modal-eyebrow" class="block text-[11px] font-bold uppercase tracking-wider text-blue-600 truncate">New appointment</span>
+          <h3 id="appointment-modal-title" class="mt-0.5 text-base font-bold text-slate-900 truncate">Schedule a visit</h3>
         </div>
-        <button id="appointment-modal-close-button" type="button" onclick="closeAppointmentModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg" aria-label="Close appointment form">
+        <button id="appointment-modal-close-button" type="button" onclick="closeAppointmentModal()" class="shrink-0 flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg sm:rounded-xl transition focus:outline-none focus:ring-2 focus:ring-blue-500/20" aria-label="Close appointment form">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
-      <form id="appointment-form" onsubmit="saveAppointment(event)" class="p-5 space-y-4">
-        <div class="block">
-          <label id="appointment-entry-label" for="appointment-patient-search" class="block text-xs font-bold text-slate-600 mb-1.5">Patient</label>
-          <div id="appointment-patient-picker" class="relative">
-            <span class="pointer-events-none absolute left-3.5 top-3 text-slate-400">
-              <i id="appointment-entry-patient-icon" data-lucide="search" class="h-4 w-4"></i>
-              <i id="appointment-entry-note-icon" data-lucide="notebook-pen" class="hidden h-4 w-4"></i>
-            </span>
-            <input id="appointment-patient-search" type="text" role="combobox" aria-autocomplete="list" aria-controls="appointment-patient-results" aria-expanded="false" autocomplete="off" required maxlength="120" oninput="filterAppointmentPatients()" onfocus="filterAppointmentPatients()" onblur="setTimeout(closeAppointmentPatientResults, 120)" onkeydown="handleAppointmentPatientSearchKeydown(event)" placeholder="Search patients by number, name, or phone" class="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-20 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
-            <span class="absolute right-1.5 top-1.5 z-20 inline-flex gap-1">
-              <button id="appointment-patient-add-button" type="button" onclick="openNewPatientFromAppointment()" aria-label="Register a new patient" title="Register a new patient" class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none">
-                <i data-lucide="plus" class="h-4 w-4"></i>
-              </button>
-              <button id="appointment-note-toggle" type="button" onclick="toggleAppointmentNoteMode()" aria-label="Add a calendar note" title="Add a calendar note" aria-pressed="false" class="flex h-8 w-8 items-center justify-center rounded-lg border border-violet-200 bg-violet-50 text-xs font-black text-violet-700 shadow-sm transition hover:bg-violet-100 focus:outline-none focus:ring-2 focus:ring-violet-500/30">N</button>
-            </span>
-            <input id="appointment-patient-id" type="hidden" />
-            <div id="appointment-patient-results" role="listbox" aria-label="Patient search results" class="absolute z-30 mt-1 hidden max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl"></div>
+      <form id="appointment-form" onsubmit="saveAppointment(event)" class="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <div id="appointment-form-body" class="flex-1 overflow-y-auto px-4 py-3.5 sm:px-5 sm:py-4 space-y-3 sm:space-y-4 overscroll-contain">
+          <div class="block">
+            <label id="appointment-entry-label" for="appointment-patient-search" class="block text-xs font-bold text-slate-600 mb-1.5">Patient</label>
+            <div id="appointment-patient-picker" class="relative">
+              <span class="pointer-events-none absolute left-3.5 top-3 text-slate-400">
+                <i id="appointment-entry-patient-icon" data-lucide="search" class="h-4 w-4"></i>
+                <i id="appointment-entry-note-icon" data-lucide="notebook-pen" class="hidden h-4 w-4"></i>
+              </span>
+              <input id="appointment-patient-search" type="text" role="combobox" aria-autocomplete="list" aria-controls="appointment-patient-results" aria-expanded="false" autocomplete="off" required maxlength="120" oninput="filterAppointmentPatients()" onfocus="filterAppointmentPatients()" onblur="setTimeout(closeAppointmentPatientResults, 120)" onkeydown="handleAppointmentPatientSearchKeydown(event)" placeholder="Search patients by number, name, or phone" class="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-20 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
+              <span class="absolute right-1.5 top-1.5 z-20 inline-flex gap-1">
+                <button id="appointment-patient-add-button" type="button" onclick="openNewPatientFromAppointment()" aria-label="Register a new patient" title="Register a new patient" class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none">
+                  <i data-lucide="plus" class="h-4 w-4"></i>
+                </button>
+                <button id="appointment-note-toggle" type="button" onclick="toggleAppointmentNoteMode()" aria-label="Add a calendar note" title="Add a calendar note" aria-pressed="false" class="flex h-8 w-8 items-center justify-center rounded-lg border border-violet-200 bg-violet-50 text-xs font-black text-violet-700 shadow-sm transition hover:bg-violet-100 focus:outline-none focus:ring-2 focus:ring-violet-500/30">N</button>
+              </span>
+              <input id="appointment-patient-id" type="hidden" />
+              <div id="appointment-patient-results" role="listbox" aria-label="Patient search results" class="absolute z-30 mt-1 hidden max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl"></div>
+            </div>
+            <p id="appointment-patient-search-hint" class="mt-1.5 text-[11px] text-slate-400">Search by patient number, name, or phone number, then choose a result.</p>
           </div>
-          <p id="appointment-patient-search-hint" class="mt-1.5 text-[11px] text-slate-400">Search by patient number, name, or phone number, then choose a result.</p>
-        </div>
-        <label class="block">
-          <span class="block text-xs font-bold text-slate-600 mb-1.5">Assigned doctor</span>
-          <select id="appointment-assigned-user-id" required class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
-            <option value="">Loading doctors...</option>
-          </select>
-        </label>
-        <div data-appointment-schedule-fields class="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-          <label class="block min-w-0 sm:col-span-2">
-            <span class="block text-xs font-bold text-slate-600 mb-1.5">Date</span>
-            <input id="appointment-date" type="date" required onchange="updateAppointmentModalDateLabel()" class="block w-full min-w-0 px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
-            <span id="appointment-date-weekday" class="mt-1.5 block min-w-0 text-[10px] font-black leading-4 text-blue-600"></span>
-          </label>
-          <label class="block min-w-0">
-            <span class="block text-xs font-bold text-slate-600 mb-1.5">Time</span>
-            <input id="appointment-time" type="time" step="900" required class="block w-full min-w-0 px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
-          </label>
-          <label class="block min-w-0">
-            <span class="block text-xs font-bold text-slate-600 mb-1.5">Duration</span>
-            <select id="appointment-duration" class="block w-full min-w-0 px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
-              <option value="15">15 minutes</option>
-              <option value="30" selected>30 minutes</option>
-              <option value="45">45 minutes</option>
-              <option value="60">1 hour</option>
-              <option value="90">1 hour 30 minutes</option>
-              <option value="120">2 hours</option>
-            </select>
-          </label>
-        </div>
-        <div id="appointment-clinical-fields" class="grid grid-cols-2 gap-3">
           <label class="block">
-            <span class="block text-xs font-bold text-slate-600 mb-1.5">Visit type</span>
-            <select id="appointment-type" required class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
-              <option value="">Loading visit types...</option>
+            <span class="block text-xs font-bold text-slate-600 mb-1.5">Assigned doctor</span>
+            <select id="appointment-assigned-user-id" required class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+              <option value="">Loading doctors...</option>
             </select>
           </label>
+          <div data-appointment-schedule-fields class="grid min-w-0 grid-cols-2 gap-2.5 sm:gap-3">
+            <label class="block min-w-0 col-span-2">
+              <span class="block text-xs font-bold text-slate-600 mb-1.5">Date</span>
+              <input id="appointment-date" type="date" required onchange="updateAppointmentModalDateLabel()" class="block w-full min-w-0 px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+              <span id="appointment-date-weekday" class="mt-1.5 block min-w-0 text-[10px] font-black leading-4 text-blue-600"></span>
+            </label>
+            <label class="block min-w-0 col-span-1">
+              <span class="block text-xs font-bold text-slate-600 mb-1.5">Time</span>
+              <input id="appointment-time" type="time" step="900" required class="block w-full min-w-0 px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+            </label>
+            <label class="block min-w-0 col-span-1">
+              <span class="block text-xs font-bold text-slate-600 mb-1.5">Duration</span>
+              <select id="appointment-duration" class="block w-full min-w-0 px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+                <option value="15">15 minutes</option>
+                <option value="30" selected>30 minutes</option>
+                <option value="45">45 minutes</option>
+                <option value="60">1 hour</option>
+                <option value="90">1 hour 30 minutes</option>
+                <option value="120">2 hours</option>
+              </select>
+            </label>
+          </div>
+          <div id="appointment-clinical-fields" class="grid grid-cols-2 gap-2.5 sm:gap-3">
+            <label class="block min-w-0 col-span-1">
+              <span class="block text-xs font-bold text-slate-600 mb-1.5">Visit type</span>
+              <select id="appointment-type" required class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+                <option value="">Loading visit types...</option>
+              </select>
+            </label>
+            <label class="block min-w-0 col-span-1">
+              <span class="block text-xs font-bold text-slate-600 mb-1.5">Status</span>
+              <select id="appointment-status" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+                <option value="Scheduled">Scheduled</option>
+                <option value="Confirmed">Confirmed</option>
+                <option value="Checked in">Checked in</option>
+                <option value="In progress">In progress</option>
+                <option value="Completed">Completed</option>
+                <option value="Cancelled">Cancelled</option>
+                <option value="No-show">No-show</option>
+              </select>
+            </label>
+          </div>
           <label class="block">
-            <span class="block text-xs font-bold text-slate-600 mb-1.5">Status</span>
-            <select id="appointment-status" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
-              <option value="Scheduled">Scheduled</option>
-              <option value="Confirmed">Confirmed</option>
-              <option value="Checked in">Checked in</option>
-              <option value="In progress">In progress</option>
-              <option value="Completed">Completed</option>
-              <option value="Cancelled">Cancelled</option>
-              <option value="No-show">No-show</option>
-            </select>
+            <span class="block text-xs font-bold text-slate-600 mb-1.5">Notes</span>
+            <textarea id="appointment-notes" rows="2" placeholder="Optional appointment notes" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"></textarea>
           </label>
+          <p id="appointment-date-note" class="px-3 py-2 rounded-lg bg-slate-50 text-xs text-slate-500"></p>
         </div>
-        <label class="block">
-          <span class="block text-xs font-bold text-slate-600 mb-1.5">Notes</span>
-          <textarea id="appointment-notes" rows="2" placeholder="Optional appointment notes" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"></textarea>
-        </label>
-        <p id="appointment-date-note" class="px-3 py-2 rounded-lg bg-slate-50 text-xs text-slate-500"></p>
-        <div class="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-          <button type="button" id="btn-delete-appointment" onclick="deleteAppointmentFromModal()" class="hidden px-4 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 transition">Delete</button>
-          <div class="ml-auto flex justify-end gap-2">
-            <button type="button" onclick="closeAppointmentModal()" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition">Cancel</button>
-            <button type="submit" id="btn-save-appointment" class="px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition disabled:opacity-50 disabled:cursor-not-allowed">Save appointment</button>
+
+        <div id="appointment-form-footer" class="shrink-0 px-4 py-3 sm:px-5 sm:py-3.5 border-t border-slate-100 bg-slate-50/80">
+          <div id="appointment-modal-actions" class="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2">
+            <button type="button" id="btn-delete-appointment" onclick="deleteAppointmentFromModal()" class="hidden w-full sm:w-auto px-4 py-2.5 sm:py-2 rounded-xl text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 transition flex items-center justify-center gap-1.5 min-h-[40px] sm:min-h-0">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              <span>Delete</span>
+            </button>
+            <div class="flex items-center justify-end gap-2 w-full sm:w-auto">
+              <button type="button" id="appointment-modal-cancel-button" onclick="closeAppointmentModal()" class="flex-1 sm:flex-none px-4 py-2.5 sm:py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition flex items-center justify-center min-h-[40px] sm:min-h-0">Cancel</button>
+              <button type="submit" id="btn-save-appointment" class="flex-1 sm:flex-none px-5 py-2.5 sm:py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-h-[40px] sm:min-h-0">Save appointment</button>
+            </div>
           </div>
         </div>
       </form>
@@ -8676,6 +8759,7 @@
     let documentedFindingsTab = 'treatment';
     let documentedFindingsStatusFilter = 'all';
     let expandedFindingProcedureSteps = new Set();
+    let collapsedOrthoFindings = new Set();
     let showRootsAnatomy = true;
 
     // Appointment calendar state
@@ -11009,6 +11093,7 @@
         selectedFindingIds = new Set();
         invoicedFindingIds = new Set();
         expandedFindingProcedureSteps = new Set();
+        collapsedOrthoFindings = new Set();
         chartInvoiceStatePatientId = null;
         chartInvoiceStateLoading = false;
         editingWhatsAppTemplateId = null;
@@ -12443,6 +12528,7 @@
         active: Boolean(record.active),
         sortOrder: Number(record.sort_order) || 0,
         trackImplantProgress: Boolean(record.track_implant_progress),
+        isOrthoPackage: Boolean(record.is_ortho_package),
         steps: normaliseDentalProcedureSteps(record.procedure_steps),
         createdAt: record.created_at,
         updatedAt: record.updated_at
@@ -12611,6 +12697,44 @@
       return 'P';
     }
 
+    function normaliseOrthoVisit(visit, index = 0) {
+      if (!visit || typeof visit !== 'object') return null;
+      const visitId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(visit.id || ''))
+        ? String(visit.id)
+        : createChartFindingId();
+      const rawNumber = Number(visit.visitNumber || visit.visit_number);
+      const visitNumber = Number.isInteger(rawNumber) && rawNumber > 0 ? rawNumber : (index + 1);
+      const date = normaliseChartCreatedAt(visit.date || visit.createdAt || visit.created_at || new Date().toISOString());
+      const createdAt = normaliseChartCreatedAt(visit.createdAt || visit.created_at || date);
+      const price = Math.max(0, Number(visit.price) || 0);
+      const status = normaliseOperationStatus(visit.status, 'C');
+      const notes = typeof visit.notes === 'string'
+        ? visit.notes
+        : Array.isArray(visit.notes)
+          ? visit.notes.map(n => typeof n === 'string' ? n : n.text || '').filter(Boolean).join('\n')
+          : '';
+      const doctorId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(visit.doctorId || visit.doctor_id || ''))
+        ? String(visit.doctorId || visit.doctor_id)
+        : null;
+      const doctorName = String(visit.doctorName || visit.doctor_name || '').trim().slice(0, 100);
+      return {
+        id: visitId,
+        visitNumber,
+        date,
+        notes,
+        price,
+        status,
+        doctorId,
+        doctorName,
+        createdAt
+      };
+    }
+
+    function normaliseOrthoVisits(visits) {
+      if (!Array.isArray(visits)) return [];
+      return visits.map((v, i) => normaliseOrthoVisit(v, i)).filter(Boolean);
+    }
+
     function normaliseChartFinding(value) {
       if (value && typeof value === 'object' && !Array.isArray(value)) {
         const hasStoredPrice = value.price !== null && value.price !== undefined && String(value.price).trim() !== '';
@@ -12622,6 +12746,8 @@
         const doctorNameValue = value.doctorName || value.doctor_name;
         const steps = normaliseChartFindingSteps(value.steps || value.procedureSteps || value.procedure_steps);
         const isProcedureStep = Boolean(value.isProcedureStep || value.is_procedure_step);
+        const orthoVisits = normaliseOrthoVisits(value.orthoVisits || value.ortho_visits);
+        const isOrthoPackage = Boolean(value.isOrthoPackage || value.is_ortho_package || orthoVisits.length > 0);
         return {
           code: String(value.code || value.operation || value.value || 'none'),
           status: steps.length ? chartFindingStatusFromSteps(steps, value.status) : normaliseOperationStatus(value.status, 'E'),
@@ -12640,10 +12766,12 @@
           parentFindingId: isProcedureStep && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value.parentFindingId || value.parent_finding_id || '')) ? String(value.parentFindingId || value.parent_finding_id) : null,
           procedureStepId: isProcedureStep ? String(value.procedureStepId || value.procedure_step_id || '').trim() : '',
           procedureStepName: isProcedureStep ? String(value.procedureStepName || value.procedure_step_name || '').trim().slice(0, 100) : '',
-          procedureStepPercentage: isProcedureStep ? Math.max(0, Math.min(100, Number(value.procedureStepPercentage || value.procedure_step_percentage) || 0)) : 0
+          procedureStepPercentage: isProcedureStep ? Math.max(0, Math.min(100, Number(value.procedureStepPercentage || value.procedure_step_percentage) || 0)) : 0,
+          isOrthoPackage,
+          orthoVisits
         };
       }
-      return { code: String(value || 'none'), status: 'E', createdAt: null, beginDate: null, completedAt: null, id: null, price: null, batchId: null, billingMultiplier: null, doctorId: null, doctorName: '', notes: [], steps: [], isProcedureStep: false, parentFindingId: null, procedureStepId: '', procedureStepName: '', procedureStepPercentage: 0 };
+      return { code: String(value || 'none'), status: 'E', createdAt: null, beginDate: null, completedAt: null, id: null, price: null, batchId: null, billingMultiplier: null, doctorId: null, doctorName: '', notes: [], steps: [], isProcedureStep: false, parentFindingId: null, procedureStepId: '', procedureStepName: '', procedureStepPercentage: 0, isOrthoPackage: false, orthoVisits: [] };
     }
 
     function createChartFindingId() {
@@ -12675,7 +12803,17 @@
     function chartFindingInvoiceAmounts(findings) {
       const amountByFindingId = new Map();
       findings.forEach(finding => {
+        if (finding.isOrthoPackage && Array.isArray(finding.orthoVisits)) {
+          finding.orthoVisits.forEach(visit => {
+            if (visit.id) {
+              amountByFindingId.set(visit.id, Math.max(0, Number(visit.price) || 0));
+            }
+          });
+        }
         const members = (finding.memberFindings || [finding]).filter(member => member.id);
+        if (finding.isOrthoPackage) {
+          return;
+        }
         if (!finding.batchId || members.length < 2) {
           members.forEach(member => amountByFindingId.set(member.id, Math.max(0, Number(member.price) || 0)));
           return;
@@ -12703,10 +12841,11 @@
       } : null;
     }
 
-    function chartFindingStorageRecord(code, status, createdAt = null, id = null, price = null, batchId = null, notes = null, billingMultiplier = null, doctorId = null, doctorName = '', completedAt = null, steps = null, procedureStepMeta = null, beginDate = null) {
+    function chartFindingStorageRecord(code, status, createdAt = null, id = null, price = null, batchId = null, notes = null, billingMultiplier = null, doctorId = null, doctorName = '', completedAt = null, steps = null, procedureStepMeta = null, beginDate = null, orthoVisits = null, isOrthoPackage = false) {
       const hasExplicitPrice = price !== null && price !== undefined && String(price).trim() !== '';
       const numericPrice = hasExplicitPrice ? Number(price) : Number.NaN;
       const normalisedSteps = normaliseChartFindingSteps(steps);
+      const normalisedVisits = normaliseOrthoVisits(orthoVisits);
       const record = {
         code: String(code || 'none'),
         status: normalisedSteps.length ? chartFindingStatusFromSteps(normalisedSteps, status) : normaliseOperationStatus(status, 'E'),
@@ -12751,6 +12890,10 @@
         record.procedureStepId = String(procedureStepMeta.procedureStepId || '');
         record.procedureStepName = String(procedureStepMeta.procedureStepName || '').trim().slice(0, 100);
         record.procedureStepPercentage = Math.max(0, Math.min(100, Number(procedureStepMeta.procedureStepPercentage) || 0));
+      }
+      if (isOrthoPackage || normalisedVisits.length > 0) {
+        record.isOrthoPackage = true;
+        record.orthoVisits = normalisedVisits;
       }
       return record;
     }
@@ -12810,7 +12953,7 @@
 
     function ensureWholeOperations(toothData) {
       toothData.wholeOperations = chartWholeFindings(toothData).map(finding => (
-        chartFindingStorageRecord(finding.code, finding.status, finding.createdAt, finding.id, finding.price, finding.batchId, finding.notes, finding.billingMultiplier, finding.doctorId, finding.doctorName, finding.completedAt, finding.steps, chartFindingProcedureStepMeta(finding), finding.beginDate)
+        chartFindingStorageRecord(finding.code, finding.status, finding.createdAt, finding.id, finding.price, finding.batchId, finding.notes, finding.billingMultiplier, finding.doctorId, finding.doctorName, finding.completedAt, finding.steps, chartFindingProcedureStepMeta(finding), finding.beginDate, finding.orthoVisits, finding.isOrthoPackage)
       ));
       toothData.status = 'none';
       return toothData.wholeOperations;
@@ -12826,7 +12969,7 @@
     function ensureMouthOperations(patient) {
       const meta = ensureChartMeta(patient);
       meta.mouthOperations = chartMouthFindings(patient).map(finding => (
-        chartFindingStorageRecord(finding.code, finding.status, finding.createdAt, finding.id, finding.price, null, finding.notes, null, finding.doctorId, finding.doctorName, finding.completedAt, finding.steps, chartFindingProcedureStepMeta(finding), finding.beginDate)
+        chartFindingStorageRecord(finding.code, finding.status, finding.createdAt, finding.id, finding.price, null, finding.notes, null, finding.doctorId, finding.doctorName, finding.completedAt, finding.steps, chartFindingProcedureStepMeta(finding), finding.beginDate, finding.orthoVisits, finding.isOrthoPackage)
       ));
       return meta.mouthOperations;
     }
@@ -12850,7 +12993,9 @@
           finding.completedAt,
           finding.steps,
           chartFindingProcedureStepMeta(finding),
-          finding.beginDate
+          finding.beginDate,
+          finding.orthoVisits,
+          finding.isOrthoPackage
         ));
       if (records.length) meta.mouthOperations = records;
       else delete meta.mouthOperations;
@@ -12995,10 +13140,10 @@
 
       let [specialtiesResult, operationsResult] = await Promise.all([
         db.from('dental_specialties').select('id, name, description, icon_name, accent_color, active, sort_order, created_at, updated_at').order('sort_order').order('name'),
-        db.from('dental_operations').select('id, specialty_id, code, name, action_scope, visual_code, price, active, sort_order, track_implant_progress, procedure_steps, created_at, updated_at').order('sort_order').order('name')
+        db.from('dental_operations').select('id, specialty_id, code, name, action_scope, visual_code, price, active, sort_order, track_implant_progress, procedure_steps, is_ortho_package, created_at, updated_at').order('sort_order').order('name')
       ]);
       if (specialtiesResult.error) throw specialtiesResult.error;
-      if (operationsResult.error && /procedure_steps/i.test(String(operationsResult.error.message || ''))) {
+      if (operationsResult.error && /is_ortho_package|procedure_steps/i.test(String(operationsResult.error.message || ''))) {
         operationsResult = await db.from('dental_operations').select('id, specialty_id, code, name, action_scope, visual_code, price, active, sort_order, track_implant_progress, created_at, updated_at').order('sort_order').order('name');
       }
       if (operationsResult.error) throw operationsResult.error;
@@ -13398,6 +13543,8 @@
       document.getElementById('admin-operation-price').value = '0';
       document.getElementById('admin-operation-active').checked = true;
       document.getElementById('admin-operation-has-steps').checked = false;
+      const orthoPkgReset = document.getElementById('admin-operation-is-ortho-package');
+      if (orthoPkgReset) orthoPkgReset.checked = false;
       document.getElementById('admin-operation-form-title').textContent = 'Add clinical operation';
       document.getElementById('admin-operation-cancel-button').classList.add('hidden');
       setAdminMessage('admin-operation-message', '');
@@ -13437,6 +13584,8 @@
       document.getElementById('admin-operation-active').checked = operation.active;
       dentalOperationStepDraft = operation.steps.map(step => ({ ...step }));
       document.getElementById('admin-operation-has-steps').checked = dentalOperationStepDraft.length > 0;
+      const orthoPkgEdit = document.getElementById('admin-operation-is-ortho-package');
+      if (orthoPkgEdit) orthoPkgEdit.checked = Boolean(operation.isOrthoPackage);
       document.getElementById('admin-operation-form-title').textContent = 'Edit clinical operation';
       document.getElementById('admin-operation-cancel-button').classList.remove('hidden');
       renderDentalVisualPresetOptions(operation.visualCode);
@@ -13495,6 +13644,7 @@
         return setAdminMessage('admin-operation-message', 'Procedure step percentages must total exactly 100% before saving.', 'error');
       }
       const procedureSteps = stepsEnabled ? normaliseDentalProcedureSteps(dentalOperationStepDraft) : [];
+      const isOrthoPackage = Boolean(document.getElementById('admin-operation-is-ortho-package')?.checked);
       const payload = {
         specialty_id: specialtyId,
         name,
@@ -13503,7 +13653,8 @@
         price: Math.max(0, Number(document.getElementById('admin-operation-price').value) || 0),
         sort_order: Number(document.getElementById('admin-operation-sort-order').value) || 0,
         active: document.getElementById('admin-operation-active').checked,
-        procedure_steps: procedureSteps
+        procedure_steps: procedureSteps,
+        is_ortho_package: isOrthoPackage
       };
       if (!operationId) payload.code = dentalOperationCode(name, specialtyId);
       button.disabled = true;
@@ -13777,7 +13928,7 @@
 
       operationsList.innerHTML = selectedOperations.length ? selectedOperations.map((operation, index) => `<article class="grid grid-cols-[auto_minmax(0,1fr)] gap-3 p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
         <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-[10px] font-black text-slate-500">${index + 1}</span>
-        <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><h5 class="text-sm font-black text-slate-800">${escapeHtml(operation.name)}</h5><span class="rounded-md border px-2 py-0.5 text-[10px] font-black ${dentalOperationBadgeClass(operation.code, operation.actionScope)}">${dentalOperationScopeLabel(operation.actionScope, 'Surfaces')}</span><span class="rounded-md bg-violet-50 px-2 py-0.5 text-[10px] font-black text-violet-700">${escapeHtml(formatInvoiceMoney(operation.price))}</span>${operation.steps.length ? `<span class="inline-flex items-center gap-1 rounded-md bg-cyan-50 px-2 py-0.5 text-[10px] font-black text-cyan-700"><i data-lucide="list-checks" class="h-3 w-3"></i>${operation.steps.length} step${operation.steps.length === 1 ? '' : 's'}</span>` : ''}<span class="rounded-md px-2 py-0.5 text-[10px] font-black ${operation.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">${operation.active ? 'Active' : 'Inactive'}</span></div><p class="mt-1.5 break-all font-mono text-[10px] leading-4 text-slate-400">${escapeHtml(operation.code)} · visual: ${escapeHtml(operation.visualCode)} · order ${operation.sortOrder}</p></div>
+        <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><h5 class="text-sm font-black text-slate-800">${escapeHtml(operation.name)}</h5><span class="rounded-md border px-2 py-0.5 text-[10px] font-black ${dentalOperationBadgeClass(operation.code, operation.actionScope)}">${dentalOperationScopeLabel(operation.actionScope, 'Surfaces')}</span><span class="rounded-md bg-violet-50 px-2 py-0.5 text-[10px] font-black text-violet-700">${escapeHtml(formatInvoiceMoney(operation.price))}</span>${operation.isOrthoPackage ? `<span class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-black text-indigo-700"><i data-lucide="layers" class="h-3 w-3"></i>${currentUiLanguage === 'ar' ? 'حزمة زيارات (تقويم)' : 'Multi-visit package'}</span>` : ''}${operation.steps.length ? `<span class="inline-flex items-center gap-1 rounded-md bg-cyan-50 px-2 py-0.5 text-[10px] font-black text-cyan-700"><i data-lucide="list-checks" class="h-3 w-3"></i>${operation.steps.length} step${operation.steps.length === 1 ? '' : 's'}</span>` : ''}<span class="rounded-md px-2 py-0.5 text-[10px] font-black ${operation.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">${operation.active ? 'Active' : 'Inactive'}</span></div><p class="mt-1.5 break-all font-mono text-[10px] leading-4 text-slate-400">${escapeHtml(operation.code)} · visual: ${escapeHtml(operation.visualCode)} · order ${operation.sortOrder}</p></div>
         <div class="col-span-2 flex flex-wrap justify-end gap-2 sm:col-span-1"><button type="button" onclick="setDentalOperationActive('${operation.id}', ${!operation.active})" class="rounded-lg border px-2.5 py-2 text-[10px] font-black ${operation.active ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}">${operation.active ? 'Deactivate' : 'Activate'}</button><button type="button" onclick="editDentalOperation('${operation.id}')" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-black text-slate-600 hover:bg-slate-50"><i data-lucide="pencil" class="h-3.5 w-3.5"></i> Edit</button><button type="button" onclick="openDentalOperationDeleteModal('${operation.id}')" class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[10px] font-black text-red-600 hover:bg-red-100"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i> Delete</button></div>
       </article>`).join('') : '<div class="flex min-h-44 flex-col items-center justify-center p-8 text-center"><i data-lucide="list-plus" class="h-7 w-7 text-slate-300"></i><p class="mt-3 text-sm font-black text-slate-600">No procedures in this category</p><button type="button" onclick="startDentalOperationForSpecialty(\'' + selectedSpecialty.id + '\')" class="mt-3 rounded-lg bg-cyan-600 px-3 py-2 text-[10px] font-black text-white hover:bg-cyan-700">Add the first procedure</button></div>';
       lucide.createIcons();
@@ -24804,11 +24955,14 @@
           <tr class="transition hover:bg-slate-50/80">
             <td class="w-16 px-4 py-4 text-center font-mono font-bold text-slate-400" style="font-size: 15px;">${idx + 1}</td>
             <td class="px-4 py-4 ${isAr ? 'text-right' : 'text-left'}">
-              <div class="font-bold text-slate-900 leading-snug" style="font-size: 17px;">${escapeHtml(primaryName)}</div>
+              <div class="flex flex-wrap items-center gap-2 font-bold text-slate-900 leading-snug" style="font-size: 17px;">
+                <span>${escapeHtml(primaryName)}</span>
+                ${op.isOrthoPackage ? `<span class="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700">${isAr ? 'حزمة زيارات (تقويم)' : 'Multi-visit package'}</span>` : ''}
+              </div>
               ${secondaryName ? `<div class="mt-1 font-mono font-semibold text-slate-500" style="font-size: 14px;">${escapeHtml(secondaryName)}</div>` : `<div class="mt-1 font-mono text-slate-400" style="font-size: 13px;">${escapeHtml(op.code)}</div>`}
             </td>
             <td class="w-44 px-4 py-4 ${isAr ? 'text-left' : 'text-right'} font-black text-slate-900 whitespace-nowrap">
-              <span class="inline-block rounded-xl ${op.price > 0 ? 'bg-violet-50 text-violet-700 border border-violet-200/60' : 'bg-slate-100 text-slate-500'} px-3.5 py-1.5 font-mono font-black" style="font-size: 15px;">
+              <span class="inline-block rounded-xl ${op.price > 0 ? 'bg-violet-50 text-violet-700 border border-violet-200' : 'bg-slate-100 text-slate-500'} px-3.5 py-1.5 font-mono font-black" style="font-size: 15px;">
                 ${escapeHtml(formattedPrice)}
               </span>
             </td>
@@ -25531,6 +25685,7 @@
       const normalisedStatus = normaliseOperationStatus(operationStatus, 'P');
       const beginDate = (normalisedStatus === 'In' || normalisedStatus === 'C') ? createdAt : null;
       const batchId = targets.length > 1 ? createChartFindingId() : null;
+      const isOrthoPkg = Boolean(dentalOperationByCode(operationCode)?.isOrthoPackage);
       targets.forEach(target => {
         const toothData = getOrCreateChartTooth(patient, target.tooth);
         const wholeOperations = ensureWholeOperations(toothData);
@@ -25548,7 +25703,9 @@
           null,
           createChartFindingSteps(procedureSteps, operationStatus),
           null,
-          beginDate
+          beginDate,
+          [],
+          isOrthoPkg
         );
         wholeOperations.push(record);
         renderToothVisuals(target.tooth);
@@ -25571,6 +25728,7 @@
       const createdAt = new Date().toISOString();
       const normalisedStatus = normaliseOperationStatus(operationStatus, 'P');
       const beginDate = (normalisedStatus === 'In' || normalisedStatus === 'C') ? createdAt : null;
+      const isOrthoPkg = Boolean(dentalOperationByCode(operationCode)?.isOrthoPackage);
       ensureMouthOperations(patient).push(chartFindingStorageRecord(
         operationCode,
         normalisedStatus,
@@ -25585,7 +25743,9 @@
         null,
         createChartFindingSteps(procedureSteps, operationStatus),
         null,
-        beginDate
+        beginDate,
+        [],
+        isOrthoPkg
       ));
       updateClinicalOperationPreview();
       renderFindingsList();
@@ -26010,6 +26170,23 @@
       const targetLabel = card.dataset.findingKind === 'mouth'
         ? 'the whole mouth'
         : toothIds.length > 1 ? `${toothIds.length} teeth` : chartToothLabel(toothIds[0]);
+
+      const mouthFinding = chartMouthFindings(patient).find(f => findingIds.includes(f.id));
+      let wholeFinding = null;
+      Object.values(patient.chartState || {}).forEach(toothData => {
+        if (!toothData || typeof toothData !== 'object' || Array.isArray(toothData)) return;
+        const match = ensureWholeOperations(toothData).find(f => findingIds.includes(f.id));
+        if (match) wholeFinding = match;
+      });
+      const findingToCheck = mouthFinding || wholeFinding;
+      if (findingToCheck?.isOrthoPackage) {
+        const hasInvoicedVisits = (findingToCheck.orthoVisits || []).some(v => invoicedFindingIds.has(v.id));
+        if (hasInvoicedVisits) {
+          alert(currentUiLanguage === 'ar' ? 'لا يمكن حذف هذه الباقة لأن بعض زياراتها مفوترة بالفعل. يرجى إزالة بنود الفاتورة أولاً.' : 'Cannot delete this procedure because one or more visits have already been invoiced. Please remove the invoiced visits from the invoice first.');
+          return;
+        }
+      }
+
       if (!confirm(`Delete ${operationLabel} from ${targetLabel}? This cannot be undone.`)) return;
 
       let deleted = false;
@@ -26021,7 +26198,10 @@
       });
 
       if (!deleted) return;
-      findingIds.forEach(findingId => selectedFindingIds.delete(findingId));
+      findingIds.forEach(findingId => {
+        selectedFindingIds.delete(findingId);
+        collapsedOrthoFindings.delete(findingId);
+      });
       renderChartFindingTeeth(toothIds);
       renderFindingsList();
       await saveActivePatientChart();
@@ -26056,7 +26236,9 @@
             nextFinding.completedAt,
             nextFinding.steps,
             chartFindingProcedureStepMeta(nextFinding),
-            nextFinding.beginDate
+            nextFinding.beginDate,
+            nextFinding.orthoVisits,
+            nextFinding.isOrthoPackage
           );
           updated = true;
         });
@@ -27011,7 +27193,27 @@
       const summary = document.getElementById('findings-invoice-selection-summary');
       const button = document.getElementById('findings-invoice-button');
       if (!summary || !button) return;
-      const currentFindings = new Map(findings.flatMap(finding => finding.memberFindings || [finding]).filter(finding => finding.id).map(finding => [finding.id, finding]));
+      const currentFindings = new Map();
+      findings.forEach(finding => {
+        if (finding.isOrthoPackage && Array.isArray(finding.orthoVisits)) {
+          finding.orthoVisits.forEach(visit => {
+            if (visit.id) {
+              currentFindings.set(visit.id, {
+                ...visit,
+                code: finding.code,
+                toothId: finding.toothId,
+                parentFindingId: finding.id,
+                isOrthoVisit: true
+              });
+            }
+          });
+        }
+        if (!finding.isOrthoPackage) {
+          (finding.memberFindings || [finding]).forEach(member => {
+            if (member.id) currentFindings.set(member.id, member);
+          });
+        }
+      });
       selectedFindingIds = new Set([...selectedFindingIds].filter(id => {
         const finding = currentFindings.get(id);
         return finding && !invoicedFindingIds.has(id) && Number(finding.price) > 0;
@@ -27021,10 +27223,10 @@
       const total = [...selectedFindingIds].reduce((sum, findingId) => sum + (invoiceAmounts.get(findingId) || 0), 0);
       const count = selectedFindings.length;
       summary.textContent = chartInvoiceStateLoading
-        ? 'Checking invoiced operations…'
+        ? (currentUiLanguage === 'ar' ? 'جارٍ التحقق من العمليات المفوترة…' : 'Checking invoiced operations…')
         : count
-          ? `${count} operation${count === 1 ? '' : 's'} selected · ${formatInvoiceMoney(total)}`
-          : 'Select uninvoiced operations to add them to an invoice';
+          ? `${count} ${currentUiLanguage === 'ar' ? 'عمليات محددة' : count === 1 ? 'operation selected' : 'operations selected'} · ${formatInvoiceMoney(total)}`
+          : (currentUiLanguage === 'ar' ? 'حدد العمليات غير المفوترة لإضافتها إلى الفاتورة' : 'Select uninvoiced operations to add them to an invoice');
       const shouldShow = !chartInvoiceStateLoading && count > 0;
       button.classList.toggle('inline-flex', shouldShow);
       button.classList.toggle('hidden', !shouldShow);
@@ -27034,7 +27236,7 @@
         ? `Add ${count} selected operation${count === 1 ? '' : 's'} to invoice`
         : 'Add invoice');
       button.title = count ? `${count} selected · ${formatInvoiceMoney(total)}` : 'Add invoice';
-      button.innerHTML = '<i data-lucide="receipt-text" class="h-4 w-4"></i><span>Add invoice</span>';
+      button.innerHTML = '<i data-lucide="receipt-text" class="h-4 w-4"></i><span>' + (currentUiLanguage === 'ar' ? 'إضافة إلى الفاتورة' : 'Add invoice') + '</span>';
       lucide.createIcons();
     }
 
@@ -27061,10 +27263,22 @@
     async function invoiceSelectedFindings() {
       const patient = getActivePatient();
       const findings = collectDocumentedFindings(patient);
-      const availableIds = new Set(findings
-        .flatMap(finding => finding.memberFindings || [finding])
-        .filter(finding => finding.id && Number(finding.price) > 0 && !invoicedFindingIds.has(finding.id))
-        .map(finding => finding.id));
+      const availableIds = new Set();
+      findings.forEach(finding => {
+        if (finding.isOrthoPackage && Array.isArray(finding.orthoVisits)) {
+          finding.orthoVisits.forEach(visit => {
+            if (visit.id && Number(visit.price) > 0 && !invoicedFindingIds.has(visit.id)) {
+              availableIds.add(visit.id);
+            }
+          });
+        } else if (!finding.isOrthoPackage) {
+          (finding.memberFindings || [finding]).forEach(member => {
+            if (member.id && Number(member.price) > 0 && !invoicedFindingIds.has(member.id)) {
+              availableIds.add(member.id);
+            }
+          });
+        }
+      });
       const findingIds = [...selectedFindingIds].filter(id => availableIds.has(id));
       if (!patient || !findingIds.length || chartInvoiceStateLoading) return;
 
@@ -27095,6 +27309,197 @@
       }
     }
 
+    function toggleOrthoVisitsCollapse(findingId) {
+      if (!findingId) return;
+      if (collapsedOrthoFindings.has(findingId)) {
+        collapsedOrthoFindings.delete(findingId);
+      } else {
+        collapsedOrthoFindings.add(findingId);
+      }
+      renderFindingsList();
+    }
+
+    async function addOrthoVisit(button) {
+      const card = button.closest('[data-finding-id]');
+      const findingId = card?.dataset.findingId;
+      const patient = getActivePatient();
+      if (!patient || !findingId) return;
+      let newVisitNumber = 1;
+      let added = false;
+      updateChartFindingById(patient, findingId, finding => {
+        const visits = Array.isArray(finding.orthoVisits) ? [...finding.orthoVisits] : [];
+        newVisitNumber = visits.length + 1;
+        const newVisit = normaliseOrthoVisit({
+          id: createChartFindingId(),
+          visitNumber: newVisitNumber,
+          date: new Date().toISOString(),
+          notes: '',
+          price: 0,
+          status: 'P',
+          doctorId: finding.doctorId || null,
+          doctorName: finding.doctorName || '',
+          createdAt: new Date().toISOString()
+        }, visits.length);
+        visits.push(newVisit);
+        added = true;
+        return {
+          ...finding,
+          isOrthoPackage: true,
+          orthoVisits: visits
+        };
+      });
+      if (!added) return;
+      collapsedOrthoFindings.delete(findingId);
+      renderFindingsList();
+      await saveActivePatientChart();
+      showAppointmentNotificationToast(
+        currentUiLanguage === 'ar' ? 'تمت إضافة الزيارة' : 'Visit added',
+        currentUiLanguage === 'ar' ? `تمت إضافة الزيارة رقم ${newVisitNumber}` : `Visit #${newVisitNumber} added.`
+      );
+    }
+
+    async function deleteOrthoVisit(button) {
+      const card = button.closest('[data-finding-id]');
+      const visitRow = button.closest('[data-ortho-visit-id]');
+      const findingId = card?.dataset.findingId;
+      const visitId = visitRow?.dataset.orthoVisitId;
+      const patient = getActivePatient();
+      if (!patient || !findingId || !visitId) return;
+      if (invoicedFindingIds.has(visitId)) {
+        alert(currentUiLanguage === 'ar' ? 'هذه الزيارة مفوترة بالفعل ولا يمكن حذفها.' : 'This visit has already been invoiced and cannot be deleted.');
+        return;
+      }
+      if (!confirm(currentUiLanguage === 'ar' ? 'هل أنت متأكد من حذف هذه الزيارة؟' : 'Are you sure you want to delete this visit?')) return;
+      let deleted = false;
+      updateChartFindingById(patient, findingId, finding => {
+        const visits = (finding.orthoVisits || []).filter(v => v.id !== visitId);
+        const renumbered = visits.map((v, idx) => ({ ...v, visitNumber: idx + 1 }));
+        deleted = true;
+        return {
+          ...finding,
+          orthoVisits: renumbered
+        };
+      });
+      if (!deleted) return;
+      selectedFindingIds.delete(visitId);
+      renderFindingsList();
+      await saveActivePatientChart();
+      showAppointmentNotificationToast(
+        currentUiLanguage === 'ar' ? 'تم حذف الزيارة' : 'Visit deleted',
+        currentUiLanguage === 'ar' ? 'تمت إزالة الزيارة بنجاح' : 'The visit has been removed.'
+      );
+    }
+
+    async function updateOrthoVisitDate(input) {
+      const card = input.closest('[data-finding-id]');
+      const visitRow = input.closest('[data-ortho-visit-id]');
+      const findingId = card?.dataset.findingId;
+      const visitId = visitRow?.dataset.orthoVisitId;
+      const patient = getActivePatient();
+      if (!patient || !findingId || !visitId) return;
+      const dateValue = input.value ? new Date(input.value).toISOString() : new Date().toISOString();
+      if (!updateChartFindingById(patient, findingId, finding => {
+        const visits = (finding.orthoVisits || []).map(v => v.id === visitId ? {
+          ...v,
+          date: dateValue
+        } : v);
+        return { ...finding, orthoVisits: visits };
+      })) return;
+      renderFindingsList();
+      await saveActivePatientChart();
+    }
+
+    async function updateOrthoVisitPrice(input) {
+      const card = input.closest('[data-finding-id]');
+      const visitRow = input.closest('[data-ortho-visit-id]');
+      const findingId = card?.dataset.findingId;
+      const visitId = visitRow?.dataset.orthoVisitId;
+      const patient = getActivePatient();
+      if (!patient || !findingId || !visitId) return;
+      if (invoicedFindingIds.has(visitId)) {
+        alert(currentUiLanguage === 'ar' ? 'هذه الزيارة مفوترة بالفعل ولا يمكن تغيير سعرها.' : 'This visit is already invoiced and its price cannot be changed.');
+        renderFindingsList();
+        return;
+      }
+      const price = Number(input.value);
+      if (!Number.isFinite(price) || price < 0) {
+        alert('Enter a valid price of zero or more.');
+        renderFindingsList();
+        return;
+      }
+      const roundedPrice = Math.round(price * 100) / 100;
+      if (!updateChartFindingById(patient, findingId, finding => {
+        const visits = (finding.orthoVisits || []).map(v => v.id === visitId ? {
+          ...v,
+          price: roundedPrice
+        } : v);
+        return { ...finding, orthoVisits: visits };
+      })) return;
+      if (roundedPrice <= 0) {
+        selectedFindingIds.delete(visitId);
+      }
+      renderFindingsList();
+      await saveActivePatientChart();
+    }
+
+    async function updateOrthoVisitDoctor(select) {
+      const card = select.closest('[data-finding-id]');
+      const visitRow = select.closest('[data-ortho-visit-id]');
+      const findingId = card?.dataset.findingId;
+      const visitId = visitRow?.dataset.orthoVisitId;
+      const patient = getActivePatient();
+      if (!patient || !findingId || !visitId) return;
+      const doctorId = String(select.value || '');
+      const doctor = doctorId ? chartDoctors.find(item => item.userId === doctorId) : null;
+      if (doctorId && !doctor) {
+        alert('Choose an active doctor from the list.');
+        renderFindingsList();
+        return;
+      }
+      if (!updateChartFindingById(patient, findingId, finding => {
+        const visits = (finding.orthoVisits || []).map(v => v.id === visitId ? {
+          ...v,
+          doctorId: doctor?.userId || null,
+          doctorName: doctor?.fullName || ''
+        } : v);
+        return { ...finding, orthoVisits: visits };
+      })) return;
+      renderFindingsList();
+      await saveActivePatientChart();
+    }
+
+    async function updateOrthoVisitNotes(textarea) {
+      const card = textarea.closest('[data-finding-id]');
+      const visitRow = textarea.closest('[data-ortho-visit-id]');
+      const findingId = card?.dataset.findingId;
+      const visitId = visitRow?.dataset.orthoVisitId;
+      const patient = getActivePatient();
+      if (!patient || !findingId || !visitId) return;
+      const notes = String(textarea.value || '').trim();
+      updateChartFindingById(patient, findingId, finding => {
+        const visits = (finding.orthoVisits || []).map(v => v.id === visitId ? {
+          ...v,
+          notes
+        } : v);
+        return { ...finding, orthoVisits: visits };
+      });
+      await saveActivePatientChart();
+    }
+
+    function toggleOrthoVisitSelection(checkbox) {
+      const visitId = checkbox.dataset.orthoVisitId;
+      if (!visitId || checkbox.disabled || invoicedFindingIds.has(visitId)) return;
+      if (checkbox.checked) {
+        selectedFindingIds.add(visitId);
+      } else {
+        selectedFindingIds.delete(visitId);
+      }
+      const patient = getActivePatient();
+      const findings = collectDocumentedFindings(patient);
+      renderFindingInvoiceToolbar(findings);
+      renderFindingsList();
+    }
+
     function collectDocumentedFindings(patient) {
       const findings = [];
       if (!patient?.chartState) return findings;
@@ -27117,7 +27522,9 @@
           doctorName: finding.doctorName,
           notes: finding.notes,
           steps: finding.steps,
-          surfaces: []
+          surfaces: [],
+          isOrthoPackage: Boolean(finding.isOrthoPackage),
+          orthoVisits: normaliseOrthoVisits(finding.orthoVisits)
         });
       });
       Object.entries(patient.chartState).forEach(([toothId, data]) => {
@@ -27142,7 +27549,9 @@
             doctorName: finding.doctorName,
             notes: finding.notes,
             steps: finding.steps,
-            surfaces: []
+            surfaces: [],
+            isOrthoPackage: Boolean(finding.isOrthoPackage),
+            orthoVisits: normaliseOrthoVisits(finding.orthoVisits)
           });
         });
 
@@ -27168,7 +27577,9 @@
                 doctorName: finding.doctorName,
                 notes: finding.notes,
                 steps: finding.steps,
-                surfaces: []
+                surfaces: [],
+                isOrthoPackage: false,
+                orthoVisits: []
               });
             }
             const group = surfaceGroups.get(groupKey);
@@ -27204,7 +27615,9 @@
             toothIds: [],
             findingIds: [],
             memberFindings: [],
-            totalPrice: 0
+            totalPrice: 0,
+            isOrthoPackage: Boolean(finding.isOrthoPackage),
+            orthoVisits: normaliseOrthoVisits(finding.orthoVisits)
           };
           batchGroups.set(groupKey, batch);
           groupedFindings.push(batch);
@@ -27275,6 +27688,16 @@
         const findingPrice = Math.max(0, Number(finding.price) || 0);
         const billingMultiplier = isBatch ? chartFindingBillingMultiplier(finding, memberFindings.length) : 1;
         const totalPrice = isBatch ? chartFindingBatchTotal(finding, memberFindings.length) : findingPrice;
+        const isOrthoPackage = Boolean(finding.isOrthoPackage);
+        const orthoVisits = isOrthoPackage ? normaliseOrthoVisits(finding.orthoVisits) : [];
+        const isOrthoCollapsed = Boolean(finding.id && collapsedOrthoFindings.has(finding.id));
+        const totalAllocatedPrice = orthoVisits.reduce((sum, v) => sum + Math.max(0, Number(v.price) || 0), 0);
+        const remainingBalance = findingPrice - totalAllocatedPrice;
+        const invoicedVisitsCount = orthoVisits.filter(v => invoicedFindingIds.has(v.id)).length;
+        const isOrthoFullyInvoiced = Boolean(orthoVisits.length > 0 && invoicedVisitsCount === orthoVisits.length);
+        const isOrthoPartlyInvoiced = Boolean(invoicedVisitsCount > 0 && invoicedVisitsCount < orthoVisits.length);
+        const isOrthoLocked = invoicedVisitsCount > 0;
+
         const procedureStepsMarkup = procedureSteps.length ? `<div class="${procedureStepsExpanded ? '' : 'hidden '}w-full border-t border-cyan-100 bg-cyan-50/35 px-3 py-3" data-procedure-steps-panel>
           <div class="mb-2 flex flex-wrap items-center justify-between gap-2"><p class="text-[10px] font-black uppercase tracking-wider text-cyan-700">Procedure steps</p><p class="text-[10px] font-bold text-slate-500">${completedProcedureSteps} of ${procedureSteps.length} completed · ${dentalProcedureStepsTotal(procedureSteps.filter(step => step.status === 'C'))}% earned</p></div>
           <div class="space-y-2">${procedureSteps.map((step, index) => {
@@ -27289,18 +27712,130 @@
           }).join('')}</div>
           <p class="mt-2 text-[9px] font-semibold leading-4 text-slate-400">Percentage-based salary uses each completed step's share. Fixed per-procedure pay ignores the shares and uses the parent procedure after every step is complete.</p>
         </div>` : '';
-        const invoicedMemberIds = findingIds.filter(findingId => invoicedFindingIds.has(findingId));
-        const selectableMemberIds = memberFindings
-          .filter(member => member.id && !invoicedFindingIds.has(member.id) && Number(member.price) > 0)
-          .map(member => member.id);
-        const isInvoiced = invoicedMemberIds.length > 0;
-        const isFullyInvoiced = Boolean(findingIds.length && invoicedMemberIds.length === findingIds.length);
+
+        let orthoVisitsMarkup = '';
+        if (isOrthoPackage) {
+          const visitsListHtml = orthoVisits.length ? orthoVisits.map((visit) => {
+            const isVisitInvoiced = invoicedFindingIds.has(visit.id);
+            const isVisitSelected = selectedFindingIds.has(visit.id);
+            const visitPrice = Math.max(0, Number(visit.price) || 0);
+            const canSelectVisit = !isVisitInvoiced && visitPrice > 0 && !chartInvoiceStateLoading;
+            return `
+              <div data-ortho-visit-id="${escapeHtml(visit.id)}" class="ortho-visit-card flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-2xs transition hover:border-indigo-200">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <input type="checkbox"
+                      data-ortho-visit-id="${escapeHtml(visit.id)}"
+                      class="h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      ${isVisitInvoiced ? 'checked disabled' : (canSelectVisit ? (isVisitSelected ? 'checked' : '') : 'disabled')}
+                      onchange="toggleOrthoVisitSelection(this)"
+                      aria-label="${isVisitInvoiced ? 'Invoiced' : 'Select'} visit #${visit.visitNumber}"
+                      title="${isVisitInvoiced ? 'This visit is already invoiced' : (visitPrice <= 0 ? 'Set visit price before invoicing' : 'Select for invoice')}">
+                    <span class="inline-flex items-center justify-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-black text-indigo-700">
+                      ${currentUiLanguage === 'ar' ? 'زيارة' : 'Visit'} #${visit.visitNumber}
+                    </span>
+                    ${isVisitInvoiced ? '<span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-black text-emerald-700">' + (currentUiLanguage === 'ar' ? 'مفوترة' : 'Invoiced') + '</span>' : ''}
+                  </div>
+
+                  <div class="flex flex-wrap items-center gap-2 ms-auto">
+                    <!-- Date/Time Picker -->
+                    <label class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50/70 px-2 py-1 text-[10px] font-bold text-slate-600 shadow-2xs" title="${currentUiLanguage === 'ar' ? 'تاريخ ووقت الزيارة' : 'Visit date & time'}">
+                      <i data-lucide="calendar" class="h-3 w-3 text-indigo-500 shrink-0"></i>
+                      <input type="datetime-local"
+                        value="${chartOperationDateInputValue(visit.date || visit.createdAt)}"
+                        onchange="updateOrthoVisitDate(this)"
+                        class="bg-transparent text-[10px] font-semibold text-slate-700 outline-none"
+                        aria-label="Visit date">
+                    </label>
+
+                    <!-- Doctor Select -->
+                    <label class="inline-flex items-center overflow-hidden rounded-lg border border-cyan-200 bg-white shadow-2xs" title="${currentUiLanguage === 'ar' ? 'طبيب الزيارة' : 'Doctor for this visit'}">
+                      <span class="border-r border-cyan-100 bg-cyan-50 px-2 py-1 text-[9px] font-black text-cyan-700">${currentUiLanguage === 'ar' ? 'الطبيب' : 'Dr'}</span>
+                      <select onchange="updateOrthoVisitDoctor(this)" class="bg-transparent px-1.5 py-1 text-[10px] font-bold text-slate-700 outline-none" aria-label="Visit doctor">
+                        ${chartDoctorSelectOptions(visit)}
+                      </select>
+                    </label>
+
+                    <!-- Visit Cost / Price -->
+                    <label class="inline-flex items-center overflow-hidden rounded-lg border ${isVisitInvoiced ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-70' : 'border-indigo-200 bg-white focus-within:ring-2 focus-within:ring-indigo-500/20 shadow-2xs'}" title="${isVisitInvoiced ? 'This visit is invoiced' : 'Visit fee to invoice'}">
+                      <span class="border-r px-1.5 py-1 text-[9px] font-black ${isVisitInvoiced ? 'border-slate-200 bg-slate-200 text-slate-500' : 'border-indigo-100 bg-indigo-50 text-indigo-600'}">EGP</span>
+                      <input type="number" min="0" step="0.01"
+                        value="${visitPrice}"
+                        onchange="updateOrthoVisitPrice(this)"
+                        ${isVisitInvoiced ? 'disabled' : ''}
+                        class="w-16 bg-transparent px-1.5 py-1 text-right text-[10px] font-black outline-none ${isVisitInvoiced ? 'cursor-not-allowed text-slate-400' : 'text-slate-700'}"
+                        aria-label="Visit price">
+                    </label>
+
+                    <!-- Delete Visit Button -->
+                    ${isVisitInvoiced ? '' : `
+                    <button type="button" onclick="deleteOrthoVisit(this)"
+                      class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:border-red-300 hover:bg-red-100"
+                      title="${currentUiLanguage === 'ar' ? 'حذف الزيارة' : 'Delete visit'}"
+                      aria-label="Delete visit #${visit.visitNumber}">
+                      <i data-lucide="trash-2" class="h-3 w-3"></i>
+                    </button>`}
+                  </div>
+                </div>
+
+                <!-- Notes Textarea -->
+                <div>
+                  <textarea rows="1"
+                    placeholder="${currentUiLanguage === 'ar' ? 'ملاحظات الزيارة، التعديلات، تقدم العلاج…' : 'Visit notes, adjustments, archwires, progress…'}"
+                    onchange="updateOrthoVisitNotes(this)"
+                    class="w-full rounded-lg border border-slate-200 bg-slate-50/50 p-1.5 text-[11px] text-slate-700 placeholder-slate-400 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-500/15"
+                    aria-label="Visit notes">${escapeHtml(visit.notes || '')}</textarea>
+                </div>
+              </div>
+            `;
+          }).join('') : `
+            <div class="rounded-xl border border-dashed border-indigo-200 bg-indigo-50/30 px-4 py-3 text-center">
+              <p class="text-[11px] font-bold text-indigo-700">${currentUiLanguage === 'ar' ? 'لا توجد زيارات مسجلة لهذه الباقة بعد.' : 'No visits recorded for this package yet.'}</p>
+              <button type="button" onclick="addOrthoVisit(this)" class="mt-1.5 inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-indigo-700 transition shadow-2xs">
+                <i data-lucide="plus" class="h-3 w-3"></i>
+                <span>${currentUiLanguage === 'ar' ? 'إضافة الزيارة الأولى' : 'Add First Visit'}</span>
+              </button>
+            </div>
+          `;
+
+          orthoVisitsMarkup = `
+            <div data-ortho-visits-panel class="${isOrthoCollapsed ? 'hidden ' : ''}w-full border-t border-indigo-100 bg-indigo-50/20 px-3.5 py-2.5">
+              <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center gap-1.5">
+                  <i data-lucide="layers" class="h-3.5 w-3.5 text-indigo-600"></i>
+                  <span class="text-[10px] font-black uppercase tracking-wider text-indigo-900">${currentUiLanguage === 'ar' ? 'زيارات الباقة' : 'Package Visits'}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-[10px] font-bold text-slate-500">${invoicedVisitsCount} / ${orthoVisits.length} ${currentUiLanguage === 'ar' ? 'مفوترة' : 'invoiced'}</span>
+                  <button type="button" onclick="addOrthoVisit(this)" class="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-600 px-2 py-0.5 text-[10px] font-black text-white hover:bg-indigo-700 shadow-2xs transition">
+                    <i data-lucide="plus" class="h-3 w-3"></i>
+                    <span>${currentUiLanguage === 'ar' ? 'إضافة زيارة' : 'Add Visit'}</span>
+                  </button>
+                </div>
+              </div>
+              <div class="space-y-2">
+                ${visitsListHtml}
+              </div>
+            </div>
+          `;
+        }
+
+        const invoicedMemberIds = isOrthoPackage
+          ? orthoVisits.filter(v => invoicedFindingIds.has(v.id)).map(v => v.id)
+          : findingIds.filter(findingId => invoicedFindingIds.has(findingId));
+        const selectableMemberIds = isOrthoPackage
+          ? []
+          : memberFindings
+              .filter(member => member.id && !invoicedFindingIds.has(member.id) && Number(member.price) > 0)
+              .map(member => member.id);
+        const isInvoiced = isOrthoPackage ? isOrthoLocked : invoicedMemberIds.length > 0;
+        const isFullyInvoiced = isOrthoPackage ? isOrthoFullyInvoiced : Boolean(findingIds.length && invoicedMemberIds.length === findingIds.length);
         const isSelected = Boolean(selectableMemberIds.length && selectableMemberIds.every(findingId => selectedFindingIds.has(findingId)));
         const isCheckboxChecked = isFullyInvoiced || isSelected;
         const canSelect = Boolean(selectableMemberIds.length && !chartInvoiceStateLoading);
         const surfaceLabels = finding.surfaces.map(surface => surfaceClinicalName(finding.toothId, surface));
         const visibleToothIds = toothIds.slice(0, 3);
-        const toothEditingLocked = isInvoiced;
+        const toothEditingLocked = isInvoiced || (isOrthoPackage && isOrthoLocked);
         const toothEditorTitle = toothEditingLocked
           ? 'Delete the related invoice item before changing the procedure teeth'
           : `Edit the teeth for ${dentalOperationLabel(finding.code)}`;
@@ -27387,9 +27922,15 @@
         const dataAttributes = `data-finding-ids="${escapeHtml(findingIds.join(','))}" data-tooth-ids="${escapeHtml(toothIds.join(','))}" onchange="updateFindingGroupStatusFromControl(this)"`;
         const findingIdentityAttributes = `data-finding-id="${escapeHtml(findingIds[0] || '')}" data-finding-ids="${escapeHtml(findingIds.join(','))}" data-finding-kind="${escapeHtml(finding.kind)}" data-batch-id="${escapeHtml(finding.batchId || '')}" data-tooth-id="${escapeHtml(finding.toothId)}" data-tooth-ids="${escapeHtml(toothIds.join(','))}" data-operation-code="${escapeHtml(finding.code)}" data-operation-status="${finding.status}" data-surfaces="${escapeHtml(finding.surfaces.join(','))}"`;
         return `
-          <article ${findingIdentityAttributes} onclick="toggleFindingCardSelection(event, this)" aria-selected="${isSelected}" class="finding-row ${procedureSteps.length ? 'has-procedure-steps' : ''} ${isSelected ? 'is-selected' : ''} ${isInvoiced ? 'is-invoiced' : ''} ${isBatch ? 'is-batch-finding' : ''} flex flex-row flex-nowrap items-center gap-2.5 overflow-hidden rounded-xl border border-slate-200 border-l-4 px-3 py-2.5 shadow-sm transition hover:shadow-md" style="--finding-display-color:${displayColor};--finding-status-soft:${statusSoft};--finding-status-border:${statusBorder};border-left-color:${displayColor}">
+          <article ${findingIdentityAttributes} onclick="toggleFindingCardSelection(event, this)" aria-selected="${isSelected}" class="finding-row ${procedureSteps.length ? 'has-procedure-steps' : ''} ${isOrthoPackage ? 'has-ortho-visits' : ''} ${isSelected ? 'is-selected' : ''} ${isInvoiced ? 'is-invoiced' : ''} ${isBatch ? 'is-batch-finding' : ''} flex flex-row ${(procedureSteps.length || isOrthoPackage) ? 'flex-wrap' : 'flex-nowrap'} items-center gap-2.5 overflow-hidden rounded-xl border border-slate-200 border-l-4 px-3 py-2.5 shadow-sm transition hover:shadow-md" style="--finding-display-color:${displayColor};--finding-status-soft:${statusSoft};--finding-status-border:${statusBorder};border-left-color:${displayColor}">
             <div class="finding-row-summary flex min-w-0 flex-1 items-center gap-3">
-              <input type="checkbox" class="finding-selection-checkbox ${isFullyInvoiced ? 'is-invoiced-checkbox' : ''} h-4 w-4 shrink-0 rounded border-slate-300 text-violet-600 focus:ring-violet-500" ${isCheckboxChecked ? 'checked' : ''} ${canSelect ? '' : 'disabled'} onchange="toggleFindingSelectionFromControl(this)" aria-label="${isFullyInvoiced ? 'Invoiced' : 'Select'} ${escapeHtml(dentalOperationLabel(finding.code))}${isFullyInvoiced ? '' : ' for invoicing'}" title="${isFullyInvoiced ? 'This operation is already invoiced' : !selectableMemberIds.length ? 'Add a price before selecting this operation' : isInvoiced ? 'Select the uninvoiced teeth in this batch' : 'Select for invoicing'}">
+              ${isOrthoPackage ? `
+                <div class="flex h-4 w-4 shrink-0 items-center justify-center text-indigo-600" title="${currentUiLanguage === 'ar' ? 'باقة زيارات متعددة (تفوتر بالزيارة)' : 'Multi-visit package (invoiced per visit)'}">
+                  <i data-lucide="package" class="h-4 w-4"></i>
+                </div>
+              ` : `
+                <input type="checkbox" class="finding-selection-checkbox ${isFullyInvoiced ? 'is-invoiced-checkbox' : ''} h-4 w-4 shrink-0 rounded border-slate-300 text-violet-600 focus:ring-violet-500" ${isCheckboxChecked ? 'checked' : ''} ${canSelect ? '' : 'disabled'} onchange="toggleFindingSelectionFromControl(this)" aria-label="${isFullyInvoiced ? 'Invoiced' : 'Select'} ${escapeHtml(dentalOperationLabel(finding.code))}${isFullyInvoiced ? '' : ' for invoicing'}" title="${isFullyInvoiced ? 'This operation is already invoiced' : !selectableMemberIds.length ? 'Add a price before selecting this operation' : isInvoiced ? 'Select the uninvoiced teeth in this batch' : 'Select for invoicing'}">
+              `}
               <div class="finding-tooth-picker flex flex-col shrink-0 items-center justify-center gap-1 w-12">
                 ${toothBadges}
               </div>
@@ -27397,9 +27938,25 @@
                 <div class="finding-operation-heading flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                   ${procedureSteps.length ? `<button type="button" onclick="toggleFindingProcedureSteps(this)" aria-expanded="${procedureStepsExpanded}" class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-cyan-200 bg-cyan-50 text-cyan-700 transition hover:bg-cyan-100" title="${procedureStepsExpanded ? 'Collapse' : 'Open'} procedure steps" aria-label="${procedureStepsExpanded ? 'Collapse' : 'Open'} ${escapeHtml(dentalOperationLabel(finding.code))} steps"><i data-lucide="${procedureStepsExpanded ? 'minus' : 'plus'}" class="h-3 w-3"></i></button>` : ''}
                   <h4 class="finding-operation-title text-xs sm:text-sm">${escapeHtml(dentalOperationLabel(finding.code))}</h4>
-                  ${isFullyInvoiced ? '<span class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-emerald-700">Invoiced</span>' : isInvoiced ? '<span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-blue-700">Partly invoiced</span>' : findingPrice <= 0 ? '<span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-700">Set price</span>' : ''}
+                  ${isOrthoPackage ? `
+                    <span class="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-indigo-700"><i data-lucide="package" class="h-2.5 w-2.5"></i>${currentUiLanguage === 'ar' ? 'باقة متعددة الزيارات' : 'Multi-Visit Package'}</span>
+                    ${isOrthoFullyInvoiced ? '<span class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-emerald-700">' + (currentUiLanguage === 'ar' ? 'مكتملة الفوترة' : 'All visits invoiced') + '</span>' : isOrthoPartlyInvoiced ? '<span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-blue-700">' + invoicedVisitsCount + '/' + orthoVisits.length + ' ' + (currentUiLanguage === 'ar' ? 'زيارات مفوترة' : 'visits invoiced') + '</span>' : findingPrice <= 0 ? '<span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-700">' + (currentUiLanguage === 'ar' ? 'تحديد سعر الباقة' : 'Set package fee') + '</span>' : ''}
+                  ` : `
+                    ${isFullyInvoiced ? '<span class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-emerald-700">Invoiced</span>' : isInvoiced ? '<span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-blue-700">Partly invoiced</span>' : findingPrice <= 0 ? '<span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-700">Set price</span>' : ''}
+                  `}
                 </div>
-                ${isMouth
+                ${isOrthoPackage ? `
+                  <div class="mt-1 flex flex-wrap items-center gap-2">
+                    <button type="button" onclick="toggleOrthoVisitsCollapse('${escapeHtml(finding.id)}')" aria-expanded="${!isOrthoCollapsed}" class="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 transition hover:bg-indigo-100" title="${isOrthoCollapsed ? (currentUiLanguage === 'ar' ? 'إظهار الزيارات' : 'Expand visits') : (currentUiLanguage === 'ar' ? 'إخفاء الزيارات' : 'Collapse visits')}">
+                      <i data-lucide="${isOrthoCollapsed ? 'chevron-right' : 'chevron-down'}" class="h-3.5 w-3.5"></i>
+                      <span>${orthoVisits.length} ${currentUiLanguage === 'ar' ? (orthoVisits.length === 1 ? 'زيارة' : 'زيارات') : (orthoVisits.length === 1 ? 'visit' : 'visits')}</span>
+                    </button>
+                    <button type="button" onclick="addOrthoVisit(this)" class="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-600 px-2 py-0.5 text-[11px] font-bold text-white transition hover:bg-indigo-700 active:scale-[0.98] shadow-2xs">
+                      <i data-lucide="plus" class="h-3 w-3"></i>
+                      <span>${currentUiLanguage === 'ar' ? 'إضافة زيارة' : 'Add Visit'}</span>
+                    </button>
+                  </div>
+                ` : isMouth
                   ? '<p class="mt-0.5 truncate text-[11px] font-normal text-slate-500">Applied once to the complete mouth · tooth selection ignored</p>'
                   : isWhole
                     ? ''
@@ -27417,20 +27974,42 @@
                 <span class="border-r border-cyan-100 bg-cyan-50 px-2 py-1.5 text-[9px] font-black text-cyan-700">${procedureSteps.length ? 'Fixed pay' : 'Doctor'}</span>
                 <select onchange="updateFindingDoctorFromControl(this)" class="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-[11px] font-bold text-slate-700 outline-none" aria-label="Assigned doctor for ${escapeHtml(dentalOperationLabel(finding.code))}">${chartDoctorSelectOptions(finding)}</select>
               </label>
-              <div class="finding-pricing-group flex flex-col items-end justify-center shrink-0">
-                <label class="finding-price-control inline-flex items-center overflow-hidden rounded-lg border ${isInvoiced ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-70' : 'border-violet-200 bg-white/85 focus-within:ring-2 focus-within:ring-violet-500/20'}" title="${isInvoiced ? 'Delete this procedure from its invoice before changing the price' : isBatch ? 'Edit the base price for this batch' : 'Edit operation price'}">
-                  <span class="border-r px-2 py-1.5 text-[9px] font-black ${isInvoiced ? 'border-slate-200 bg-slate-200 text-slate-500' : 'border-violet-100 bg-violet-50 text-violet-600'}">EGP</span>
-                  <input type="number" min="0" step="0.01" value="${findingPrice}" onchange="updateFindingPriceFromControl(this)" ${isInvoiced ? 'disabled' : ''} class="w-20 bg-transparent px-2 py-1.5 text-right text-[11px] font-black outline-none ${isInvoiced ? 'cursor-not-allowed text-slate-400' : 'text-slate-700'}" aria-label="${isBatch ? 'Base price' : 'Price'} for ${escapeHtml(dentalOperationLabel(finding.code))}" aria-disabled="${isInvoiced}">
-                </label>
-                ${isBatch ? `
-                  <div class="finding-batch-multiplier-row mt-1 flex items-center justify-end gap-1.5 shrink-0">
-                    <label class="finding-batch-multiplier-control inline-flex items-center overflow-hidden rounded-md border ${isInvoiced ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-70' : 'border-violet-200 bg-white/85 focus-within:ring-2 focus-within:ring-violet-500/20'}" title="${isInvoiced ? 'Delete this procedure from its invoice before changing the multiplier' : 'Choose how many times the base price is billed'}">
-                      <span class="border-r px-1.5 py-0.5 text-[10px] font-black ${isInvoiced ? 'border-slate-200 bg-slate-200 text-slate-500' : 'border-violet-100 bg-violet-50 text-violet-600'}">×</span>
-                      <input type="number" min="1" max="999" step="1" inputmode="numeric" value="${billingMultiplier}" onchange="updateFindingBillingMultiplierFromControl(this)" ${isInvoiced ? 'disabled' : ''} class="w-8 bg-transparent px-1 py-0.5 text-center text-[10px] font-black outline-none ${isInvoiced ? 'cursor-not-allowed text-slate-400' : 'text-slate-700'}" aria-label="Billing multiplier for ${escapeHtml(dentalOperationLabel(finding.code))}" aria-disabled="${isInvoiced}">
+              ${isOrthoPackage ? `
+                <div class="finding-pricing-group flex flex-col items-end justify-center shrink-0">
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-tight hidden sm:inline">${currentUiLanguage === 'ar' ? 'سعر الباقة:' : 'Package:'}</span>
+                    <label class="finding-price-control inline-flex items-center overflow-hidden rounded-lg border border-indigo-200 bg-white/85 focus-within:ring-2 focus-within:ring-indigo-500/20 shadow-2xs" title="${currentUiLanguage === 'ar' ? 'إجمالي سعر الباقة التعاقدي' : 'Total package contract fee'}">
+                      <span class="border-r border-indigo-100 bg-indigo-50 px-2 py-1.5 text-[9px] font-black text-indigo-600">EGP</span>
+                      <input type="number" min="0" step="0.01" value="${findingPrice}" onchange="updateFindingPriceFromControl(this)" class="w-20 bg-transparent px-2 py-1.5 text-right text-[11px] font-black outline-none text-slate-700" aria-label="${currentUiLanguage === 'ar' ? 'إجمالي سعر الباقة' : 'Total package fee'} for ${escapeHtml(dentalOperationLabel(finding.code))}">
                     </label>
-                    <span class="whitespace-nowrap text-[10px] font-black text-violet-700 tracking-tight">= ${escapeHtml(formatInvoiceMoney(totalPrice))}</span>
-                  </div>` : ''}
-              </div>
+                  </div>
+                  <div class="mt-1 flex flex-wrap items-center justify-end gap-1 text-[10px]">
+                    <span class="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-600" title="${currentUiLanguage === 'ar' ? 'المبلغ الموزع على الزيارات' : 'Allocated across visits'}">
+                      ${currentUiLanguage === 'ar' ? 'الموزع:' : 'Allocated:'} ${escapeHtml(formatInvoiceMoney(totalAllocatedPrice))}
+                    </span>
+                    <span class="inline-flex items-center rounded-md px-1.5 py-0.5 text-[9px] font-black ${remainingBalance < 0 ? 'bg-rose-50 text-rose-700' : remainingBalance === 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}" title="${currentUiLanguage === 'ar' ? 'الرصيد المتبقي للتوزيع' : 'Remaining balance to allocate'}">
+                      ${remainingBalance < 0
+                        ? (currentUiLanguage === 'ar' ? 'تجاوز بـ:' : 'Over:') + ' ' + escapeHtml(formatInvoiceMoney(Math.abs(remainingBalance)))
+                        : (currentUiLanguage === 'ar' ? 'المتبقي:' : 'Rem:') + ' ' + escapeHtml(formatInvoiceMoney(remainingBalance))}
+                    </span>
+                  </div>
+                </div>
+              ` : `
+                <div class="finding-pricing-group flex flex-col items-end justify-center shrink-0">
+                  <label class="finding-price-control inline-flex items-center overflow-hidden rounded-lg border ${isInvoiced ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-70' : 'border-violet-200 bg-white/85 focus-within:ring-2 focus-within:ring-violet-500/20'}" title="${isInvoiced ? 'Delete this procedure from its invoice before changing the price' : isBatch ? 'Edit the base price for this batch' : 'Edit operation price'}">
+                    <span class="border-r px-2 py-1.5 text-[9px] font-black ${isInvoiced ? 'border-slate-200 bg-slate-200 text-slate-500' : 'border-violet-100 bg-violet-50 text-violet-600'}">EGP</span>
+                    <input type="number" min="0" step="0.01" value="${findingPrice}" onchange="updateFindingPriceFromControl(this)" ${isInvoiced ? 'disabled' : ''} class="w-20 bg-transparent px-2 py-1.5 text-right text-[11px] font-black outline-none ${isInvoiced ? 'cursor-not-allowed text-slate-400' : 'text-slate-700'}" aria-label="${isBatch ? 'Base price' : 'Price'} for ${escapeHtml(dentalOperationLabel(finding.code))}" aria-disabled="${isInvoiced}">
+                  </label>
+                  ${isBatch ? `
+                    <div class="finding-batch-multiplier-row mt-1 flex items-center justify-end gap-1.5 shrink-0">
+                      <label class="finding-batch-multiplier-control inline-flex items-center overflow-hidden rounded-md border ${isInvoiced ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-70' : 'border-violet-200 bg-white/85 focus-within:ring-2 focus-within:ring-violet-500/20'}" title="${isInvoiced ? 'Delete this procedure from its invoice before changing the multiplier' : 'Choose how many times the base price is billed'}">
+                        <span class="border-r px-1.5 py-0.5 text-[10px] font-black ${isInvoiced ? 'border-slate-200 bg-slate-200 text-slate-500' : 'border-violet-100 bg-violet-50 text-violet-600'}">×</span>
+                        <input type="number" min="1" max="999" step="1" inputmode="numeric" value="${billingMultiplier}" onchange="updateFindingBillingMultiplierFromControl(this)" ${isInvoiced ? 'disabled' : ''} class="w-8 bg-transparent px-1 py-0.5 text-center text-[10px] font-black outline-none ${isInvoiced ? 'cursor-not-allowed text-slate-400' : 'text-slate-700'}" aria-label="Billing multiplier for ${escapeHtml(dentalOperationLabel(finding.code))}" aria-disabled="${isInvoiced}">
+                      </label>
+                      <span class="whitespace-nowrap text-[10px] font-black text-violet-700 tracking-tight">= ${escapeHtml(formatInvoiceMoney(totalPrice))}</span>
+                    </div>` : ''}
+                </div>
+              `}
               ${procedureSteps.length ? `<div class="finding-status-control flex shrink-0 items-center gap-1.5 rounded-lg border bg-white/80 px-2 py-1.5 sm:w-48" style="border-color:${statusBorder};color:${displayColor}" title="The procedure status is calculated from its steps">
                 <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${displayColor}"></span>
                 <span class="finding-status-select-mobile sm:hidden text-center font-black text-xs">${escapeHtml(status.key)}</span>
@@ -27451,9 +28030,14 @@
                 <span class="finding-note-text hidden sm:inline">Notes</span>
                 ${findingNotes.length ? `<span class="finding-note-count text-[9px] font-black">${findingNotes.length}</span>` : ''}
               </button>
-              <button type="button" onclick="deleteFindingFromControl(this)" class="finding-delete-button inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:border-red-300 hover:bg-red-100" title="Delete ${escapeHtml(dentalOperationLabel(finding.code))}" aria-label="Delete ${escapeHtml(dentalOperationLabel(finding.code))}"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button>
+              ${isOrthoPackage && isOrthoLocked ? `
+                <button type="button" disabled class="finding-delete-button inline-flex h-7 w-7 shrink-0 cursor-not-allowed items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-slate-400 opacity-60" title="${currentUiLanguage === 'ar' ? 'لا يمكن حذف هذه الباقة لأن بعض زياراتها مفوترة بالفعل. يرجى حذف بنود الفاتورة أولاً.' : 'Cannot delete this package because one or more visits are invoiced. Remove invoice items first.'}" aria-label="Delete locked"><i data-lucide="lock" class="h-3.5 w-3.5"></i></button>
+              ` : `
+                <button type="button" onclick="deleteFindingFromControl(this)" class="finding-delete-button inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:border-red-300 hover:bg-red-100" title="Delete ${escapeHtml(dentalOperationLabel(finding.code))}" aria-label="Delete ${escapeHtml(dentalOperationLabel(finding.code))}"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button>
+              `}
             </div>
             ${procedureStepsMarkup}
+            ${orthoVisitsMarkup}
           </article>`;
       }).join('');
       if (window.lucide) lucide.createIcons();
@@ -32226,10 +32810,13 @@
         document.getElementById('appointment-type').value = entry.isNote ? '' : configuredVisitType?.id || '';
         document.getElementById('appointment-status').value = entry.status;
         document.getElementById('appointment-notes').value = entry.notes;
-        eyebrow.textContent = entry.isNote ? 'Edit calendar note' : 'Edit appointment';
+        eyebrow.textContent = entry.isNote ? (currentUiLanguage === 'ar' ? 'تعديل ملاحظة التقويم' : 'Edit calendar note') : (currentUiLanguage === 'ar' ? 'تعديل الموعد' : 'Edit appointment');
         title.textContent = entry.isNote ? entry.noteTitle : entry.patient;
-        saveButton.textContent = entry.isNote ? 'Save note' : 'Save changes';
+        saveButton.textContent = entry.isNote ? (currentUiLanguage === 'ar' ? 'حفظ الملاحظة' : 'Save note') : (currentUiLanguage === 'ar' ? 'حفظ التغييرات' : 'Save changes');
         deleteButton.classList.remove('hidden');
+        const deleteSpan = deleteButton.querySelector('span');
+        if (deleteSpan) deleteSpan.textContent = currentUiLanguage === 'ar' ? 'حذف' : 'Delete';
+        else deleteButton.textContent = currentUiLanguage === 'ar' ? 'حذف' : 'Delete';
         const editable = canModifyAppointments();
         saveButton.disabled = !editable || !hasDoctors;
         deleteButton.disabled = !editable;
@@ -32248,9 +32835,9 @@
         setAppointmentDurationSelection(selectedDuration);
         document.getElementById('appointment-status').value = 'Scheduled';
         document.getElementById('appointment-type').value = appointmentVisitTypes.find(type => type.active)?.id || '';
-        eyebrow.textContent = 'New appointment';
-        title.textContent = 'Schedule a visit';
-        saveButton.textContent = 'Save appointment';
+        eyebrow.textContent = currentUiLanguage === 'ar' ? 'موعد جديد' : 'New appointment';
+        title.textContent = currentUiLanguage === 'ar' ? 'حجز موعد' : 'Schedule a visit';
+        saveButton.textContent = currentUiLanguage === 'ar' ? 'حفظ الموعد' : 'Save appointment';
         saveButton.disabled = !hasPatients || !hasDoctors;
         deleteButton.classList.add('hidden');
         deleteButton.disabled = false;
@@ -32261,8 +32848,12 @@
             : `Scheduling for ${appointmentDayFormatter.format(appointmentSelectedDate)} at ${appointmentTimeFromMinutes(startMinutes)} for ${appointmentDurationLabel(selectedDuration)}.`;
       }
 
+      const cancelButton = document.getElementById('appointment-modal-cancel-button');
+      if (cancelButton) cancelButton.textContent = currentUiLanguage === 'ar' ? 'إلغاء' : 'Cancel';
+
       modal.classList.remove('hidden');
       modal.classList.add('flex');
+      if (window.lucide) lucide.createIcons();
       closeAppointmentPatientResults();
       document.getElementById('appointment-modal-close-button')?.focus();
     }

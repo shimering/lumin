@@ -14,3 +14,6 @@ supabase/*
 !supabase/migrations/*.sql
 !supabase/functions/
 !supabase/functions/**
+supabase/functions/appointment-push/
+supabase/functions/google-calendar/
+supabase/functions/hr-attendance-push/
