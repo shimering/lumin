@@ -243,7 +243,7 @@ test('English and Arabic settings explain browser-managed permissions and manual
     const modeNote = h.settingsElements['settings-voice-mode-note'].textContent;
     assert.equal(permission, h.context.luminVoicePermissionNotice());
     assert.match(permission, language === 'ar' ? /لا يستطيع Lumin منع طلبات الإذن/ : /cannot suppress browser permission prompts/);
-    assert.match(modeNote, language === 'ar' ? /لا يُستخدم إلا عند اختياره/ : /only when you select it/);
+    assert.match(modeNote, language === 'ar' ? /لا يُستخدم إلا عند اختياره/ : /only when selected/);
     assert.doesNotMatch(h.modeBadge.title, /On-Device/);
     assert.equal(h.radios[0].disabled, false);
   }

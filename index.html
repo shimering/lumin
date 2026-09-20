@@ -28560,8 +28560,8 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         : 'Browser STT is the default. Choose Cloud Audio when you want to send a recording to Gemini.';
       const modeNote = document.getElementById('settings-voice-mode-note');
       if (modeNote) modeNote.textContent = currentUiLanguage === 'ar'
-        ? 'يرسل التعرف الصوتي النص إلى Gemini. يرسل الصوت السحابي تسجيلًا ولا يُستخدم إلا عند اختياره.'
-        : 'STT sends recognized text to Gemini. Cloud Audio sends a recording and is used only when you select it.';
+        ? 'يبقى التعرف الصوتي نشطاً ما دام الزر أحمر؛ اضغط لإيقافه. تُرسل كل جملة نهائية إلى Gemini منفصلة. يرسل الصوت السحابي تسجيلاً ولا يُستخدم إلا عند اختياره.'
+        : 'STT stays active while the button is red; tap it to stop. Each final sentence is sent to Gemini separately. Cloud Audio sends a recording and is used only when selected.';
       const radios = document.querySelectorAll('input[name="voice-scribe-engine"]');
       radios.forEach(radio => {
         radio.checked = radio.value === mode;
@@ -28832,7 +28832,284 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       await startLuminVoiceAudioRecording();
     }
 
+    async function processLuminContinuousSegments(segments, patientId) {
+      luminVoiceQueueCancelled = false;
+      for (const text of segments) {
+        if (luminVoiceQueueCancelled || getActivePatient()?.id !== patientId) break;
+        await processLuminVoiceText(text, patientId);
+      }
+      if (!luminVoiceProcessingActive && !luminVoiceQueueCancelled) {
+        updateVoiceAssistantUI('idle', '', false);
+      }
+    }
+
     async function startLuminLocalSpeechRecognition(retryCount = 0) {
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRec) {
+        luminVoiceStarting = false;
+        updateVoiceAssistantUI('idle');
+        showToast(currentUiLanguage === 'ar' ? 'الإملاء غير مدعوم في هذا المتصفح. يمكنك اختيار الصوت السحابي يدوياً.' : 'STT is unavailable in this browser. You can select Cloud Audio manually.', 'warning');
+        return;
+      }
+      if (luminLocalSpeechSession || luminVoiceProcessingActive || document.hidden) return;
+      const patientId = getActivePatient()?.id;
+      if (!patientId) return;
+      const requestId = luminVoiceStartRequestId;
+      const session = {
+        patientId,
+        recognition: null,
+        stream: null,
+        closed: false,
+        stopping: false,
+        started: false,
+        guardPending: false,
+        pendingFinalText: '',
+        finalSegments: [],
+        lastResultIndex: 0,
+        timers: new Set(),
+        restoreAudioSession: null,
+        restartAttempts: 0
+      };
+      luminLocalSpeechSession = session;
+      luminVoiceQueueCancelled = false;
+      luminVoiceStarting = true;
+      luminVoiceRecordingActive = false;
+      updateVoiceAssistantUI('recording');
+
+      const ownsSession = () => luminLocalSpeechSession === session && !session.closed;
+      const later = (callback, delay) => {
+        const timer = setTimeout(() => {
+          session.timers.delete(timer);
+          if (ownsSession()) callback();
+        }, delay);
+        session.timers.add(timer);
+        return timer;
+      };
+      const clearTimer = timer => {
+        if (!timer) return;
+        clearTimeout(timer);
+        session.timers.delete(timer);
+      };
+      const clearTimers = () => {
+        session.timers.forEach(clearTimeout);
+        session.timers.clear();
+      };
+      const flushFinalText = () => {
+        if (!session.pendingFinalText.trim()) return;
+        const text = session.pendingFinalText.trim();
+        session.pendingFinalText = '';
+        const parts = text.match(/[^.!?؟。]+[.!?؟。]?/g) || [text];
+        parts.map(part => part.trim()).filter(Boolean).forEach(part => session.finalSegments.push(part));
+        updateVoiceRecordingInterimText('');
+      };
+      const finish = (processSegments = true, abort = false) => {
+        if (!ownsSession()) return;
+        session.closed = true;
+        clearTimers();
+        flushFinalText();
+        const recognition = session.recognition;
+        if (recognition) {
+          ['onstart', 'onresult', 'onerror', 'onend', 'onaudiostart', 'onaudioend',
+            'onsoundstart', 'onsoundend', 'onspeechstart', 'onspeechend', 'onnomatch']
+            .forEach(event => { recognition[event] = null; });
+          if (abort) { try { recognition.abort(); } catch (_) {} }
+        }
+        session.stream?.getTracks().forEach(track => track.stop());
+        session.stream = null;
+        session.restoreAudioSession?.();
+        session.restoreAudioSession = null;
+        luminLocalSpeechSession = null;
+        luminLocalSpeechRecognition = null;
+        luminVoiceStarting = false;
+        luminVoiceRecordingActive = false;
+        const segments = session.finalSegments.slice();
+        session.finalSegments.length = 0;
+        logLuminVoiceEvent('local', abort ? 'continuous-released-abort' : 'continuous-released');
+        if (!processSegments || !segments.length || getActivePatient()?.id !== patientId || document.hidden) {
+          updateVoiceAssistantUI('idle');
+          return;
+        }
+        processLuminContinuousSegments(segments, patientId);
+      };
+      session.cancel = () => finish(false, true);
+      session.stop = () => {
+        if (!ownsSession() || session.stopping) return;
+        session.stopping = true;
+        clearTimers();
+        flushFinalText();
+        luminVoiceStarting = false;
+        luminVoiceRecordingActive = false;
+        if (session.guardPending || !session.started) {
+          finish(true, true);
+          return;
+        }
+        try { session.recognition.stop(); } catch (_) { finish(true, true); }
+        if (ownsSession()) later(() => finish(true, true), 1500);
+      };
+      const recover = reason => {
+        if (!ownsSession() || session.stopping) return;
+        logLuminVoiceEvent('local', reason);
+        finish(false, true);
+        if (requestId !== luminVoiceStartRequestId || getActivePatient()?.id !== patientId || document.hidden) return;
+        if (retryCount < 1) {
+          showToast(currentUiLanguage === 'ar' ? 'جارٍ إعادة توصيل ميكروفون الإملاء المستمر. يرجى إبقاء الزر مفعلاً.' : 'Reconnecting continuous STT. Keep the button enabled to continue.', 'info');
+          scheduleLuminLocalSpeechStart(retryCount + 1, 650, patientId);
+        } else {
+          showToast(currentUiLanguage === 'ar' ? 'توقف الإملاء المستمر. اضغط الزر لبدء جلسة جديدة.' : 'Continuous STT stopped. Tap the button to start a new session.', 'warning');
+        }
+      };
+
+      let captureStarted = false;
+      let soundDetected = false;
+      let startTimer = null;
+      let finalTimer = null;
+
+      try {
+        if (isLuminIOSDevice() && navigator.mediaDevices?.getUserMedia) {
+          session.guardPending = true;
+          try {
+            const audioSession = navigator.audioSession;
+            if (audioSession) {
+              const previousType = audioSession.type;
+              audioSession.type = 'play-and-record';
+              session.restoreAudioSession = () => {
+                try {
+                  if (audioSession.type === 'play-and-record') audioSession.type = previousType;
+                } catch (_) {}
+              };
+            }
+          } catch (_) {}
+          logLuminVoiceEvent('local', 'continuous-request-microphone');
+          navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+            session.guardPending = false;
+            if (!ownsSession() || requestId !== luminVoiceStartRequestId || getActivePatient()?.id !== patientId || document.hidden) {
+              stream.getTracks().forEach(track => track.stop());
+              return;
+            }
+            session.stream = stream;
+            logLuminVoiceEvent('local', 'continuous-microphone-ready');
+            if (!startTimer && !captureStarted && !soundDetected) {
+              startTimer = later(() => recover('continuous-capture-start-timeout'), 6000);
+            }
+          }).catch(() => {
+            session.guardPending = false;
+            if (ownsSession()) logLuminVoiceEvent('local', 'continuous-microphone-guard-unavailable');
+          });
+        }
+
+        const recognition = new SpeechRec();
+        session.recognition = recognition;
+        luminLocalSpeechRecognition = recognition;
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
+        recognition.lang = (currentUiLanguage === 'ar' || document.documentElement.dir === 'rtl') ? 'ar-SA' : 'en-US';
+
+        const markListening = () => {
+          if (!ownsSession() || session.stopping) return false;
+          luminVoiceStarting = false;
+          luminVoiceRecordingActive = true;
+          return true;
+        };
+        recognition.onstart = () => {
+          if (!markListening()) return;
+          session.restartAttempts = 0;
+          logLuminVoiceEvent('local', 'continuous-service-start');
+          if (!captureStarted && !soundDetected) {
+            clearTimer(startTimer);
+            startTimer = later(() => recover('continuous-capture-start-timeout'), 6000);
+          }
+        };
+        recognition.onaudiostart = () => {
+          if (!markListening()) return;
+          captureStarted = true;
+          clearTimer(startTimer);
+          logLuminVoiceEvent('local', 'continuous-audio-start');
+        };
+        recognition.onsoundstart = recognition.onspeechstart = () => {
+          if (!markListening()) return;
+          soundDetected = true;
+          clearTimer(startTimer);
+          logLuminVoiceEvent('local', 'continuous-sound-start');
+        };
+        recognition.onresult = event => {
+          if (!ownsSession()) return;
+          const results = event.results || [];
+          const eventStart = Number(event.resultIndex) || 0;
+          // Real Web Speech keeps prior final results in the list, while some
+          // Safari builds expose only the current result. Support both shapes.
+          const resultStart = results.length <= session.lastResultIndex
+            ? Math.min(eventStart, Math.max(0, results.length - 1))
+            : Math.max(session.lastResultIndex, eventStart);
+          let finalText = '';
+          let interimText = '';
+          for (let i = resultStart; i < results.length; i += 1) {
+            const result = results[i];
+            const text = result?.[0]?.transcript || '';
+            if (result?.isFinal) finalText += text + ' ';
+            else interimText += text;
+          }
+          session.lastResultIndex = Math.max(session.lastResultIndex, results.length);
+          if (finalText.trim()) {
+            session.pendingFinalText = (session.pendingFinalText + ' ' + finalText).trim();
+            clearTimer(finalTimer);
+            // In continuous mode each final result is a completed spoken
+            // phrase. Queue it immediately so separate chairside sentences
+            // become separate Gemini requests instead of one merged command.
+            flushFinalText();
+          }
+          const preview = (session.pendingFinalText + ' ' + interimText).trim();
+          if (preview) updateVoiceRecordingInterimText(preview);
+          logLuminVoiceEvent('local', finalText.trim() ? 'continuous-final-result' : 'continuous-interim-result');
+        };
+        recognition.onerror = event => {
+          if (!ownsSession()) return;
+          const error = event?.error;
+          logLuminVoiceEvent('local', 'continuous-error-' + (error || 'unknown'));
+          if (error === 'not-allowed' || error === 'service-not-allowed') {
+            finish(false, true);
+            showToast(currentUiLanguage === 'ar' ? 'اسمح بالميكروفون والتعرف على الكلام لهذا الموقع في إعدادات المتصفح.' : 'Allow microphone and speech recognition for this site in your browser settings.', 'warning');
+          }
+        };
+        recognition.onend = () => {
+          if (!ownsSession()) return;
+          logLuminVoiceEvent('local', 'continuous-end');
+          if (session.stopping) {
+            finish(true, false);
+            return;
+          }
+          session.restartAttempts += 1;
+          if (session.restartAttempts > 2) {
+            recover('continuous-session-ended');
+            return;
+          }
+          captureStarted = false;
+          soundDetected = false;
+          clearTimer(startTimer);
+          startTimer = later(() => recover('continuous-restart-timeout'), 6000);
+          try {
+            recognition.start();
+          } catch (_) {
+            later(() => {
+              if (!ownsSession() || session.stopping) return;
+              try { recognition.start(); } catch (_) { recover('continuous-restart-failed'); }
+            }, 250);
+          }
+        };
+        session.started = true;
+        recognition.start();
+      } catch (error) {
+        if (!ownsSession()) return;
+        if (error?.name === 'NotAllowedError' || error?.name === 'SecurityError') {
+          finish(false, true);
+          showToast(currentUiLanguage === 'ar' ? 'اسمح بالميكروفون لهذا الموقع في إعدادات المتصفح ثم حاول مجدداً.' : 'Allow the microphone for this site in your browser settings, then try again.', 'warning');
+        } else {
+          recover('continuous-start-failed');
+        }
+      }
+    }
+
+    async function startLuminOneShotSpeechRecognition(retryCount = 0) {
       const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRec) {
         luminVoiceStarting = false;
@@ -29260,6 +29537,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
 
     function cancelLuminVoiceProcessing(isTimeout = false) {
       luminVoiceStartRequestId += 1;
+      luminVoiceQueueCancelled = true;
       clearInterval(luminVoiceProcessingTimer);
       clearTimeout(luminVoiceSilenceTimer);
       clearTimeout(luminVoiceMaxTimer);

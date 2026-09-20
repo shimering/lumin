@@ -252,28 +252,40 @@ test('Windows starts STT in the tap without waiting for a Gemini key or requesti
   await pending;
 });
 
-test('two consecutive iPad STT commands use fresh capture and recognizers, process once, and release the microphone', async () => {
+test('one continuous iPad session sends separate final phrases after the button is turned off', async () => {
   const h = harness();
-  for (const text of ['synthetic first command', 'synthetic second command']) {
-    const recognition = await h.begin();
-    assert.equal(recognition.continuous, false);
-    assert.equal(h.audioSessionType, 'play-and-record');
-    assert.equal(h.streams.at(-1).track.stops, 0, 'guard capture stays active during recognition');
-    const oldEnd = recognition.onend;
-    recognition.emitResult(text);
-    await recognition.emitEnd();
-    await oldEnd?.();
-    assert.equal(h.streams.at(-1).track.stops, 1);
-    assert.equal(h.audioSessionType, 'auto');
-    assert.equal(h.state().starting, false);
-    assert.equal(h.state().recording, false);
-    await h.advance(1000);
-  }
-  assert.equal(h.recognizers.length, 2);
-  assert.notEqual(h.recognizers[0], h.recognizers[1]);
-  assert.equal(h.microphoneRequests.length, 2);
+  const recognition = await h.begin();
+  assert.equal(recognition.continuous, true);
+  assert.equal(h.audioSessionType, 'play-and-record');
+  assert.equal(h.streams.at(-1).track.stops, 0, 'guard capture stays active during recognition');
+  recognition.emitResult('synthetic first command');
+  recognition.emitResult('synthetic second command');
+  h.context.stopLuminVoiceRecording();
+  await recognition.emitEnd();
+  await h.advance(1500);
+  assert.equal(h.streams.at(-1).track.stops, 1);
+  assert.equal(h.audioSessionType, 'auto');
+  assert.equal(h.state().starting, false);
+  assert.equal(h.state().recording, false);
+  assert.equal(h.recognizers.length, 1);
+  assert.equal(h.microphoneRequests.length, 1);
   assert.deepEqual(h.processed.map(item => item.text), ['synthetic first command', 'synthetic second command']);
   assert.equal(h.cloudStarts, 0);
+});
+
+test('an unexpected speech end restarts the same continuous recognizer while the button remains on', async () => {
+  const h = harness();
+  const recognition = await h.begin();
+  await recognition.emitEnd();
+  await settle();
+  assert.equal(h.recognizers.length, 1);
+  assert.equal(recognition.starts, 2);
+  assert.equal(h.state().recording, true);
+  h.context.stopLuminVoiceRecording();
+  await recognition.emitEnd();
+  await h.advance(1500);
+  assert.equal(h.streams[0].track.stops, 1);
+  assert.equal(h.state().recording, false);
 });
 
 test('iPad Safari tabs also acquire the local microphone guard', async () => {
@@ -324,7 +336,9 @@ test('manual stop cancels pending permission, and a late stream cannot damage a 
   assert.equal(h.recognizers.length, 2, 'the replacement command starts immediately; the cancelled permission cannot add another recognizer');
   assert.equal(h.state().recording, true);
   current.emitResult('only current command');
+  h.context.stopLuminVoiceRecording();
   await current.emitEnd();
+  await h.advance(1500);
   assert.deepEqual(h.processed.map(item => item.text), ['only current command']);
 });
 
@@ -370,36 +384,25 @@ test('obsolete recognizer callbacks cannot process discarded speech or stop a ne
   assert.equal(h.streams[1].track.stops, 0);
   assert.equal(h.audioSessionType, 'play-and-record');
   second.emitResult('current command');
+  h.context.stopLuminVoiceRecording();
   await second.emitEnd();
+  await h.advance(1500);
   assert.deepEqual(h.processed.map(item => item.text), ['current command']);
 });
 
-test('no-speech and empty-end failures each receive only one local retry and never upload audio', async t => {
-  for (const failure of ['no-speech', 'empty-end']) {
-    await t.test(failure, async () => {
-      const h = harness();
-      const first = await h.begin();
-      if (failure === 'no-speech') first.emitError('no-speech');
-      else await first.emitEnd();
-      await settle();
-      assert.equal(h.streams[0].track.stops, 1);
-      await h.advance(650);
-      assert.equal(h.recognizers.length, 2, 'one fresh local capture retries a silent session');
-      const retry = h.recognizers[1];
-      retry.emitStart();
-      retry.emitAudioStart();
-      if (failure === 'no-speech') retry.emitError('no-speech');
-      else await retry.emitEnd();
-      await settle();
-      await h.advance(60000);
-      assert.equal(h.recognizers.length, 2, 'retry budget prevents a background microphone loop');
-      assert.equal(h.streams[1].track.stops, 1);
-      assert.equal(h.audioSessionType, 'auto');
-      assert.equal(h.cloudStarts, 0);
-      assert.equal(h.context.getLuminVoiceEngineMode(), 'local');
-      assert.equal(h.processed.length, 0);
-    });
-  }
+test('no-speech and network events do not close a continuous session or switch to Cloud Audio', async () => {
+  const h = harness();
+  const recognition = await h.begin();
+  recognition.emitError('no-speech');
+  recognition.emitError('network');
+  await settle();
+  assert.equal(h.state().recording, true);
+  assert.equal(h.cloudStarts, 0);
+  assert.equal(h.context.getLuminVoiceEngineMode(), 'local');
+  h.context.stopLuminVoiceRecording();
+  await recognition.emitEnd();
+  await h.advance(1500);
+  assert.equal(h.processed.length, 0);
 });
 
 test('a cancelled silent-capture retry cannot reopen the microphone', async () => {
@@ -436,6 +439,10 @@ test('permission and network recognition failures never switch engines or start 
       const recognition = await h.begin();
       recognition.emitError(error);
       await settle();
+      if (error !== 'not-allowed' && error !== 'service-not-allowed') {
+        h.context.stopLuminVoiceRecording();
+        await recognition.emitEnd();
+      }
       await h.advance(60000);
       assert.equal(h.cloudStarts, 0);
       assert.equal(h.context.getLuminVoiceEngineMode(), 'local');
@@ -513,6 +520,7 @@ test('changing patients during STT discards the captured command before text pro
   const recognition = await h.begin();
   recognition.emitResult('old patient command');
   h.setPatient('different-synthetic-patient');
+  h.context.stopLuminVoiceRecording();
   await recognition.emitEnd();
   assert.equal(h.processed.length, 0);
   assert.equal(h.streams[0].track.stops, 1);
@@ -528,7 +536,9 @@ test('unavailable or throwing experimental audioSession routing does not prevent
       const h = harness(options);
       const recognition = await h.begin();
       recognition.emitResult('synthetic command');
+      h.context.stopLuminVoiceRecording();
       await recognition.emitEnd();
+      await h.advance(1500);
       assert.deepEqual(h.processed.map(item => item.text), ['synthetic command']);
       assert.equal(h.streams[0].track.stops, 1);
       assert.equal(h.cloudStarts, 0);
