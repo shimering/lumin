@@ -5697,9 +5697,8 @@
           <h2 class="patient-workspace-name min-w-0 truncate text-lg font-black tracking-tight text-white sm:text-xl">Patient</h2>
         </div>
         <div class="flex shrink-0 items-center justify-end gap-2">
-          <button id="patient-workspace-voice-btn" type="button" onclick="handlePatientWorkspaceVoiceClick()" class="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 px-3 text-xs font-black text-white shadow-sm transition hover:from-blue-700 hover:to-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 active:scale-95" title="Voice Scribe: Dictate procedures to this patient's chart" aria-label="Start voice dictation for this patient">
-            <i data-lucide="mic" class="h-3.5 w-3.5"></i>
-            <span>Voice Scribe</span>
+          <button id="patient-workspace-voice-btn" type="button" onclick="handlePatientWorkspaceVoiceClick()" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-sm transition hover:from-blue-700 hover:to-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 active:scale-95" title="Voice Scribe: Dictate procedures to this patient's chart" aria-label="Start voice dictation for this patient">
+            <i data-lucide="mic" class="h-5 w-5"></i>
           </button>
           <button type="button" data-patient-workspace-action="payments" onclick="renderPatientPayments()" class="hidden h-9 items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-3 text-xs font-black text-white transition hover:bg-white/20"><i data-lucide="refresh-cw" class="h-3.5 w-3.5"></i> Refresh</button>
           <button id="profile-edit-patient-button" type="button" onclick="openEditPatientModal(activeWorkspacePatientId)" class="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-white px-3 text-xs font-black text-blue-900 shadow-sm transition hover:bg-cyan-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
@@ -5960,9 +5959,8 @@
                   </div>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
-                  <button id="chart-voice-action-btn" type="button" onclick="toggleLuminVoiceRecording()" class="inline-flex items-center gap-1.5 rounded-lg bg-cyan-950/40 px-2.5 py-1 text-xs font-black text-cyan-200 transition hover:bg-cyan-900/60 hover:text-white" style="border: 1px solid rgba(34, 211, 238, 0.4);" title="Voice scribe: Dictate procedures (or hold Spacebar)" aria-label="Start voice dictation">
-                    <i id="chart-voice-action-btn-icon" data-lucide="mic" class="h-3.5 w-3.5"></i>
-                    <span id="chart-voice-action-btn-text" class="hidden sm:inline">Voice</span>
+                  <button id="chart-voice-action-btn" type="button" onclick="toggleLuminVoiceRecording()" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-950/40 text-cyan-200 transition hover:bg-cyan-900/60 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/30 active:scale-95" title="Voice scribe: Dictate procedures (or hold Spacebar)" aria-label="Start voice dictation">
+                    <i id="chart-voice-action-btn-icon" data-lucide="mic" class="h-5 w-5"></i>
                   </button>
                   <button onclick="clearSelectedTooth()" class="shrink-0 rounded-lg p-1.5 text-slate-300 transition hover:bg-red-500/20 hover:text-red-200" style="border: 1px solid rgba(255, 255, 255, 0.1);" title="Clear all findings from the selected tooth" aria-label="Clear selected tooth findings">
                     <i data-lucide="trash-2" class="h-4 w-4"></i>
@@ -6080,10 +6078,9 @@
       <div class="flex items-center gap-2 pointer-events-auto">
         <button id="chart-voice-mode-badge" type="button" onclick="toggleVoiceScribeModeQuick()" class="rounded-full bg-slate-900/80 px-2.5 py-1 text-[10px] font-black text-emerald-300 shadow-md backdrop-blur-xs transition hover:scale-105" title="Click to toggle Local STT vs Cloud Audio">Local STT</button>
         <span id="chart-voice-spacebar-hint" class="hidden rounded-full bg-slate-900/80 px-2.5 py-1 text-[10px] font-bold text-slate-300 shadow-md backdrop-blur-xs md:inline-block">Hold <kbd class="font-mono text-cyan-300 font-bold">Space</kbd> to talk</span>
-        <button id="chart-voice-fab" type="button" onclick="handlePatientWorkspaceVoiceClick()" class="group relative flex h-14 min-w-14 items-center justify-center gap-2.5 rounded-full bg-blue-600 px-4 text-white shadow-xl shadow-blue-600/30 transition-all duration-200 hover:scale-105 hover:bg-blue-700 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/30" title="Chairside Voice Scribe (hold Spacebar)" aria-label="Toggle voice recording">
+        <button id="chart-voice-fab" type="button" onclick="handlePatientWorkspaceVoiceClick()" class="group relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white shadow-xl shadow-blue-600/30 transition-all duration-200 hover:scale-105 hover:bg-blue-700 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/30" title="Chairside Voice Scribe (hold Spacebar)" aria-label="Start voice dictation">
           <span id="chart-voice-fab-pulse" class="pointer-events-none absolute -inset-1 rounded-full opacity-0 transition-opacity"></span>
           <i id="chart-voice-fab-icon" data-lucide="mic" class="relative z-10 h-6 w-6 shrink-0"></i>
-          <span id="chart-voice-fab-label" class="relative z-10 font-bold text-xs">Voice Scribe</span>
         </button>
       </div>
     </div>
@@ -28589,10 +28586,9 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       const fab = document.getElementById('chart-voice-fab');
       const fabPulse = document.getElementById('chart-voice-fab-pulse');
       const fabIcon = document.getElementById('chart-voice-fab-icon');
-      const fabLabel = document.getElementById('chart-voice-fab-label');
       const actionBtn = document.getElementById('chart-voice-action-btn');
-      const actionBtnText = document.getElementById('chart-voice-action-btn-text');
       const actionBtnIcon = document.getElementById('chart-voice-action-btn-icon');
+      const patientVoiceBtn = document.getElementById('patient-workspace-voice-btn');
       const statusCard = document.getElementById('chart-voice-status-card');
 
       syncVoiceFabBadge();
@@ -28605,14 +28601,18 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         }
         if (fabPulse) fabPulse.classList.remove('opacity-0');
         if (fabIcon) fabIcon.setAttribute('data-lucide', 'mic');
-        if (fabLabel) fabLabel.textContent = currentUiLanguage === 'ar' ? 'جاري الاستماع...' : 'Listening...';
+
+        const recordingLabel = currentUiLanguage === 'ar' ? 'إيقاف الإملاء الصوتي' : 'Stop voice dictation';
+        [fab, actionBtn, patientVoiceBtn].forEach(button => {
+          if (!button) return;
+          button.setAttribute('aria-label', recordingLabel);
+          button.title = recordingLabel;
+        });
 
         if (actionBtn) {
           actionBtn.style.backgroundColor = '#dc2626';
-          actionBtn.style.borderColor = '#ef4444';
           actionBtn.classList.add('text-white');
         }
-        if (actionBtnText) actionBtnText.textContent = currentUiLanguage === 'ar' ? 'استماع...' : 'Listening...';
         if (actionBtnIcon) actionBtnIcon.setAttribute('data-lucide', 'mic');
 
         if (statusCard) {
@@ -28652,13 +28652,17 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         }
         if (fabPulse) fabPulse.classList.add('opacity-0');
         if (fabIcon) fabIcon.setAttribute('data-lucide', 'loader-2');
-        if (fabLabel) fabLabel.textContent = currentUiLanguage === 'ar' ? 'جاري التحليل...' : 'Analyzing...';
+
+        const processingLabel = currentUiLanguage === 'ar' ? 'جارٍ تحليل الإملاء الصوتي' : 'Analyzing voice dictation';
+        [fab, actionBtn, patientVoiceBtn].forEach(button => {
+          if (!button) return;
+          button.setAttribute('aria-label', processingLabel);
+          button.title = processingLabel;
+        });
 
         if (actionBtn) {
           actionBtn.style.backgroundColor = '#7c3aed';
-          actionBtn.style.borderColor = '#8b5cf6';
         }
-        if (actionBtnText) actionBtnText.textContent = currentUiLanguage === 'ar' ? 'معالجة...' : 'Analyzing...';
 
         if (statusCard) {
           statusCard.classList.remove('hidden');
@@ -28701,14 +28705,18 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         }
         if (fabPulse) fabPulse.classList.add('opacity-0');
         if (fabIcon) fabIcon.setAttribute('data-lucide', 'mic');
-        if (fabLabel) fabLabel.textContent = currentUiLanguage === 'ar' ? 'مساعد الصوت' : 'Voice Scribe';
+
+        const idleLabel = currentUiLanguage === 'ar' ? 'بدء الإملاء الصوتي' : 'Start voice dictation';
+        [fab, actionBtn, patientVoiceBtn].forEach(button => {
+          if (!button) return;
+          button.setAttribute('aria-label', idleLabel);
+          button.title = currentUiLanguage === 'ar' ? 'مساعد الصوت للمخطط السني' : 'Dental chart Voice Scribe';
+        });
 
         if (actionBtn) {
           actionBtn.style.backgroundColor = '';
-          actionBtn.style.borderColor = '';
           actionBtn.classList.remove('text-white');
         }
-        if (actionBtnText) actionBtnText.textContent = currentUiLanguage === 'ar' ? 'صوت' : 'Voice';
         if (actionBtnIcon) actionBtnIcon.setAttribute('data-lucide', 'mic');
 
         if (state === 'idle' && statusCard && hideStatusCard) {
