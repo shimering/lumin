@@ -28441,9 +28441,11 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       if (modal) modal.classList.remove('hidden');
     }
 
+    let luminLocalSpeechEngine = null;
     let luminLocalSpeechRecognition = null;
     let luminLocalSpeechTranscript = '';
     let luminLocalSpeechStartTimer = null;
+    let luminLocalSpeechSoundTimer = null;
     let luminLocalSpeechEndTimer = null;
     let luminLocalSpeechRetryTimer = null;
     let luminLocalSpeechFinalize = null;
@@ -28453,28 +28455,34 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       clearTimeout(luminVoiceSilenceTimer);
       clearTimeout(luminVoiceMaxTimer);
       clearTimeout(luminLocalSpeechStartTimer);
+      clearTimeout(luminLocalSpeechSoundTimer);
       clearTimeout(luminLocalSpeechEndTimer);
       clearTimeout(luminLocalSpeechRetryTimer);
       luminLocalSpeechStartTimer = null;
+      luminLocalSpeechSoundTimer = null;
       luminLocalSpeechEndTimer = null;
       luminLocalSpeechRetryTimer = null;
       luminLocalSpeechFinalize = null;
       luminVoiceStarting = false;
-      if (luminLocalSpeechRecognition) {
-        const rec = luminLocalSpeechRecognition;
-        luminLocalSpeechRecognition = null;
+      const rec = luminLocalSpeechRecognition || (abortInstance ? luminLocalSpeechEngine : null);
+      luminLocalSpeechRecognition = null;
+      if (rec) {
         rec.onstart = null;
         rec.onresult = null;
         rec.onerror = null;
         rec.onend = null;
         rec.onaudiostart = null;
         rec.onaudioend = null;
+        rec.onsoundstart = null;
+        rec.onsoundend = null;
         rec.onspeechstart = null;
         rec.onspeechend = null;
+        rec.onnomatch = null;
         if (abortInstance) {
           try { rec.abort(); } catch (_) {}
+          if (luminLocalSpeechEngine === rec) luminLocalSpeechEngine = null;
         }
-        luminLocalSpeechReadyAt = Date.now() + 250;
+        luminLocalSpeechReadyAt = Date.now() + (abortInstance ? 600 : 150);
       }
     }
 
@@ -28841,16 +28849,22 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       updateVoiceAssistantUI('recording');
 
       try {
-        const recognition = new SpeechRec();
+        // Reuse the same one-shot recognition controller between commands. Recreating
+        // controllers can leave a detached microphone session on Chromium/WebKit.
+        const isReusedEngine = Boolean(luminLocalSpeechEngine);
+        const recognition = luminLocalSpeechEngine || new SpeechRec();
+        luminLocalSpeechEngine = recognition;
         luminLocalSpeechRecognition = recognition;
 
-        recognition.continuous = true;
+        recognition.continuous = false;
         recognition.interimResults = true;
         recognition.maxAlternatives = 1;
         recognition.lang = (currentUiLanguage === 'ar' || document.documentElement.dir === 'rtl') ? 'ar-SA' : 'en-US';
 
         let localTranscript = '';
         let sessionFinished = false;
+        let audioCaptureStarted = false;
+        let soundDetected = false;
 
         const finishSession = async (processTranscript = true, forceAbort = false) => {
           if (sessionFinished) return;
@@ -28859,8 +28873,10 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
           clearTimeout(luminVoiceSilenceTimer);
           clearTimeout(luminVoiceMaxTimer);
           clearTimeout(luminLocalSpeechStartTimer);
+          clearTimeout(luminLocalSpeechSoundTimer);
           clearTimeout(luminLocalSpeechEndTimer);
           luminLocalSpeechStartTimer = null;
+          luminLocalSpeechSoundTimer = null;
           luminLocalSpeechEndTimer = null;
 
           if (luminLocalSpeechRecognition === recognition) {
@@ -28876,13 +28892,17 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
           recognition.onend = null;
           recognition.onaudiostart = null;
           recognition.onaudioend = null;
+          recognition.onsoundstart = null;
+          recognition.onsoundend = null;
           recognition.onspeechstart = null;
           recognition.onspeechend = null;
+          recognition.onnomatch = null;
           if (forceAbort) {
             try { recognition.abort(); } catch (_) {}
+            if (luminLocalSpeechEngine === recognition) luminLocalSpeechEngine = null;
           }
 
-          luminLocalSpeechReadyAt = Date.now() + 250;
+          luminLocalSpeechReadyAt = Date.now() + (forceAbort ? 600 : 150);
           luminVoiceStarting = false;
           luminVoiceRecordingActive = false;
 
@@ -28897,11 +28917,23 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
           await processLuminVoiceText(text);
         };
 
+        const recycleSilentCapture = (reason) => {
+          if (sessionFinished || luminLocalSpeechRecognition !== recognition) return;
+          console.warn(reason);
+          finishSession(false, true).then(() => {
+            if (retryCount < 1) {
+              showToast(currentUiLanguage === 'ar' ? 'تمت إعادة تهيئة الميكروفون. يرجى تكرار الأمر.' : 'Microphone reconnected. Please repeat the command.', 'info');
+              scheduleLuminLocalSpeechStart(retryCount + 1, 650);
+            } else {
+              showToast(currentUiLanguage === 'ar' ? 'لم يبدأ التقاط صوت الميكروفون. تم التبديل إلى التسجيل السحابي.' : 'Microphone audio capture did not start. Switched to cloud audio.', 'warning');
+              scheduleLuminVoiceAudioFallback();
+            }
+          });
+        };
+
         luminLocalSpeechFinalize = finishSession;
 
         recognition.onstart = () => {
-          clearTimeout(luminLocalSpeechStartTimer);
-          luminLocalSpeechStartTimer = null;
           luminVoiceStarting = false;
           luminVoiceRecordingActive = true;
 
@@ -28922,7 +28954,43 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
           }, 15000);
         };
 
+        recognition.onaudiostart = () => {
+          audioCaptureStarted = true;
+          clearTimeout(luminLocalSpeechStartTimer);
+          luminLocalSpeechStartTimer = null;
+          luminVoiceStarting = false;
+          luminVoiceRecordingActive = true;
+
+          // A reused or recovery Web Speech controller can report audio capture while
+          // delivering no acoustic events. Recycle it before the normal silence cutoff.
+          if (isReusedEngine || retryCount > 0) {
+            clearTimeout(luminLocalSpeechSoundTimer);
+            luminLocalSpeechSoundTimer = setTimeout(() => {
+              if (!soundDetected && !luminLocalSpeechTranscript) {
+                recycleSilentCapture('Reused local speech session captured no sound; recycling the microphone session.');
+              }
+            }, 4000);
+          }
+        };
+
+        recognition.onsoundstart = () => {
+          soundDetected = true;
+          clearTimeout(luminLocalSpeechSoundTimer);
+          luminLocalSpeechSoundTimer = null;
+        };
+
+        recognition.onspeechstart = () => {
+          soundDetected = true;
+          clearTimeout(luminLocalSpeechSoundTimer);
+          luminLocalSpeechSoundTimer = null;
+        };
+
         recognition.onresult = (event) => {
+          soundDetected = true;
+          clearTimeout(luminLocalSpeechStartTimer);
+          clearTimeout(luminLocalSpeechSoundTimer);
+          luminLocalSpeechStartTimer = null;
+          luminLocalSpeechSoundTimer = null;
           let interim = '';
           let final = '';
           for (let i = 0; i < event.results.length; ++i) {
@@ -28975,21 +29043,15 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
 
         recognition.onend = () => finishSession(true, false);
 
-        // Chrome/WebKit can occasionally accept start() but never emit onstart for a
-        // second session. Recover instead of leaving the voice button permanently locked.
+        // `start` only confirms that the recognition service is running. Actual microphone
+        // capture is confirmed by `audiostart`; a ghost second session can emit the former
+        // without the latter and would otherwise sit red until the silence timeout.
         clearTimeout(luminLocalSpeechStartTimer);
         luminLocalSpeechStartTimer = setTimeout(() => {
           if (sessionFinished || luminLocalSpeechRecognition !== recognition) return;
-          console.warn('Local speech recognition did not start; recycling the session.');
-          finishSession(false, true).then(() => {
-            if (retryCount < 1) {
-              scheduleLuminLocalSpeechStart(retryCount + 1, 350);
-            } else {
-              showToast(currentUiLanguage === 'ar' ? 'تعذر إعادة تشغيل الإملاء المحلي. تم التبديل إلى التسجيل السحابي.' : 'Local dictation did not restart. Switched to cloud audio.', 'warning');
-              scheduleLuminVoiceAudioFallback();
-            }
-          });
-        }, 3000);
+          if (audioCaptureStarted || soundDetected) return;
+          recycleSilentCapture('Local speech recognition started without audio capture; recycling the microphone session.');
+        }, 2500);
 
         recognition.start();
 
@@ -29081,6 +29143,8 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       luminVoiceStartRequestId += 1;
       clearTimeout(luminVoiceSilenceTimer);
       clearTimeout(luminVoiceMaxTimer);
+      clearTimeout(luminLocalSpeechSoundTimer);
+      luminLocalSpeechSoundTimer = null;
       if (luminLocalSpeechRecognition) {
         const rec = luminLocalSpeechRecognition;
         const finalize = luminLocalSpeechFinalize;
