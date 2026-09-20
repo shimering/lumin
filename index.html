@@ -7175,8 +7175,8 @@
                   </div>
                   <input type="radio" name="voice-scribe-engine" value="local" onchange="setLuminVoiceEngineMode(this.value)" class="h-4 w-4 text-blue-600 focus:ring-blue-500" />
                 </div>
-                <span class="mt-1.5 inline-block rounded-md bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">Recommended</span>
-                <p class="mt-2 text-[11px] leading-relaxed text-slate-500">Transcribes speech directly on your iPad / browser using the Web Speech API. Zero audio upload lag, 95% less Gemini quota, and sub-second parsing.</p>
+                <span id="settings-voice-local-label" class="mt-1.5 inline-block rounded-md bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">Browser speech recognition</span>
+                <p id="settings-voice-local-description" class="mt-2 text-[11px] leading-relaxed text-slate-500">Uses your browser's speech recognition and sends the resulting text to Gemini. Availability depends on your browser and device.</p>
               </div>
             </label>
 
@@ -7198,6 +7198,7 @@
 
           <div class="rounded-xl border border-slate-100 bg-slate-50/60 p-3 text-[11px] text-slate-500 leading-snug">
             <span class="font-bold text-slate-700">Note:</span> If Local Dictation is selected on a browser without Web Speech support, Lumin automatically falls back to Cloud Audio smoothly.
+            <p id="settings-voice-installed-note" class="hidden mt-2 text-blue-700"></p>
           </div>
         </div>
 
@@ -28315,7 +28316,7 @@
 
     // ================= CHAIRSIDE VOICE CONTROL AI AGENT =================
     let luminVoiceRecorder = null;
-    let luminVoiceAudioChunks = [];
+    let luminVoiceAudioSession = null;
     let luminVoiceRecordingActive = false;
     let luminVoiceStarting = false;
     let luminVoiceStartRequestId = 0;
@@ -28327,6 +28328,14 @@
     let clinicGeminiApiKeyCached = '';
     let luminVoiceProcessingAbortController = null;
     let luminVoiceProcessingTimer = null;
+    // Event names only: never retain audio, transcripts, patient details or API keys here.
+    const luminVoiceDiagnostics = [];
+    window.luminVoiceDiagnostics = luminVoiceDiagnostics;
+
+    function logLuminVoiceEvent(engine, event) {
+      luminVoiceDiagnostics.push({ time: new Date().toISOString(), engine, event });
+      if (luminVoiceDiagnostics.length > 60) luminVoiceDiagnostics.shift();
+    }
 
     const LUMIN_VOICE_SYSTEM_INSTRUCTION = `You are "Lumin Voice Scribe", a specialized real-time clinical dental assistant integrated into Lumin Dental PMS.
 Your mission is to transcribe and convert voice utterances from a dentist or dental assistant into structured clinical chart mutations for the currently opened patient.
@@ -28516,7 +28525,25 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       return Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
     }
 
+    function isLuminInstalledIOSApp() {
+      // iPadOS can use the desktop Macintosh user agent.
+      const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent || '')
+        || (/Macintosh|MacIntel/i.test(`${navigator.userAgent || ''} ${navigator.platform || ''}`)
+          && Number(navigator.maxTouchPoints || 0) > 1);
+      return isIOS && (navigator.standalone === true
+        || Boolean(window.matchMedia?.('(display-mode: standalone)').matches));
+    }
+
+    function luminInstalledVoiceNotice() {
+      return currentUiLanguage === 'ar'
+        ? 'يستخدم التطبيق المثبّت على iPad وiPhone الصوت السحابي. تُرسل التسجيلات إلى Gemini للتحليل. تحدث ثم انقر على الميكروفون للإنهاء.'
+        : 'The installed iPad/iPhone app uses Cloud Audio. Recordings are sent to Gemini for analysis. Speak, then tap the microphone to finish.';
+    }
+
     function getLuminVoiceEngineMode() {
+      // Web Speech availability alone does not imply reliable Home Screen capture.
+      // Use the existing recorder on installed iOS; preserve the preference for browser tabs.
+      if (isLuminInstalledIOSApp()) return 'cloud';
       const saved = localStorage.getItem('lumin_voice_engine_mode');
       if (saved === 'cloud') return 'cloud';
       if (saved === 'local') return isLocalSpeechRecognitionSupported() ? 'local' : 'cloud';
@@ -28524,6 +28551,11 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     }
 
     function setLuminVoiceEngineMode(mode) {
+      if (isLuminInstalledIOSApp()) {
+        syncVoiceEngineSettingsUI();
+        showToast(luminInstalledVoiceNotice(), 'info');
+        return;
+      }
       if (mode === 'local' && !isLocalSpeechRecognitionSupported()) {
         showToast(currentUiLanguage === 'ar' ? 'التعرف الصوتي المحلي غير مدعوم في هذا المتصفح. تم التبديل إلى سحابي.' : 'Local speech recognition is not supported in this browser. Switched to cloud audio.', 'warning');
         localStorage.setItem('lumin_voice_engine_mode', 'cloud');
@@ -28558,19 +28590,39 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       badge.title = isLocal
         ? (currentUiLanguage === 'ar' ? 'وضع الإملاء المحلي نشط (انقر للتبديل لسحابي)' : 'Local On-Device Dictation active (Click to switch to Cloud Audio)')
         : (currentUiLanguage === 'ar' ? 'وضع الصوت السحابي نشط (انقر للتبديل لمحلي)' : 'Direct Cloud Audio active (Click to switch to Local Dictation)');
+      if (isLuminInstalledIOSApp()) {
+        badge.title = luminInstalledVoiceNotice();
+        badge.setAttribute('aria-label', luminInstalledVoiceNotice());
+      }
     }
 
     function syncVoiceEngineSettingsUI() {
       const mode = getLuminVoiceEngineMode();
+      const localLabel = document.getElementById('settings-voice-local-label');
+      if (localLabel) localLabel.textContent = currentUiLanguage === 'ar' ? 'التعرف الصوتي في المتصفح' : 'Browser speech recognition';
+      const localDescription = document.getElementById('settings-voice-local-description');
+      if (localDescription) localDescription.textContent = currentUiLanguage === 'ar'
+        ? 'يستخدم التعرف الصوتي في المتصفح ويرسل النص الناتج إلى Gemini. يعتمد توفره على المتصفح والجهاز.'
+        : 'Uses your browser\'s speech recognition and sends the resulting text to Gemini. Availability depends on your browser and device.';
       const radios = document.querySelectorAll('input[name="voice-scribe-engine"]');
       radios.forEach(radio => {
         radio.checked = radio.value === mode;
+        radio.disabled = radio.value === 'local' && isLuminInstalledIOSApp();
       });
+
+      const installedNotice = document.getElementById('settings-voice-installed-note');
+      if (installedNotice) {
+        installedNotice.classList.toggle('hidden', !isLuminInstalledIOSApp());
+        installedNotice.textContent = luminInstalledVoiceNotice();
+      }
 
       const deviceBadge = document.getElementById('settings-voice-device-badge');
       if (deviceBadge) {
         const supported = isLocalSpeechRecognitionSupported();
-        if (supported) {
+        if (isLuminInstalledIOSApp()) {
+          deviceBadge.className = 'rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-black text-blue-700';
+          deviceBadge.textContent = currentUiLanguage === 'ar' ? 'الصوت السحابي للتطبيق المثبّت' : 'Cloud Audio for installed app';
+        } else if (supported) {
           deviceBadge.className = 'rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700';
           deviceBadge.textContent = currentUiLanguage === 'ar' ? 'الإملاء المحلي مدعوم على هذا الجهاز' : 'On-Device STT Supported';
         } else {
@@ -28591,6 +28643,8 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     }
 
     function updateVoiceAssistantUI(state, message = '', hideStatusCard = true) {
+      // A previous success card must not hide the new recording or its stop control.
+      if (state === 'recording' || state === 'processing') clearTimeout(luminVoiceCardTimer);
       const fab = document.getElementById('chart-voice-fab');
       const fabPulse = document.getElementById('chart-voice-fab-pulse');
       const fabIcon = document.getElementById('chart-voice-fab-icon');
@@ -28644,7 +28698,9 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
                   </div>
                   <span class="text-[9px] font-bold text-slate-400 shrink-0">${currentUiLanguage === 'ar' ? 'انقر للإنهاء' : 'Tap to finish'}</span>
                 </div>
-                <p id="chart-voice-interim-text" class="mt-0.5 text-xs text-slate-500 italic truncate">${currentUiLanguage === 'ar' ? 'تحدث الآن (مثال: الضرس الأول العلوي يمين حشو كمبوزيت)' : 'Speak now (e.g. Upper right 6, occlusal composite, completed)'}</p>
+                <p id="chart-voice-interim-text" class="mt-0.5 text-xs text-slate-500 italic truncate">${getLuminVoiceEngineMode() === 'cloud'
+                  ? (currentUiLanguage === 'ar' ? 'تحدث الآن، ثم انقر للإنهاء والتحليل عبر Gemini' : 'Speak now, then tap to finish and analyze with Gemini')
+                  : (currentUiLanguage === 'ar' ? 'تحدث الآن (مثال: الضرس الأول العلوي يمين حشو كمبوزيت)' : 'Speak now (e.g. Upper right 6, occlusal composite, completed)')}</p>
               </div>
               <button type="button" onclick="stopLuminVoiceRecording()" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-600 text-white shadow-xs transition hover:bg-red-700" aria-label="Stop recording">
                 <i data-lucide="square" class="h-3.5 w-3.5 fill-current"></i>
@@ -28805,6 +28861,10 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       luminVoiceStarting = true;
       const apiKey = await getLuminGeminiApiKey();
       if (startRequestId !== luminVoiceStartRequestId) return;
+      if (getActivePatient()?.id !== patient.id) {
+        luminVoiceStarting = false;
+        return;
+      }
       if (!apiKey) {
         luminVoiceStarting = false;
         showLuminVoiceApiKeyModal();
@@ -28821,6 +28881,10 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     }
 
     function startLuminLocalSpeechRecognition(retryCount = 0) {
+      if (isLuminInstalledIOSApp()) {
+        startLuminVoiceAudioRecording();
+        return;
+      }
       const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRec) {
         startLuminVoiceAudioRecording();
@@ -28849,8 +28913,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       updateVoiceAssistantUI('recording');
 
       try {
-        // Reuse the same one-shot recognition controller between commands. Recreating
-        // controllers can leave a detached microphone session on Chromium/WebKit.
+        // Reuse a stopped controller between commands, replacing it after a failed session.
         const isReusedEngine = Boolean(luminLocalSpeechEngine);
         const recognition = luminLocalSpeechEngine || new SpeechRec();
         luminLocalSpeechEngine = recognition;
@@ -28934,6 +28997,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         luminLocalSpeechFinalize = finishSession;
 
         recognition.onstart = () => {
+          logLuminVoiceEvent('local', 'service-start');
           luminVoiceStarting = false;
           luminVoiceRecordingActive = true;
 
@@ -28955,6 +29019,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         };
 
         recognition.onaudiostart = () => {
+          logLuminVoiceEvent('local', 'audio-start');
           audioCaptureStarted = true;
           clearTimeout(luminLocalSpeechStartTimer);
           luminLocalSpeechStartTimer = null;
@@ -28974,6 +29039,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         };
 
         recognition.onsoundstart = () => {
+          logLuminVoiceEvent('local', 'sound-start');
           soundDetected = true;
           clearTimeout(luminLocalSpeechSoundTimer);
           luminLocalSpeechSoundTimer = null;
@@ -28986,6 +29052,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         };
 
         recognition.onresult = (event) => {
+          logLuminVoiceEvent('local', 'result');
           soundDetected = true;
           clearTimeout(luminLocalSpeechStartTimer);
           clearTimeout(luminLocalSpeechSoundTimer);
@@ -29017,6 +29084,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         };
 
         recognition.onerror = (event) => {
+          logLuminVoiceEvent('local', 'error');
           console.warn('Local speech recognition event error:', event?.error);
           clearTimeout(luminVoiceSilenceTimer);
           clearTimeout(luminVoiceMaxTimer);
@@ -29041,7 +29109,10 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
           }
         };
 
-        recognition.onend = () => finishSession(true, false);
+        recognition.onend = () => {
+          logLuminVoiceEvent('local', 'end');
+          return finishSession(true, false);
+        };
 
         // `start` only confirms that the recognition service is running. Actual microphone
         // capture is confirmed by `audiostart`; a ghost second session can emit the former
@@ -29069,16 +29140,79 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     }
 
     async function startLuminVoiceAudioRecording() {
+      if (luminVoiceAudioSession || luminVoiceProcessingActive) return;
       const startRequestId = luminVoiceStartRequestId;
-      let stream = null;
+      const session = { patientId: getActivePatient()?.id, stream: null, recorder: null, chunks: [], stopping: false, closed: false, startTimer: null, endTimer: null, maxTimer: null };
+      luminVoiceAudioSession = session;
       luminVoiceStarting = true;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        if (startRequestId !== luminVoiceStartRequestId) {
-          stream.getTracks().forEach(track => track.stop());
+      logLuminVoiceEvent('cloud', 'request-microphone');
+
+      const ownsSession = () => luminVoiceAudioSession === session && !session.closed;
+      const release = () => {
+        if (session.closed) return false;
+        const owned = ownsSession();
+        session.closed = true;
+        clearTimeout(session.startTimer);
+        clearTimeout(session.endTimer);
+        clearTimeout(session.maxTimer);
+        if (session.recorder) {
+          session.recorder.onstart = null;
+          session.recorder.ondataavailable = null;
+          session.recorder.onstop = null;
+          session.recorder.onerror = null;
+          if (session.recorder.state !== 'inactive') {
+            try { session.recorder.stop(); } catch (_) {}
+          }
+        }
+        session.stream?.getTracks().forEach(track => track.stop());
+        if (owned) {
+          luminVoiceAudioSession = null;
+          luminVoiceRecorder = null;
+          luminVoiceStarting = false;
+          luminVoiceRecordingActive = false;
+        }
+        return owned;
+      };
+      const fail = () => {
+        if (!release()) return;
+        logLuminVoiceEvent('cloud', 'capture-failed');
+        updateVoiceAssistantUI('idle', '', false);
+        showVoiceStatusCard('error', currentUiLanguage === 'ar'
+          ? 'تعذر تسجيل الصوت. تحقق من إذن الميكروفون ثم حاول مرة أخرى.'
+          : 'Could not record audio. Check microphone permission, then try again.');
+      };
+      session.cancel = () => {
+        if (!release()) return;
+        session.chunks = [];
+        logLuminVoiceEvent('cloud', 'cancelled');
+      };
+      session.stop = () => {
+        if (!ownsSession() || session.stopping) return;
+        if (!session.recorder) {
+          session.cancel();
+          updateVoiceAssistantUI('idle');
           return;
         }
-        luminVoiceAudioChunks = [];
+        session.stopping = true;
+        clearTimeout(session.startTimer);
+        clearTimeout(session.maxTimer);
+        // Keep the start gate closed until the final dataavailable + stop events arrive.
+        luminVoiceStarting = true;
+        luminVoiceRecordingActive = false;
+        logLuminVoiceEvent('cloud', 'stopping');
+        session.endTimer = setTimeout(fail, 5000);
+        try { session.recorder.stop(); } catch (_) { fail(); }
+      };
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (!ownsSession() || startRequestId !== luminVoiceStartRequestId) {
+          stream.getTracks().forEach(track => track.stop());
+          release();
+          return;
+        }
+        session.stream = stream;
+        logLuminVoiceEvent('cloud', 'microphone-open');
 
         let mimeType = 'audio/webm;codecs=opus';
         if (!window.MediaRecorder || typeof MediaRecorder.isTypeSupported !== 'function') {
@@ -29088,58 +29222,57 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         }
 
         const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+        session.recorder = recorder;
         luminVoiceRecorder = recorder;
 
         recorder.ondataavailable = (event) => {
-          if (event.data && event.data.size > 0) luminVoiceAudioChunks.push(event.data);
+          if (!ownsSession()) return;
+          if (event.data && event.data.size > 0) {
+            session.chunks.push(event.data);
+            logLuminVoiceEvent('cloud', 'audio-chunk');
+          }
         };
 
         recorder.onstart = () => {
+          if (!ownsSession() || session.stopping) return;
+          clearTimeout(session.startTimer);
           luminVoiceStarting = false;
           luminVoiceRecordingActive = true;
+          logLuminVoiceEvent('cloud', 'recording');
           updateVoiceAssistantUI('recording');
         };
 
         recorder.onstop = async () => {
-          luminVoiceStarting = false;
-          luminVoiceRecordingActive = false;
-          try {
-            stream.getTracks().forEach(track => track.stop());
-          } catch (_) {}
-          if (luminVoiceRecorder === recorder) luminVoiceRecorder = null;
-
-          if (!luminVoiceAudioChunks.length) {
-            updateVoiceAssistantUI('idle');
+          if (!ownsSession()) return;
+          const recordedBlob = new Blob(session.chunks, { type: recorder.mimeType || 'audio/webm' });
+          release();
+          session.chunks = [];
+          logLuminVoiceEvent('cloud', 'stopped');
+          if (!recordedBlob.size) {
+            updateVoiceAssistantUI('idle', '', false);
+            showVoiceStatusCard('error', currentUiLanguage === 'ar' ? 'لم يتم تسجيل صوت. اضغط على الميكروفون للمحاولة مرة أخرى.' : 'No audio was recorded. Tap the microphone to try again.');
             return;
           }
-          const recordedBlob = new Blob(luminVoiceAudioChunks, { type: recorder.mimeType || 'audio/webm' });
-          await processLuminVoiceBlob(recordedBlob);
+          await processLuminVoiceBlob(recordedBlob, session.patientId);
         };
 
-        recorder.start();
-
-        // Safety timeout: max 12 seconds per dictation utterance
-        clearTimeout(luminVoiceSilenceTimer);
-        luminVoiceSilenceTimer = setTimeout(() => {
-          if (luminVoiceRecordingActive && luminVoiceRecorder?.state === 'recording') {
-            stopLuminVoiceRecording();
-          }
-        }, 12000);
+        recorder.onerror = fail;
+        session.startTimer = setTimeout(fail, 10000);
+        // Timeslices expose recording progress without sharing audio between commands.
+        recorder.start(250);
+        session.maxTimer = setTimeout(session.stop, 12000);
 
       } catch (err) {
-        luminVoiceStarting = false;
-        luminVoiceRecordingActive = false;
-        if (stream) {
-          try { stream.getTracks().forEach(track => track.stop()); } catch (_) {}
-        }
-        if (startRequestId !== luminVoiceStartRequestId) return;
-        console.error('Microphone access failed:', err);
-        showToast(currentUiLanguage === 'ar' ? 'تعذر الوصول للميكروفون. يرجى السماح بالوصول.' : 'Microphone access denied or unavailable.', 'danger');
-        updateVoiceAssistantUI('idle');
+        if (!ownsSession()) return;
+        fail();
       }
     }
 
     function stopLuminVoiceRecording() {
+      if (luminVoiceAudioSession) {
+        luminVoiceAudioSession.stop();
+        return;
+      }
       luminVoiceStartRequestId += 1;
       clearTimeout(luminVoiceSilenceTimer);
       clearTimeout(luminVoiceMaxTimer);
@@ -29175,13 +29308,6 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       } else if (luminVoiceStarting) {
         cleanupLocalSpeechRecognition(false);
         updateVoiceAssistantUI('idle');
-      }
-      if (luminVoiceRecorder && luminVoiceRecorder.state === 'recording') {
-        luminVoiceStarting = false;
-        luminVoiceRecordingActive = false;
-        try {
-          luminVoiceRecorder.stop();
-        } catch (_) {}
       }
     }
 
@@ -29226,11 +29352,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       luminVoiceStarting = false;
       cleanupLocalSpeechRecognition(true);
       luminLocalSpeechTranscript = '';
-      if (luminVoiceRecorder && luminVoiceRecorder.state === 'recording') {
-        try {
-          luminVoiceRecorder.stop();
-        } catch (_) {}
-      }
+      if (luminVoiceAudioSession) luminVoiceAudioSession.cancel();
       if (luminVoiceProcessingAbortController) {
         try { luminVoiceProcessingAbortController.abort(); } catch (_) {}
       }
@@ -29245,25 +29367,24 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       }
     }
 
-    async function fetchGeminiVoiceWithFallback(apiKey, requestBody) {
+    async function fetchGeminiVoiceWithFallback(apiKey, requestBody, signal) {
       // Prioritize fast, high-quota models: gemini-3.5-flash-lite (sub-second), gemini-flash-lite-latest, gemini-3.7-flash
       const candidateModels = ['gemini-3.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-3.7-flash'];
       let lastError = null;
 
       for (const model of candidateModels) {
+        if (signal?.aborted) throw new DOMException('Voice analysis cancelled', 'AbortError');
+        const controller = new AbortController();
+        const abortAttempt = () => controller.abort();
+        signal?.addEventListener('abort', abortAttempt, { once: true });
+        const timeoutId = setTimeout(abortAttempt, 8500);
         try {
-          const controller = new AbortController();
-          luminVoiceProcessingAbortController = controller;
-          const timeoutId = setTimeout(() => controller.abort(), 8500);
-
           const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestBody),
             signal: controller.signal
           });
-          clearTimeout(timeoutId);
-
           if (response.ok) {
             return await response.json();
           }
@@ -29272,19 +29393,26 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
           console.warn(`Model ${model} returned HTTP ${response.status}:`, errData?.error?.message);
           lastError = new Error(errData?.error?.message || `Model ${model} returned status ${response.status}`);
         } catch (err) {
+          if (signal?.aborted) throw new DOMException('Voice analysis cancelled', 'AbortError');
           console.warn(`Model ${model} attempt failed:`, err?.message || err);
           lastError = err;
+        } finally {
+          clearTimeout(timeoutId);
+          signal?.removeEventListener('abort', abortAttempt);
         }
       }
 
       throw lastError || new Error('All voice recognition endpoints timed out.');
     }
 
-    async function processLuminVoiceBlob(blob) {
+    async function processLuminVoiceBlob(blob, patientId = getActivePatient()?.id) {
+      const controller = new AbortController();
+      luminVoiceProcessingAbortController = controller;
       luminVoiceProcessingActive = true;
       updateVoiceAssistantUI('processing');
 
       try {
+        if (getActivePatient()?.id !== patientId) throw new Error(currentUiLanguage === 'ar' ? 'تم تغيير ملف المريض. أعد تسجيل الأمر للمريض الحالي.' : 'The patient changed. Record the command again for the current patient.');
         const apiKey = await getLuminGeminiApiKey();
         if (!apiKey) throw new Error('Missing Gemini API Key');
 
@@ -29333,7 +29461,9 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
           }
         };
 
-        const resJson = await fetchGeminiVoiceWithFallback(apiKey, requestBody);
+        const resJson = await fetchGeminiVoiceWithFallback(apiKey, requestBody, controller.signal);
+        if (controller.signal.aborted || luminVoiceProcessingAbortController !== controller) return;
+        if (getActivePatient()?.id !== patientId) throw new Error(currentUiLanguage === 'ar' ? 'تم تغيير ملف المريض. أعد تسجيل الأمر للمريض الحالي.' : 'The patient changed. Record the command again for the current patient.');
         const payloadText = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!payloadText) throw new Error('No response returned from Gemini.');
 
@@ -29341,6 +29471,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         await executeVoiceChartActions(payload);
 
       } catch (err) {
+        if (controller.signal.aborted || luminVoiceProcessingAbortController !== controller) return;
         console.error('Lumin Voice Agent error:', err);
         const isQuota = /quota|429|RESOURCE_EXHAUSTED/i.test(err.message || '');
         const friendlyMsg = isQuota
@@ -29350,8 +29481,11 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         showVoiceStatusCard('error', friendlyMsg);
         updateVoiceAssistantUI('idle', '', false);
       } finally {
-        clearInterval(luminVoiceProcessingTimer);
-        luminVoiceProcessingActive = false;
+        if (luminVoiceProcessingAbortController === controller) {
+          clearInterval(luminVoiceProcessingTimer);
+          luminVoiceProcessingAbortController = null;
+          luminVoiceProcessingActive = false;
+        }
       }
     }
 
@@ -29361,6 +29495,9 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         return;
       }
 
+      const controller = new AbortController();
+      luminVoiceProcessingAbortController = controller;
+      const patientId = getActivePatient()?.id;
       luminVoiceProcessingActive = true;
       updateVoiceAssistantUI('processing');
 
@@ -29392,7 +29529,9 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
           }
         };
 
-        const resJson = await fetchGeminiVoiceWithFallback(apiKey, requestBody);
+        const resJson = await fetchGeminiVoiceWithFallback(apiKey, requestBody, controller.signal);
+        if (controller.signal.aborted || luminVoiceProcessingAbortController !== controller) return;
+        if (getActivePatient()?.id !== patientId) throw new Error(currentUiLanguage === 'ar' ? 'تم تغيير ملف المريض. أعد تسجيل الأمر للمريض الحالي.' : 'The patient changed. Record the command again for the current patient.');
         const payloadText = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!payloadText) throw new Error('No response returned from Gemini.');
 
@@ -29403,6 +29542,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         await executeVoiceChartActions(payload);
 
       } catch (err) {
+        if (controller.signal.aborted || luminVoiceProcessingAbortController !== controller) return;
         console.error('Lumin Voice Agent text processing error:', err);
         const isQuota = /quota|429|RESOURCE_EXHAUSTED/i.test(err.message || '');
         const friendlyMsg = isQuota
@@ -29412,8 +29552,11 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         showVoiceStatusCard('error', friendlyMsg);
         updateVoiceAssistantUI('idle', '', false);
       } finally {
-        clearInterval(luminVoiceProcessingTimer);
-        luminVoiceProcessingActive = false;
+        if (luminVoiceProcessingAbortController === controller) {
+          clearInterval(luminVoiceProcessingTimer);
+          luminVoiceProcessingAbortController = null;
+          luminVoiceProcessingActive = false;
+        }
       }
     }
 
