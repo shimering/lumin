@@ -39,7 +39,7 @@ async function settle() {
 
 function harness(options = {}) {
   const storage = new Map();
-  if (options.savedMode !== null) storage.set('lumin_voice_engine_mode', options.savedMode ?? 'local');
+  if (options.savedMode !== null) storage.set('lumin_voice_engine_mode', options.savedMode ?? 'cloud');
   const streams = [];
   const recorders = [];
   const microphoneRequests = [];
@@ -50,6 +50,16 @@ function harness(options = {}) {
   let nextTimer = 1;
   const radios = [{ value: 'local', disabled: false }, { value: 'cloud', disabled: false }];
   const deviceBadge = {};
+  const modeBadge = { setAttribute(name, value) { this[name] = value; } };
+  const settingsElements = {
+    'settings-voice-device-badge': deviceBadge,
+    'chart-voice-mode-badge': modeBadge,
+    'settings-voice-description': {},
+    'settings-voice-local-label': {},
+    'settings-voice-local-description': {},
+    'settings-voice-mode-note': {},
+    'settings-voice-permission-note': {}
+  };
 
   class FakeMediaRecorder {
     static isTypeSupported(type) { return type === 'audio/mp4'; }
@@ -115,7 +125,7 @@ function harness(options = {}) {
       readyState: 'loading',
       documentElement: { dir: 'ltr' },
       addEventListener() {},
-      getElementById: id => id === 'settings-voice-device-badge' ? deviceBadge : null,
+      getElementById: id => settingsElements[id] || null,
       querySelectorAll: selector => selector === 'input[name="voice-scribe-engine"]' ? radios : []
     },
     addEventListener() {},
@@ -153,7 +163,7 @@ function harness(options = {}) {
   `, context);
 
   return {
-    context, storage, streams, recorders, microphoneRequests, processed, uiStates, toasts, radios, deviceBadge, realProcessBlob,
+    context, storage, streams, recorders, microphoneRequests, processed, uiStates, toasts, radios, deviceBadge, modeBadge, settingsElements, realProcessBlob,
     run: code => vm.runInContext(code, context),
     state: () => vm.runInContext('({ starting: luminVoiceStarting, recording: luminVoiceRecordingActive, processing: luminVoiceProcessingActive, recorder: luminVoiceRecorder })', context),
     async begin() {
@@ -167,24 +177,26 @@ function harness(options = {}) {
   };
 }
 
-test('only installed iOS apps bypass local STT, including iPad desktop user agents', async t => {
+test('STT defaults on every device and only an explicit cloud preference enables Cloud Audio', async t => {
   const cases = [
-    ['installed iPad', {}, true, 'cloud'],
-    ['installed iPad desktop identity', { userAgent: desktopIpadUA }, true, 'cloud'],
-    ['installed iPhone', { userAgent: iphoneUA }, true, 'cloud'],
-    ['standalone display mode', { standalone: false, displayModeStandalone: true }, true, 'cloud'],
+    ['installed iPad', {}, true, 'local'],
+    ['installed iPad desktop identity', { userAgent: desktopIpadUA }, true, 'local'],
+    ['installed iPhone', { userAgent: iphoneUA }, true, 'local'],
+    ['standalone display mode', { standalone: false, displayModeStandalone: true }, true, 'local'],
     ['iPad browser tab', { standalone: false }, false, 'local'],
     ['desktop-identity iPad browser tab', { userAgent: desktopIpadUA, standalone: false }, false, 'local'],
     ['Mac app without touch', { userAgent: desktopIpadUA, maxTouchPoints: 0 }, false, 'local'],
     ['Windows touch app', { userAgent: windowsUA }, false, 'local'],
     ['Android app', { userAgent: 'Mozilla/5.0 (Linux; Android 14; Tablet) AppleWebKit/537.36 Chrome/130.0.0.0' }, false, 'local'],
     ['browser with explicit cloud choice', { standalone: false, savedMode: 'cloud' }, false, 'cloud'],
-    ['browser without speech recognition', { standalone: false, speechSupported: false }, false, 'cloud'],
-    ['installed iPad with no preference', { savedMode: null }, true, 'cloud']
+    ['installed iPad with explicit cloud choice', { savedMode: 'cloud' }, true, 'cloud'],
+    ['browser without speech recognition', { standalone: false, speechSupported: false }, false, 'local'],
+    ['installed iPad with saved STT preference', { savedMode: 'local' }, true, 'local'],
+    ['invalid preference', { savedMode: 'invalid' }, true, 'local']
   ];
   for (const [name, options, installedIOS, mode] of cases) {
     await t.test(name, () => {
-      const h = harness(options);
+      const h = harness({ savedMode: null, ...options });
       const savedBefore = h.storage.get('lumin_voice_engine_mode');
       assert.equal(h.context.isLuminInstalledIOSApp(), installedIOS);
       assert.equal(h.context.getLuminVoiceEngineMode(), mode);
@@ -193,16 +205,48 @@ test('only installed iOS apps bypass local STT, including iPad desktop user agen
   }
 });
 
-test('installed iPad disables local mode and keeps the saved preference when toggled', () => {
-  const h = harness();
+test('installed iPad supports manually switching both ways and persists the selected mode', () => {
+  const h = harness({ savedMode: null });
   h.context.syncVoiceEngineSettingsUI();
-  assert.equal(h.radios[0].disabled, true);
-  assert.equal(h.radios[0].checked, false);
-  assert.equal(h.radios[1].checked, true);
-  h.context.setLuminVoiceEngineMode('local');
+  assert.equal(h.radios[0].disabled, false);
+  assert.equal(h.radios[0].checked, true);
+  assert.equal(h.radios[1].checked, false);
+  assert.match(h.modeBadge.title, /Browser STT active/);
+  assert.equal(h.modeBadge['aria-label'], h.modeBadge.title);
   h.context.toggleVoiceScribeModeQuick();
   assert.equal(h.context.getLuminVoiceEngineMode(), 'cloud');
+  assert.equal(h.storage.get('lumin_voice_engine_mode'), 'cloud');
+  assert.equal(h.radios[1].checked, true);
+  h.context.toggleVoiceScribeModeQuick();
+  assert.equal(h.context.getLuminVoiceEngineMode(), 'local');
   assert.equal(h.storage.get('lumin_voice_engine_mode'), 'local');
+  assert.equal(h.radios[0].checked, true);
+});
+
+test('choosing unsupported STT warns without selecting or persisting Cloud Audio', () => {
+  const h = harness({ speechSupported: false });
+  h.context.setLuminVoiceEngineMode('local');
+  assert.equal(h.context.getLuminVoiceEngineMode(), 'local');
+  assert.equal(h.storage.get('lumin_voice_engine_mode'), 'local');
+  assert.match(h.toasts.at(-1)[0], /will not switch automatically/);
+  assert.equal(h.toasts.at(-1)[1], 'warning');
+  h.context.setLuminVoiceEngineMode('invalid');
+  assert.equal(h.storage.get('lumin_voice_engine_mode'), 'local');
+  assert.equal(h.microphoneRequests.length, 0);
+});
+
+test('English and Arabic settings explain browser-managed permissions and manual cloud choice', () => {
+  for (const language of ['en', 'ar']) {
+    const h = harness({ savedMode: null, language });
+    h.context.syncVoiceEngineSettingsUI();
+    const permission = h.settingsElements['settings-voice-permission-note'].textContent;
+    const modeNote = h.settingsElements['settings-voice-mode-note'].textContent;
+    assert.equal(permission, h.context.luminVoicePermissionNotice());
+    assert.match(permission, language === 'ar' ? /لا يستطيع Lumin منع طلبات الإذن/ : /cannot suppress browser permission prompts/);
+    assert.match(modeNote, language === 'ar' ? /لا يُستخدم إلا عند اختياره/ : /only when you select it/);
+    assert.doesNotMatch(h.modeBadge.title, /On-Device/);
+    assert.equal(h.radios[0].disabled, false);
+  }
 });
 
 test('two sequential button dictations produce independent MP4 blobs and release each microphone', async () => {
