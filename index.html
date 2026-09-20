@@ -28846,7 +28846,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       const requestId = luminVoiceStartRequestId;
       const session = {
         patientId, recognition: null, stream: null, closed: false, stopping: false,
-        started: false, transcript: '', timers: new Set(), restoreAudioSession: null
+        started: false, guardPending: false, transcript: '', timers: new Set(), restoreAudioSession: null
       };
       luminLocalSpeechSession = session;
       luminVoiceStarting = true;
@@ -28903,11 +28903,11 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         if (!ownsSession() || session.stopping) return;
         session.stopping = true;
         clearTimers();
-        if (!session.started) {
+        if (!session.started || session.guardPending) {
           finish(false, true);
           return;
         }
-        luminVoiceStarting = true;
+        luminVoiceStarting = false;
         luminVoiceRecordingActive = false;
         try { session.recognition.stop(); } catch (_) { finish(true, true); }
         if (ownsSession()) later(() => finish(true, true), 1500);
@@ -28927,9 +28927,11 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       };
 
       try {
-        // Hold a local capture stream during iOS STT to keep WebKit's audio session
-        // active (WebKit PR 67772). This stream is never recorded or uploaded.
-        // Acquire on the mic gesture, with no timeout while the permission sheet is open.
+        // Start Web Speech synchronously from the button gesture. Waiting for the
+        // getUserMedia promise first can lose Safari's user activation on the
+        // second command. The optional guard stream is acquired in parallel and
+        // is never recorded or uploaded.
+        let guardPromise = null;
         if (isLuminIOSDevice() && navigator.mediaDevices?.getUserMedia) {
           try {
             const audioSession = navigator.audioSession;
@@ -28942,16 +28944,31 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
                 } catch (_) {}
               };
             }
-          } catch (_) { /* Audio Session is optional; normal microphone capture still works. */ }
+          } catch (_) { /* Audio Session is optional; normal speech capture still works. */ }
           logLuminVoiceEvent('local', 'request-microphone');
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          if (!ownsSession() || requestId !== luminVoiceStartRequestId || getActivePatient()?.id !== patientId || document.hidden) {
-            stream.getTracks().forEach(track => track.stop());
-            if (ownsSession()) finish(false, true);
-            return;
-          }
-          session.stream = stream;
-          logLuminVoiceEvent('local', 'microphone-ready');
+          guardPromise = navigator.mediaDevices.getUserMedia({ audio: true });
+          guardPromise.then(stream => {
+            session.guardPending = false;
+            if (!ownsSession() || requestId !== luminVoiceStartRequestId || getActivePatient()?.id !== patientId || document.hidden) {
+              stream.getTracks().forEach(track => track.stop());
+              return;
+            }
+            session.stream = stream;
+            logLuminVoiceEvent('local', 'microphone-ready');
+            // If Safari emits neither start nor audio events, begin the bounded
+            // recovery timer only after the permission promise has settled. This
+            // avoids treating an open permission sheet as a silent recording.
+            if (!startTimer && !captureStarted && !soundDetected) {
+              startTimer = later(() => recover('capture-start-timeout'), 6000);
+            }
+          }).catch(() => {
+            session.guardPending = false;
+            // SpeechRecognition owns the actual transcription path. A guard
+            // failure must not replace it with Cloud Audio or abort a healthy
+            // recognition session.
+            if (ownsSession()) logLuminVoiceEvent('local', 'microphone-guard-unavailable');
+          });
+          session.guardPending = true;
         }
 
         // Never restart a spent native controller: every command owns its callbacks,
@@ -29045,11 +29062,8 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         };
         session.started = true;
         recognition.start();
-        // On iOS the explicit permission request has already resolved. Some broken
-        // native starts emit no events at all; desktop consent must not be timed out.
-        if (ownsSession() && !startTimer && session.stream && !captureStarted && !soundDetected) {
-          startTimer = later(() => recover('capture-start-timeout'), 6000);
-        }
+        // A pending permission sheet must not be treated as a silent capture.
+        // Once the guard resolves, onstart/onaudiostart own the normal watchdog.
       } catch (error) {
         if (!ownsSession()) return;
         if (error?.name === 'NotAllowedError' || error?.name === 'SecurityError') {

@@ -292,7 +292,7 @@ test('microphone permission can remain pending without starting any capture watc
   const pending = h.context.startLuminVoiceRecording();
   await settle();
   assert.equal(h.microphoneRequests.length, 1);
-  assert.equal(h.recognizers.length, 0);
+  assert.equal(h.recognizers.length, 1, 'speech recognition starts from the button gesture while the optional guard permission is pending');
   await h.advance(60000);
   assert.equal(h.state().starting, true, 'permission dialog is not mistaken for silent capture');
   assert.equal(h.cloudStarts, 0);
@@ -321,7 +321,7 @@ test('manual stop cancels pending permission, and a late stream cannot damage a 
   assert.equal(oldStream.track.stops, 1);
   assert.equal(currentStream.track.stops, 0);
   assert.equal(h.audioSessionType, 'play-and-record');
-  assert.equal(h.recognizers.length, 1, 'cancelled permission cannot construct a recognizer');
+  assert.equal(h.recognizers.length, 2, 'the replacement command starts immediately; the cancelled permission cannot add another recognizer');
   assert.equal(h.state().recording, true);
   current.emitResult('only current command');
   await current.emitEnd();
