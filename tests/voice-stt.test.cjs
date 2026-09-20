@@ -232,6 +232,17 @@ test('STT is the default on iPad apps, Safari tabs, desktop-identity iPads, and 
   }
 });
 
+test('voice tooth normalization handles primary Palmer letters and deciduous FDI numbers', () => {
+  const h = harness();
+  for (const [spoken, universal] of [
+    ['upper right A', 'A'], ['UR D', 'D'], ['deciduous upper right D', 'D'],
+    ['upper left F', 'F'], ['lower left M', 'M'], ['lower right T', 'T'],
+    ['55', 'A'], ['54', 'B'], ['52', 'D'], ['61', 'F'], ['75', 'K'], ['85', 'T']
+  ]) {
+    assert.equal(h.context.resolveVoiceToothUniversal(spoken), universal, spoken);
+  }
+});
+
 test('an explicit Cloud Audio preference is preserved and is the only cloud start path', async () => {
   const h = harness({ savedMode: 'cloud' });
   assert.equal(h.context.getLuminVoiceEngineMode(), 'cloud');

@@ -28355,6 +28355,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
      - 38..31 -> 17..24 (38=17, 37=18, 36=19, 35=20, 34=21, 33=22, 32=23, 31=24)
      - 41..48 -> 25..32 (41=25, 42=26, 43=27, 44=28, 45=29, 46=30, 47=31, 48=32)
    - Deciduous / Primary:
+     - Palmer letters: Upper Right A-E (A second molar, B first molar, C canine, D lateral incisor, E central incisor); Upper Left F-J; Lower Left K-O; Lower Right P-T.
      - 55..51 (UR A-E) -> A..E (55=A, 54=B, 53=C, 52=D, 51=E)
      - 61..65 (UL F-J) -> F..J (61=F, 62=G, 63=H, 64=I, 65=J)
      - 75..71 (LL K-O) -> K..O (75=K, 74=L, 73=M, 72=N, 71=O)
@@ -29773,6 +29774,17 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     function resolveVoiceToothUniversal(input) {
       if (!input && input !== 0) return '';
       let s = String(input).trim().toUpperCase().replace(/^(TOOTH|TOOTH#|#|T|S)/, '').trim();
+      const primaryPhrase = s
+        .replace(/\b(DECIDUOUS|PRIMARY|MILK|TOOTH)\b/g, ' ')
+        .replace(/[‐‑‒–—-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/\s/g, '');
+      const primaryQuadrantMatch = primaryPhrase.match(/^(UPPERRIGHT|UR)([A-E])$/)
+        || primaryPhrase.match(/^(UPPERLEFT|UL)([F-J])$/)
+        || primaryPhrase.match(/^(LOWERLEFT|LL)([K-O])$/)
+        || primaryPhrase.match(/^(LOWERRIGHT|LR)([P-T])$/);
+      if (primaryQuadrantMatch) return primaryQuadrantMatch[2];
 
       // Already universal 1..32
       const num = parseInt(s, 10);
