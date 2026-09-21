@@ -136,6 +136,90 @@ async function sendMetaWhatsAppMessage(
   return data;
 }
 
+type WhatsAppLocation = {
+  latitude: number;
+  longitude: number;
+  name?: string;
+  address?: string;
+};
+
+function normaliseWhatsAppLocation(value: any): WhatsAppLocation | null {
+  const rawLatitude = value?.latitude;
+  const rawLongitude = value?.longitude;
+  if (rawLatitude === null || rawLatitude === undefined || rawLatitude === "" || rawLongitude === null || rawLongitude === undefined || rawLongitude === "") {
+    return null;
+  }
+  const latitude = Number(rawLatitude);
+  const longitude = Number(rawLongitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
+    return null;
+  }
+  const name = String(value?.name || "Current location").trim().slice(0, 160) || "Current location";
+  const address = String(value?.address || "").trim().slice(0, 512);
+  return { latitude, longitude, name, address };
+}
+
+function whatsappLocationContent(location: WhatsAppLocation): string {
+  const query = encodeURIComponent(`${location.latitude},${location.longitude}`);
+  return `📍 ${location.name || "Current location"}\nhttps://www.google.com/maps/search/?api=1&query=${query}`;
+}
+
+// Send a pinned location message via Meta Graph API.
+async function sendMetaWhatsAppLocation(
+  phoneId: string,
+  accessToken: string,
+  toPhone: string,
+  location: WhatsAppLocation,
+  contextMessageId?: string | null
+) {
+  const isTargetBsuid = isBsuid(toPhone);
+  const clean = isTargetBsuid ? toPhone.trim() : cleanPhone(toPhone);
+  if (!phoneId || !accessToken || !clean) {
+    console.warn("sendMetaWhatsAppLocation: missing required parameter", {
+      phoneId: Boolean(phoneId),
+      accessToken: Boolean(accessToken),
+      toPhone: Boolean(clean),
+    });
+    return null;
+  }
+
+  const url = `https://graph.facebook.com/v21.0/${phoneId}/messages`;
+  const payload: any = {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    type: "location",
+    location: {
+      latitude: location.latitude,
+      longitude: location.longitude,
+      name: location.name,
+      ...(location.address ? { address: location.address } : {}),
+    },
+  };
+  if (isTargetBsuid) {
+    payload.recipient = clean;
+  } else {
+    payload.to = clean;
+  }
+  if (contextMessageId) {
+    payload.context = { message_id: contextMessageId };
+  }
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    console.error("Meta Graph API location error:", data);
+    throw new Error(data?.error?.message || "Failed to send WhatsApp location via Meta API");
+  }
+  return data;
+}
+
 // Send a WhatsApp emoji reaction via Meta Graph API
 async function sendMetaWhatsAppReaction(
   phoneId: string,
@@ -1569,15 +1653,22 @@ Deno.serve(async (req: Request) => {
           message_type = "text",
           audio_base64,
           audio_mime_type,
+          location,
           reply_to_id,
           reply_to_text,
           reply_to_sender,
         } = body;
 
         const isAudio = message_type === "audio" && Boolean(audio_base64);
-        if ((!conversation_id && !phone) || (!content && !isAudio)) {
-          return jsonResponse({ error: "conversation_id or phone, and content or audio_base64 are required" }, 400);
+        const isLocation = message_type === "location";
+        const safeLocation = isLocation ? normaliseWhatsAppLocation(location) : null;
+        if (isLocation && !safeLocation) {
+          return jsonResponse({ error: "A valid latitude and longitude are required for a location message" }, 400);
         }
+        if ((!conversation_id && !phone) || (!content && !isAudio && !safeLocation)) {
+          return jsonResponse({ error: "conversation_id or phone, and content, audio_base64, or location are required" }, 400);
+        }
+        const displayContent = safeLocation ? whatsappLocationContent(safeLocation) : (content || (isAudio ? "🎤 Voice Message" : ""));
 
         let conv: any = null;
         if (conversation_id) {
@@ -1630,7 +1721,7 @@ Deno.serve(async (req: Request) => {
                 patient_id: linkedPatientId,
                 patient_name: linkedPatientName,
                 ai_enabled: true,
-                last_message: content || (isAudio ? "🎤 Voice Message" : ""),
+                last_message: displayContent,
                 last_message_at: new Date().toISOString(),
                 unread_count: 0,
                 status: "active",
@@ -1645,7 +1736,7 @@ Deno.serve(async (req: Request) => {
 
         let metaSendResult = null;
         let mediaUrl: string | null = null;
-        const finalContent = content || (isAudio ? "🎤 Voice Message" : "");
+        const finalContent = displayContent;
 
         let contextWamid: string | null = null;
         if (reply_to_id) {
@@ -1696,6 +1787,16 @@ Deno.serve(async (req: Request) => {
               mediaUrl
             );
           }
+        } else if (safeLocation) {
+          if (settings.phoneId && settings.accessToken) {
+            metaSendResult = await sendMetaWhatsAppLocation(
+              settings.phoneId,
+              settings.accessToken,
+              conv.phone,
+              safeLocation,
+              contextWamid
+            );
+          }
         } else {
           if (settings.phoneId && settings.accessToken) {
             metaSendResult = await sendMetaWhatsAppMessage(
@@ -1715,7 +1816,7 @@ Deno.serve(async (req: Request) => {
             sender: "staff",
             sender_name: "Clinic Staff",
             content: finalContent,
-            message_type: isAudio ? "audio" : "text",
+            message_type: isAudio ? "audio" : (safeLocation ? "location" : "text"),
             media_url: mediaUrl,
             whatsapp_message_id: metaSendResult?.messages?.[0]?.id || null,
             status: metaSendResult ? "sent" : "recorded",
@@ -2057,6 +2158,10 @@ Deno.serve(async (req: Request) => {
                 if (incoming.type === "text") {
                   messageType = "text";
                   textContent = incoming.text?.body || "";
+                } else if (incoming.type === "location") {
+                  messageType = "location";
+                  const incomingLocation = normaliseWhatsAppLocation(incoming.location);
+                  textContent = incomingLocation ? whatsappLocationContent(incomingLocation) : "📍 Location";
                 } else if (incoming.type === "image") {
                   messageType = "image";
                   textContent = incoming.image?.caption || "📷 Photo";

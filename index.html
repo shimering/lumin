@@ -4044,6 +4044,9 @@
       }
     }
     #whatsapp-reply-panel {
+      display: block !important;
+      flex: 0 0 auto !important;
+      min-height: 0 !important;
       padding: 0.75rem 1rem !important;
       background-color: #ffffff !important;
       border-top: 1px solid #e2e8f0 !important;
@@ -4083,9 +4086,9 @@
       color: #ffffff !important;
       border: none !important;
       border-radius: 9999px !important;
-      width: 2.5rem !important;
-      height: 2.5rem !important;
-      min-width: 2.5rem !important;
+      width: 2.75rem !important;
+      height: 2.75rem !important;
+      min-width: 2.75rem !important;
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
@@ -4115,10 +4118,12 @@
     html[dir="rtl"] #whatsapp-reply-submit svg {
       transform: scaleX(-1);
     }
+    #whatsapp-template-picker-btn,
+    #whatsapp-location-btn,
     #whatsapp-voice-record-btn {
-      width: 2.5rem !important;
-      height: 2.5rem !important;
-      min-width: 2.5rem !important;
+      width: 2.75rem !important;
+      height: 2.75rem !important;
+      min-width: 2.75rem !important;
       border-radius: 9999px !important;
       display: flex !important;
       align-items: center !important;
@@ -4129,10 +4134,24 @@
       border: none !important;
       transition: background-color 0.15s ease, color 0.15s ease !important;
     }
+    #whatsapp-template-picker-btn:hover,
+    #whatsapp-location-btn:hover,
     #whatsapp-voice-record-btn:hover {
       background-color: #f1f5f9 !important;
       color: #1e293b !important;
     }
+    #whatsapp-location-btn {
+      color: #047857 !important;
+      background-color: #ecfdf5 !important;
+    }
+    #whatsapp-location-btn:hover {
+      background-color: #d1fae5 !important;
+      color: #065f46 !important;
+    }
+    #whatsapp-template-picker-btn i,
+    #whatsapp-template-picker-btn svg,
+    #whatsapp-location-btn i,
+    #whatsapp-location-btn svg,
     #whatsapp-voice-record-btn i,
     #whatsapp-voice-record-btn svg {
       width: 1.15rem !important;
@@ -4256,6 +4275,8 @@
       }
       body.whatsapp-mobile-chat-open #whatsapp-main-chat,
       body.whatsapp-mobile-chat-open #whatsapp-chat-active {
+        display: flex !important;
+        flex-direction: column !important;
         height: var(--whatsapp-mobile-viewport-height, calc(100dvh - var(--mobile-nav-height))) !important;
         max-height: var(--whatsapp-mobile-viewport-height, calc(100dvh - var(--mobile-nav-height))) !important;
         min-height: 0 !important;
@@ -4263,6 +4284,7 @@
       }
       #whatsapp-reply-panel {
         padding: 0.5rem 0.75rem !important;
+        padding-bottom: max(0.5rem, env(safe-area-inset-bottom)) !important;
         background-color: #ffffff !important;
         width: 100% !important;
         max-width: 100% !important;
@@ -4290,14 +4312,16 @@
         width: 100% !important;
       }
       #whatsapp-reply-submit {
-        width: 2.25rem !important;
-        height: 2.25rem !important;
-        min-width: 2.25rem !important;
+        width: 2.75rem !important;
+        height: 2.75rem !important;
+        min-width: 2.75rem !important;
       }
+      #whatsapp-template-picker-btn,
+      #whatsapp-location-btn,
       #whatsapp-voice-record-btn {
-        width: 2.25rem !important;
-        height: 2.25rem !important;
-        min-width: 2.25rem !important;
+        width: 2.75rem !important;
+        height: 2.75rem !important;
+        min-width: 2.75rem !important;
       }
       #whatsapp-messages-container {
         padding: 0.85rem !important;
@@ -7444,8 +7468,13 @@
               <!-- Floating Minimalist WhatsApp Chat Capsule -->
               <form id="whatsapp-reply-form" onsubmit="sendWhatsAppManualReply(event)" class="relative flex items-center gap-1.5 sm:gap-2 w-full max-w-full rounded-full border border-slate-200 bg-white px-2 sm:px-3 py-1.5 shadow-sm transition-all focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20">
                 <!-- Template Picker Button -->
-                <button type="button" onclick="openWhatsAppChatTemplatePicker(this)" class="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition" title="Saved Templates">
+                <button id="whatsapp-template-picker-btn" type="button" onclick="openWhatsAppChatTemplatePicker(this)" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition active:scale-[0.98]" title="Saved Templates" aria-label="Saved Templates">
                   <i data-lucide="bookmark" class="h-4 w-4 sm:h-5 sm:w-5"></i>
+                </button>
+
+                <!-- Share a pinned/current location through WhatsApp on desktop, tablet, and mobile. -->
+                <button id="whatsapp-location-btn" type="button" onclick="openWhatsAppLocationSheet()" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50" title="Share location" aria-label="Share location">
+                  <i data-lucide="map-pin" class="h-4 w-4 sm:h-5 sm:w-5"></i>
                 </button>
 
                 <!-- Expanding Textarea Container -->
@@ -7475,12 +7504,12 @@
                 </div>
 
                 <!-- Voice Recording Button -->
-                <button type="button" id="whatsapp-voice-record-btn" onclick="toggleWhatsAppVoiceRecording()" class="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition" title="Record Voice Message">
+                <button type="button" id="whatsapp-voice-record-btn" onclick="toggleWhatsAppVoiceRecording()" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition active:scale-[0.98]" title="Record Voice Message">
                   <i data-lucide="mic" class="h-4 w-4 sm:h-5 sm:w-5"></i>
                 </button>
 
                 <!-- Send Button (WhatsApp Emerald Green Circle) -->
-                <button type="submit" id="whatsapp-reply-submit" class="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs transition active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed" title="Send (Enter)">
+                <button type="submit" id="whatsapp-reply-submit" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs transition active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed" title="Send (Enter)">
                   <i data-lucide="send" class="h-4 w-4 sm:h-5 sm:w-5 ml-0.5 text-white"></i>
                   <span id="whatsapp-reply-submit-text" class="sr-only">Send</span>
                 </button>
@@ -7493,6 +7522,61 @@
     </section>
 
   </main>
+
+  <!-- ================= MODAL: WHATSAPP LOCATION ================= -->
+  <div id="modal-whatsapp-location" onclick="if (event.target === this) closeWhatsAppLocationSheet()" class="fixed inset-0 z-[95] hidden items-end justify-center bg-slate-900/40 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+    <form id="whatsapp-location-form" onsubmit="sendWhatsAppLocation(event)" role="dialog" aria-modal="true" aria-labelledby="whatsapp-location-title" class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl" style="padding-bottom: max(1rem, env(safe-area-inset-bottom));">
+      <header class="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-6 sm:py-5">
+        <div class="flex min-w-0 items-center gap-3">
+          <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+            <i data-lucide="map-pin" class="h-5 w-5"></i>
+          </span>
+          <div class="min-w-0">
+            <h3 id="whatsapp-location-title" class="text-lg font-semibold tracking-tight text-slate-900">Send location</h3>
+            <p class="mt-0.5 text-xs leading-relaxed text-slate-500">Share a map pin with this patient in WhatsApp.</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeWhatsAppLocationSheet()" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20" title="Close" aria-label="Close">
+          <i data-lucide="x" class="h-5 w-5"></i>
+        </button>
+      </header>
+
+      <div class="space-y-5 p-5 sm:p-6">
+        <button id="whatsapp-current-location-btn" type="button" onclick="useWhatsAppCurrentLocation()" class="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50">
+          <i data-lucide="crosshair" class="h-4 w-4"></i>
+          <span id="whatsapp-current-location-btn-text">Use my current location</span>
+        </button>
+        <p id="whatsapp-location-status" class="hidden rounded-xl bg-slate-100 px-3 py-2 text-xs font-medium text-slate-600" role="status"></p>
+
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label class="block sm:col-span-2">
+            <span class="mb-1.5 block text-xs font-semibold text-slate-700">Location name</span>
+            <input id="whatsapp-location-name" maxlength="160" placeholder="Current location" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20" />
+          </label>
+          <label class="block">
+            <span class="mb-1.5 block text-xs font-semibold text-slate-700">Latitude</span>
+            <input id="whatsapp-location-latitude" type="number" inputmode="decimal" step="any" min="-90" max="90" required placeholder="30.0444" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20" />
+          </label>
+          <label class="block">
+            <span class="mb-1.5 block text-xs font-semibold text-slate-700">Longitude</span>
+            <input id="whatsapp-location-longitude" type="number" inputmode="decimal" step="any" min="-180" max="180" required placeholder="31.2357" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20" />
+          </label>
+          <label class="block sm:col-span-2">
+            <span class="mb-1.5 block text-xs font-semibold text-slate-700">Address <span class="font-medium text-slate-400">(optional)</span></span>
+            <input id="whatsapp-location-address" maxlength="512" placeholder="Paste an address or leave blank" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20" />
+          </label>
+        </div>
+      </div>
+
+      <footer class="flex items-center justify-end gap-2.5 border-t border-slate-100 bg-slate-50 px-5 py-4 sm:px-6">
+        <button type="button" onclick="closeWhatsAppLocationSheet()" class="min-h-11 rounded-xl px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20">Cancel</button>
+        <button id="whatsapp-location-submit" type="submit" class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50">
+          <i data-lucide="send" class="h-4 w-4"></i>
+          <span id="whatsapp-location-submit-text">Send location</span>
+        </button>
+      </footer>
+    </form>
+  </div>
 
   <!-- ================= MODAL: WHATSAPP & AI SETTINGS ================= -->
   <div id="modal-whatsapp-settings" onclick="if (event.target === this) closeWhatsAppSettingsModal()" class="fixed inset-0 z-[90] hidden items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
@@ -9268,6 +9352,20 @@
       'AI Auto-Reply': 'الرد التلقائي بالذكاء الاصطناعي',
       'Human Mode': 'الوضع البشري',
       'Quick Replies': 'ردود سريعة',
+      'Saved Templates': 'القوالب المحفوظة',
+      'Share location': 'مشاركة الموقع',
+      'Send location': 'إرسال الموقع',
+      'Share a map pin with this patient in WhatsApp.': 'شارك دبوس الموقع مع هذا المريض عبر واتساب.',
+      'Use my current location': 'استخدام موقعي الحالي',
+      'Location name': 'اسم الموقع',
+      'Current location': 'الموقع الحالي',
+      'Latitude': 'خط العرض',
+      'Longitude': 'خط الطول',
+      'Address': 'العنوان',
+      '(optional)': '(اختياري)',
+      'Paste an address or leave blank': 'ألصق العنوان أو اتركه فارغاً',
+      'Close': 'إغلاق',
+      'Cancel': 'إلغاء',
       'Loyalty': 'الولاء',
       'Loyalty discount': 'خصم الولاء',
       'Settled with loyalty': 'تمت التسوية بالولاء',
@@ -30309,7 +30407,10 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         const contentBottom = mobileViewContentBottom(appShell, viewportBottom);
         const whatsAppTop = whatsAppView.getBoundingClientRect().top;
         const availableHeight = Math.floor((contentBottom - whatsAppTop) / zoom);
-        const finalHeight = Math.max(112, availableHeight);
+        // A few Android browsers briefly report a stale bottom-nav rectangle while the chat opens.
+        // Keep enough room for the conversation header and non-shrinking composer until the next frame corrects it.
+        const minimumUsableHeight = isChatOpen ? Math.min(320, Math.floor(viewportH)) : 112;
+        const finalHeight = Math.max(minimumUsableHeight, availableHeight);
         document.documentElement.style.setProperty('--whatsapp-mobile-viewport-height', `${finalHeight}px`);
         whatsAppView.style.setProperty('--whatsapp-mobile-viewport-height', `${finalHeight}px`);
         resetWhatsAppWindowScroll();
@@ -35754,6 +35855,31 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
           }
         }
 
+        let locationHtml = '';
+        if (msg.message_type === 'location') {
+          const locationContent = String(msg.content || '');
+          const mapUrl = locationContent.match(/https?:\/\/[^\s]+/i)?.[0] || '';
+          const locationName = locationContent
+            .replace(mapUrl, '')
+            .replace(/^📍\s*/, '')
+            .trim() || (currentUiLanguage === 'ar' ? 'موقع مشترك' : 'Shared location');
+          locationHtml = mapUrl ? `
+            <a href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener noreferrer" class="mb-2.5 flex min-h-11 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:bg-emerald-50 hover:border-slate-300">
+              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><i data-lucide="map-pin" class="h-4 w-4"></i></span>
+              <span class="min-w-0 flex-1">
+                <span class="block truncate text-sm font-semibold text-slate-800">${escapeHtml(locationName)}</span>
+                <span class="mt-0.5 block text-xs font-medium text-emerald-700">${currentUiLanguage === 'ar' ? 'فتح في الخرائط' : 'Open in maps'}</span>
+              </span>
+              <i data-lucide="external-link" class="h-4 w-4 shrink-0 text-slate-400"></i>
+            </a>
+          ` : `
+            <div class="mb-2.5 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><i data-lucide="map-pin" class="h-4 w-4"></i></span>
+              <span class="min-w-0 truncate text-sm font-semibold text-slate-800">${escapeHtml(locationName)}</span>
+            </div>
+          `;
+        }
+
         // Quoted message preview
         let quotedHtml = '';
         if (msg.reply_to_text) {
@@ -35830,13 +35956,14 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
               ${senderTag}
               ${quotedHtml}
               ${mediaHtml}
+              ${locationHtml}
               ${msg.message_type === 'template' ? `
                 <div class="mb-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-100/90 px-2.5 py-1 text-xs font-bold text-emerald-800">
                   <i data-lucide="bookmark-check" class="h-3.5 w-3.5 text-emerald-600"></i>
                   <span>Meta Template 🚀</span>
                 </div>
               ` : ''}
-              <p class="text-sm sm:text-[15px] leading-relaxed whitespace-pre-wrap select-text tracking-normal" dir="auto">${escapeHtml(msg.content || '')}</p>
+              ${msg.message_type === 'location' ? '' : `<p class="text-sm sm:text-[15px] leading-relaxed whitespace-pre-wrap select-text tracking-normal" dir="auto">${escapeHtml(msg.content || '')}</p>`}
               <div class="flex items-center justify-end gap-1.5 mt-1.5">
                 <span class="text-[11px] font-medium opacity-65">${timeStr}</span>
                 ${statusTickHtml}
@@ -35936,6 +36063,182 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       }
     }
 
+    function whatsappLocationLabels() {
+      const isArabic = currentUiLanguage === 'ar';
+      return {
+        current: isArabic ? 'الموقع الحالي' : 'Current location',
+        location: isArabic ? 'الموقع' : 'Location',
+        locating: isArabic ? 'جارٍ تحديد موقعك...' : 'Finding your location...',
+        locationReady: isArabic ? 'تم تحديد موقعك. راجع التفاصيل ثم أرسلها.' : 'Location found. Review the details, then send it.',
+        unavailable: isArabic ? 'لا يدعم هذا المتصفح مشاركة الموقع. أدخل الإحداثيات يدوياً.' : 'This browser cannot share a location. Enter coordinates manually.',
+        denied: isArabic ? 'لم يتم السماح بالوصول إلى الموقع. اسمح بالوصول أو أدخل الإحداثيات يدوياً.' : 'Location permission was not granted. Allow it or enter coordinates manually.',
+        timedOut: isArabic ? 'استغرق تحديد الموقع وقتاً أطول من المتوقع. حاول مرة أخرى أو أدخل الإحداثيات يدوياً.' : 'Finding your location took too long. Try again or enter coordinates manually.',
+        failed: isArabic ? 'تعذر تحديد الموقع. تحقق من خدمات الموقع وحاول مرة أخرى.' : 'We could not determine the location. Check location services and try again.',
+        invalid: isArabic ? 'أدخل خط عرض وخط طول صالحين قبل الإرسال.' : 'Enter a valid latitude and longitude before sending.',
+        sending: isArabic ? 'جارٍ إرسال الموقع...' : 'Sending location...',
+        send: isArabic ? 'إرسال الموقع' : 'Send location',
+        shared: isArabic ? 'موقع مشترك' : 'Shared location'
+      };
+    }
+
+    function setWhatsAppLocationStatus(message, tone = 'neutral') {
+      const status = document.getElementById('whatsapp-location-status');
+      if (!status) return;
+      if (!message) {
+        status.textContent = '';
+        status.className = 'hidden rounded-xl bg-slate-100 px-3 py-2 text-xs font-medium text-slate-600';
+        return;
+      }
+      status.textContent = message;
+      status.className = tone === 'error'
+        ? 'rounded-xl bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700'
+        : tone === 'success'
+          ? 'rounded-xl bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800'
+          : 'rounded-xl bg-slate-100 px-3 py-2 text-xs font-medium text-slate-600';
+    }
+
+    function openWhatsAppLocationSheet() {
+      if (!activeWhatsAppConversationId) {
+        alert(currentUiLanguage === 'ar' ? 'يرجى اختيار محادثة أولاً' : 'Please select a conversation first');
+        return;
+      }
+      const modal = document.getElementById('modal-whatsapp-location');
+      const form = document.getElementById('whatsapp-location-form');
+      if (!modal || !form) return;
+      form.reset();
+      setWhatsAppLocationStatus('');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      lucide.createIcons();
+      setTimeout(() => document.getElementById('whatsapp-current-location-btn')?.focus(), 0);
+    }
+
+    function closeWhatsAppLocationSheet({ restoreFocus = true } = {}) {
+      const modal = document.getElementById('modal-whatsapp-location');
+      if (!modal) return;
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      setWhatsAppLocationStatus('');
+      if (restoreFocus) document.getElementById('whatsapp-location-btn')?.focus({ preventScroll: true });
+    }
+
+    function readWhatsAppLocationForm() {
+      const latitude = Number.parseFloat(document.getElementById('whatsapp-location-latitude')?.value || '');
+      const longitude = Number.parseFloat(document.getElementById('whatsapp-location-longitude')?.value || '');
+      const labels = whatsappLocationLabels();
+      const name = String(document.getElementById('whatsapp-location-name')?.value || '').trim().slice(0, 160) || labels.current;
+      const address = String(document.getElementById('whatsapp-location-address')?.value || '').trim().slice(0, 512);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
+      return { latitude, longitude, name, address };
+    }
+
+    function whatsappLocationContent(location) {
+      const label = String(location?.name || whatsappLocationLabels().current).trim() || whatsappLocationLabels().current;
+      const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${location.latitude},${location.longitude}`)}`;
+      return `📍 ${label}\n${mapUrl}`;
+    }
+
+    function browserLocationErrorMessage(error) {
+      const labels = whatsappLocationLabels();
+      if (error?.code === 1) return labels.denied;
+      if (error?.code === 3) return labels.timedOut;
+      return labels.failed;
+    }
+
+    async function useWhatsAppCurrentLocation() {
+      const labels = whatsappLocationLabels();
+      const button = document.getElementById('whatsapp-current-location-btn');
+      const label = document.getElementById('whatsapp-current-location-btn-text');
+      if (!navigator.geolocation) {
+        setWhatsAppLocationStatus(labels.unavailable, 'error');
+        return;
+      }
+
+      if (button) button.disabled = true;
+      if (label) label.textContent = labels.locating;
+      setWhatsAppLocationStatus(labels.locating);
+      try {
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            maximumAge: 60000,
+            timeout: 15000
+          });
+        });
+        const latitudeInput = document.getElementById('whatsapp-location-latitude');
+        const longitudeInput = document.getElementById('whatsapp-location-longitude');
+        const nameInput = document.getElementById('whatsapp-location-name');
+        if (latitudeInput) latitudeInput.value = Number(position.coords.latitude).toFixed(6);
+        if (longitudeInput) longitudeInput.value = Number(position.coords.longitude).toFixed(6);
+        if (nameInput && !nameInput.value.trim()) nameInput.value = labels.current;
+        setWhatsAppLocationStatus(labels.locationReady, 'success');
+      } catch (error) {
+        console.warn('Unable to obtain WhatsApp location:', error);
+        setWhatsAppLocationStatus(browserLocationErrorMessage(error), 'error');
+      } finally {
+        if (button) button.disabled = false;
+        if (label) label.textContent = currentUiLanguage === 'ar' ? 'استخدام موقعي الحالي' : 'Use my current location';
+      }
+    }
+
+    async function sendWhatsAppLocation(event) {
+      if (event) event.preventDefault();
+      if (!activeWhatsAppConversationId) return;
+
+      const labels = whatsappLocationLabels();
+      const location = readWhatsAppLocationForm();
+      if (!location) {
+        setWhatsAppLocationStatus(labels.invalid, 'error');
+        return;
+      }
+
+      const submitButton = document.getElementById('whatsapp-location-submit');
+      const submitText = document.getElementById('whatsapp-location-submit-text');
+      const displayContent = whatsappLocationContent(location);
+      const replyingMessage = whatsappActiveReplyMessage;
+      if (submitButton) submitButton.disabled = true;
+      if (submitText) submitText.textContent = labels.sending;
+      setWhatsAppLocationStatus(labels.sending);
+
+      try {
+        const payload = {
+          action: 'send_manual_message',
+          conversation_id: activeWhatsAppConversationId,
+          message_type: 'location',
+          content: displayContent,
+          location
+        };
+        if (replyingMessage) {
+          payload.reply_to_id = replyingMessage.id;
+          payload.reply_to_text = replyingMessage.content ? replyingMessage.content.slice(0, 200) : '📍 Location';
+          payload.reply_to_sender = replyingMessage.sender_name || (replyingMessage.sender === 'patient' ? (activeWhatsAppConversation?.patient_name || 'Patient') : 'Clinic Staff');
+        }
+
+        const { data, error } = await db.functions.invoke('whatsapp-webhook', { body: payload });
+        if (error) throw error;
+
+        if (data?.message) {
+          whatsappMessages = mergeWhatsAppMessages(whatsappMessages, data.message);
+          renderWhatsAppMessages(true);
+        } else {
+          await syncNewWhatsAppMessages(activeWhatsAppConversationId, true);
+        }
+        if (activeWhatsAppConversation) {
+          activeWhatsAppConversation.last_message = displayContent;
+          activeWhatsAppConversation.last_message_at = new Date().toISOString();
+          renderWhatsAppConversationsList();
+        }
+        clearWhatsAppReplyMessage();
+        closeWhatsAppLocationSheet();
+      } catch (error) {
+        console.error('Failed to send WhatsApp location:', error);
+        setWhatsAppLocationStatus(currentUiLanguage === 'ar' ? `فشل إرسال الموقع: ${error.message || 'خطأ غير معروف'}` : `Failed to send location: ${error.message || 'Unknown error'}`, 'error');
+      } finally {
+        if (submitButton) submitButton.disabled = false;
+        if (submitText) submitText.textContent = labels.send;
+      }
+    }
+
     let mediaRecorder = null;
     let audioMediaStream = null;
     let audioChunks = [];
@@ -35988,6 +36291,8 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
 
         const recordingBar = document.getElementById('whatsapp-voice-recording-bar');
         const textContainer = document.getElementById('whatsapp-text-input-container');
+        const templateButton = document.getElementById('whatsapp-template-picker-btn');
+        const locationButton = document.getElementById('whatsapp-location-btn');
         const micBtn = document.getElementById('whatsapp-voice-record-btn');
         const submitBtn = document.getElementById('whatsapp-reply-submit');
         const timerEl = document.getElementById('whatsapp-voice-timer');
@@ -35997,6 +36302,8 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
           recordingBar.classList.add('flex');
         }
         if (textContainer) textContainer.classList.add('hidden');
+        if (templateButton) templateButton.classList.add('hidden');
+        if (locationButton) locationButton.classList.add('hidden');
         if (micBtn) micBtn.classList.add('hidden');
         if (submitBtn) submitBtn.classList.add('hidden');
 
@@ -36040,6 +36347,8 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
 
       const recordingBar = document.getElementById('whatsapp-voice-recording-bar');
       const textContainer = document.getElementById('whatsapp-text-input-container');
+      const templateButton = document.getElementById('whatsapp-template-picker-btn');
+      const locationButton = document.getElementById('whatsapp-location-btn');
       const micBtn = document.getElementById('whatsapp-voice-record-btn');
       const submitBtn = document.getElementById('whatsapp-reply-submit');
       const timerEl = document.getElementById('whatsapp-voice-timer');
@@ -36049,6 +36358,8 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         recordingBar.classList.remove('flex');
       }
       if (textContainer) textContainer.classList.remove('hidden');
+      if (templateButton) templateButton.classList.remove('hidden');
+      if (locationButton) locationButton.classList.remove('hidden');
       if (micBtn) micBtn.classList.remove('hidden');
       if (submitBtn) submitBtn.classList.remove('hidden');
       if (timerEl) timerEl.textContent = '0:00';
