@@ -6600,6 +6600,47 @@
           </div>
         </div>
 
+        <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs" aria-labelledby="admin-whatsapp-ai-instructions-title">
+          <div class="flex flex-col gap-4 border-b border-slate-100 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
+            <div class="flex min-w-0 items-start gap-3.5">
+              <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-800">
+                <i data-lucide="brain-circuit" class="h-5 w-5"></i>
+              </span>
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2.5">
+                  <h3 id="admin-whatsapp-ai-instructions-title" class="text-base font-black text-slate-900 sm:text-lg">AI agent instructions</h3>
+                  <span id="admin-whatsapp-ai-instruction-count" class="rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-black text-violet-800">0 sections</span>
+                </div>
+                <p class="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500 sm:text-sm">Organize the booking agent's clinic guidance into named sections. Section titles help the AI understand the purpose of each instruction body.</p>
+              </div>
+            </div>
+            <button type="button" onclick="addWhatsAppAiInstructionBlock()" class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-100 px-4 py-2.5 text-xs font-black text-violet-800 transition-all duration-150 ease-out hover:bg-violet-50 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 disabled:pointer-events-none disabled:opacity-50">
+              <i data-lucide="plus" class="h-4 w-4"></i>
+              <span>Add instruction</span>
+            </button>
+          </div>
+          <div class="bg-slate-50 p-4 sm:p-6">
+            <div class="mb-4 flex items-start gap-3 rounded-xl bg-blue-50 p-4 text-blue-700">
+              <i data-lucide="info" class="mt-0.5 h-4 w-4 shrink-0"></i>
+              <p class="text-xs leading-relaxed">The saved sections are combined in order and sent privately to the WhatsApp AI agent. Patients do not see these titles or instructions.</p>
+            </div>
+            <div id="admin-whatsapp-ai-instruction-list" class="space-y-4" aria-live="polite">
+              <div class="animate-pulse space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
+                <div class="h-4 w-36 rounded-lg bg-slate-200"></div>
+                <div class="h-11 rounded-xl bg-slate-100"></div>
+                <div class="h-16 rounded-xl bg-slate-100"></div>
+              </div>
+            </div>
+          </div>
+          <div class="flex flex-col gap-3 border-t border-slate-100 bg-white p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <p id="admin-whatsapp-ai-instruction-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="status"></p>
+            <button id="admin-whatsapp-ai-instruction-save" type="button" onclick="saveWhatsAppAiInstructionBlocks()" style="margin-inline-start: auto" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-black text-white transition-all duration-150 ease-out hover:bg-slate-800 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 disabled:pointer-events-none disabled:opacity-50">
+              <i data-lucide="save" class="h-4 w-4"></i>
+              <span>Save AI instructions</span>
+            </button>
+          </div>
+        </section>
+
         <div class="rounded-2xl border border-emerald-200 bg-gradient-to-br from-white to-emerald-50/60 p-5 shadow-xs">
           <div class="flex items-start gap-3">
             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700"><i data-lucide="message-circle-more" class="h-5 w-5"></i></span>
@@ -7587,7 +7628,7 @@
           <div class="min-w-0">
             <span class="wa-settings-eyebrow">WhatsApp Integration</span>
             <h3 id="whatsapp-settings-modal-title">AI Agent &amp; Cloud API</h3>
-            <p>Manage message delivery, Meta credentials, and AI booking behavior.</p>
+            <p>Manage message delivery, Meta credentials, and the Gemini model.</p>
           </div>
         </div>
         <button type="button" onclick="closeWhatsAppSettingsModal()" aria-label="Close settings" class="wa-settings-close"><i data-lucide="x"></i></button>
@@ -7670,7 +7711,7 @@
               <div class="wa-settings-panel-heading">
                 <div class="wa-settings-panel-title">
                   <span class="wa-settings-panel-icon" aria-hidden="true"><i data-lucide="brain-circuit"></i></span>
-                  <div><h4 id="whatsapp-ai-configuration-title">AI configuration</h4><p>Gemini access, model, and booking guidance.</p></div>
+                  <div><h4 id="whatsapp-ai-configuration-title">AI configuration</h4><p>Gemini access and model selection.</p></div>
                 </div>
               </div>
               <div class="wa-settings-field-grid">
@@ -7687,10 +7728,6 @@
                     <option value="gemini-3.6-flash">Gemini 3.6 Flash — fast, quota limited</option>
                     <option value="gemini-3.8-flash">Gemini 3.8 Flash — deeper reasoning</option>
                   </select>
-                </label>
-                <label class="wa-settings-field is-wide">
-                  <span class="wa-settings-label">Booking Agent Instructions</span>
-                  <textarea id="setting-whatsapp-ai-prompt" rows="4" placeholder="You are Lumin Dental Clinic's friendly receptionist. Include working hours, booking rules, and escalation guidance..." class="wa-settings-input"></textarea>
                 </label>
               </div>
             </section>
@@ -8832,6 +8869,11 @@
     let whatsappMessageTemplates = [];
     let whatsappTemplatesLoaded = false;
     let whatsappTemplatesLoadPromise = null;
+    let whatsappAiInstructionBlocks = [];
+    let whatsappAiInstructionsLoaded = false;
+    let whatsappAiInstructionsLoadPromise = null;
+    let whatsappAiInstructionsSaving = false;
+    let whatsappAiInstructionsDirty = false;
     let dentalSpecialties = [];
     let dentalOperations = [];
     let dentalCustomizationLoaded = false;
@@ -10914,6 +10956,241 @@
       }
     }
 
+    function createWhatsAppAiInstructionId() {
+      if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+      return `instruction-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    }
+
+    function normaliseWhatsAppAiInstructionBlocks(value, legacyInstructions = '') {
+      let source = value;
+      if (typeof source === 'string') {
+        try { source = JSON.parse(source); } catch (_) { source = []; }
+      }
+      if (!Array.isArray(source)) source = [];
+      const blocks = source.slice(0, 25).map((block, index) => ({
+        id: String(block?.id || createWhatsAppAiInstructionId()).trim().slice(0, 100),
+        title: String(block?.title || ''),
+        body: String(block?.body || ''),
+        order: index
+      }));
+      const legacyBody = String(legacyInstructions || '').trim();
+      return blocks.length || !legacyBody
+        ? blocks
+        : [{ id: 'general', title: 'General', body: legacyBody, order: 0 }];
+    }
+
+    function setWhatsAppAiInstructionMessage(message, type = 'success') {
+      const element = document.getElementById('admin-whatsapp-ai-instruction-message');
+      if (!element) return;
+      element.textContent = message;
+      element.className = `rounded-xl px-3 py-2 text-xs font-bold ${type === 'error' ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`;
+      element.classList.toggle('hidden', !message);
+    }
+
+    function renderAdminWhatsAppAiInstructionBlocks() {
+      const list = document.getElementById('admin-whatsapp-ai-instruction-list');
+      const count = document.getElementById('admin-whatsapp-ai-instruction-count');
+      if (!list || !count) return;
+      const total = whatsappAiInstructionBlocks.length;
+      count.textContent = `${total} section${total === 1 ? '' : 's'}`;
+      if (!whatsappAiInstructionsLoaded) {
+        list.innerHTML = `
+          <div class="animate-pulse space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
+            <div class="h-4 w-36 rounded-lg bg-slate-200"></div>
+            <div class="h-11 rounded-xl bg-slate-100"></div>
+            <div class="h-16 rounded-xl bg-slate-100"></div>
+          </div>`;
+        return;
+      }
+
+      if (!total) {
+        list.innerHTML = `
+          <div class="flex flex-col items-center rounded-2xl bg-white px-6 py-10 text-center shadow-xs">
+            <span class="flex h-12 w-12 items-center justify-center rounded-full bg-violet-100 text-violet-800"><i data-lucide="file-plus-2" class="h-5 w-5"></i></span>
+            <h4 class="mt-4 text-sm font-black text-slate-800">No AI instructions yet</h4>
+            <p class="mt-1 max-w-sm text-xs leading-relaxed text-slate-500">Add a named instruction section for booking rules, clinic policies, escalation guidance, or any other agent behavior.</p>
+            <button type="button" onclick="addWhatsAppAiInstructionBlock()" class="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-violet-100 px-4 py-2.5 text-xs font-black text-violet-800 transition hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30">
+              <i data-lucide="plus" class="h-4 w-4"></i> Add first instruction
+            </button>
+          </div>`;
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
+
+      list.innerHTML = whatsappAiInstructionBlocks.map((block, index) => `
+        <article data-whatsapp-ai-instruction-id="${escapeHtml(block.id)}" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs sm:p-5">
+          <div class="mb-4 flex items-center justify-between gap-3">
+            <div class="flex min-w-0 items-center gap-2.5">
+              <span class="flex h-8 min-w-8 items-center justify-center rounded-full bg-violet-100 px-2 text-[11px] font-black text-violet-800">${index + 1}</span>
+              <div class="min-w-0">
+                <h4 class="truncate text-sm font-black text-slate-800">${escapeHtml(block.title || `Instruction ${index + 1}`)}</h4>
+                <p class="mt-0.5 text-[11px] font-medium text-slate-400">Agent guidance section</p>
+              </div>
+            </div>
+            <button type="button" onclick="removeWhatsAppAiInstructionBlock(this.closest('[data-whatsapp-ai-instruction-id]').dataset.whatsappAiInstructionId)" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-700 transition hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30" title="Remove instruction" aria-label="Remove instruction ${index + 1}">
+              <i data-lucide="trash-2" class="h-4 w-4"></i>
+            </button>
+          </div>
+          <div class="grid gap-4">
+            <label class="block">
+              <span class="mb-1.5 block text-xs font-bold text-slate-600">Title</span>
+              <input value="${escapeHtml(block.title)}" maxlength="120" dir="auto" oninput="updateWhatsAppAiInstructionBlock(this.closest('[data-whatsapp-ai-instruction-id]').dataset.whatsappAiInstructionId, 'title', this.value, this)" placeholder="e.g. General, Booking rules, Emergency escalation" class="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
+            </label>
+            <label class="block">
+              <span class="mb-1.5 flex items-center justify-between gap-3 text-xs font-bold text-slate-600"><span>Instruction body</span><span data-instruction-character-count class="text-[10px] font-bold text-slate-400">${block.body.length} / 12000</span></span>
+              <textarea rows="5" maxlength="12000" dir="auto" oninput="updateWhatsAppAiInstructionBlock(this.closest('[data-whatsapp-ai-instruction-id]').dataset.whatsappAiInstructionId, 'body', this.value, this)" placeholder="Write the private guidance this AI agent should follow..." class="w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm leading-6 text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20">${escapeHtml(block.body)}</textarea>
+            </label>
+          </div>
+        </article>`).join('');
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function updateWhatsAppAiInstructionBlock(instructionId, field, value, input = null) {
+      if (!['title', 'body'].includes(field)) return;
+      const block = whatsappAiInstructionBlocks.find(item => item.id === instructionId);
+      if (!block) return;
+      block[field] = String(value || '');
+      if (field === 'body' && input) {
+        const counter = input.closest('label')?.querySelector('[data-instruction-character-count]');
+        if (counter) counter.textContent = `${block.body.length} / 12000`;
+      }
+      if (field === 'title') {
+        const heading = input?.closest('[data-whatsapp-ai-instruction-id]')?.querySelector('h4');
+        if (heading) heading.textContent = block.title.trim() || 'Untitled instruction';
+      }
+      whatsappAiInstructionsDirty = true;
+      setWhatsAppAiInstructionMessage('');
+    }
+
+    async function addWhatsAppAiInstructionBlock() {
+      if (!hasPageAccess('admin')) return;
+      if (!whatsappAiInstructionsLoaded) {
+        try { await ensureWhatsAppAiInstructionsLoaded(); } catch (_) { return; }
+      }
+      if (whatsappAiInstructionBlocks.length >= 25) {
+        setWhatsAppAiInstructionMessage('You can save up to 25 instruction sections.', 'error');
+        return;
+      }
+      whatsappAiInstructionBlocks.push({
+        id: createWhatsAppAiInstructionId(),
+        title: '',
+        body: '',
+        order: whatsappAiInstructionBlocks.length
+      });
+      whatsappAiInstructionsDirty = true;
+      renderAdminWhatsAppAiInstructionBlocks();
+      const card = document.querySelector('#admin-whatsapp-ai-instruction-list [data-whatsapp-ai-instruction-id]:last-child');
+      card?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      card?.querySelector('input')?.focus();
+    }
+
+    function removeWhatsAppAiInstructionBlock(instructionId) {
+      if (!hasPageAccess('admin')) return;
+      whatsappAiInstructionBlocks = whatsappAiInstructionBlocks
+        .filter(block => block.id !== instructionId)
+        .map((block, index) => ({ ...block, order: index }));
+      whatsappAiInstructionsDirty = true;
+      renderAdminWhatsAppAiInstructionBlocks();
+      setWhatsAppAiInstructionMessage('Instruction removed from this draft. Save to apply the change.');
+    }
+
+    async function fetchWhatsAppAiInstructionBlocks() {
+      if (!hasPageAccess('admin')) return false;
+      const { data, error } = await db
+        .from('clinic_settings')
+        .select('whatsapp_ai_instruction_blocks, whatsapp_ai_instructions')
+        .eq('id', 1)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error('WhatsApp AI instructions were not found.');
+      whatsappAiInstructionBlocks = normaliseWhatsAppAiInstructionBlocks(
+        data.whatsapp_ai_instruction_blocks,
+        data.whatsapp_ai_instructions
+      );
+      whatsappAiInstructionsLoaded = true;
+      whatsappAiInstructionsDirty = false;
+      renderAdminWhatsAppAiInstructionBlocks();
+      return true;
+    }
+
+    async function ensureWhatsAppAiInstructionsLoaded() {
+      if (whatsappAiInstructionsLoaded) return true;
+      if (!whatsappAiInstructionsLoadPromise) {
+        whatsappAiInstructionsLoadPromise = fetchWhatsAppAiInstructionBlocks()
+          .catch(error => {
+            setWhatsAppAiInstructionMessage(error.message || 'Could not load AI instructions.', 'error');
+            throw error;
+          })
+          .finally(() => { whatsappAiInstructionsLoadPromise = null; });
+      }
+      return whatsappAiInstructionsLoadPromise;
+    }
+
+    async function saveWhatsAppAiInstructionBlocks() {
+      if (!hasPageAccess('admin') || whatsappAiInstructionsSaving) return;
+      if (!whatsappAiInstructionsLoaded) {
+        try { await ensureWhatsAppAiInstructionsLoaded(); } catch (_) { return; }
+      }
+      const saveButton = document.getElementById('admin-whatsapp-ai-instruction-save');
+      const cleanedBlocks = whatsappAiInstructionBlocks.map((block, index) => ({
+        id: String(block.id || createWhatsAppAiInstructionId()).trim().slice(0, 100),
+        title: String(block.title || '').trim(),
+        body: String(block.body || '').trim(),
+        order: index
+      }));
+      const incompleteIndex = cleanedBlocks.findIndex(block => !block.title || !block.body);
+      if (incompleteIndex >= 0) {
+        setWhatsAppAiInstructionMessage(`Complete both the title and instruction body in section ${incompleteIndex + 1}.`, 'error');
+        document.querySelectorAll('#admin-whatsapp-ai-instruction-list [data-whatsapp-ai-instruction-id]')[incompleteIndex]?.querySelector('input, textarea')?.focus();
+        return;
+      }
+      const oversizedIndex = cleanedBlocks.findIndex(block => block.title.length > 120 || block.body.length > 12000);
+      if (oversizedIndex >= 0) {
+        setWhatsAppAiInstructionMessage(`Section ${oversizedIndex + 1} exceeds the 120-character title or 12,000-character body limit.`, 'error');
+        return;
+      }
+      const totalBodyLength = cleanedBlocks.reduce((total, block) => total + block.body.length, 0);
+      if (totalBodyLength > 50000) {
+        setWhatsAppAiInstructionMessage('The combined instruction bodies must be 50,000 characters or fewer.', 'error');
+        return;
+      }
+
+      whatsappAiInstructionsSaving = true;
+      if (saveButton) saveButton.disabled = true;
+      setWhatsAppAiInstructionMessage('Saving AI instructions...');
+      const compiledLegacyInstructions = cleanedBlocks
+        .map(block => `### ${block.title}\n${block.body}`)
+        .join('\n\n');
+      try {
+        const { data, error } = await db
+          .from('clinic_settings')
+          .update({
+            whatsapp_ai_instruction_blocks: cleanedBlocks,
+            whatsapp_ai_instructions: compiledLegacyInstructions,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', 1)
+          .select('whatsapp_ai_instruction_blocks, whatsapp_ai_instructions')
+          .maybeSingle();
+        if (error) throw error;
+        if (!data) throw new Error('AI instructions were not updated. Administrator access is required.');
+        whatsappAiInstructionBlocks = normaliseWhatsAppAiInstructionBlocks(
+          data.whatsapp_ai_instruction_blocks,
+          data.whatsapp_ai_instructions
+        );
+        whatsappAiInstructionsLoaded = true;
+        whatsappAiInstructionsDirty = false;
+        renderAdminWhatsAppAiInstructionBlocks();
+        setWhatsAppAiInstructionMessage('AI instructions saved. New WhatsApp conversations will use these sections.');
+        showAppointmentNotificationToast('WhatsApp AI', 'AI agent instructions saved.');
+      } catch (error) {
+        setWhatsAppAiInstructionMessage(error.message || 'Could not save AI instructions.', 'error');
+      } finally {
+        whatsappAiInstructionsSaving = false;
+        if (saveButton) saveButton.disabled = false;
+      }
+    }
+
     function appointmentStatusColorInputId(status) {
       return `admin-appointment-status-color-${status.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
     }
@@ -11325,6 +11602,10 @@
         whatsappMessageTemplates = [];
         whatsappTemplatesLoaded = false;
         whatsappTemplatesLoadPromise = null;
+        whatsappAiInstructionBlocks = [];
+        whatsappAiInstructionsLoaded = false;
+        whatsappAiInstructionsLoadPromise = null;
+        whatsappAiInstructionsDirty = false;
         dentalSpecialties = [];
         dentalOperations = [];
         dentalCustomizationLoaded = false;
@@ -11501,6 +11782,10 @@
         whatsappMessageTemplates = [];
         whatsappTemplatesLoaded = false;
         whatsappTemplatesLoadPromise = null;
+        whatsappAiInstructionBlocks = [];
+        whatsappAiInstructionsLoaded = false;
+        whatsappAiInstructionsLoadPromise = null;
+        whatsappAiInstructionsDirty = false;
         dentalSpecialties = [];
         dentalOperations = [];
         dentalCustomizationLoaded = false;
@@ -15266,6 +15551,12 @@
         renderAdminWhatsAppTemplates();
         renderWhatsAppTemplatePreview();
         renderAdminWhatsAppDispatchMode();
+        renderAdminWhatsAppAiInstructionBlocks();
+        if (!whatsappAiInstructionsLoaded) {
+          void ensureWhatsAppAiInstructionsLoaded().catch(error => {
+            console.error('Could not load WhatsApp AI instructions.', error);
+          });
+        }
       }
       if (showPrintForms) {
         if (prescriptionPrintSettingsLoaded && medicationCatalogLoaded && prescriptionTemplatesLoaded) {
@@ -17436,7 +17727,13 @@
         if (accessChanged && !(await refreshCurrentAccessFromRealtime())) return;
         const adminVisible = hasPageAccess('admin') && realtimeViewIsVisible('admin');
         const refreshLoadedResourcesForAccess = accessChanged && !adminVisible;
-        if (changedTables.has('clinic_settings')) await fetchClinicSettings(true);
+        if (changedTables.has('clinic_settings')) {
+          await fetchClinicSettings(true);
+          if (adminVisible && adminActiveTab === 'templates' && !whatsappAiInstructionsSaving && !whatsappAiInstructionsDirty) {
+            whatsappAiInstructionsLoaded = false;
+            await ensureWhatsAppAiInstructionsLoaded();
+          }
+        }
         const loyaltyChanged = [...changedTables].some(table => REALTIME_LOYALTY_TABLES.has(table));
         if (changedTables.has('loyalty_settings')) await fetchLoyaltySettings();
         if ((loyaltyChanged || accessChanged || [...changedTables].some(table => REALTIME_INVOICE_TABLES.has(table))) && realtimeViewIsVisible('loyalty') && canViewPatientLoyalty()) await renderPatientLoyalty(false, { preserveControls: true });
@@ -36794,7 +37091,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
 
       try {
         const { data, error } = await db.from('clinic_settings').select(
-          'whatsapp_enabled, whatsapp_dispatch_mode, whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token, gemini_api_key, whatsapp_ai_instructions, whatsapp_ai_model'
+          'whatsapp_enabled, whatsapp_dispatch_mode, whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token, gemini_api_key, whatsapp_ai_model'
         ).eq('id', 1).maybeSingle();
 
         if (error) throw error;
@@ -36810,7 +37107,6 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         const modelSelect = document.getElementById('setting-whatsapp-model');
         if (modelSelect) modelSelect.value = data.whatsapp_ai_model || 'gemini-3.5-flash-lite';
         document.getElementById('setting-whatsapp-access-token').value = data.whatsapp_access_token || '';
-        document.getElementById('setting-whatsapp-ai-prompt').value = data.whatsapp_ai_instructions || '';
         return data;
       } finally {
         if (enabledToggle) {
@@ -36924,7 +37220,6 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         gemini_api_key: String(document.getElementById('setting-whatsapp-gemini-key')?.value || '').trim(),
         whatsapp_ai_model: String(document.getElementById('setting-whatsapp-model')?.value || 'gemini-3.5-flash-lite').trim(),
         whatsapp_access_token: String(document.getElementById('setting-whatsapp-access-token')?.value || '').trim(),
-        whatsapp_ai_instructions: String(document.getElementById('setting-whatsapp-ai-prompt')?.value || '').trim(),
         updated_at: new Date().toISOString()
       };
 

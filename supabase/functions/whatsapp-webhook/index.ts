@@ -19,6 +19,20 @@ function getSupabaseClient() {
   return createClient(supabaseUrl, supabaseKey);
 }
 
+function compileWhatsAppAiInstructions(blocks: unknown, legacyInstructions: unknown): string {
+  const compiledBlocks = (Array.isArray(blocks) ? blocks : [])
+    .map((block: any, index: number) => {
+      const title = String(block?.title || `Instruction ${index + 1}`).trim();
+      const body = String(block?.body || "").trim();
+      return body ? `### ${title}\n${body}` : "";
+    })
+    .filter(Boolean);
+
+  return compiledBlocks.length
+    ? compiledBlocks.join("\n\n")
+    : String(legacyInstructions || "").trim();
+}
+
 // Check if an identifier is a WhatsApp Business-Scoped User ID (BSUID) or username-protected ID
 function isBsuid(val: string): boolean {
   if (!val || typeof val !== "string") return false;
@@ -60,13 +74,27 @@ function extractIdentifierFromWamid(wamid: string): string | null {
 
 // Fetch WhatsApp and Gemini credentials from clinic_settings or environment
 async function getClinicWhatsAppSettings(supabase: any) {
-  const { data } = await supabase
+  let { data, error } = await supabase
     .from("clinic_settings")
     .select(
-      "whatsapp_enabled, whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token, gemini_api_key, whatsapp_ai_instructions, whatsapp_ai_model, attendance_timezone, onesignal_rest_api_key"
+      "whatsapp_enabled, whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token, gemini_api_key, whatsapp_ai_instructions, whatsapp_ai_instruction_blocks, whatsapp_ai_model, attendance_timezone, onesignal_rest_api_key"
     )
     .eq("id", 1)
     .maybeSingle();
+
+  // Keep deployments safe while the instruction-block migration is rolling out.
+  if (error) {
+    const fallback = await supabase
+      .from("clinic_settings")
+      .select(
+        "whatsapp_enabled, whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token, gemini_api_key, whatsapp_ai_instructions, whatsapp_ai_model, attendance_timezone, onesignal_rest_api_key"
+      )
+      .eq("id", 1)
+      .maybeSingle();
+    data = fallback.data;
+    error = fallback.error;
+  }
+  if (error) console.warn("Could not load WhatsApp clinic settings:", error.message || error);
 
   return {
     enabled: Boolean(data?.whatsapp_enabled ?? true),
@@ -75,7 +103,7 @@ async function getClinicWhatsAppSettings(supabase: any) {
     accessToken: String(data?.whatsapp_access_token || Deno.env.get("WHATSAPP_ACCESS_TOKEN") || "").trim(),
     verifyToken: String(data?.whatsapp_verify_token || Deno.env.get("WHATSAPP_VERIFY_TOKEN") || "lumin_secret_token").trim(),
     geminiApiKey: String(data?.gemini_api_key || Deno.env.get("GEMINI_API_KEY") || "").trim(),
-    aiInstructions: String(data?.whatsapp_ai_instructions || "").trim(),
+    aiInstructions: compileWhatsAppAiInstructions(data?.whatsapp_ai_instruction_blocks, data?.whatsapp_ai_instructions),
     aiModel: String(data?.whatsapp_ai_model || "gemini-3.5-flash-lite").trim(),
     attendanceTimezone: String(data?.attendance_timezone || "Africa/Cairo").trim(),
     oneSignalApiKey: String(data?.onesignal_rest_api_key || Deno.env.get("ONESIGNAL_REST_API_KEY") || "").trim(),
@@ -1535,7 +1563,7 @@ Rules:
 4. Keep your responses concise, friendly, and formatted nicely for WhatsApp (use *bold* and bullet points sparingly). Do not use long markdown tables.
 ${isBsuid(conversation?.phone) ? "\n5. SPECIAL PATIENT NOTICE (MASKED WHATSAPP USERNAME): This patient is contacting via a masked WhatsApp Username (their phone number is protected). During the conversation, politely ask them to provide their mobile phone number so the clinic reception can confirm their reservation and contact them if needed." : ""}
 
-${customInstructions ? `Additional clinic instructions & doctor shift rules: ${customInstructions}` : ""}`;
+${customInstructions ? `Additional clinic instruction sections:\n${customInstructions}` : ""}`;
 
   // Build Gemini contents array from history, merging consecutive turns of the same role
   const initialContents: any[] = [];
