@@ -623,13 +623,19 @@
       flex-wrap: nowrap !important;
     }
     #findings-container .finding-row.has-procedure-steps {
+      width: 100% !important;
+      min-width: 0 !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
       flex-wrap: wrap !important;
     }
     #findings-container .finding-row.has-procedure-steps [data-procedure-steps-panel] {
       flex: 0 0 100% !important;
       width: 100% !important;
-      min-width: 100% !important;
+      min-width: 0 !important;
+      max-width: 100% !important;
       box-sizing: border-box !important;
+      overflow: hidden;
     }
     #chart-finding-tooth-editor-modal {
       overscroll-behavior: contain;
@@ -757,7 +763,10 @@
       grid-template-columns: auto minmax(0, 1fr) 5.5rem auto;
     }
     .procedure-step-clinical-row {
-      grid-template-columns: auto minmax(0, 1fr) minmax(11rem, auto) minmax(10rem, auto);
+      width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+      grid-template-columns: auto minmax(0, 1fr) minmax(10rem, 12rem) minmax(9rem, 11rem);
     }
     @media (max-width: 639px) {
       .procedure-step-admin-row {
@@ -1096,6 +1105,23 @@
         flex: 0 0 1.75rem !important;
         justify-content: center !important;
       }
+      #findings-container .finding-row.has-procedure-steps {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+      }
+      #findings-container .finding-row.has-procedure-steps .finding-row-summary,
+      #findings-container .finding-row.has-procedure-steps .finding-row-actions {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        flex: 1 1 100% !important;
+      }
+      #findings-container .finding-row.has-procedure-steps .finding-row-actions {
+        flex-wrap: wrap !important;
+        justify-content: flex-end !important;
+        margin-left: 0 !important;
+      }
     }
 
     #findings-container .finding-row.has-ortho-visits,
@@ -1188,7 +1214,14 @@
 
     @media (max-width: 767.98px) {
       .procedure-step-clinical-row {
-        grid-template-columns: auto minmax(0, 1fr) minmax(9rem, auto) auto;
+        align-items: start;
+        grid-template-columns: auto minmax(0, 1fr);
+      }
+      .procedure-step-clinical-row .finding-step-doctor-control,
+      .procedure-step-clinical-row .finding-step-status-control {
+        grid-column: 2;
+        width: 100%;
+        min-height: 2.75rem;
       }
     }
 
@@ -28376,7 +28409,7 @@
             return `<div class="procedure-step-clinical-row grid items-center gap-2 rounded-xl border border-cyan-100 bg-white p-2.5">
               <span class="flex h-7 w-7 items-center justify-center rounded-lg ${step.status === 'C' ? 'bg-emerald-100 text-emerald-700' : step.status === 'In' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'} text-[10px] font-black">${step.status === 'C' ? '<i data-lucide="check" class="h-3.5 w-3.5"></i>' : index + 1}</span>
               <div class="min-w-0"><p class="truncate text-xs font-black text-slate-800">${escapeHtml(step.name)}</p><p class="mt-0.5 text-[9px] font-bold text-slate-400">${step.percentage}% · ${escapeHtml(formatInvoiceMoney(stepValue))} of this procedure</p></div>
-              <label class="inline-flex min-w-0 items-center overflow-hidden rounded-lg border border-cyan-200 bg-white focus-within:ring-2 focus-within:ring-cyan-500/20"><span class="border-r border-cyan-100 bg-cyan-50 px-2 py-1.5 text-[9px] font-black text-cyan-700">Doctor</span><select data-procedure-step-id="${escapeHtml(step.id)}" onchange="updateFindingProcedureStepFromControl(this,'doctor')" class="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-[10px] font-bold text-slate-700 outline-none" aria-label="Doctor assigned to ${escapeHtml(step.name)}">${chartDoctorSelectOptions(step)}</select></label>
+              <label class="finding-step-doctor-control inline-flex min-w-0 items-center overflow-hidden rounded-lg border border-cyan-200 bg-white focus-within:ring-2 focus-within:ring-cyan-500/20"><span class="border-r border-cyan-100 bg-cyan-50 px-2 py-1.5 text-[9px] font-black text-cyan-700">Doctor</span><select data-procedure-step-id="${escapeHtml(step.id)}" onchange="updateFindingProcedureStepFromControl(this,'doctor')" class="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-[10px] font-bold text-slate-700 outline-none" aria-label="Doctor assigned to ${escapeHtml(step.name)}">${chartDoctorSelectOptions(step)}</select></label>
               <label class="finding-step-status-control inline-flex min-w-0 items-center gap-1.5"><span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${stepStatus.color}"></span><select data-procedure-step-id="${escapeHtml(step.id)}" onchange="updateFindingProcedureStepFromControl(this,'status')" class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[10px] font-black outline-none focus:ring-2 focus:ring-cyan-500/20" style="color:${stepStatus.color}" aria-label="Status of ${escapeHtml(step.name)}">${chartProcedureStepStatusOptions(step.status)}</select></label>
             </div>`;
           }).join('')}</div>
