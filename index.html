@@ -622,6 +622,15 @@
       min-width: max-content;
       flex-wrap: nowrap !important;
     }
+    #findings-container .finding-row.has-procedure-steps {
+      flex-wrap: wrap !important;
+    }
+    #findings-container .finding-row.has-procedure-steps [data-procedure-steps-panel] {
+      flex: 0 0 100% !important;
+      width: 100% !important;
+      min-width: 100% !important;
+      box-sizing: border-box !important;
+    }
     #chart-finding-tooth-editor-modal {
       overscroll-behavior: contain;
     }
@@ -1086,13 +1095,6 @@
         height: 1.75rem !important;
         flex: 0 0 1.75rem !important;
         justify-content: center !important;
-      }
-      #findings-container .finding-row.has-procedure-steps {
-        flex-wrap: wrap !important;
-      }
-      #findings-container .finding-row.has-procedure-steps [data-procedure-steps-panel] {
-        flex: 0 0 100% !important;
-        width: 100% !important;
       }
     }
 
