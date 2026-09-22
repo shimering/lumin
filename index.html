@@ -762,6 +762,49 @@
     .procedure-step-admin-row {
       grid-template-columns: auto minmax(0, 1fr) 5.5rem auto;
     }
+    .admin-dental-dialog input:not([type="checkbox"]):not([type="radio"]),
+    .admin-dental-dialog select,
+    .admin-dental-dialog button {
+      min-height: 2.75rem;
+    }
+    .admin-dental-dialog-layer {
+      align-items: flex-end;
+      justify-content: center;
+      padding: env(safe-area-inset-top) 0 0;
+    }
+    .admin-dental-dialog {
+      width: 100%;
+      max-height: 92vh;
+      border-radius: 1rem 1rem 0 0;
+    }
+    #admin-dental-specialty-form {
+      max-height: 90vh;
+    }
+    .admin-dental-dialog-body {
+      touch-action: pan-y;
+      -webkit-overflow-scrolling: touch;
+    }
+    .admin-catalog-create-button:focus-visible,
+    .admin-dental-dialog :focus-visible {
+      outline: 2px solid rgba(37, 99, 235, 0.45);
+      outline-offset: 2px;
+    }
+    @media (min-width: 640px) {
+      .admin-dental-dialog-layer {
+        align-items: center;
+        padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
+      }
+      .admin-dental-dialog {
+        max-height: calc(100vh - 2rem);
+        border-radius: 1rem;
+      }
+      #admin-dental-specialty-form {
+        max-width: 42rem;
+      }
+      #admin-dental-operation-form {
+        max-width: 56rem;
+      }
+    }
     .procedure-step-clinical-row {
       width: 100%;
       min-width: 0;
@@ -6896,13 +6939,23 @@
           </div>
         </div>
 
-        <div class="rounded-2xl border border-cyan-200 bg-gradient-to-br from-white to-cyan-50/70 p-5 shadow-xs">
-          <div class="flex items-start gap-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-100 text-cyan-700"><i data-lucide="stethoscope" class="h-5 w-5"></i></span>
-            <div>
-              <span class="text-[11px] font-bold uppercase tracking-wider text-cyan-700">Dental chart customization</span>
-              <h3 class="mt-1 text-lg font-black text-slate-900">Clinical action catalog</h3>
-              <p class="mt-1 text-sm text-slate-500">Organize chart operations by dental specialty and choose the icon and accent color shown in the Clinical Actions rail.</p>
+        <div class="rounded-2xl border border-cyan-200 bg-gradient-to-br from-white to-cyan-50/70 p-4 shadow-xs sm:p-5">
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex min-w-0 items-start gap-3">
+              <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-100 text-cyan-700"><i data-lucide="stethoscope" class="h-5 w-5"></i></span>
+              <div class="min-w-0">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-cyan-700">Dental chart customization</span>
+                <h3 class="mt-1 text-lg font-black text-slate-900">Clinical action catalog</h3>
+                <p class="mt-1 text-sm text-slate-500">Organize chart operations by dental specialty and choose the icon and accent color shown in the Clinical Actions rail.</p>
+              </div>
+            </div>
+            <div class="grid w-full grid-cols-2 gap-2 sm:w-auto sm:shrink-0" aria-label="Clinical action catalog creation tools">
+              <button type="button" onclick="openDentalSpecialtyDialog()" aria-haspopup="dialog" aria-controls="modal-dental-specialty-form" class="admin-catalog-create-button inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-cyan-50 px-3 py-2.5 text-xs font-black text-cyan-700 transition hover:bg-cyan-100 active:scale-[0.98] focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 sm:px-4">
+                <i data-lucide="folder-plus" class="h-4 w-4"></i><span>Add category</span>
+              </button>
+              <button id="admin-open-operation-dialog-button" type="button" onclick="openDentalOperationDialog()" aria-haspopup="dialog" aria-controls="modal-dental-operation-form" disabled class="admin-catalog-create-button inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-cyan-600 px-3 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-cyan-700 active:scale-[0.98] focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 sm:px-4">
+                <i data-lucide="plus" class="h-4 w-4"></i><span>Add procedure</span>
+              </button>
             </div>
           </div>
         </div>
@@ -6919,12 +6972,13 @@
           <div id="admin-dental-operations-list" class="max-h-[32rem] divide-y divide-slate-100 overflow-y-auto overscroll-y-contain"></div>
         </div>
 
-        <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <form id="admin-dental-specialty-form" onsubmit="saveDentalSpecialty(event)" class="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-            <div class="border-b border-slate-100 pb-4">
-              <h4 id="admin-specialty-form-title" class="text-sm font-black text-slate-800">Add dental specialty</h4>
-              <p class="mt-1 text-xs text-slate-400">Examples: Endodontics, Periodontics, Paediatric Dentistry.</p>
+        <div id="modal-dental-specialty-form" onclick="if (event.target === this) closeDentalSpecialtyDialog()" class="admin-dental-dialog-layer fixed inset-0 z-[90] hidden items-end justify-center bg-slate-900/40 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+          <form id="admin-dental-specialty-form" role="dialog" aria-modal="true" aria-labelledby="admin-specialty-form-title" onkeydown="handleAdminDentalDialogKeydown(event, 'specialty')" onsubmit="saveDentalSpecialty(event)" class="admin-dental-dialog relative flex max-h-[90vh] w-full min-w-0 flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:max-h-[calc(100vh-2rem)] sm:max-w-2xl sm:rounded-2xl">
+            <div class="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 bg-gradient-to-br from-white to-cyan-50/70 p-4 sm:p-5">
+              <div class="min-w-0"><span class="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-700">Clinical action catalog</span><h4 id="admin-specialty-form-title" class="mt-1 text-lg font-semibold tracking-tight text-slate-900">Add dental specialty</h4><p class="mt-1 text-xs text-slate-500">Examples: Endodontics, Periodontics, Paediatric Dentistry.</p></div>
+              <button type="button" onclick="closeDentalSpecialtyDialog()" aria-label="Close dental specialty dialog" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-white hover:text-slate-700 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/20"><i data-lucide="x" class="h-5 w-5"></i></button>
             </div>
+            <div class="admin-dental-dialog-body min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-y-contain p-4 sm:p-5">
             <label class="block"><span class="mb-1.5 block text-xs font-bold text-slate-600">Category name</span><input id="admin-specialty-name" required minlength="2" maxlength="80" placeholder="e.g. Periodontics" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20" /></label>
             <label class="block"><span class="mb-1.5 block text-xs font-bold text-slate-600">Description</span><textarea id="admin-specialty-description" maxlength="500" rows="3" placeholder="Optional description" class="w-full resize-y rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"></textarea></label>
             <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
@@ -6937,17 +6991,21 @@
               <label class="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3"><span><span class="block text-xs font-black text-slate-700">Active</span><span class="mt-0.5 block text-[10px] text-slate-400">Show in dental chart</span></span><input id="admin-specialty-active" type="checkbox" checked class="h-4 w-4 rounded border-slate-300 text-cyan-600" /></label>
             </div>
             <p id="admin-specialty-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="status"></p>
-            <div class="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
-              <button id="admin-specialty-cancel-button" type="button" onclick="resetDentalSpecialtyForm()" class="hidden rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 hover:bg-slate-50">Cancel editing</button>
-              <button id="admin-specialty-save-button" type="submit" class="inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-4 py-2.5 text-xs font-black text-white hover:bg-cyan-700 disabled:cursor-wait disabled:opacity-60"><i data-lucide="save" class="h-4 w-4"></i> Save category</button>
+            </div>
+            <div class="grid shrink-0 grid-cols-2 gap-2 border-t border-slate-100 bg-slate-50/80 p-4 sm:flex sm:justify-end" style="padding-bottom:max(1rem, env(safe-area-inset-bottom));">
+              <button id="admin-specialty-cancel-button" type="button" onclick="closeDentalSpecialtyDialog()" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-600 transition hover:bg-slate-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/20">Cancel</button>
+              <button id="admin-specialty-save-button" type="submit" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-cyan-600 px-4 py-2.5 text-xs font-black text-white transition hover:bg-cyan-700 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/20 disabled:cursor-wait disabled:opacity-60"><i data-lucide="save" class="h-4 w-4"></i> Save category</button>
             </div>
           </form>
+        </div>
 
-          <form id="admin-dental-operation-form" onsubmit="saveDentalOperation(event)" class="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-            <div class="border-b border-slate-100 pb-4">
-              <h4 id="admin-operation-form-title" class="text-sm font-black text-slate-800">Add clinical operation</h4>
-              <p class="mt-1 text-xs text-slate-400">Choose its specialty, target, visual representation, and invoice price.</p>
+        <div id="modal-dental-operation-form" onclick="if (event.target === this) closeDentalOperationDialog()" class="admin-dental-dialog-layer fixed inset-0 z-[90] hidden items-end justify-center bg-slate-900/40 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+          <form id="admin-dental-operation-form" role="dialog" aria-modal="true" aria-labelledby="admin-operation-form-title" onkeydown="handleAdminDentalDialogKeydown(event, 'operation')" onsubmit="saveDentalOperation(event)" class="admin-dental-dialog relative flex max-h-[92vh] w-full min-w-0 flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:max-h-[calc(100vh-2rem)] sm:max-w-4xl sm:rounded-2xl">
+            <div class="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 bg-gradient-to-br from-white to-blue-50/70 p-4 sm:p-5">
+              <div class="min-w-0"><span class="text-[10px] font-black uppercase tracking-[0.18em] text-blue-700">Clinical action catalog</span><h4 id="admin-operation-form-title" class="mt-1 text-lg font-semibold tracking-tight text-slate-900">Add clinical operation</h4><p class="mt-1 text-xs text-slate-500">Choose its specialty, target, visual representation, and invoice price.</p></div>
+              <button type="button" onclick="closeDentalOperationDialog()" aria-label="Close clinical operation dialog" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-white hover:text-slate-700 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20"><i data-lucide="x" class="h-5 w-5"></i></button>
             </div>
+            <div class="admin-dental-dialog-body min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-y-contain p-4 sm:p-5">
             <label class="block"><span class="mb-1.5 block text-xs font-bold text-slate-600">Operation name</span><input id="admin-operation-name" required minlength="2" maxlength="100" placeholder="e.g. Pulpotomy" oninput="updateDentalOperationCodePreview()" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" /></label>
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label><span class="mb-1.5 block text-xs font-bold text-slate-600">Dental specialty</span><select id="admin-operation-specialty" required onchange="updateDentalOperationCodePreview()" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"></select></label>
@@ -6993,9 +7051,10 @@
               </label>
             </div>
             <p id="admin-operation-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="status"></p>
-            <div class="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
-              <button id="admin-operation-cancel-button" type="button" onclick="resetDentalOperationForm()" class="hidden rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 hover:bg-slate-50">Cancel editing</button>
-              <button id="admin-operation-save-button" type="submit" class="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-black text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"><i data-lucide="save" class="h-4 w-4"></i> Save operation</button>
+            </div>
+            <div class="grid shrink-0 grid-cols-2 gap-2 border-t border-slate-100 bg-slate-50/80 p-4 sm:flex sm:justify-end" style="padding-bottom:max(1rem, env(safe-area-inset-bottom));">
+              <button id="admin-operation-cancel-button" type="button" onclick="closeDentalOperationDialog()" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-600 transition hover:bg-slate-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/20">Cancel</button>
+              <button id="admin-operation-save-button" type="submit" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-black text-white transition hover:bg-blue-700 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:cursor-wait disabled:opacity-60"><i data-lucide="save" class="h-4 w-4"></i> Save operation</button>
             </div>
           </form>
         </div>
@@ -8929,6 +8988,7 @@
     let editingDentalOperationId = null;
     let dentalOperationStepDraft = [];
     let selectedAdminDentalSpecialtyId = '';
+    let adminDentalDialogReturnFocus = null;
     let pendingDentalOperationDeletion = null;
     let editingPaymentMethodId = null;
     let editingExpenseTypeId = null;
@@ -14204,6 +14264,93 @@
       renderDentalOperationStepsEditor();
     }
 
+    function showAdminDentalDialog(modalId, focusId) {
+      const modal = document.getElementById(modalId);
+      if (!modal) return;
+      const activeElement = document.activeElement;
+      if (activeElement instanceof HTMLElement && !activeElement.closest('.admin-dental-dialog-layer')) {
+        adminDentalDialogReturnFocus = activeElement;
+      }
+      document.querySelectorAll('.admin-dental-dialog-layer').forEach(layer => {
+        if (layer !== modal) {
+          layer.classList.add('hidden');
+          layer.classList.remove('flex');
+        }
+      });
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      window.requestAnimationFrame(() => document.getElementById(focusId)?.focus({ preventScroll: true }));
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function hideAdminDentalDialog(modalId, restoreFocus = true) {
+      const modal = document.getElementById(modalId);
+      if (!modal) return;
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      if (restoreFocus && adminDentalDialogReturnFocus instanceof HTMLElement && adminDentalDialogReturnFocus.isConnected) {
+        adminDentalDialogReturnFocus.focus({ preventScroll: true });
+      }
+      adminDentalDialogReturnFocus = null;
+    }
+
+    function handleAdminDentalDialogKeydown(event, dialogType) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        if (dialogType === 'specialty') closeDentalSpecialtyDialog();
+        else closeDentalOperationDialog();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const dialog = event.currentTarget;
+      const focusable = [...dialog.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+        .filter(element => !element.closest('.hidden'));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    function openDentalSpecialtyDialog() {
+      if (!hasPageAccess('admin')) return;
+      resetDentalSpecialtyForm();
+      showAdminDentalDialog('modal-dental-specialty-form', 'admin-specialty-name');
+    }
+
+    function closeDentalSpecialtyDialog(options = {}) {
+      hideAdminDentalDialog('modal-dental-specialty-form', options.restoreFocus !== false);
+      resetDentalSpecialtyForm();
+    }
+
+    function openDentalOperationDialog(specialtyId = selectedAdminDentalSpecialtyId) {
+      if (!hasPageAccess('admin')) return;
+      if (!dentalSpecialties.length) {
+        openDentalSpecialtyDialog();
+        setAdminMessage('admin-specialty-message', 'Create a dental category before adding its first procedure.');
+        return;
+      }
+      resetDentalOperationForm();
+      const targetSpecialtyId = dentalSpecialties.some(specialty => specialty.id === specialtyId)
+        ? specialtyId
+        : dentalSpecialties[0].id;
+      selectedAdminDentalSpecialtyId = targetSpecialtyId;
+      document.getElementById('admin-operation-specialty').value = targetSpecialtyId;
+      updateDentalOperationCodePreview();
+      showAdminDentalDialog('modal-dental-operation-form', 'admin-operation-name');
+    }
+
+    function closeDentalOperationDialog(options = {}) {
+      hideAdminDentalDialog('modal-dental-operation-form', options.restoreFocus !== false);
+      resetDentalOperationForm();
+    }
+
     function resetDentalSpecialtyForm() {
       editingDentalSpecialtyId = null;
       const form = document.getElementById('admin-dental-specialty-form');
@@ -14213,7 +14360,6 @@
       document.getElementById('admin-specialty-sort-order').value = '10';
       document.getElementById('admin-specialty-active').checked = true;
       document.getElementById('admin-specialty-form-title').textContent = 'Add dental specialty';
-      document.getElementById('admin-specialty-cancel-button').classList.add('hidden');
       setAdminMessage('admin-specialty-message', '');
       renderDentalSpecialtyIconOptions(DEFAULT_SPECIALTY_ICON);
     }
@@ -14231,7 +14377,6 @@
       const orthoPkgReset = document.getElementById('admin-operation-is-ortho-package');
       if (orthoPkgReset) orthoPkgReset.checked = false;
       document.getElementById('admin-operation-form-title').textContent = 'Add clinical operation';
-      document.getElementById('admin-operation-cancel-button').classList.add('hidden');
       setAdminMessage('admin-operation-message', '');
       renderDentalVisualPresetOptions();
       renderDentalOperationStepsEditor();
@@ -14249,11 +14394,9 @@
       document.getElementById('admin-specialty-sort-order').value = specialty.sortOrder;
       document.getElementById('admin-specialty-active').checked = specialty.active;
       document.getElementById('admin-specialty-form-title').textContent = 'Edit dental specialty';
-      document.getElementById('admin-specialty-cancel-button').classList.remove('hidden');
       setAdminMessage('admin-specialty-message', '');
       renderDentalSpecialtyIconOptions(specialty.iconName);
-      document.getElementById('admin-dental-specialty-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      document.getElementById('admin-specialty-name').focus();
+      showAdminDentalDialog('modal-dental-specialty-form', 'admin-specialty-name');
     }
 
     function editDentalOperation(operationId) {
@@ -14272,13 +14415,11 @@
       const orthoPkgEdit = document.getElementById('admin-operation-is-ortho-package');
       if (orthoPkgEdit) orthoPkgEdit.checked = Boolean(operation.isOrthoPackage);
       document.getElementById('admin-operation-form-title').textContent = 'Edit clinical operation';
-      document.getElementById('admin-operation-cancel-button').classList.remove('hidden');
       renderDentalVisualPresetOptions(operation.visualCode);
       renderDentalOperationStepsEditor();
       updateDentalOperationCodePreview();
       setAdminMessage('admin-operation-message', '');
-      document.getElementById('admin-dental-operation-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      document.getElementById('admin-operation-name').focus();
+      showAdminDentalDialog('modal-dental-operation-form', 'admin-operation-name');
     }
 
     async function saveDentalSpecialty(event) {
@@ -14557,12 +14698,7 @@
 
     function startDentalOperationForSpecialty(specialtyId) {
       if (!hasPageAccess('admin') || !dentalSpecialties.some(specialty => specialty.id === specialtyId)) return;
-      selectedAdminDentalSpecialtyId = specialtyId;
-      resetDentalOperationForm();
-      document.getElementById('admin-operation-specialty').value = specialtyId;
-      updateDentalOperationCodePreview();
-      document.getElementById('admin-dental-operation-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      document.getElementById('admin-operation-name').focus({ preventScroll: true });
+      openDentalOperationDialog(specialtyId);
     }
 
     function renderAdminDentalCustomization() {
@@ -14572,7 +14708,12 @@
       const selectedSpecialtySummary = document.getElementById('admin-dental-selected-specialty');
       const selectedCount = document.getElementById('admin-dental-selected-count');
       const operationsList = document.getElementById('admin-dental-operations-list');
+      const openOperationDialogButton = document.getElementById('admin-open-operation-dialog-button');
       if (!specialtySelect || !specialtyList || !selectedSpecialtySummary || !selectedCount || !operationsList) return;
+      if (openOperationDialogButton) {
+        openOperationDialogButton.disabled = !dentalSpecialties.length;
+        openOperationDialogButton.title = dentalSpecialties.length ? 'Add a procedure to the selected category' : 'Add a category first';
+      }
       const previousSpecialtyId = specialtySelect.value;
       specialtySelect.innerHTML = dentalSpecialties.map(specialty => `<option value="${specialty.id}">${escapeHtml(specialty.name)}${specialty.active ? '' : ' (inactive)'}</option>`).join('');
       specialtySelect.value = dentalSpecialties.some(specialty => specialty.id === previousSpecialtyId) ? previousSpecialtyId : (dentalSpecialties[0]?.id || '');
@@ -15525,6 +15666,12 @@
       const showAttendance = adminActiveTab === 'attendance';
       const showCustomization = adminActiveTab === 'customization';
       const showStorage = adminActiveTab === 'storage';
+      if (!showCustomization) {
+        const specialtyDialog = document.getElementById('modal-dental-specialty-form');
+        const operationDialog = document.getElementById('modal-dental-operation-form');
+        if (specialtyDialog && !specialtyDialog.classList.contains('hidden')) closeDentalSpecialtyDialog({ restoreFocus: false });
+        if (operationDialog && !operationDialog.classList.contains('hidden')) closeDentalOperationDialog({ restoreFocus: false });
+      }
       const accessTab = document.getElementById('admin-tab-access');
       const templatesTab = document.getElementById('admin-tab-whatsapp') || document.getElementById('admin-tab-templates');
       const printFormsTab = document.getElementById('admin-tab-print-forms');
