@@ -3435,6 +3435,12 @@
       background: rgba(255, 255, 255, 0.06);
     }
 
+    #patients-table { table-layout: fixed; }
+    #patients-table .patients-table-number-column { width: 9rem; }
+    #patients-table .patients-table-name-column { width: 18rem; }
+    #patients-table .patients-table-contact-column { width: 21rem; }
+    #patients-table .patients-table-actions-column { width: 24rem; }
+
     @media (max-width: 767px) {
       html { -webkit-text-size-adjust: 100%; }
       body { overflow-x: hidden; }
@@ -3529,20 +3535,18 @@
       }
       #patients-table {
         display: table;
-        width: 88rem;
-        min-width: 88rem !important;
+        width: 58rem;
+        min-width: 58rem !important;
         table-layout: fixed;
         border-collapse: separate;
         border-spacing: 0;
         background: white;
       }
       #patients-table thead { display: table-header-group; }
-      #patients-table .patients-table-patient-column { width: 15rem; }
-      #patients-table .patients-table-contact-column { width: 12rem; }
-      #patients-table .patients-table-demographics-column { width: 10rem; }
-      #patients-table .patients-table-medical-column { width: 15rem; }
-      #patients-table .patients-table-findings-column { width: 12rem; }
-      #patients-table .patients-table-actions-column { width: 24rem; }
+      #patients-table .patients-table-number-column { width: 8rem; }
+      #patients-table .patients-table-name-column { width: 14rem; }
+      #patients-table .patients-table-contact-column { width: 20rem; }
+      #patients-table .patients-table-actions-column { width: 16rem; }
       #patients-table thead tr {
         display: table-row;
         width: auto;
@@ -3587,6 +3591,16 @@
         text-align: center !important;
       }
       #patients-table tbody td::before { display: none !important; }
+      #patients-table .patient-action-label { display: none !important; }
+      #patients-table .patient-row-action-button {
+        width: 2.75rem;
+        height: 2.75rem;
+        min-width: 2.75rem;
+        min-height: 2.75rem;
+        justify-content: center;
+        gap: 0 !important;
+        padding: 0 !important;
+      }
 
       #patient-workspace-header .patient-workspace-name { font-size: 1.05rem; line-height: 1.35rem; overflow-wrap: anywhere; }
       #view-chart .arch-scroll {
@@ -5483,26 +5497,22 @@
         <div id="patient-query-results-scroll" class="mobile-scroll-region">
           <table id="patients-table" class="w-full text-left text-xs">
             <colgroup>
-              <col class="patients-table-patient-column" />
+              <col class="patients-table-number-column" />
+              <col class="patients-table-name-column" />
               <col class="patients-table-contact-column" />
-              <col class="patients-table-demographics-column" />
-              <col class="patients-table-medical-column" />
-              <col class="patients-table-findings-column" />
               <col class="patients-table-actions-column" />
             </colgroup>
             <thead class="bg-white text-slate-400 font-bold uppercase tracking-wider border-b border-slate-200">
               <tr>
-                <th class="px-6 py-3.5">Patient Info</th>
+                <th class="px-6 py-3.5">Patient number</th>
+                <th class="px-6 py-3.5">Patient name</th>
                 <th class="px-6 py-3.5">Contact</th>
-                <th class="px-6 py-3.5">Demographics</th>
-                <th class="px-6 py-3.5">Medical Alerts & History</th>
-                <th class="px-6 py-3.5">Charted Findings</th>
                 <th class="px-6 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody id="patients-table-body" class="divide-y divide-slate-100 text-slate-700 font-medium">
               <tr>
-                <td colspan="6" class="text-center py-8 text-slate-400">Loading patients from Supabase...</td>
+                <td colspan="4" class="text-center py-8 text-slate-400">Loading patients from Supabase...</td>
               </tr>
             </tbody>
           </table>
@@ -19033,7 +19043,7 @@
       if (error) {
         console.error('Could not load patient directory page:', error);
         const tbody = document.getElementById('patients-table-body');
-        if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-sm font-bold text-red-600">Could not load patients. Check the connection and try again.</td></tr>';
+        if (tbody) tbody.innerHTML = '<tr><td colspan="4" class="py-8 text-center text-sm font-bold text-red-600">Could not load patients. Check the connection and try again.</td></tr>';
         patientDirectoryLoaded = false;
         return false;
       }
@@ -19093,7 +19103,7 @@
         if (error) {
           console.error('Supabase Error:', error);
           document.getElementById('patients-table-body').innerHTML = `
-            <tr><td colspan="6" class="text-center py-6 text-red-500 font-bold">
+            <tr><td colspan="4" class="text-center py-6 text-red-500 font-bold">
               Error connecting to database. Please make sure the 'patients' table is created in Supabase SQL editor.
             </td></tr>
           `;
@@ -21834,7 +21844,7 @@
         patientDirectoryLoaded = false;
         patientDirectoryLoadPromise = null;
         const tbody = document.getElementById('patients-table-body');
-        if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-sm font-bold text-slate-400">Loading patients...</td></tr>';
+        if (tbody) tbody.innerHTML = '<tr><td colspan="4" class="py-8 text-center text-sm font-bold text-slate-400">Loading patients...</td></tr>';
         void ensurePatientDirectoryPageLoaded();
         return;
       }
@@ -21898,13 +21908,13 @@
       }
 
       if (!patientsLoaded && searchQuery) {
-        tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-sm font-bold text-slate-400">Loading the searchable patient directory...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="py-8 text-center text-sm font-bold text-slate-400">Loading the searchable patient directory...</td></tr>';
         void ensurePatientsLoaded();
         return;
       }
 
       if (!patientsLoaded && !patientDirectoryLoaded) {
-        tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-sm font-bold text-slate-400">Loading patients...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="py-8 text-center text-sm font-bold text-slate-400">Loading patients...</td></tr>';
         void ensurePatientDirectoryPageLoaded();
         return;
       }
@@ -21927,7 +21937,7 @@
 
       if (filtered.length === 0) {
         renderPatientQueryPagination(0);
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-slate-400">No patients matching your query criteria.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-slate-400">No patients matching your query criteria.</td></tr>`;
         lucide.createIcons();
         return;
       }
@@ -21940,47 +21950,41 @@
       renderPatientQueryPagination(totalMatches);
 
       tbody.innerHTML = visiblePatients.map(p => {
-        const findingsCount = countPatientFindings(p);
         const chartAllowed = hasPageAccess('chart');
         return `
           <tr tabindex="0" class="cursor-pointer hover:bg-slate-50 transition" onclick="openPatientWorkspace('${p.id}', 'profile')" onkeydown="if ((event.key === 'Enter' || event.key === ' ') && event.target === this) { event.preventDefault(); openPatientWorkspace('${p.id}', 'profile'); }">
-            <td data-label="${currentUiLanguage === 'ar' ? 'بيانات المريض' : 'Patient info'}" class="px-6 py-4">
+            <td data-label="${currentUiLanguage === 'ar' ? 'رقم المريض' : 'Patient number'}" class="px-6 py-4">
+              <span class="patient-record-number text-sm font-black text-blue-600">${escapeHtml(formatPatientNumber(p))}${p.legacyPatientId && p.legacyPatientId !== p.patientNumber ? ` · ${currentUiLanguage === 'ar' ? 'قديم' : 'Old'} #${escapeHtml(String(p.legacyPatientId))}` : ''}</span>
+            </td>
+            <td data-label="${currentUiLanguage === 'ar' ? 'اسم المريض' : 'Patient name'}" class="px-6 py-4">
               <div class="patient-row-main flex items-center gap-3">
                 <div class="patient-row-text">
-                  <span class="patient-row-name font-bold text-slate-900 block">${escapeHtml(p.name)}</span>
-                  <span class="patient-record-number text-[11px] font-bold text-blue-600">${escapeHtml(formatPatientNumber(p))}${p.legacyPatientId && p.legacyPatientId !== p.patientNumber ? ` · ${currentUiLanguage === 'ar' ? 'قديم' : 'Old'} #${escapeHtml(String(p.legacyPatientId))}` : ''}</span>
-                  <span class="patient-mobile-phone hidden">${escapeHtml([p.phone, p.secondaryPhone].filter(Boolean).join(' · '))}</span>
+                  <span class="patient-row-name block text-sm font-bold text-slate-900">${escapeHtml(p.name)}</span>
                 </div>
               </div>
             </td>
             <td data-label="${currentUiLanguage === 'ar' ? 'التواصل' : 'Contact'}" class="px-6 py-4 text-slate-600">
-              <span class="block">${escapeHtml(p.phone || (currentUiLanguage === 'ar' ? 'غير متوفر' : 'Not provided'))}</span>
-              ${p.secondaryPhone ? `<span class="mt-1 block text-[11px] font-semibold text-slate-400">${escapeHtml(p.secondaryPhone)}</span>` : ''}
-            </td>
-            <td data-label="${currentUiLanguage === 'ar' ? 'البيانات الشخصية' : 'Demographics'}" class="px-6 py-4 text-slate-600">${escapeHtml(p.gender)}, ${escapeHtml(patientAgeLabel(p))}</td>
-            <td data-label="${currentUiLanguage === 'ar' ? 'التاريخ الطبي' : 'Medical history'}" class="px-6 py-4">
-              ${p.medicalHistory && p.medicalHistory !== 'None reported' ? 
-                `<span class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1 w-fit"><i data-lucide="alert-triangle" class="w-3 h-3"></i> ${escapeHtml(p.medicalHistory)}</span>` 
-                : `<span class="text-slate-400">None reported</span>`}
-            </td>
-            <td data-label="${currentUiLanguage === 'ar' ? 'نتائج المخطط' : 'Charted findings'}" class="px-6 py-4">
-              <span class="px-2.5 py-1 rounded-md text-[11px] font-bold ${findingsCount > 0 ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-slate-100 text-slate-500'}">
-                ${findingsCount} Conditions
-              </span>
+              <div class="patient-directory-contact flex min-w-0 items-center justify-between gap-3">
+                <div class="min-w-0">
+                  <span class="block truncate">${escapeHtml(p.phone || (currentUiLanguage === 'ar' ? 'غير متوفر' : 'Not provided'))}</span>
+                  ${p.secondaryPhone ? `<span class="mt-1 block truncate text-[11px] font-semibold text-slate-400">${escapeHtml(p.secondaryPhone)}</span>` : ''}
+                </div>
+                <span class="patient-directory-contact-actions inline-flex shrink-0 items-center gap-2" onclick="event.stopPropagation()">${patientPhoneActionsMarkup(p, 'primary')}</span>
+              </div>
             </td>
             <td data-label="${currentUiLanguage === 'ar' ? 'الإجراءات' : 'Actions'}" class="patient-row-action px-6 py-4 text-right">
               <div class="patient-row-actions flex items-center justify-end gap-1.5">
-                <button type="button" onclick="event.stopPropagation(); openPatientInvoices('${p.id}')" aria-label="${currentUiLanguage === 'ar' ? 'فواتير' : 'Invoices for'} ${escapeHtml(p.name)}" class="patient-invoice-button inline-flex items-center gap-1.5 rounded-lg bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 transition hover:bg-violet-600 hover:text-white">
-                  <i data-lucide="receipt-text" class="patient-invoice-icon h-3.5 w-3.5"></i><span class="patient-invoice-label">${currentUiLanguage === 'ar' ? 'الفواتير' : 'Invoices'}</span>
+                <button type="button" onclick="event.stopPropagation(); openPatientInvoices('${p.id}')" aria-label="${currentUiLanguage === 'ar' ? 'فواتير' : 'Invoices for'} ${escapeHtml(p.name)}" title="${currentUiLanguage === 'ar' ? 'الفواتير' : 'Invoices'}" class="patient-row-action-button patient-invoice-button inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 transition hover:bg-violet-600 hover:text-white">
+                  <i data-lucide="receipt-text" class="patient-invoice-icon h-4 w-4"></i><span class="patient-action-label patient-invoice-label">${currentUiLanguage === 'ar' ? 'الفواتير' : 'Invoices'}</span>
                 </button>
-                <button type="button" onclick="event.stopPropagation(); openEditPatientModal('${p.id}')" aria-label="${currentUiLanguage === 'ar' ? 'تعديل بيانات' : 'Edit'} ${escapeHtml(p.name)}" class="patient-edit-button inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 transition hover:bg-slate-700 hover:text-white">
-                  <i data-lucide="pencil" class="patient-edit-icon h-3.5 w-3.5"></i><span class="patient-edit-label">${currentUiLanguage === 'ar' ? 'تعديل' : 'Edit'}</span>
+                <button type="button" onclick="event.stopPropagation(); openEditPatientModal('${p.id}')" aria-label="${currentUiLanguage === 'ar' ? 'تعديل بيانات' : 'Edit'} ${escapeHtml(p.name)}" title="${currentUiLanguage === 'ar' ? 'تعديل' : 'Edit'}" class="patient-row-action-button patient-edit-button inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 transition hover:bg-slate-700 hover:text-white">
+                  <i data-lucide="pencil" class="patient-edit-icon h-4 w-4"></i><span class="patient-action-label patient-edit-label">${currentUiLanguage === 'ar' ? 'تعديل' : 'Edit'}</span>
                 </button>
                 ${chartAllowed
-                  ? `<button type="button" onclick="event.stopPropagation(); openPatientChart('${p.id}')" aria-label="${currentUiLanguage === 'ar' ? 'فتح مخطط' : 'Open chart for'} ${escapeHtml(p.name)}" class="patient-open-chart inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-600 transition hover:bg-blue-600 hover:text-white"><img src="icons/dental-chart-icon.webp" alt="" aria-hidden="true" class="dental-chart-button-icon h-5 w-5 shrink-0 object-contain" /><span class="patient-open-label">${currentUiLanguage === 'ar' ? 'المخطط' : 'Chart'}</span></button>`
+                  ? `<button type="button" onclick="event.stopPropagation(); openPatientChart('${p.id}')" aria-label="${currentUiLanguage === 'ar' ? 'فتح مخطط' : 'Open chart for'} ${escapeHtml(p.name)}" title="${currentUiLanguage === 'ar' ? 'المخطط' : 'Chart'}" class="patient-row-action-button patient-open-chart inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-600 transition hover:bg-blue-600 hover:text-white"><img src="icons/dental-chart-icon.webp" alt="" aria-hidden="true" class="dental-chart-button-icon h-5 w-5 shrink-0 object-contain" /><span class="patient-action-label patient-open-label">${currentUiLanguage === 'ar' ? 'المخطط' : 'Chart'}</span></button>`
                   : ''}
-                <button type="button" onclick="event.stopPropagation(); deletePatient('${p.id}')" aria-label="${currentUiLanguage === 'ar' ? 'حذف' : 'Delete'} ${escapeHtml(p.name)}" class="patient-delete-button inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 transition hover:border-red-600 hover:bg-red-600 hover:text-white">
-                  <i data-lucide="trash-2" class="patient-delete-icon h-3.5 w-3.5"></i><span class="patient-delete-label">${currentUiLanguage === 'ar' ? 'حذف' : 'Delete'}</span>
+                <button type="button" onclick="event.stopPropagation(); deletePatient('${p.id}')" aria-label="${currentUiLanguage === 'ar' ? 'حذف' : 'Delete'} ${escapeHtml(p.name)}" title="${currentUiLanguage === 'ar' ? 'حذف' : 'Delete'}" class="patient-row-action-button patient-delete-button inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 transition hover:border-red-600 hover:bg-red-600 hover:text-white">
+                  <i data-lucide="trash-2" class="patient-delete-icon h-4 w-4"></i><span class="patient-action-label patient-delete-label">${currentUiLanguage === 'ar' ? 'حذف' : 'Delete'}</span>
                 </button>
               </div>
             </td>
@@ -31868,7 +31872,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     }
 
     function patientProfilePhoneContext(patientId, phoneKind = 'primary') {
-      const patient = patients.find(item => String(item.id) === String(patientId));
+      const patient = getKnownPatient(patientId);
       if (!patient) return null;
       const resolvedPhoneKind = phoneKind === 'secondary' ? 'secondary' : 'primary';
       const rawPhone = resolvedPhoneKind === 'secondary' ? patient.secondaryPhone : patient.phone;
