@@ -1,4 +1,4 @@
-const LUMIN_CACHE = "lumin-dental-shell-v113";
+const LUMIN_CACHE = "lumin-dental-shell-v114";
 const LUMIN_SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -8,7 +8,7 @@ const LUMIN_SHELL = [
   "/icons/dental-icon-v1-512.png",
   "/icons/dental-icon-v1-maskable-512.png",
   "/lumin-app.css",
-  "/lumin-theme.css?v=15",
+  "/lumin-theme.css?v=16",
   "/lumin-loyalty.js?v=5",
   "/vendor/lucide.min.js",
   "/vendor/supabase.js"

@@ -1,5 +1,158 @@
 /* Optional raised appearance. Original application styles remain the flat theme. */
 @media screen {
+/*
+ * Lumin responsive typography system
+ *
+ * Native UI fonts keep the PWA fast and readable offline while matching each
+ * platform: SF on Apple devices, Segoe UI on Windows, and Roboto on Android.
+ * Font-size tokens change by viewing distance rather than scaling layout rems:
+ * mobile (close), tablet/iPad (chairside), laptop/desktop (high-density).
+ */
+    :root {
+      --lumin-font-ui: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "Noto Sans Arabic", Tahoma, Arial, sans-serif;
+      --lumin-type-micro: 0.6875rem;
+      --lumin-type-micro-leading: 1rem;
+      --lumin-type-caption: 0.75rem;
+      --lumin-type-caption-leading: 1.125rem;
+      --lumin-type-body: 0.875rem;
+      --lumin-type-body-leading: 1.3125rem;
+      --lumin-type-body-large: 1rem;
+      --lumin-type-body-large-leading: 1.5rem;
+      --lumin-type-subheading: 1.125rem;
+      --lumin-type-subheading-leading: 1.5625rem;
+      --lumin-type-heading: 1.25rem;
+      --lumin-type-heading-leading: 1.75rem;
+      --lumin-type-display: 1.5rem;
+      --lumin-type-display-leading: 2rem;
+    }
+    html {
+      font-family: var(--lumin-font-ui);
+      font-optical-sizing: auto;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    body,
+    button,
+    input,
+    select,
+    textarea,
+    .font-sans {
+      font-family: var(--lumin-font-ui);
+    }
+    body {
+      font-size: var(--lumin-type-body);
+      line-height: var(--lumin-type-body-leading);
+    }
+    .text-\[8px\],
+    .text-\[9px\],
+    .text-\[10px\] {
+      font-size: var(--lumin-type-micro) !important;
+      line-height: var(--lumin-type-micro-leading);
+    }
+    .text-\[11px\],
+    .text-\[12px\],
+    .text-xs {
+      font-size: var(--lumin-type-caption) !important;
+      line-height: var(--lumin-type-caption-leading);
+    }
+    .text-sm {
+      font-size: var(--lumin-type-body) !important;
+      line-height: var(--lumin-type-body-leading);
+    }
+    .text-base {
+      font-size: var(--lumin-type-body-large) !important;
+      line-height: var(--lumin-type-body-large-leading);
+    }
+    .text-lg {
+      font-size: var(--lumin-type-subheading) !important;
+      line-height: var(--lumin-type-subheading-leading);
+    }
+    .text-xl {
+      font-size: var(--lumin-type-heading) !important;
+      line-height: var(--lumin-type-heading-leading);
+    }
+    .text-2xl {
+      font-size: var(--lumin-type-display) !important;
+      line-height: var(--lumin-type-display-leading);
+    }
+    #dashboard-appointments-list {
+      --dashboard-card-font-reduction: 0pt;
+    }
+    .appointment-off-hours-label,
+    .appointment-week-off-hours-label,
+    .appointment-range-preview span {
+      font-size: var(--lumin-type-micro);
+      line-height: var(--lumin-type-micro-leading);
+    }
+    .wa-settings-eyebrow,
+    #setting-whatsapp-enabled-status,
+    .wa-settings-panel-title p,
+    .wa-settings-label small,
+    .wa-settings-dispatch-copy,
+    .wa-settings-copy-button,
+    .wa-settings-refresh-button,
+    .wa-settings-storage-meta,
+    .wa-settings-footer-note {
+      font-size: var(--lumin-type-caption);
+      line-height: var(--lumin-type-caption-leading);
+    }
+    .wa-settings-heading p,
+    .wa-settings-agent-copy > p,
+    .wa-settings-panel-title h4,
+    .wa-settings-label,
+    #modal-whatsapp-settings .wa-settings-input,
+    .wa-settings-webhook-copy,
+    .wa-settings-storage-copy,
+    .wa-settings-secondary-button,
+    .wa-settings-primary-button {
+      font-size: var(--lumin-type-body);
+      line-height: var(--lumin-type-body-leading);
+    }
+    #findings-container .finding-doctor-control span,
+    #findings-container .finding-doctor-control select,
+    #findings-container .finding-price-control input,
+    #findings-container .finding-batch-multiplier-control input,
+    #findings-container .finding-batch-multiplier-control span {
+      font-size: var(--lumin-type-micro) !important;
+      line-height: var(--lumin-type-micro-leading);
+    }
+    @media (min-width: 768px) and (max-width: 1023px) {
+      :root {
+        --lumin-type-micro: 0.75rem;
+        --lumin-type-micro-leading: 1.0625rem;
+        --lumin-type-caption: 0.8125rem;
+        --lumin-type-caption-leading: 1.1875rem;
+        --lumin-type-body: 0.9375rem;
+        --lumin-type-body-leading: 1.4375rem;
+        --lumin-type-body-large: 1.0625rem;
+        --lumin-type-body-large-leading: 1.5625rem;
+        --lumin-type-subheading: 1.1875rem;
+        --lumin-type-subheading-leading: 1.625rem;
+        --lumin-type-heading: 1.375rem;
+        --lumin-type-heading-leading: 1.875rem;
+        --lumin-type-display: 1.625rem;
+        --lumin-type-display-leading: 2.125rem;
+      }
+    }
+    @media (max-width: 1023px) {
+      input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="hidden"]),
+      select,
+      textarea {
+        font-size: 1rem !important;
+        line-height: 1.5rem;
+      }
+    }
+    @media (max-width: 767px) {
+      #appointments-month-view > div:first-child,
+      #appointments-calendar-grid > button > span:not(:first-child),
+      #appointments-day-timeline .appointment-day-event p:not(.appointment-day-patient-name),
+      #appointments-week-timeline .appointment-week-event p {
+        font-size: var(--lumin-type-micro) !important;
+        line-height: var(--lumin-type-micro-leading);
+      }
+    }
 /* Shared raised surfaces. Geometry, visibility, and clinical/status colors stay in the base styles. */
     body.lumin-raised {
       --lumin-hue: 215;
