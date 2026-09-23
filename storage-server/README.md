@@ -30,13 +30,19 @@ You can open these folders in **Windows File Explorer** anytime to view, copy, o
 ### Step 1: Start the Local Storage Server
 Double-click `start-server.bat`.
 * The server will launch at `http://localhost:5000`.
-* It uses your local Python virtual environment (`.venv`).
+* It searches for Python 3.9 or newer using the Python launcher, PATH, and common installation folders.
+* If the copied `.venv` points to Python on another computer, it rebuilds the environment automatically.
+* It installs missing packages from `requirements.txt` before starting.
 
 ### Step 2: Start the Cloudflare Tunnel
 Double-click `start-tunnel.bat`.
-* On first run, it will automatically download `cloudflared.exe`.
+* It detects whether Windows is 32-bit or 64-bit and launches the correct version automatically.
+* On first run, it downloads the matching official Cloudflare executable.
+* You can also manually run `start-tunnel-windows-32bit.bat` or `start-tunnel-windows-64bit.bat`.
 * It will output a public HTTPS address like:
   `https://random-words.trycloudflare.com`
+
+Alternatively, double-click `start-storage.bat` to prepare Python, start the local server, and start the correctly matched Cloudflare Tunnel together.
 
 ### Step 3: Connect in Lumin App
 1. Open **Lumin Dental Clinic** in your browser.

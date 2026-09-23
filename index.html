@@ -81,6 +81,30 @@
       touch-action: pan-x pan-y;
     }
 
+    #patient-media-upload-modal { padding: env(safe-area-inset-top) 0 0; }
+    #patient-media-upload-modal > [role="dialog"] {
+      max-height: 90vh;
+      border-radius: 1rem 1rem 0 0;
+      -webkit-overflow-scrolling: touch;
+    }
+    #media-upload-header { position: sticky; top: 0; z-index: 1; background: #fff; }
+    #media-upload-actions {
+      position: sticky;
+      bottom: 0;
+      background: #fff;
+      padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    }
+    #media-dropzone:focus-visible, #btn-paste-media-image:focus-visible {
+      outline: 2px solid #3b82f6;
+      outline-offset: 2px;
+    }
+    #media-dropzone:active, #btn-paste-media-image:active { transform: scale(0.98); }
+    #btn-paste-media-image:disabled { opacity: 0.5; pointer-events: none; }
+    @media (min-width: 640px) {
+      #patient-media-upload-modal { padding: 1rem; }
+      #patient-media-upload-modal > [role="dialog"] { border-radius: 1rem; }
+    }
+
     .surface-poly {
       transition: fill 0.12s ease, stroke 0.12s ease, filter 0.12s ease;
       cursor: pointer;
@@ -8017,19 +8041,19 @@
 
   <!-- ================= PATIENT MEDIA MODALS ================= -->
   <!-- Upload Modal -->
-  <div id="patient-media-upload-modal" class="appointment-card-popover-layer fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
-    <div role="dialog" aria-modal="true" aria-label="Upload Patient Media" class="w-full max-w-lg overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-xl" style="box-shadow: 0 34px 90px -24px rgba(15, 23, 42, 0.62), 0 18px 44px -22px rgba(15, 23, 42, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.72); animation: appointment-card-popover-in 160ms cubic-bezier(0.22, 1, 0.36, 1);">
-      <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+  <div id="patient-media-upload-modal" class="appointment-card-popover-layer fixed inset-0 z-50 hidden items-end justify-center bg-slate-950/55 backdrop-blur-sm sm:items-center">
+    <div role="dialog" aria-modal="true" aria-label="Upload Patient Media" class="w-full max-w-lg overflow-y-auto border border-slate-200 bg-white shadow-xl" style="box-shadow: 0 34px 90px -24px rgba(15, 23, 42, 0.62), 0 18px 44px -22px rgba(15, 23, 42, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.72); animation: appointment-card-popover-in 160ms cubic-bezier(0.22, 1, 0.36, 1);">
+      <div id="media-upload-header" class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
         <div class="flex items-center gap-2.5">
           <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><i data-lucide="upload-cloud" class="h-4 w-4"></i></span>
           <h3 class="text-sm font-black text-slate-800">Upload Patient Media / X-Ray</h3>
         </div>
-        <button type="button" onclick="closePatientMediaUploadModal()" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><i data-lucide="x" class="h-5 w-5"></i></button>
+        <button type="button" onclick="closePatientMediaUploadModal()" class="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 active:scale-[0.98]"><i data-lucide="x" class="h-5 w-5"></i></button>
       </div>
       <form id="patient-media-upload-form" onsubmit="handlePatientMediaUploadSubmit(event)" class="p-6 space-y-4">
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1.5">Category *</label>
-          <select id="upload-media-category" required class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <select id="upload-media-category" required class="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
             <option value="Panoramic">Panoramic X-Ray</option>
             <option value="Periapical">Periapical / Bitewings</option>
             <option value="Intraoral">Intraoral Clinical Photo</option>
@@ -8041,12 +8065,12 @@
 
         <!-- Dropzone -->
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1.5">Select File (Image, PDF, DICOM) *</label>
-          <div id="media-dropzone" onclick="document.getElementById('upload-media-file-input').click()" class="relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-6 text-center transition hover:border-blue-400 hover:bg-blue-50/30 cursor-pointer">
-            <input id="upload-media-file-input" type="file" accept="image/*,.pdf,.dcm" required class="sr-only" onchange="handleMediaFileSelected(this)" />
+          <label for="upload-media-file-input" class="block text-xs font-bold text-slate-700 mb-1.5">Select File (Image, PDF, DICOM) *</label>
+          <input id="upload-media-file-input" type="file" accept="image/*,.pdf,.dcm" class="sr-only" onchange="handleMediaFileSelected(this)" />
+          <div id="media-dropzone" role="button" tabindex="0" onclick="document.getElementById('upload-media-file-input').click()" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); document.getElementById('upload-media-file-input').click(); }" class="relative flex min-h-11 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-6 text-center transition hover:border-slate-300 hover:bg-blue-50/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 active:scale-[0.98] cursor-pointer">
             <div id="dropzone-empty" class="space-y-2">
               <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600"><i data-lucide="cloud-arrow-up" class="h-6 w-6"></i></span>
-              <p class="text-xs font-bold text-slate-700">Click or drag & drop image here</p>
+              <p class="text-xs font-bold text-slate-700">Tap to choose or drag a file here</p>
               <p class="text-[11px] text-slate-400">JPEG, PNG, WEBP, PDF up to 50MB</p>
             </div>
             <div id="dropzone-preview" class="hidden space-y-2 w-full">
@@ -8055,11 +8079,16 @@
               <p id="upload-preview-size" class="text-[11px] text-slate-400"></p>
             </div>
           </div>
+          <button id="btn-paste-media-image" type="button" onclick="pastePatientMediaFromClipboard()" class="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition-all duration-150 ease-out hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50">
+            <i data-lucide="clipboard-paste" class="h-4 w-4"></i>
+            <span>Paste image from clipboard</span>
+          </button>
+          <p class="mt-1.5 text-xs text-slate-500">You can also press Ctrl+V or ⌘V while this window is open.</p>
         </div>
 
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1.5">Description / Note (Optional)</label>
-          <input id="upload-media-note" type="text" placeholder="e.g. Tooth #14 pre-op, Upper quadrant..." class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <input id="upload-media-note" type="text" placeholder="e.g. Tooth #14 pre-op, Upper quadrant..." class="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
 
         <div id="upload-progress-container" class="hidden space-y-1.5">
@@ -8074,9 +8103,9 @@
 
         <p id="upload-media-error" class="hidden rounded-xl bg-red-50 p-3 text-xs font-bold text-red-600"></p>
 
-        <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-          <button type="button" onclick="closePatientMediaUploadModal()" class="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">Cancel</button>
-          <button id="btn-submit-media-upload" type="submit" class="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white hover:bg-blue-700 shadow-sm transition">
+        <div id="media-upload-actions" class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+          <button type="button" onclick="closePatientMediaUploadModal()" class="min-h-11 rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 active:scale-[0.98]">Cancel</button>
+          <button id="btn-submit-media-upload" type="submit" class="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50">
             <i data-lucide="upload" class="h-3.5 w-3.5"></i>
             <span>Upload to Local Storage</span>
           </button>
@@ -9791,6 +9820,9 @@
       'Lab Documents': 'تقارير المعمل',
       'No media uploaded for this patient yet.': 'لم يتم رفع أي أشعة أو صور لهذا المريض بعد.',
       'Upload Patient Media / X-Ray': 'رفع أشعة / وسائط المريض',
+      'Tap to choose or drag a file here': 'اضغط لاختيار ملف أو اسحبه إلى هنا',
+      'Paste image from clipboard': 'لصق صورة من الحافظة',
+      'You can also press Ctrl+V or ⌘V while this window is open.': 'يمكنك أيضاً الضغط على Ctrl+V أو ⌘V أثناء فتح هذه النافذة.',
       'New Patient': 'مريض جديد',
       'Install App': 'تثبيت التطبيق',
       'Install app': 'تثبيت التطبيق',
@@ -24461,6 +24493,24 @@
       lucide.createIcons();
     }
 
+    let selectedPatientMediaUploadFile = null;
+    let patientMediaPreviewUrl = '';
+    const patientMediaClipboardExtensions = {
+      'image/png': 'png',
+      'image/jpeg': 'jpg',
+      'image/webp': 'webp',
+      'image/gif': 'gif',
+      'image/bmp': 'bmp',
+      'image/tiff': 'tiff'
+    };
+
+    function showPatientMediaUploadError(message) {
+      const error = document.getElementById('upload-media-error');
+      if (!error) return;
+      error.textContent = message;
+      error.classList.remove('hidden');
+    }
+
     function openPatientMediaUploadModal() {
       const modal = document.getElementById('patient-media-upload-modal');
       const form = document.getElementById('patient-media-upload-form');
@@ -24470,6 +24520,7 @@
       if (form) form.reset();
       if (error) error.classList.add('hidden');
       if (progress) progress.classList.add('hidden');
+      selectedPatientMediaUploadFile = null;
       resetMediaDropzonePreview();
       modal.classList.remove('hidden');
       modal.classList.add('flex');
@@ -24483,6 +24534,8 @@
         modal.classList.add('hidden');
         modal.classList.remove('flex');
       }
+      selectedPatientMediaUploadFile = null;
+      resetMediaDropzonePreview();
     }
 
     function setupMediaDropzoneEvents() {
@@ -24507,21 +24560,86 @@
       });
 
       dropzone.addEventListener('drop', (e) => {
-        const dt = e.dataTransfer;
-        const files = dt.files;
-        if (files && files.length > 0) {
-          const input = document.getElementById('upload-media-file-input');
-          if (input) {
-            input.files = files;
-            handleMediaFileSelected(input);
-          }
-        }
+        const file = e.dataTransfer?.files?.[0];
+        if (file) selectPatientMediaUploadFile(file, true);
       }, false);
+
+      document.addEventListener('paste', (event) => {
+        const modal = document.getElementById('patient-media-upload-modal');
+        if (!modal || modal.classList.contains('hidden')) return;
+        const imageItem = Array.from(event.clipboardData?.items || [])
+          .find(item => item.kind === 'file' && patientMediaClipboardExtensions[item.type]);
+        if (!imageItem) return;
+        const file = imageItem.getAsFile();
+        if (!file) return;
+        event.preventDefault();
+        selectPatientMediaUploadFile(createPatientMediaClipboardFile(file, imageItem.type), true);
+      });
     }
 
     function handleMediaFileSelected(input) {
       const file = input.files?.[0];
       if (!file) return;
+      selectPatientMediaUploadFile(file);
+    }
+
+    function createPatientMediaClipboardFile(blob, mimeType) {
+      const extension = patientMediaClipboardExtensions[mimeType];
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      return new File([blob], `clipboard-${timestamp}.${extension}`, { type: mimeType });
+    }
+
+    async function pastePatientMediaFromClipboard() {
+      if (!navigator.clipboard?.read) {
+        showPatientMediaUploadError(currentUiLanguage === 'ar'
+          ? 'اللصق من الحافظة غير متاح هنا. افتح التطبيق عبر HTTPS أو اختر صورة من جهازك.'
+          : 'Clipboard paste is unavailable here. Open Lumin over HTTPS or choose an image from your device.');
+        return;
+      }
+
+      const button = document.getElementById('btn-paste-media-image');
+      if (button) button.disabled = true;
+      document.getElementById('upload-media-error')?.classList.add('hidden');
+      try {
+        // Read directly from the click gesture; Safari may ask the user to confirm Paste.
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          const mimeType = item.types.find(type => patientMediaClipboardExtensions[type]);
+          if (!mimeType) continue;
+          const blob = await item.getType(mimeType);
+          selectPatientMediaUploadFile(createPatientMediaClipboardFile(blob, mimeType), true);
+          return;
+        }
+        showPatientMediaUploadError(currentUiLanguage === 'ar'
+          ? 'لا توجد صورة مدعومة في الحافظة. انسخ صورة أو اختر ملفاً من جهازك.'
+          : 'No supported image was found in the clipboard. Copy an image or choose a file from your device.');
+      } catch (error) {
+        showPatientMediaUploadError(currentUiLanguage === 'ar'
+          ? 'تعذّر الوصول إلى الحافظة. اسمح باللصق إذا طلب المتصفح ذلك، أو اختر صورة من جهازك.'
+          : 'Could not read the clipboard. Allow Paste if your browser asks, or choose an image from your device.');
+      } finally {
+        if (button) button.disabled = false;
+      }
+    }
+
+    function selectPatientMediaUploadFile(file, clearFileInput = false) {
+      if (!file) return false;
+      if (file.size > 50 * 1024 * 1024 || file.size === 0) {
+        selectedPatientMediaUploadFile = null;
+        resetMediaDropzonePreview();
+        const input = document.getElementById('upload-media-file-input');
+        if (input) input.value = '';
+        showPatientMediaUploadError(currentUiLanguage === 'ar'
+          ? 'يجب أن يكون حجم الملف أكبر من صفر ولا يتجاوز 50 ميجابايت.'
+          : 'The file must be larger than zero and no more than 50 MB.');
+        return false;
+      }
+      selectedPatientMediaUploadFile = file;
+      if (clearFileInput) {
+        const input = document.getElementById('upload-media-file-input');
+        if (input) input.value = '';
+      }
+      document.getElementById('upload-media-error')?.classList.add('hidden');
       const emptyState = document.getElementById('dropzone-empty');
       const previewState = document.getElementById('dropzone-preview');
       const previewImg = document.getElementById('upload-preview-img');
@@ -24533,13 +24651,17 @@
       if (nameLabel) nameLabel.textContent = file.name;
       if (sizeLabel) sizeLabel.textContent = `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
 
+      if (patientMediaPreviewUrl) URL.revokeObjectURL(patientMediaPreviewUrl);
+      patientMediaPreviewUrl = '';
       if (file.type.startsWith('image/') && previewImg) {
-        const reader = new FileReader();
-        reader.onload = (e) => { previewImg.src = e.target.result; previewImg.classList.remove('hidden'); };
-        reader.readAsDataURL(file);
+        patientMediaPreviewUrl = URL.createObjectURL(file);
+        previewImg.src = patientMediaPreviewUrl;
+        previewImg.classList.remove('hidden');
       } else if (previewImg) {
+        previewImg.src = '';
         previewImg.classList.add('hidden');
       }
+      return true;
     }
 
     function resetMediaDropzonePreview() {
@@ -24547,6 +24669,8 @@
       document.getElementById('dropzone-preview')?.classList.add('hidden');
       const previewImg = document.getElementById('upload-preview-img');
       if (previewImg) previewImg.src = '';
+      if (patientMediaPreviewUrl) URL.revokeObjectURL(patientMediaPreviewUrl);
+      patientMediaPreviewUrl = '';
     }
 
     async function handlePatientMediaUploadSubmit(event) {
@@ -24560,9 +24684,9 @@
       const progressPct = document.getElementById('upload-progress-pct');
       const submitBtn = document.getElementById('btn-submit-media-upload');
 
-      const file = fileInput?.files?.[0];
+      const file = selectedPatientMediaUploadFile || fileInput?.files?.[0];
       if (!file) {
-        if (errorEl) { errorEl.textContent = 'Please select a file to upload.'; errorEl.classList.remove('hidden'); }
+        showPatientMediaUploadError(currentUiLanguage === 'ar' ? 'اختر ملفاً أو الصق صورة قبل الرفع.' : 'Choose a file or paste an image before uploading.');
         return;
       }
 
