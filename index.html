@@ -990,31 +990,45 @@
 
     @media (max-width: 899px) {
       #findings-container {
+        --finding-mobile-summary: 19rem;
+        --finding-mobile-dates: 13rem;
+        --finding-mobile-doctor: 8.5rem;
+        --finding-mobile-price: 7rem;
+        --finding-mobile-status: 4.5rem;
+        --finding-mobile-separate: 6rem;
+        --finding-mobile-notes: 3rem;
+        --finding-mobile-delete: 2.75rem;
+        --finding-mobile-gap: 0.5rem;
+        --finding-mobile-row-width: 70rem;
         overflow-x: auto !important;
         overscroll-behavior-inline: contain;
         -webkit-overflow-scrolling: touch;
         touch-action: pan-x pan-y;
       }
       #findings-container .finding-row {
-        min-width: 58.5rem !important;
-        width: 58.5rem !important;
-        max-width: 58.5rem !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
+        display: grid !important;
+        grid-template-columns: var(--finding-mobile-summary) max-content;
+        min-width: var(--finding-mobile-row-width) !important;
+        width: var(--finding-mobile-row-width) !important;
+        max-width: var(--finding-mobile-row-width) !important;
+        column-gap: 0.625rem !important;
+        row-gap: 0.625rem !important;
         align-items: center !important;
         overflow: visible !important;
         box-sizing: border-box !important;
       }
       #findings-container .finding-row.is-batch-finding {
-        min-width: 63.5rem !important;
-        width: 63.5rem !important;
-        max-width: 63.5rem !important;
+        min-width: var(--finding-mobile-row-width) !important;
+        width: var(--finding-mobile-row-width) !important;
+        max-width: var(--finding-mobile-row-width) !important;
       }
       #findings-container .finding-row-summary {
-        width: 18.5rem !important;
-        min-width: 18.5rem !important;
-        max-width: 18.5rem !important;
-        flex: 0 0 18.5rem !important;
+        grid-column: 1;
+        width: var(--finding-mobile-summary) !important;
+        min-width: 0 !important;
+        max-width: var(--finding-mobile-summary) !important;
+        overflow: hidden !important;
+        flex: 0 0 var(--finding-mobile-summary) !important;
         box-sizing: border-box !important;
       }
       #findings-container .finding-tooth-picker {
@@ -1027,7 +1041,8 @@
         flex-shrink: 0 !important;
       }
       #findings-container .finding-operation-heading {
-        flex-wrap: nowrap !important;
+        max-width: 100% !important;
+        flex-wrap: wrap !important;
         overflow: hidden !important;
       }
       #findings-container .finding-operation-title {
@@ -1048,30 +1063,39 @@
         flex-wrap: nowrap !important;
       }
       #findings-container .finding-row-actions {
-        width: 37.5rem !important;
-        min-width: 37.5rem !important;
-        max-width: 37.5rem !important;
-        flex: 0 0 37.5rem !important;
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
+        grid-column: 2;
+        display: grid !important;
+        grid-template-columns:
+          var(--finding-mobile-dates)
+          var(--finding-mobile-doctor)
+          var(--finding-mobile-price)
+          var(--finding-mobile-status)
+          var(--finding-mobile-separate)
+          var(--finding-mobile-notes)
+          var(--finding-mobile-delete);
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        flex: 0 0 auto !important;
         align-items: center !important;
-        gap: 0.5rem !important;
+        gap: var(--finding-mobile-gap) !important;
+        margin-left: 0 !important;
         box-sizing: border-box !important;
       }
       #findings-container .finding-row.is-batch-finding .finding-row-actions {
         width: auto !important;
-        min-width: auto !important;
+        min-width: 0 !important;
         max-width: none !important;
-        flex: 1 0 auto !important;
+        flex: 0 0 auto !important;
       }
       #findings-container .finding-dates-group {
-        width: 12.5rem !important;
-        min-width: 12.5rem !important;
-        max-width: 12.5rem !important;
-        flex: 0 0 12.5rem !important;
+        grid-column: 1;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: var(--finding-mobile-dates) !important;
+        flex: 0 0 var(--finding-mobile-dates) !important;
         margin-left: 0 !important;
-        align-items: flex-end !important;
+        align-items: stretch !important;
         overflow: visible !important;
       }
       #findings-container .finding-date-control,
@@ -1079,11 +1103,22 @@
         width: 100% !important;
         justify-content: flex-end !important;
       }
+      #findings-container .finding-date-display,
+      #findings-container .finding-begin-date-display {
+        width: 100% !important;
+        min-width: 0 !important;
+        justify-content: flex-end !important;
+      }
+      #findings-container :is(.finding-date-display, .finding-begin-date-display) > :is(time, span):first-child {
+        min-width: 0 !important;
+        flex: 1 1 auto !important;
+      }
       #findings-container .finding-doctor-control {
-        width: 8.5rem !important;
-        min-width: 8.5rem !important;
-        max-width: 8.5rem !important;
-        flex: 0 0 8.5rem !important;
+        grid-column: 2;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: var(--finding-mobile-doctor) !important;
+        flex: 0 0 var(--finding-mobile-doctor) !important;
       }
       #findings-container .finding-doctor-control span {
         padding: 0.25rem 0.35rem !important;
@@ -1094,27 +1129,50 @@
         font-size: 9.5px !important;
       }
       #findings-container .finding-pricing-group {
+        grid-column: 3;
         display: flex !important;
         flex-direction: column !important;
-        align-items: flex-end !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: var(--finding-mobile-price) !important;
+        align-items: stretch !important;
         justify-content: center !important;
         flex-shrink: 0 !important;
       }
       #findings-container .finding-price-control {
-        width: 6rem !important;
-        min-width: 6rem !important;
-        max-width: 6rem !important;
-        flex: 0 0 6rem !important;
+        display: inline-flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: var(--finding-mobile-price) !important;
+        height: 2.75rem !important;
+        min-height: 2.75rem !important;
+        max-height: 2.75rem !important;
+        flex: 0 0 2.75rem !important;
       }
       #findings-container .finding-row.is-batch-finding .finding-pricing-group,
       #findings-container .finding-row.is-batch-finding .finding-price-control {
-        width: 6.85rem !important;
-        min-width: 6.85rem !important;
-        max-width: 6.85rem !important;
-        flex: 0 0 6.85rem !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: var(--finding-mobile-price) !important;
+      }
+      #findings-container .finding-pricing-group > :first-child {
+        width: 100% !important;
+        min-width: 0 !important;
+      }
+      #findings-container .finding-price-control > span {
+        display: inline-flex !important;
+        height: 100% !important;
+        align-items: center !important;
       }
       #findings-container .finding-price-control input {
-        width: 3.25rem !important;
+        width: auto !important;
+        min-width: 0 !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        flex: 1 1 auto !important;
+        padding-block: 0.25rem !important;
         font-size: 10px !important;
       }
       #findings-container .finding-batch-multiplier-row {
@@ -1140,10 +1198,11 @@
         font-size: 9.5px !important;
       }
       #findings-container .finding-status-control {
-        width: 4rem !important;
-        min-width: 4rem !important;
-        max-width: 4rem !important;
-        flex: 0 0 4rem !important;
+        grid-column: 4;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: var(--finding-mobile-status) !important;
+        flex: 0 0 var(--finding-mobile-status) !important;
         justify-content: center !important;
       }
       #findings-container .finding-status-select-mobile {
@@ -1156,38 +1215,48 @@
         text-align-last: center !important;
       }
       #findings-container .finding-note-button {
-        width: 2.25rem !important;
-        min-width: 2.25rem !important;
-        max-width: 2.25rem !important;
-        height: 2rem !important;
-        flex: 0 0 2.25rem !important;
+        grid-column: 6;
+        width: 100% !important;
+        min-width: 2.75rem !important;
+        max-width: var(--finding-mobile-notes) !important;
+        height: 2.75rem !important;
+        flex: 0 0 var(--finding-mobile-notes) !important;
         padding: 0 !important;
         justify-content: center !important;
       }
       #findings-container .finding-delete-button {
-        width: 1.75rem !important;
-        min-width: 1.75rem !important;
-        max-width: 1.75rem !important;
-        height: 1.75rem !important;
-        flex: 0 0 1.75rem !important;
+        grid-column: 7;
+        width: 2.75rem !important;
+        min-width: 2.75rem !important;
+        max-width: 2.75rem !important;
+        height: 2.75rem !important;
+        flex: 0 0 2.75rem !important;
+        justify-content: center !important;
+      }
+      #findings-container .finding-separate-button {
+        grid-column: 5;
+        width: 100% !important;
+        min-height: 2.75rem !important;
         justify-content: center !important;
       }
       #findings-container .finding-row.has-procedure-steps {
-        width: 100% !important;
-        min-width: 0 !important;
-        max-width: 100% !important;
+        width: var(--finding-mobile-row-width) !important;
+        min-width: var(--finding-mobile-row-width) !important;
+        max-width: var(--finding-mobile-row-width) !important;
       }
       #findings-container .finding-row.has-procedure-steps .finding-row-summary,
       #findings-container .finding-row.has-procedure-steps .finding-row-actions {
-        width: 100% !important;
+        width: auto !important;
         min-width: 0 !important;
-        max-width: 100% !important;
-        flex: 1 1 100% !important;
+        max-width: none !important;
+        flex: 0 0 auto !important;
       }
       #findings-container .finding-row.has-procedure-steps .finding-row-actions {
-        flex-wrap: wrap !important;
-        justify-content: flex-end !important;
+        display: grid !important;
         margin-left: 0 !important;
+      }
+      #findings-container .finding-row.has-procedure-steps [data-procedure-steps-panel] {
+        grid-column: 1 / -1;
       }
     }
 
@@ -1277,6 +1346,73 @@
       max-width: 100% !important;
       min-width: 0 !important;
       box-sizing: border-box !important;
+    }
+
+    @media (max-width: 899px) {
+      #findings-container .finding-row.has-ortho-visits {
+        display: block !important;
+        width: var(--finding-mobile-row-width) !important;
+        min-width: var(--finding-mobile-row-width) !important;
+        max-width: var(--finding-mobile-row-width) !important;
+      }
+      #findings-container .finding-row.has-ortho-visits .finding-row-main {
+        display: grid !important;
+        grid-template-columns: var(--finding-mobile-summary) max-content;
+        align-items: center !important;
+        column-gap: 0.625rem !important;
+        row-gap: 0.625rem !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
+      }
+      #findings-container .finding-row.has-ortho-visits .finding-row-summary {
+        grid-column: 1;
+        display: flex !important;
+        width: var(--finding-mobile-summary) !important;
+        min-width: 0 !important;
+        max-width: var(--finding-mobile-summary) !important;
+        overflow: hidden !important;
+        flex: 0 0 var(--finding-mobile-summary) !important;
+      }
+      #findings-container .finding-row.has-ortho-visits .finding-row-actions {
+        grid-column: 2;
+        display: grid !important;
+        grid-template-columns:
+          var(--finding-mobile-dates)
+          var(--finding-mobile-doctor)
+          var(--finding-mobile-price)
+          var(--finding-mobile-status)
+          var(--finding-mobile-separate)
+          var(--finding-mobile-notes)
+          var(--finding-mobile-delete);
+        align-items: center !important;
+        gap: var(--finding-mobile-gap) !important;
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        margin: 0 !important;
+      }
+      #findings-container .finding-row.has-ortho-visits .finding-operation-details {
+        min-width: 0 !important;
+        flex: 1 1 auto !important;
+        overflow: hidden !important;
+      }
+      #findings-container .finding-row.has-ortho-visits .finding-operation-heading {
+        max-width: 100% !important;
+        flex-wrap: wrap !important;
+        white-space: normal !important;
+        overflow: hidden !important;
+      }
+    }
+
+    @media (min-width: 640px) and (max-width: 899px) {
+      #findings-container {
+        --finding-mobile-doctor: 9.5rem;
+        --finding-mobile-price: 10.5rem;
+        --finding-mobile-status: 11.5rem;
+        --finding-mobile-notes: 4.75rem;
+        --finding-mobile-row-width: 83rem;
+      }
     }
 
     /* Desktop finding rows share one column contract so every control aligns vertically. */

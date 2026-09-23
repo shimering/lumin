@@ -33,7 +33,22 @@ test('conditional batch and expandable rows preserve the column contract', () =>
   assert.match(html, /\.finding-row\.has-ortho-visits \.finding-row-main[\s\S]*display:\s*grid !important/);
 });
 
-test('tablet and mobile findings retain contained horizontal scrolling', () => {
+test('tablet and mobile findings use one fixed card length with contained scrolling', () => {
   assert.match(html, /@media \(max-width: 899px\)[\s\S]*#findings-container\s*\{[\s\S]*overflow-x:\s*auto !important/);
-  assert.match(html, /#findings-container \.finding-row\s*\{[\s\S]*min-width:\s*58\.5rem !important/);
+  assert.match(html, /--finding-mobile-row-width:\s*70rem/);
+  assert.match(html, /@media \(min-width: 640px\) and \(max-width: 899px\)[\s\S]*--finding-mobile-row-width:\s*83rem/);
+  assert.match(html, /#findings-container \.finding-row\s*\{[\s\S]*grid-template-columns:\s*var\(--finding-mobile-summary\) max-content/);
+  assert.match(html, /#findings-container \.finding-row\.is-batch-finding\s*\{[\s\S]*width:\s*var\(--finding-mobile-row-width\) !important/);
+  assert.match(html, /#findings-container \.finding-row\.has-procedure-steps\s*\{[\s\S]*width:\s*var\(--finding-mobile-row-width\) !important/);
+  assert.match(html, /#findings-container \.finding-row\.has-ortho-visits\s*\{[\s\S]*width:\s*var\(--finding-mobile-row-width\) !important/);
+});
+
+test('mobile summaries cannot overlap the date column', () => {
+  assert.match(html, /#findings-container \.finding-row-summary\s*\{[\s\S]*max-width:\s*var\(--finding-mobile-summary\) !important;[\s\S]*overflow:\s*hidden !important/);
+  assert.match(html, /#findings-container \.finding-row-actions\s*\{[\s\S]*grid-template-columns:[\s\S]*var\(--finding-mobile-dates\)[\s\S]*var\(--finding-mobile-delete\)/);
+});
+
+test('mobile price controls keep the horizontal desktop shape', () => {
+  assert.match(html, /#findings-container \.finding-price-control\s*\{[\s\S]*flex-direction:\s*row !important;[\s\S]*height:\s*2\.75rem !important/);
+  assert.match(html, /#findings-container \.finding-price-control input\s*\{[\s\S]*height:\s*100% !important;[\s\S]*flex:\s*1 1 auto !important/);
 });
