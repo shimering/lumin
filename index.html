@@ -1279,6 +1279,145 @@
       box-sizing: border-box !important;
     }
 
+    /* Desktop finding rows share one column contract so every control aligns vertically. */
+    @media (min-width: 900px) {
+      #findings-container {
+        --finding-summary-min: 18rem;
+        --finding-column-dates: 13.5rem;
+        --finding-column-doctor: 12.5rem;
+        --finding-column-price: 10.5rem;
+        --finding-column-status: 11.5rem;
+        --finding-column-separate: 6rem;
+        --finding-column-notes: 4.75rem;
+        --finding-column-delete: 2rem;
+        --finding-column-gap: 0.5rem;
+        --finding-row-min-width: 86.5rem;
+      }
+      #findings-container .finding-row:not(.has-ortho-visits) {
+        display: grid !important;
+        grid-template-columns: minmax(var(--finding-summary-min), 1fr) max-content;
+        align-items: center !important;
+        column-gap: 0.75rem !important;
+        row-gap: 0.625rem !important;
+        width: 100% !important;
+        min-width: var(--finding-row-min-width) !important;
+        max-width: none !important;
+      }
+      #findings-container .finding-row-summary {
+        grid-column: 1;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        margin: 0 !important;
+      }
+      #findings-container .finding-row-actions,
+      #findings-container .finding-row.has-ortho-visits .finding-row-actions {
+        grid-column: 2;
+        display: grid !important;
+        grid-template-columns:
+          var(--finding-column-dates)
+          var(--finding-column-doctor)
+          var(--finding-column-price)
+          var(--finding-column-status)
+          var(--finding-column-separate)
+          var(--finding-column-notes)
+          var(--finding-column-delete);
+        align-items: center !important;
+        gap: var(--finding-column-gap) !important;
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        margin: 0 !important;
+      }
+      #findings-container .finding-dates-group {
+        grid-column: 1;
+        width: 100%;
+        min-width: 0;
+        margin: 0 !important;
+        align-items: stretch !important;
+      }
+      #findings-container :is(.finding-date-control, .finding-begin-date-control),
+      #findings-container :is(.finding-date-display, .finding-begin-date-display) {
+        width: 100%;
+        min-width: 0;
+        justify-content: flex-end;
+      }
+      #findings-container :is(.finding-date-display, .finding-begin-date-display) > :is(time, span):first-child {
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+      #findings-container .finding-doctor-control {
+        grid-column: 2;
+        width: 100%;
+        min-width: 0;
+      }
+      #findings-container .finding-pricing-group {
+        grid-column: 3;
+        width: 100%;
+        min-width: 0;
+        align-items: stretch !important;
+      }
+      #findings-container .finding-pricing-group > :first-child,
+      #findings-container .finding-pricing-group > .finding-price-control {
+        width: 100%;
+        min-width: 0;
+      }
+      #findings-container .finding-pricing-group > :first-child .finding-price-control {
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+      #findings-container .finding-price-control input {
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+      #findings-container .finding-status-control {
+        grid-column: 4;
+        width: 100% !important;
+        min-width: 0;
+      }
+      #findings-container .finding-separate-button {
+        grid-column: 5;
+        width: 100%;
+        justify-content: center;
+      }
+      #findings-container .finding-note-button {
+        grid-column: 6;
+        width: 100% !important;
+        justify-content: center;
+      }
+      #findings-container .finding-delete-button {
+        grid-column: 7;
+        justify-self: center;
+      }
+      #findings-container .finding-row.has-procedure-steps > [data-procedure-steps-panel] {
+        grid-column: 1 / -1;
+      }
+      #findings-container .finding-row.has-ortho-visits {
+        display: block !important;
+        width: 100% !important;
+        min-width: var(--finding-row-min-width) !important;
+        max-width: none !important;
+      }
+      #findings-container .finding-row.has-ortho-visits .finding-row-main {
+        display: grid !important;
+        grid-template-columns: minmax(var(--finding-summary-min), 1fr) max-content;
+        align-items: center !important;
+        column-gap: 0.75rem !important;
+        row-gap: 0.625rem !important;
+        width: 100% !important;
+        min-width: 0 !important;
+      }
+      #findings-container .finding-row.has-ortho-visits .finding-row-summary {
+        display: flex !important;
+        flex: 1 1 auto !important;
+      }
+      #findings-container .finding-row.has-ortho-visits .finding-operation-details {
+        min-width: 0 !important;
+        flex: 1 1 auto !important;
+        overflow: hidden !important;
+      }
+    }
+
     @media (max-width: 767.98px) {
       .procedure-step-clinical-row {
         align-items: start;
@@ -28995,7 +29134,7 @@
                   ${operationStatusSelectOptions(finding.status, false)}
                 </select>
               </label>`}
-              ${isBatch ? '<button type="button" onclick="separateFindingBatch(this)" class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[10px] font-black text-violet-700 transition hover:border-violet-300 hover:bg-violet-100" aria-label="Separate this batch into one row per tooth" title="Create one independent documented row for each tooth"><i data-lucide="split" class="h-3 w-3"></i>Separate</button>' : ''}
+              ${isBatch ? '<button type="button" onclick="separateFindingBatch(this)" class="finding-separate-button inline-flex shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[10px] font-black text-violet-700 transition hover:border-violet-300 hover:bg-violet-100" aria-label="Separate this batch into one row per tooth" title="Create one independent documented row for each tooth"><i data-lucide="split" class="h-3 w-3"></i>Separate</button>' : ''}
               <button type="button" data-finding-note-trigger aria-haspopup="dialog" aria-expanded="false" aria-controls="chart-finding-note-popover" onpointerenter="showChartFindingNotePreviewFromPointer(event, this)" onpointerleave="scheduleChartFindingNotePreviewClose(event)" onclick="toggleChartFindingNotePreview(event, this)" class="finding-note-button inline-flex h-8 ${findingNotes.length ? 'px-2' : 'w-8'} sm:h-auto sm:w-auto sm:px-2.5 sm:py-1.5 shrink-0 items-center justify-center gap-1 rounded-lg border text-[10px] font-black transition ${findingNotes.length ? 'border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-100' : 'border-slate-200 bg-white text-slate-500 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700'}" aria-label="${findingNotes.length ? `${findingNotes.length} note${findingNotes.length === 1 ? '' : 's'}` : 'Notes'} for ${escapeHtml(dentalOperationLabel(finding.code))}" title="${findingNotes.length ? `${findingNotes.length} note${findingNotes.length === 1 ? '' : 's'}` : 'Notes'} · ${escapeHtml(dentalOperationLabel(finding.code))}">
                 <i data-lucide="sticky-note" class="h-3.5 w-3.5 shrink-0"></i>
                 <span class="finding-note-text hidden sm:inline">Notes</span>
