@@ -8881,6 +8881,19 @@
   </div>
 
   <!-- ================= MODAL: RECORD INVOICE PAYMENT ================= -->
+  <div id="modal-invoice-discount" class="fixed inset-0 z-[81] hidden items-end justify-center bg-slate-900/40 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+    <div role="dialog" aria-modal="true" aria-labelledby="invoice-discount-title" class="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:rounded-2xl">
+      <div class="flex items-start justify-between gap-4 border-b border-slate-100 bg-gradient-to-br from-violet-50 to-white p-5"><div><span class="text-xs font-semibold uppercase tracking-wider text-violet-700">Patient invoice</span><h3 id="invoice-discount-title" class="mt-1 text-lg font-semibold tracking-tight text-slate-900">Invoice discount</h3><p id="invoice-discount-number" class="mt-1 text-xs font-medium text-slate-500"></p></div><button type="button" onclick="closeInvoiceDiscountModal()" aria-label="Close discount form" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-500 transition-all duration-150 ease-out hover:bg-slate-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20"><i data-lucide="x" class="h-5 w-5"></i></button></div>
+      <form id="invoice-discount-form" onsubmit="saveInvoiceDiscount(event)" class="space-y-4 p-5">
+        <div class="rounded-xl bg-slate-50 p-4 text-sm text-slate-700"><div class="flex justify-between gap-3"><span>Procedure subtotal</span><strong id="invoice-discount-subtotal" class="text-slate-900"></strong></div><div class="mt-2 flex justify-between gap-3"><span>Current patient balance</span><strong id="invoice-discount-current-balance" class="text-slate-900"></strong></div></div>
+        <div class="grid grid-cols-2 gap-3"><label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-700">Discount type</span><select id="invoice-discount-type" onchange="updateInvoiceDiscountPreview()" class="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20"><option value="amount">Amount (EGP)</option><option value="percent">Percent (%)</option></select></label><label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-700">Value</span><input id="invoice-discount-value" type="number" inputmode="decimal" min="0" step="0.01" required oninput="updateInvoiceDiscountPreview()" class="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20"></label></div>
+        <div class="rounded-xl bg-violet-50 p-4 text-sm text-violet-800"><div class="flex justify-between gap-3"><span>Discount</span><strong id="invoice-discount-preview-amount"></strong></div><div class="mt-2 flex justify-between gap-3"><span>New patient balance</span><strong id="invoice-discount-preview-balance"></strong></div><p class="mt-2 text-xs leading-relaxed">Doctor salary remains based on the full procedure price.</p></div>
+        <p id="invoice-discount-message" class="hidden rounded-xl px-3 py-2 text-xs font-semibold" role="alert"></p>
+        <div class="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4" style="padding-bottom:max(1rem,env(safe-area-inset-bottom))"><button type="button" onclick="closeInvoiceDiscountModal()" class="min-h-11 rounded-xl bg-slate-100 px-4 text-xs font-semibold text-slate-700 transition-all duration-150 ease-out hover:bg-slate-200 active:scale-[0.98]">Cancel</button><button id="invoice-discount-save" type="submit" class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-violet-600 px-4 text-xs font-semibold text-white transition-all duration-150 ease-out hover:bg-violet-700 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"><i data-lucide="badge-percent" class="h-4 w-4"></i> Save discount</button></div>
+      </form>
+    </div>
+  </div>
+
   <div id="modal-payment" class="fixed inset-0 z-[80] hidden items-center justify-center bg-slate-900/45 p-4 backdrop-blur-xs">
     <div role="dialog" aria-modal="true" aria-labelledby="payment-modal-title" class="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
       <div class="border-b border-slate-100 bg-gradient-to-br from-emerald-50 to-white p-5">
@@ -9444,10 +9457,12 @@
     let activePaymentInvoiceId = null;
     let activePaymentInvoiceItemId = null;
     let activePaymentInvoice = null;
+    let activeDiscountInvoice = null;
     let activeInvoiceDateEditId = null;
     let selectedFindingIds = new Set();
     let invoicedFindingIds = new Set();
     let chartSalaryTransfersByFindingId = new Map();
+    let chartInvoiceItemsByFindingId = new Map();
     let toothDentitionLongPressGesture = null;
     let toothDentitionLongPressSuppressClickUntil = 0;
     const TOOTH_DENTITION_LONG_PRESS_DELAY = 550;
@@ -9875,6 +9890,20 @@
       'View invoice': 'عرض الفاتورة',
       'Pay': 'دفع',
       'Record payment': 'تسجيل دفعة',
+      'Patient invoice': 'فاتورة المريض',
+      'Invoice discount': 'خصم الفاتورة',
+      'Close discount form': 'إغلاق نافذة الخصم',
+      'Procedure subtotal': 'إجمالي أسعار الإجراءات',
+      'Current patient balance': 'رصيد المريض الحالي',
+      'Discount type': 'نوع الخصم',
+      'Amount (EGP)': 'مبلغ (جنيه)',
+      'Percent (%)': 'نسبة مئوية (%)',
+      'Value': 'القيمة',
+      'Discount': 'الخصم',
+      'New patient balance': 'رصيد المريض الجديد',
+      'Doctor salary remains based on the full procedure price.': 'يظل راتب الطبيب محسوبًا على السعر الكامل للإجراء.',
+      'Save discount': 'حفظ الخصم',
+      'Discounted': 'تم الخصم',
       'Pay invoice': 'دفع الفاتورة',
       'Pay procedure': 'دفع الإجراء',
       'Paid in full': 'مدفوع بالكامل',
@@ -12119,9 +12148,11 @@
         activePaymentInvoiceId = null;
         activePaymentInvoiceItemId = null;
         activePaymentInvoice = null;
+        activeDiscountInvoice = null;
         activeDiagnosisAppointmentId = null;
         selectedFindingIds = new Set();
         invoicedFindingIds = new Set();
+        chartInvoiceItemsByFindingId = new Map();
         expandedFindingProcedureSteps = new Set();
         collapsedOrthoFindings = new Set();
         chartInvoiceStatePatientId = null;
@@ -12281,6 +12312,7 @@
         activeDiagnosisAppointmentId = null;
         selectedFindingIds = new Set();
         invoicedFindingIds = new Set();
+        chartInvoiceItemsByFindingId = new Map();
         chartInvoiceStatePatientId = null;
         chartInvoiceStateLoading = false;
         const urlParams = new URLSearchParams(window.location.search);
@@ -22064,9 +22096,9 @@
       return collectDocumentedFindings(patient).length;
     }
 
-    const INVOICE_SELECT_FIELDS = 'id, patient_id, invoice_date, status, paid_amount, loyalty_discount_amount, created_by, created_at, updated_at, patients(name, phone, patient_number), patient_invoice_items(id, invoice_id, finding_id, operation_id, operation_code, operation_name, operation_status, tooth_id, surfaces, unit_price, quantity, doctor_id, doctor_name, created_at), invoice_payments(id, invoice_id, invoice_item_id, patient_id, payment_method_id, payment_method_name, amount, payment_date, created_by, created_at, invoice_payment_allocations(invoice_item_id, amount)), invoice_releases(id, invoice_id, amount, release_date, created_by, created_at)';
+    const INVOICE_SELECT_FIELDS = 'id, patient_id, invoice_date, status, paid_amount, loyalty_discount_amount, manual_discount_type, manual_discount_value, manual_discount_amount, created_by, created_at, updated_at, patients(name, phone, patient_number), patient_invoice_items(id, invoice_id, finding_id, operation_id, operation_code, operation_name, operation_status, tooth_id, surfaces, unit_price, quantity, doctor_id, doctor_name, created_at), invoice_payments(id, invoice_id, invoice_item_id, patient_id, payment_method_id, payment_method_name, amount, payment_date, created_by, created_at, invoice_payment_allocations(invoice_item_id, amount)), invoice_releases(id, invoice_id, amount, release_date, created_by, created_at)';
     const FINANCE_INVOICE_SELECT_FIELDS = INVOICE_SELECT_FIELDS.replace('patients(', 'patients!inner(');
-    const FINANCE_DEPT_INVOICE_SELECT_FIELDS = 'id, patient_id, invoice_date, status, paid_amount, loyalty_discount_amount, created_by, created_at, updated_at, patients!inner(name, phone, patient_number), patient_invoice_items(id, unit_price, quantity), invoice_releases(id, invoice_id, amount, release_date, created_by, created_at)';
+    const FINANCE_DEPT_INVOICE_SELECT_FIELDS = 'id, patient_id, invoice_date, status, paid_amount, loyalty_discount_amount, manual_discount_amount, created_by, created_at, updated_at, patients!inner(name, phone, patient_number), patient_invoice_items(id, unit_price, quantity), invoice_releases(id, invoice_id, amount, release_date, created_by, created_at)';
     const FINANCE_PAYMENT_SELECT_FIELDS = 'id, invoice_id, patient_id, payment_method_id, payment_method_name, amount, payment_date, created_by, created_at, patients!inner(name, phone, patient_number)';
 
     async function fetchPatientDoctorSalaryTransfers(patientId) {
@@ -22176,6 +22208,9 @@
         paidAmount: payments.length ? recordedPaidAmount : Math.max(0, Number(record.paid_amount) || 0),
         releasedAmount: releases.reduce((sum, release) => sum + release.amount, 0),
         loyaltyDiscount: Math.max(0, Number(record.loyalty_discount_amount) || 0),
+        manualDiscountType: record.manual_discount_type || null,
+        manualDiscountValue: Math.max(0, Number(record.manual_discount_value) || 0),
+        manualDiscount: Math.max(0, Number(record.manual_discount_amount) || 0),
         createdBy: record.created_by,
         createdAt: record.created_at,
         updatedAt: record.updated_at,
@@ -22189,6 +22224,13 @@
       return invoice.loyaltyDiscount > 0 ? '<span class="inline-flex rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">' + loyaltyText('Loyalty discount: ', 'خصم الولاء: ') + escapeHtml(formatInvoiceMoney(invoice.loyaltyDiscount)) + '</span>' : '';
     }
 
+    function invoiceManualDiscountBadge(invoice) {
+      if (!invoice.manualDiscount) return '';
+      const label = currentUiLanguage === 'ar' ? 'خصم الفاتورة' : 'Invoice discount';
+      const percent = invoice.manualDiscountType === 'percent' ? ` (${invoice.manualDiscountValue}%)` : '';
+      return `<span class="inline-flex rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-800">${label}${percent}: ${escapeHtml(formatInvoiceMoney(invoice.manualDiscount))}</span>`;
+    }
+
     function invalidateLoyaltyInvoiceViews() {
       financeInvoicesLoaded = false;
       financeDeptsLoaded = false;
@@ -22197,7 +22239,7 @@
     }
 
     function invoiceTotal(invoice) {
-      return Math.max(0, invoice.items.reduce((total, item) => total + (item.unitPrice * item.quantity), 0) - (invoice.loyaltyDiscount || 0));
+      return Math.max(0, invoice.items.reduce((total, item) => total + (item.unitPrice * item.quantity), 0) - (invoice.loyaltyDiscount || 0) - (invoice.manualDiscount || 0));
     }
 
     function invoiceRemaining(invoice) {
@@ -22220,11 +22262,30 @@
     }
 
     function invoiceItemRemaining(invoice, item) {
-      return Math.max(0, invoiceItemTotal(item) - invoiceItemPaidAmount(invoice, item.id));
+      return Math.max(0, invoiceItemPatientTotal(invoice, item) - invoiceItemPaidAmount(invoice, item.id));
+    }
+
+    function invoiceItemPatientTotal(invoice, item) {
+      const discount = (invoice.loyaltyDiscount || 0) + (invoice.manualDiscount || 0);
+      if (!discount) return invoiceItemTotal(item);
+      const unpaidItems = invoice.items.map(entry => ({ item: entry, unpaid: Math.max(0, invoiceItemTotal(entry) - invoiceItemPaidAmount(invoice, entry.id)) }));
+      const unpaidTotal = unpaidItems.reduce((sum, entry) => sum + entry.unpaid, 0);
+      if (!unpaidTotal) return invoiceItemTotal(item);
+      const lastUnpaidIndex = unpaidItems.findLastIndex(entry => entry.unpaid > 0);
+      let allocated = 0;
+      for (let index = 0; index < unpaidItems.length; index++) {
+        const entry = unpaidItems[index];
+        const share = index === lastUnpaidIndex
+          ? discount - allocated
+          : Math.min(entry.unpaid, Math.round(discount * entry.unpaid / unpaidTotal * 100) / 100);
+        if (Number(entry.item.id) === Number(item.id)) return Math.max(0, invoiceItemTotal(item) - share);
+        allocated += share;
+      }
+      return invoiceItemTotal(item);
     }
 
     function invoiceItemPaymentPercent(invoice, item) {
-      const total = invoiceItemTotal(item);
+      const total = invoiceItemPatientTotal(invoice, item);
       return total > 0 ? Math.min(100, Math.round((invoiceItemPaidAmount(invoice, item.id) / total) * 100)) : 0;
     }
 
@@ -22243,6 +22304,7 @@
     function invoiceDisplayStatus(invoice) {
       if (invoice.status === 'cancelled') return { label: 'Cancelled', className: 'border-slate-200 bg-slate-100 text-slate-500' };
       if (invoice.loyaltyDiscount > 0 && invoiceRemaining(invoice) <= 0) return { label: 'Settled with loyalty', className: 'border-blue-200 bg-blue-50 text-blue-700' };
+      if (invoice.manualDiscount > 0 && invoiceRemaining(invoice) <= 0 && invoice.paidAmount === 0 && invoice.releasedAmount === 0) return { label: 'Discounted', className: 'border-violet-200 bg-violet-50 text-violet-700' };
       const total = invoiceTotal(invoice);
       if (invoice.releasedAmount > 0 && invoiceRemaining(invoice) <= 0) {
         return invoice.paidAmount > 0
@@ -22531,7 +22593,7 @@
           <td data-label="Invoice" class="px-5 py-4"><span class="rounded-lg bg-slate-100 px-2.5 py-1 font-mono text-[11px] font-black text-slate-700">${escapeHtml(invoiceNumber(invoice.id))}</span></td>
           <td data-label="Patient" class="px-5 py-4"><span class="block font-black text-slate-800">${escapeHtml(patientName)}</span><span class="mt-1 block text-[10px] font-bold text-slate-400">${escapeHtml(patientMeta)}</span></td>
           <td data-label="Date" class="px-5 py-4 font-bold text-slate-600">${escapeHtml(formatInvoiceDate(invoice.invoiceDate))}</td>
-          <td data-label="Total" class="px-5 py-4 text-right font-black text-slate-800">${escapeHtml(formatInvoiceMoney(total))}${invoiceLoyaltyBadge(invoice)}</td>
+          <td data-label="Total" class="px-5 py-4 text-right font-black text-slate-800">${escapeHtml(formatInvoiceMoney(total))}${invoiceLoyaltyBadge(invoice)}${invoiceManualDiscountBadge(invoice)}</td>
           <td data-label="Paid" class="px-5 py-4 text-right font-black text-emerald-700">${escapeHtml(formatInvoiceMoney(invoice.paidAmount))}</td>
           <td data-label="Released" class="px-5 py-4 text-right font-black text-rose-700">${escapeHtml(formatInvoiceMoney(invoice.releasedAmount))}</td>
           <td data-label="Remaining" class="px-5 py-4 text-right font-black ${remaining > 0 ? 'text-amber-700' : 'text-emerald-700'}">${escapeHtml(formatInvoiceMoney(remaining))}</td>
@@ -23835,6 +23897,87 @@
       }
     }
 
+    async function openInvoiceDiscountModal(invoiceId) {
+      if (!hasPageAccess('patients')) return;
+      const modal = document.getElementById('modal-invoice-discount');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      activeDiscountInvoice = null;
+      setAdminMessage('invoice-discount-message', '');
+      document.getElementById('invoice-discount-number').textContent = invoiceNumber(invoiceId);
+      document.getElementById('invoice-discount-save').disabled = true;
+      try {
+        const { data, error } = await db.from('patient_invoices').select(INVOICE_SELECT_FIELDS).eq('id', Number(invoiceId)).single();
+        if (error) throw error;
+        if (modal.classList.contains('hidden')) return;
+        activeDiscountInvoice = normaliseInvoiceRecord(data);
+        document.getElementById('invoice-discount-type').value = activeDiscountInvoice.manualDiscountType || 'amount';
+        document.getElementById('invoice-discount-value').value = activeDiscountInvoice.manualDiscountValue || '';
+        document.getElementById('invoice-discount-subtotal').textContent = formatInvoiceMoney(activeDiscountInvoice.items.reduce((sum, item) => sum + invoiceItemTotal(item), 0));
+        document.getElementById('invoice-discount-current-balance').textContent = formatInvoiceMoney(invoiceRemaining(activeDiscountInvoice));
+        updateInvoiceDiscountPreview();
+        translateUiTree(modal, currentUiLanguage);
+        if (window.lucide) lucide.createIcons();
+      } catch (error) {
+        setAdminMessage('invoice-discount-message', error.message || 'Could not load invoice.', 'error');
+      }
+    }
+
+    function closeInvoiceDiscountModal() {
+      const modal = document.getElementById('modal-invoice-discount');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      activeDiscountInvoice = null;
+      document.getElementById('invoice-discount-form').reset();
+      setAdminMessage('invoice-discount-message', '');
+    }
+
+    function updateInvoiceDiscountPreview() {
+      if (!activeDiscountInvoice) return;
+      const invoice = activeDiscountInvoice;
+      const subtotal = invoice.items.reduce((sum, item) => sum + invoiceItemTotal(item), 0);
+      const type = document.getElementById('invoice-discount-type').value;
+      const value = Number(document.getElementById('invoice-discount-value').value) || 0;
+      const discount = type === 'percent' ? Math.round(subtotal * value) / 100 : value;
+      const maximum = Math.max(0, subtotal - invoice.loyaltyDiscount - invoice.paidAmount - invoice.releasedAmount);
+      const valid = Number.isFinite(value) && value >= 0 && (type !== 'percent' || value <= 100) && discount <= maximum + 0.001;
+      document.getElementById('invoice-discount-value').max = type === 'percent' ? '100' : maximum.toFixed(2);
+      document.getElementById('invoice-discount-preview-amount').textContent = formatInvoiceMoney(discount);
+      document.getElementById('invoice-discount-preview-balance').textContent = formatInvoiceMoney(Math.max(0, subtotal - invoice.loyaltyDiscount - discount - invoice.paidAmount - invoice.releasedAmount));
+      document.getElementById('invoice-discount-save').disabled = !valid;
+      setAdminMessage('invoice-discount-message', valid ? '' : (currentUiLanguage === 'ar' ? 'يجب ألا يتجاوز الخصم الرصيد غير المدفوع أو ١٠٠٪.' : 'The discount cannot exceed the unpaid balance or 100%.'), valid ? '' : 'error');
+    }
+
+    async function saveInvoiceDiscount(event) {
+      event.preventDefault();
+      if (!activeDiscountInvoice || !hasPageAccess('patients')) return;
+      updateInvoiceDiscountPreview();
+      const button = document.getElementById('invoice-discount-save');
+      if (button.disabled) return;
+      const invoice = activeDiscountInvoice;
+      button.disabled = true;
+      try {
+        const { error } = await db.rpc('set_patient_invoice_discount', {
+          p_invoice_id: Number(invoice.id),
+          p_discount_type: document.getElementById('invoice-discount-type').value,
+          p_discount_value: Number(document.getElementById('invoice-discount-value').value) || 0
+        });
+        if (error) throw error;
+        closeInvoiceDiscountModal();
+        dashboardInvoiceCache.clear();
+        financeInvoicesLoaded = false;
+        financeDeptsLoaded = false;
+        financeOverviewLoaded = false;
+        await renderPatientInvoices();
+        if (activePatientId === invoice.patientId && hasPageAccess('chart')) await refreshChartFindingInvoiceState(invoice.patientId);
+        if (hasPageAccess('finances') && !document.getElementById('view-finances').classList.contains('hidden')) await refreshActiveFinanceTab();
+        showAppointmentNotificationToast(currentUiLanguage === 'ar' ? 'تم تحديث الخصم' : 'Discount updated', invoiceNumber(invoice.id));
+      } catch (error) {
+        setAdminMessage('invoice-discount-message', error.message || 'Could not save discount.', 'error');
+        button.disabled = false;
+      }
+    }
+
     function invoicePaymentIndicatorMarkup(invoice, completeAsTick = false) {
       const percent = invoicePaymentPercent(invoice);
       const complete = percent >= 100;
@@ -23847,16 +23990,17 @@
 
     function invoiceItemPaymentIndicatorMarkup(invoice, item) {
       const percent = invoiceItemPaymentPercent(invoice, item);
-      const complete = percent >= 100 && invoiceItemTotal(item) > 0;
+      const complete = percent >= 100 && invoiceItemPatientTotal(invoice, item) > 0;
       const color = complete ? '#16a34a' : percent > 0 ? '#2563eb' : '#cbd5e1';
       const center = complete
         ? '<i data-lucide="check" class="h-3.5 w-3.5 text-emerald-600"></i>'
         : '<span class="text-[9px] font-black text-slate-600">' + percent + '%</span>';
-      return '<span title="' + percent + '% paid" aria-label="' + percent + '% paid for ' + escapeHtml(item.operationName) + '" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full p-[2px]" style="background:conic-gradient(' + color + ' ' + percent + '%,#e2e8f0 ' + percent + '%)"><span class="flex h-full w-full items-center justify-center rounded-full bg-white">' + center + '</span></span>';
+      const paymentLabel = currentUiLanguage === 'ar' ? percent + '٪ مدفوع للإجراء ' + item.operationName : percent + '% paid for ' + item.operationName;
+      return '<span title="' + escapeHtml(paymentLabel) + '" aria-label="' + escapeHtml(paymentLabel) + '" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full p-[2px]" style="background:conic-gradient(' + color + ' ' + percent + '%,#e2e8f0 ' + percent + '%)"><span class="flex h-full w-full items-center justify-center rounded-full bg-white">' + center + '</span></span>';
     }
 
     async function openInvoicePaymentModal(invoiceId, invoiceItemId = null) {
-      if (!canRecordInvoicePayment()) return;
+      if (!canRecordInvoicePayment() && !hasPageAccess('chart')) return;
       const modal = document.getElementById('modal-payment');
       modal.classList.remove('hidden');
       modal.classList.add('flex');
@@ -23871,7 +24015,7 @@
       try {
         const [invoiceResult] = await Promise.all([
           db.from('patient_invoices').select(INVOICE_SELECT_FIELDS).eq('id', activePaymentInvoiceId).single(),
-          ensurePaymentMethodsLoaded()
+          canRecordInvoicePayment() ? ensurePaymentMethodsLoaded() : Promise.resolve()
         ]);
         if (invoiceResult.error) throw invoiceResult.error;
         if (activePaymentInvoiceId !== Number(invoiceId) || activePaymentInvoiceItemId !== (invoiceItemId === null ? null : Number(invoiceItemId))) return;
@@ -23881,12 +24025,11 @@
           ? null
           : invoice.items.find(item => Number(item.id) === activePaymentInvoiceItemId);
         if (activePaymentInvoiceItemId !== null && !invoiceItem) throw new Error('This procedure is no longer part of the invoice.');
-        const total = invoiceItem ? invoiceItemTotal(invoiceItem) : invoiceTotal(invoice);
+        const total = invoiceItem ? invoiceItemPatientTotal(invoice, invoiceItem) : invoiceTotal(invoice);
         const paid = invoiceItem ? invoiceItemPaidAmount(invoice, invoiceItem.id) : invoice.paidAmount;
         const remaining = invoiceItem
           ? Math.min(invoiceItemRemaining(invoice, invoiceItem), invoiceRemaining(invoice))
           : invoiceRemaining(invoice);
-        if (remaining <= 0) throw new Error(invoiceItem ? 'This procedure has no payable balance.' : 'This invoice is already settled.');
         activePaymentInvoice = invoice;
         document.getElementById('payment-modal-title').textContent = invoiceItem ? 'Pay procedure' : 'Pay invoice';
         document.getElementById('payment-modal-invoice-summary').textContent = (patient?.name || invoice.patientName || 'Patient') + ' · ' + (invoiceItem?.operationName || invoiceNumber(invoice.id));
@@ -23898,11 +24041,12 @@
         amountInput.value = remaining.toFixed(2);
         document.getElementById('payment-amount-hint').textContent = 'Maximum ' + formatInvoiceMoney(remaining);
         document.getElementById('payment-date').value = appointmentDateKey(new Date());
-        const activeMethods = paymentMethods.filter(method => method.active);
+        const activeMethods = canRecordInvoicePayment() ? paymentMethods.filter(method => method.active) : [];
         document.getElementById('payment-method').innerHTML = activeMethods.length
           ? '<option value="">Choose a method</option>' + activeMethods.map(method => '<option value="' + method.id + '">' + escapeHtml(method.name) + '</option>').join('')
           : '<option value="">No active payment methods</option>';
-        document.getElementById('payment-save-button').disabled = !activeMethods.length;
+        document.getElementById('payment-save-button').disabled = !activeMethods.length || remaining <= 0;
+        if (remaining <= 0 || !canRecordInvoicePayment()) setAdminMessage('payment-form-message', remaining <= 0 ? (currentUiLanguage === 'ar' ? 'لا يوجد رصيد متبقٍ للدفع.' : 'There is no remaining balance to pay.') : (currentUiLanguage === 'ar' ? 'يمكنك عرض حالة الدفع فقط.' : 'You can view payment status only.'), 'success');
         translateUiTree(modal, currentUiLanguage);
         lucide.createIcons();
         amountInput.focus();
@@ -23966,6 +24110,7 @@
         if (!document.getElementById('view-dashboard').classList.contains('hidden')) renderDashboard();
         if (!document.getElementById('view-invoices').classList.contains('hidden') && activeInvoicePatientId === patientId) await renderPatientInvoices();
         if (!document.getElementById('view-payments').classList.contains('hidden') && activeWorkspacePatientId === patientId) await renderPatientPayments();
+        if (activePatientId === patientId && hasPageAccess('chart') && !document.getElementById('view-chart').classList.contains('hidden')) await refreshChartFindingInvoiceState(patientId);
         if (hasPageAccess('finances') && !document.getElementById('view-finances').classList.contains('hidden')) await refreshActiveFinanceTab();
         showAppointmentNotificationToast('Payment recorded', formatInvoiceMoney(amount) + ' added to ' + (invoiceItem?.operationName || 'the invoice') + '.');
       } catch (error) {
@@ -24244,7 +24389,7 @@
       const palmerBadge = isMouth
         ? `<span class="inline-flex h-8 w-12 shrink-0 items-center justify-center rounded-lg border border-cyan-200 bg-cyan-50 text-cyan-700 shadow-2xs" title="${currentUiLanguage === 'ar' ? 'كامل الفم' : 'Whole mouth'}" aria-label="${currentUiLanguage === 'ar' ? 'كامل الفم' : 'Whole mouth'}">${wholeMouthIconSVG('h-6 w-9')}</span>`
         : item.toothId
-        ? '<span class="inline-flex h-8 w-12 shrink-0 items-center justify-center rounded-lg border border-violet-200/80 bg-white/75 text-violet-700 shadow-sm backdrop-blur-sm" title="' + escapeHtml(chartToothLabel(item.toothId)) + '">' + palmerNotationSVG(item.toothId, toothSlot, 'h-7 w-10') + '</span>'
+        ? '<span class="inline-flex h-8 w-12 shrink-0 items-center justify-center rounded-lg border border-violet-200 bg-white/75 text-violet-700 shadow-sm backdrop-blur-sm" title="' + escapeHtml(chartToothLabel(item.toothId)) + '">' + palmerNotationSVG(item.toothId, toothSlot, 'h-7 w-10') + '</span>'
         : '<span class="inline-flex h-8 w-12 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white/75 text-[9px] font-black text-slate-400">No tooth</span>';
       const surfaceLabels = item.surfaces.map(surface => CHART_SURFACES.includes(surface) ? surfaceAbbreviation(item.toothId, surface) : surface);
       const surfaces = isMouth ? 'No tooth selection' : surfaceLabels.length ? 'Surfaces ' + surfaceLabels.join(', ') : 'Whole tooth';
@@ -24262,14 +24407,14 @@
           ? '<span class="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-[10px] font-black ' + (salaryStatus === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700') + '"><i data-lucide="' + (salaryStatus === 'paid' ? 'circle-check' : 'arrow-right-left') + '" class="h-4 w-4"></i>' + (salaryStatus === 'paid' ? (currentUiLanguage === 'ar' ? 'تم دفع الراتب' : 'Salary paid') : (currentUiLanguage === 'ar' ? 'محول للراتب' : 'Transferred')) + '</span>'
           : '';
       const deleteDisabled = paidAmount > 0 || invoice.releasedAmount > 0 || invoice.loyaltyDiscount > 0;
-      const deleteTitle = invoice.loyaltyDiscount > 0 ? 'Reverse the discount on the patient Loyalty tab before deleting procedures.' : invoice.releasedAmount > 0
+      const deleteTitle = invoice.loyaltyDiscount > 0 ? 'Reverse the loyalty discount on the patient Loyalty tab before deleting procedures.' : invoice.releasedAmount > 0
         ? 'A released invoice cannot have procedures deleted.'
         : deleteDisabled ? 'Remove all payments for this procedure before deleting it.' : 'Delete procedure from invoice';
-      const balanceLabel = invoice.loyaltyDiscount > 0 && invoiceBalanceRemaining <= 0 ? 'Settled with loyalty' : invoiceBalanceReleased
+      const balanceLabel = invoice.loyaltyDiscount > 0 && invoiceBalanceRemaining <= 0 ? 'Settled with loyalty' : invoice.manualDiscount > 0 && remaining <= 0 ? (currentUiLanguage === 'ar' ? 'تمت تسويته بالخصم' : 'Settled with discount') : invoiceBalanceReleased
         ? 'Invoice balance released'
         : remaining > 0 ? formatInvoiceMoney(remaining) + ' remaining' : 'Paid in full';
       const deleteButton = '<button type="button" onclick="deletePatientInvoiceItem(' + item.id + ',' + invoice.id + ')" ' + (deleteDisabled ? 'disabled' : '') + ' title="' + escapeHtml(deleteTitle) + '" aria-label="Delete ' + escapeHtml(item.operationName) + ' from invoice" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg transition-all duration-150 ease-out active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50 ' + (deleteDisabled ? 'cursor-not-allowed bg-slate-100 text-slate-400' : 'bg-rose-50 text-rose-700 hover:bg-rose-100') + '"><i data-lucide="trash-2" class="h-4 w-4"></i></button>';
-      return '<article data-invoice-procedure="' + item.id + '" class="mx-2 mb-2 grid gap-2 rounded-xl border border-violet-100/90 bg-gradient-to-br from-white/95 via-violet-50/55 to-blue-50/45 px-3 py-2.5 shadow-sm shadow-violet-900/5 backdrop-blur-sm transition hover:border-violet-200 hover:shadow-md sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">'
+      return '<article data-invoice-procedure="' + item.id + '" class="mx-2 mb-2 grid gap-2 rounded-xl border border-slate-200 bg-gradient-to-br from-white/95 via-violet-50/55 to-blue-50/45 px-3 py-2.5 shadow-sm shadow-violet-900/5 backdrop-blur-sm transition hover:border-slate-300 hover:shadow-md sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">'
         + '<div class="flex min-w-0 items-center gap-3">' + palmerBadge + '<div class="min-w-0 flex-1"><div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5"><h5 class="min-w-0 text-xs font-black tracking-tight text-slate-900 sm:text-sm">' + escapeHtml(item.operationName) + '</h5><span class="rounded-md border px-1.5 py-0.5 text-[9px] font-black ' + status.badgeClass + '">' + escapeHtml(status.key) + ' · ' + escapeHtml(status.label) + '</span></div>'
         + '<div class="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[9px] font-bold text-slate-500"><span>' + escapeHtml(toothMeta) + '</span><span class="text-violet-300">•</span><span>' + escapeHtml(surfaces) + '</span><span class="text-violet-300">•</span><span class="inline-flex items-center gap-1"><i data-lucide="stethoscope" class="h-2.5 w-2.5 text-slate-400"></i>' + escapeHtml(item.doctorName) + '</span></div>'
         + '<div class="mt-1 flex flex-wrap items-center gap-1.5"><span class="inline-flex items-center gap-1 rounded-lg border border-violet-100 bg-white/70 px-2 py-1 text-[9px] font-black text-slate-600"><i data-lucide="calendar-days" class="h-3 w-3 text-violet-500"></i>' + escapeHtml(formatInvoiceDate(invoice.invoiceDate)) + '</span><button type="button" onclick="openInvoiceDateEditor(' + invoice.id + ',\'' + escapeHtml(invoice.invoiceDate) + '\')" class="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-100/65 px-2 py-1 text-[9px] font-black text-violet-700 transition hover:bg-violet-100"><i data-lucide="pencil" class="h-2.5 w-2.5"></i> Edit date</button><span class="text-[9px] font-black ' + (invoiceBalanceReleased ? 'text-rose-600' : remaining > 0 ? 'text-amber-600' : 'text-emerald-600') + '">' + escapeHtml(balanceLabel) + '</span></div></div></div>'
@@ -24312,13 +24457,17 @@
       const undoReleaseButton = invoice.releases.length && canUndoInvoiceRelease()
         ? '<button type="button" onclick="undoLatestInvoiceRelease(' + invoice.id + ', this)" class="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800 transition hover:bg-amber-100"><i data-lucide="undo-2" class="h-3.5 w-3.5"></i> Undo release</button>'
         : '';
+      const discountButton = hasPageAccess('patients') && invoice.items.length && invoice.status !== 'cancelled'
+        ? '<button type="button" onclick="openInvoiceDiscountModal(' + invoice.id + ')" class="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-violet-50 px-3 text-xs font-semibold text-violet-700 transition-all duration-150 ease-out hover:bg-violet-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20"><i data-lucide="badge-percent" class="h-4 w-4"></i>' + (currentUiLanguage === 'ar' ? (invoice.manualDiscount ? 'تعديل الخصم' : 'إضافة خصم') : (invoice.manualDiscount ? 'Edit discount' : 'Add discount')) + '</button>'
+        : '';
       const canDeleteInvoice = !invoice.payments.length && !invoice.releases.length && hasPageAccess('patients');
       const deleteInvoiceButton = canDeleteInvoice
         ? '<button type="button" onclick="deletePatientInvoice(' + invoice.id + ')" title="Delete invoice" aria-label="Delete invoice" class="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-rose-50 px-3 text-xs font-black text-rose-700 transition-all duration-150 ease-out hover:bg-rose-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20"><i data-lucide="trash-2" class="h-4 w-4"></i> Delete</button>'
         : '';
       return '<article class="overflow-hidden rounded-2xl border transition ' + (complete ? 'border-emerald-200 bg-emerald-50/40 shadow-sm shadow-emerald-900/5' : 'border-slate-200 bg-white hover:border-violet-200') + '">'
-        + '<div class="flex flex-col gap-3 border-b border-slate-100 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><div class="flex flex-wrap items-center gap-2"><span class="font-mono text-[11px] font-black text-slate-700">' + escapeHtml(invoiceNumber(invoice.id)) + '</span><span class="text-[10px] font-bold text-slate-400">' + escapeHtml(formatInvoiceDate(invoice.invoiceDate)) + '</span><span class="rounded-lg border px-2.5 py-1 text-[10px] font-black ' + status.className + '">' + escapeHtml(status.label) + '</span>' + (invoice.releasedAmount > 0 ? '<span class="text-[10px] font-black text-rose-600">' + escapeHtml(formatInvoiceMoney(invoice.releasedAmount)) + ' released</span>' : '') + '</div><div class="flex flex-wrap gap-2">' + payButton + releaseButton + undoReleaseButton + deleteInvoiceButton + '</div></div>'
-        + (invoice.loyaltyDiscount > 0 ? '<div class="px-4 py-2">' + invoiceLoyaltyBadge(invoice) + '</div>' : '')
+        + '<div class="flex flex-col gap-3 border-b border-slate-100 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><div class="flex flex-wrap items-center gap-2"><span class="font-mono text-[11px] font-black text-slate-700">' + escapeHtml(invoiceNumber(invoice.id)) + '</span><span class="text-[10px] font-bold text-slate-400">' + escapeHtml(formatInvoiceDate(invoice.invoiceDate)) + '</span><span class="rounded-lg border px-2.5 py-1 text-[10px] font-black ' + status.className + '">' + escapeHtml(status.label) + '</span>' + (invoice.releasedAmount > 0 ? '<span class="text-[10px] font-black text-rose-600">' + escapeHtml(formatInvoiceMoney(invoice.releasedAmount)) + ' released</span>' : '') + '</div><div class="flex flex-wrap gap-2">' + discountButton + payButton + releaseButton + undoReleaseButton + deleteInvoiceButton + '</div></div>'
+        + '<div class="flex flex-wrap items-center justify-between gap-2 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-700"><span>' + (currentUiLanguage === 'ar' ? 'إجمالي المريض' : 'Patient total') + ': <strong class="text-slate-900">' + escapeHtml(formatInvoiceMoney(total)) + '</strong></span><span>' + (currentUiLanguage === 'ar' ? 'المتبقي' : 'Remaining') + ': <strong class="text-amber-700">' + escapeHtml(formatInvoiceMoney(remaining)) + '</strong></span></div>'
+        + ((invoice.loyaltyDiscount > 0 || invoice.manualDiscount > 0) ? '<div class="flex flex-wrap gap-2 px-4 py-2">' + invoiceLoyaltyBadge(invoice) + invoiceManualDiscountBadge(invoice) + '</div>' : '')
         + '<div class="bg-gradient-to-b from-white to-slate-50/70 pt-2">' + (invoice.items.length ? invoice.items.map(item => invoiceItemMarkup(item, invoice)).join('') : '<p class="px-4 py-5 text-center text-xs font-bold text-slate-400">No invoice items.</p>') + '</div></article>';
     }
 
@@ -26530,6 +26679,7 @@
         selectedFindingIds = new Set();
         invoicedFindingIds = new Set();
         chartSalaryTransfersByFindingId = new Map();
+        chartInvoiceItemsByFindingId = new Map();
         chartInvoiceStatePatientId = null;
       }
       activeWorkspacePatientId = patientId;
@@ -26781,6 +26931,7 @@
           e.target.closest('#modal-new-patient') ||
           e.target.closest('#modal-appointment') ||
           e.target.closest('#modal-payment') ||
+          e.target.closest('#modal-invoice-discount') ||
           e.target.closest('#modal-expense') ||
           e.target.closest('#modal-expense-payment') ||
           e.target.closest('#modal-invoice-date') ||
@@ -28635,6 +28786,9 @@
         ]);
         if (chartInvoiceStatePatientId !== patientId || activePatientId !== patientId) return;
         invoicedFindingIds = new Set(invoices.flatMap(invoice => invoice.items.map(item => item.findingId).filter(Boolean)));
+        chartInvoiceItemsByFindingId = new Map(invoices.flatMap(invoice => invoice.items
+          .filter(item => item.findingId)
+          .map(item => [item.findingId, { invoice, item }])));
         chartSalaryTransfersByFindingId = new Map(invoices.flatMap(invoice => invoice.items
           .filter(item => item.findingId && salaryTransfers.has(Number(item.id)))
           .map(item => [item.findingId, { ...salaryTransfers.get(Number(item.id)), invoiceItemId: item.id }])));
@@ -29033,6 +29187,17 @@
       });
     }
 
+    function chartFindingPaymentButton(findingId, label = '') {
+      const linked = chartInvoiceItemsByFindingId.get(findingId);
+      if (!linked) return '';
+      const { invoice, item } = linked;
+      const percent = invoiceItemPaymentPercent(invoice, item);
+      const title = currentUiLanguage === 'ar'
+        ? `فتح مدفوعات ${label || item.operationName} في ${invoiceNumber(invoice.id)} · ${percent}٪ مدفوع`
+        : `Open payments for ${label || item.operationName} in ${invoiceNumber(invoice.id)} · ${percent}% paid`;
+      return `<button type="button" data-invoice-id="${Number(invoice.id)}" data-item-id="${Number(item.id)}" onclick="openInvoicePaymentModal(this.dataset.invoiceId,this.dataset.itemId)" class="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl bg-blue-50 px-2 text-xs font-semibold text-blue-700 transition-all duration-150 ease-out hover:bg-blue-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">${invoiceItemPaymentIndicatorMarkup(invoice, item)}${label ? `<span class="hidden max-w-16 truncate sm:inline">${escapeHtml(label)}</span>` : ''}</button>`;
+    }
+
     function renderFindingsList() {
       if (openChartFindingNoteTrigger) closeChartFindingNotePreview();
       const container = document.getElementById('findings-container');
@@ -29136,6 +29301,7 @@
                       ${currentUiLanguage === 'ar' ? 'زيارة' : 'Visit'} #${visit.visitNumber}
                     </span>
                     ${isVisitInvoiced ? '<span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-black text-emerald-700">' + (currentUiLanguage === 'ar' ? 'مفوترة' : 'Invoiced') + '</span>' : ''}
+                    ${isVisitInvoiced ? chartFindingPaymentButton(visit.id) : ''}
                   </div>
 
                   <div class="flex flex-wrap items-center gap-2 ms-auto">
@@ -29235,6 +29401,7 @@
           .map(member => ({ member, transfer: chartSalaryTransfersByFindingId.get(member.id) }))
           .filter(({ transfer }) => transfer?.transfer_status === 'eligible');
         const doctorSalaryActionMarkup = eligibleSalaryItems.map(({ member, transfer }) => `<button type="button" data-salary-transfer-item="${Number(transfer.invoiceItemId)}" onclick="transferDoctorSalaryInvoiceItem(${Number(transfer.invoiceItemId)})" class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-blue-50 px-3 text-[10px] font-black text-blue-700 transition-all duration-150 ease-out hover:bg-blue-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50" title="${currentUiLanguage === 'ar' ? 'تحويل الإجراء المكتمل والمفوتر لحساب راتب الطبيب' : 'Transfer this completed, invoiced procedure to doctor salary'}${eligibleSalaryItems.length > 1 ? ` · ${escapeHtml(chartFindingNoteTargetLabel(member))}` : ''}"><i data-lucide="arrow-right-left" class="h-4 w-4"></i>${currentUiLanguage === 'ar' ? 'تحويل للراتب' : 'Transfer to salary'}</button>`).join('');
+        const chartPaymentMarkup = isOrthoPackage ? '' : invoicedMemberIds.map(findingId => chartFindingPaymentButton(findingId, invoicedMemberIds.length > 1 ? chartToothLabel(memberFindings.find(member => member.id === findingId)?.toothId || '') : '')).join('');
         const isSelected = Boolean(selectableMemberIds.length && selectableMemberIds.every(findingId => selectedFindingIds.has(findingId)));
         const isCheckboxChecked = isFullyInvoiced || isSelected;
         const canSelect = Boolean(selectableMemberIds.length && !chartInvoiceStateLoading);
@@ -29426,6 +29593,7 @@
                   ${operationStatusSelectOptions(finding.status, false)}
                 </select>
               </label>`}
+              ${chartPaymentMarkup}
               ${doctorSalaryActionMarkup}
               ${isBatch ? '<button type="button" onclick="separateFindingBatch(this)" class="finding-separate-button inline-flex shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[10px] font-black text-violet-700 transition hover:border-violet-300 hover:bg-violet-100" aria-label="Separate this batch into one row per tooth" title="Create one independent documented row for each tooth"><i data-lucide="split" class="h-3 w-3"></i>Separate</button>' : ''}
               <button type="button" data-finding-note-trigger aria-haspopup="dialog" aria-expanded="false" aria-controls="chart-finding-note-popover" onpointerenter="showChartFindingNotePreviewFromPointer(event, this)" onpointerleave="scheduleChartFindingNotePreviewClose(event)" onclick="toggleChartFindingNotePreview(event, this)" class="finding-note-button inline-flex h-8 ${findingNotes.length ? 'px-2' : 'w-8'} sm:h-auto sm:w-auto sm:px-2.5 sm:py-1.5 shrink-0 items-center justify-center gap-1 rounded-lg border text-[10px] font-black transition ${findingNotes.length ? 'border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-100' : 'border-slate-200 bg-white text-slate-500 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700'}" aria-label="${findingNotes.length ? `${findingNotes.length} note${findingNotes.length === 1 ? '' : 's'}` : 'Notes'} for ${escapeHtml(dentalOperationLabel(finding.code))}" title="${findingNotes.length ? `${findingNotes.length} note${findingNotes.length === 1 ? '' : 's'}` : 'Notes'} · ${escapeHtml(dentalOperationLabel(finding.code))}">
@@ -38485,6 +38653,9 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       document.getElementById('modal-payment').addEventListener('click', event => {
         if (event.target.id === 'modal-payment') closePaymentModal();
       });
+      document.getElementById('modal-invoice-discount').addEventListener('click', event => {
+        if (event.target.id === 'modal-invoice-discount') closeInvoiceDiscountModal();
+      });
       document.getElementById('modal-invoice-date').addEventListener('click', event => {
         if (event.target.id === 'modal-invoice-date') closeInvoiceDateEditor();
       });
@@ -38523,6 +38694,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         else if (!document.getElementById('modal-expense-payment').classList.contains('hidden')) closeExpensePaymentModal();
         else if (!document.getElementById('modal-expense').classList.contains('hidden')) closeExpenseModal();
         else if (!document.getElementById('modal-invoice-date').classList.contains('hidden')) closeInvoiceDateEditor();
+        else if (!document.getElementById('modal-invoice-discount').classList.contains('hidden')) closeInvoiceDiscountModal();
         else if (!document.getElementById('modal-payment').classList.contains('hidden')) closePaymentModal();
       });
       document.addEventListener('click', event => {
