@@ -9447,6 +9447,7 @@
     let activeInvoiceDateEditId = null;
     let selectedFindingIds = new Set();
     let invoicedFindingIds = new Set();
+    let chartSalaryTransfersByFindingId = new Map();
     let toothDentitionLongPressGesture = null;
     let toothDentitionLongPressSuppressClickUntil = 0;
     const TOOTH_DENTITION_LONG_PRESS_DELAY = 550;
@@ -13811,6 +13812,7 @@
         const doctorIdValue = value.doctorId || value.doctor_id;
         const doctorNameValue = value.doctorName || value.doctor_name;
         const steps = normaliseChartFindingSteps(value.steps || value.procedureSteps || value.procedure_steps);
+        const doctorAssignmentMode = !doctorIdValue && (value.doctorAssignmentMode === 'steps' || steps.some(step => step.doctorId)) ? 'steps' : 'whole';
         const isProcedureStep = Boolean(value.isProcedureStep || value.is_procedure_step);
         const orthoVisits = normaliseOrthoVisits(value.orthoVisits || value.ortho_visits);
         const isOrthoPackage = Boolean(value.isOrthoPackage || value.is_ortho_package || orthoVisits.length > 0);
@@ -13826,6 +13828,7 @@
           billingMultiplier: Number.isInteger(billingMultiplier) && billingMultiplier >= 1 && billingMultiplier <= 999 ? billingMultiplier : null,
           doctorId: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(doctorIdValue || '')) ? String(doctorIdValue) : null,
           doctorName: String(doctorNameValue || '').trim().slice(0, 100),
+          doctorAssignmentMode,
           notes: normaliseChartOperationNotes(value.notes),
           steps,
           isProcedureStep,
@@ -13837,7 +13840,7 @@
           orthoVisits
         };
       }
-      return { code: String(value || 'none'), status: 'E', createdAt: null, beginDate: null, completedAt: null, id: null, price: null, batchId: null, billingMultiplier: null, doctorId: null, doctorName: '', notes: [], steps: [], isProcedureStep: false, parentFindingId: null, procedureStepId: '', procedureStepName: '', procedureStepPercentage: 0, isOrthoPackage: false, orthoVisits: [] };
+      return { code: String(value || 'none'), status: 'E', createdAt: null, beginDate: null, completedAt: null, id: null, price: null, batchId: null, billingMultiplier: null, doctorId: null, doctorName: '', doctorAssignmentMode: 'whole', notes: [], steps: [], isProcedureStep: false, parentFindingId: null, procedureStepId: '', procedureStepName: '', procedureStepPercentage: 0, isOrthoPackage: false, orthoVisits: [] };
     }
 
     function createChartFindingId() {
@@ -13907,7 +13910,7 @@
       } : null;
     }
 
-    function chartFindingStorageRecord(code, status, createdAt = null, id = null, price = null, batchId = null, notes = null, billingMultiplier = null, doctorId = null, doctorName = '', completedAt = null, steps = null, procedureStepMeta = null, beginDate = null, orthoVisits = null, isOrthoPackage = false) {
+    function chartFindingStorageRecord(code, status, createdAt = null, id = null, price = null, batchId = null, notes = null, billingMultiplier = null, doctorId = null, doctorName = '', completedAt = null, steps = null, procedureStepMeta = null, beginDate = null, orthoVisits = null, isOrthoPackage = false, doctorAssignmentMode = 'whole') {
       const hasExplicitPrice = price !== null && price !== undefined && String(price).trim() !== '';
       const numericPrice = hasExplicitPrice ? Number(price) : Number.NaN;
       const normalisedSteps = normaliseChartFindingSteps(steps);
@@ -13950,6 +13953,9 @@
         ...(step.doctorId ? { doctorId: step.doctorId, doctorName: step.doctorName } : {}),
         ...(step.completedAt ? { completedAt: step.completedAt } : {})
       }));
+      if (normalisedSteps.length && !record.doctorId && (doctorAssignmentMode === 'steps' || normalisedSteps.some(step => step.doctorId))) {
+        record.doctorAssignmentMode = 'steps';
+      }
       if (procedureStepMeta?.isProcedureStep) {
         record.isProcedureStep = true;
         record.parentFindingId = String(procedureStepMeta.parentFindingId || '');
@@ -13994,7 +14000,10 @@
           finding.completedAt,
           finding.steps,
           chartFindingProcedureStepMeta(finding),
-          finding.beginDate
+          finding.beginDate,
+          null,
+          false,
+          finding.doctorAssignmentMode
         ));
       if (records.length) toothData.surfaces[surface] = records;
       else delete toothData.surfaces[surface];
@@ -14019,7 +14028,7 @@
 
     function ensureWholeOperations(toothData) {
       toothData.wholeOperations = chartWholeFindings(toothData).map(finding => (
-        chartFindingStorageRecord(finding.code, finding.status, finding.createdAt, finding.id, finding.price, finding.batchId, finding.notes, finding.billingMultiplier, finding.doctorId, finding.doctorName, finding.completedAt, finding.steps, chartFindingProcedureStepMeta(finding), finding.beginDate, finding.orthoVisits, finding.isOrthoPackage)
+        chartFindingStorageRecord(finding.code, finding.status, finding.createdAt, finding.id, finding.price, finding.batchId, finding.notes, finding.billingMultiplier, finding.doctorId, finding.doctorName, finding.completedAt, finding.steps, chartFindingProcedureStepMeta(finding), finding.beginDate, finding.orthoVisits, finding.isOrthoPackage, finding.doctorAssignmentMode)
       ));
       toothData.status = 'none';
       return toothData.wholeOperations;
@@ -14035,7 +14044,7 @@
     function ensureMouthOperations(patient) {
       const meta = ensureChartMeta(patient);
       meta.mouthOperations = chartMouthFindings(patient).map(finding => (
-        chartFindingStorageRecord(finding.code, finding.status, finding.createdAt, finding.id, finding.price, null, finding.notes, null, finding.doctorId, finding.doctorName, finding.completedAt, finding.steps, chartFindingProcedureStepMeta(finding), finding.beginDate, finding.orthoVisits, finding.isOrthoPackage)
+        chartFindingStorageRecord(finding.code, finding.status, finding.createdAt, finding.id, finding.price, null, finding.notes, null, finding.doctorId, finding.doctorName, finding.completedAt, finding.steps, chartFindingProcedureStepMeta(finding), finding.beginDate, finding.orthoVisits, finding.isOrthoPackage, finding.doctorAssignmentMode)
       ));
       return meta.mouthOperations;
     }
@@ -14061,7 +14070,8 @@
           chartFindingProcedureStepMeta(finding),
           finding.beginDate,
           finding.orthoVisits,
-          finding.isOrthoPackage
+          finding.isOrthoPackage,
+          finding.doctorAssignmentMode
         ));
       if (records.length) meta.mouthOperations = records;
       else delete meta.mouthOperations;
@@ -14118,7 +14128,10 @@
             finding.completedAt,
             finding.steps,
             chartFindingProcedureStepMeta(finding),
-            finding.beginDate
+            finding.beginDate,
+            null,
+            false,
+            finding.doctorAssignmentMode
           ));
         });
         toothData.surfaces = nextSurfaces;
@@ -22063,23 +22076,29 @@
     }
 
     function doctorSalaryExpenseDeletionMessage(items, transfers) {
-      const expenses = [...new Map(items.map(item => transfers.get(Number(item.id)))
-        .filter(item => item?.expense_id)
-        .map(item => [item.expense_id, item])).values()];
-      const lines = expenses.map(item => `${item.expense_name || 'Salary expense'} (${item.expense_id})`);
+      const expenses = [...new Map(items.flatMap(item => {
+        const transfer = transfers.get(Number(item.id));
+        return Array.isArray(transfer?.expenses) && transfer.expenses.length
+          ? transfer.expenses
+          : transfer?.expense_id ? [{ id: transfer.expense_id, name: transfer.expense_name }] : [];
+      }).map(expense => [expense.id, expense])).values()];
+      const lines = expenses.map(expense => `${expense.name || 'Salary expense'} (${expense.id})`);
       return currentUiLanguage === 'ar'
         ? `احذف مصروف راتب الطبيب التالي من المالية أولاً، ثم أعد محاولة حذف الفاتورة أو الإجراء:\n${lines.join('\n')}`
         : `Delete the following doctor salary expense in Finances first, then delete the invoice or procedure:\n${lines.join('\n')}`;
     }
 
     async function transferDoctorSalaryInvoiceItem(itemId) {
-      if (!hasPageAccess('patients')) return;
-      const button = document.querySelector(`[data-salary-transfer-item="${Number(itemId)}"]`);
-      if (button) button.disabled = true;
+      if (!hasPageAccess('patients') && !hasPageAccess('chart')) return;
+      const buttons = [...document.querySelectorAll(`[data-salary-transfer-item="${Number(itemId)}"]`)];
+      buttons.forEach(button => { button.disabled = true; });
       try {
         const { error } = await db.rpc('transfer_doctor_salary_invoice_item', { p_item_id: Number(itemId) });
         if (error) throw error;
         await renderPatientInvoices();
+        if (activePatientId && !document.getElementById('view-chart')?.classList.contains('hidden')) {
+          await refreshChartFindingInvoiceState(activePatientId);
+        }
         hrDirectoryLoaded = false;
         showAppointmentNotificationToast(
           currentUiLanguage === 'ar' ? 'تم تحويل الإجراء' : 'Procedure transferred',
@@ -22088,7 +22107,7 @@
       } catch (error) {
         alert((currentUiLanguage === 'ar' ? 'تعذر تحويل الإجراء: ' : 'Could not transfer the procedure: ') + (error?.message || 'Unknown error'));
       } finally {
-        if (button?.isConnected) button.disabled = false;
+        buttons.forEach(button => { if (button.isConnected) button.disabled = false; });
       }
     }
 
@@ -26510,6 +26529,7 @@
         activeSelection = emptyChartSelection();
         selectedFindingIds = new Set();
         invoicedFindingIds = new Set();
+        chartSalaryTransfersByFindingId = new Map();
         chartInvoiceStatePatientId = null;
       }
       activeWorkspacePatientId = patientId;
@@ -26532,8 +26552,11 @@
       renderChartStructure();
       updateSelectionUI();
       renderFindingsList();
-      if (chartMetadataChanged) saveActivePatientChart();
-      refreshChartFindingInvoiceState(patient.id);
+      if (chartMetadataChanged) {
+        void saveActivePatientChart().then(() => refreshChartFindingInvoiceState(patient.id));
+      } else {
+        void refreshChartFindingInvoiceState(patient.id);
+      }
     }
 
     function openNewPatientModal(options = {}) {
@@ -27474,6 +27497,10 @@
 
       const findingIds = chartFindingIdsFromControl(button);
       const toothIds = chartFindingToothIdsFromControl(button);
+      if (findingIds.some(findingId => invoicedFindingIds.has(findingId))) {
+        alert(currentUiLanguage === 'ar' ? 'احذف الإجراء من الفاتورة أولاً قبل حذفه من مخطط الأسنان. احذف مصروف راتب الطبيب المرتبط قبل حذف الفاتورة إن وُجد.' : 'Remove this procedure from its invoice before deleting it from the dental chart. Delete any linked doctor salary expense first.');
+        return;
+      }
       const operationCode = card.dataset.operationCode;
       const operationLabel = dentalOperationLabel(operationCode);
       const targetLabel = card.dataset.findingKind === 'mouth'
@@ -27547,7 +27574,8 @@
             chartFindingProcedureStepMeta(nextFinding),
             nextFinding.beginDate,
             nextFinding.orthoVisits,
-            nextFinding.isOrthoPackage
+            nextFinding.isOrthoPackage,
+            nextFinding.doctorAssignmentMode
           );
           updated = true;
         });
@@ -27768,7 +27796,10 @@
             sourceFinding.completedAt,
             sourceFinding.steps?.map(step => ({ ...step, payrollFindingId: existingFinding ? step.payrollFindingId : createChartFindingId() })),
             chartFindingProcedureStepMeta(sourceFinding),
-            sourceFinding.beginDate
+            sourceFinding.beginDate,
+            null,
+            false,
+            sourceFinding.doctorAssignmentMode
           );
           const toothData = getOrCreateChartTooth(patient, toothId);
           if (documentedGroup.kind === 'whole') {
@@ -27840,18 +27871,25 @@
       return updated;
     }
 
-    function chartDoctorSelectOptions(finding) {
+    function chartDoctorSelectOptions(finding, options = {}) {
       const assignedId = String(finding?.doctorId || '');
       const assignedDoctor = chartDoctors.find(doctor => doctor.userId === assignedId);
-      const options = ['<option value="">Unassigned doctor</option>'];
+      const wholeProcedure = Boolean(options.wholeProcedure);
+      const choices = [];
+      if (wholeProcedure && !assignedId && finding?.doctorAssignmentMode !== 'steps') {
+        choices.push(`<option value="__whole_unassigned__" selected>${currentUiLanguage === 'ar' ? 'اختر طبيب الإجراء' : 'Choose whole doctor'}</option>`);
+      }
+      choices.push(`<option value="">${wholeProcedure
+        ? (currentUiLanguage === 'ar' ? 'بدون طبيب — تعيين الخطوات' : 'Unassigned — assign steps')
+        : (currentUiLanguage === 'ar' ? 'بدون طبيب' : 'Unassigned doctor')}</option>`);
       if (assignedId && !assignedDoctor) {
-        options.push(`<option value="${escapeHtml(assignedId)}" selected>${escapeHtml(finding?.doctorName || 'Previously assigned doctor')} (inactive)</option>`);
+        choices.push(`<option value="${escapeHtml(assignedId)}" selected>${escapeHtml(finding?.doctorName || (currentUiLanguage === 'ar' ? 'طبيب معين سابقاً' : 'Previously assigned doctor'))} ${currentUiLanguage === 'ar' ? '(غير نشط)' : '(inactive)'}</option>`);
       }
       chartDoctors.forEach(doctor => {
-        options.push(`<option value="${escapeHtml(doctor.userId)}" ${doctor.userId === assignedId ? 'selected' : ''}>${escapeHtml(doctor.fullName)}</option>`);
+        choices.push(`<option value="${escapeHtml(doctor.userId)}" ${doctor.userId === assignedId ? 'selected' : ''}>${escapeHtml(doctor.fullName)}</option>`);
       });
-      if (!chartDoctorsLoaded && !assignedId) options.push('<option value="" disabled>Loading doctors...</option>');
-      return options.join('');
+      if (!chartDoctorsLoaded && !assignedId) choices.push(`<option value="" disabled>${currentUiLanguage === 'ar' ? 'جارٍ تحميل الأطباء...' : 'Loading doctors...'}</option>`);
+      return choices.join('');
     }
 
     function toggleFindingProcedureSteps(button) {
@@ -27875,6 +27913,13 @@
       const findingIds = chartFindingIdsFromControl(control);
       const stepId = String(control.dataset.procedureStepId || '');
       if (!patient || !findingIds.length || !stepId || !['doctor', 'status'].includes(field)) return;
+
+      const group = chartFindingGroupFromControl(control);
+      if (field === 'doctor' && (group?.memberFindings || [group]).some(finding => finding?.doctorId || finding?.doctorAssignmentMode !== 'steps')) {
+        alert(currentUiLanguage === 'ar' ? 'اختر «بدون طبيب — تعيين الخطوات» في قائمة طبيب الإجراء أولاً.' : 'Choose “Unassigned — assign steps” in the whole-procedure doctor list first.');
+        renderFindingsList();
+        return;
+      }
 
       let doctor = null;
       if (field === 'doctor' && control.value) {
@@ -27924,11 +27969,18 @@
         });
         if (error) throw error;
         hrDirectoryLoaded = false;
+        financeInvoicesLoaded = false;
+        dashboardInvoiceCache.clear();
+        await refreshChartFindingInvoiceState(patient.id);
         const step = normaliseChartFindingSteps(refreshedGroup?.steps).find(item => item.id === stepId);
         showAppointmentNotificationToast(
-          field === 'doctor' ? (doctor ? 'Step doctor assigned' : 'Step doctor unassigned') : 'Procedure step updated',
           field === 'doctor'
-            ? doctor ? `${doctor.fullName} is assigned to ${step?.name || 'this step'}.` : `${step?.name || 'This step'} will not create percentage-based salary.`
+            ? (doctor ? (currentUiLanguage === 'ar' ? 'تم تعيين طبيب للخطوة' : 'Step doctor assigned') : (currentUiLanguage === 'ar' ? 'تم إلغاء تعيين طبيب الخطوة' : 'Step doctor unassigned'))
+            : (currentUiLanguage === 'ar' ? 'تم تحديث خطوة الإجراء' : 'Procedure step updated'),
+          field === 'doctor'
+            ? doctor
+              ? (currentUiLanguage === 'ar' ? `سيُحتسب نصيب خطوة ${step?.name || 'الإجراء'} للطبيب ${doctor.fullName} بعد اكتمال الإجراء وفوترته وتحويله.` : `${doctor.fullName} receives this step's share after the procedure is completed, invoiced, and transferred.`)
+              : (currentUiLanguage === 'ar' ? 'عيّن طبيباً لكل خطوة قبل تحويل الإجراء للراتب.' : 'Assign a doctor to every step before salary transfer.')
             : `${step?.name || 'The step'} is now ${operationStatusDefinition(step?.status || 'P').label.toLowerCase()}.`
         );
       } catch (error) {
@@ -27944,6 +27996,7 @@
       const patient = getActivePatient();
       const findingIds = chartFindingIdsFromControl(control);
       if (!patient || !findingIds.length) return;
+      if (control.value === '__whole_unassigned__') return;
       const doctorId = String(control.value || '');
       const doctor = doctorId ? chartDoctors.find(item => item.userId === doctorId) : null;
       if (doctorId && !doctor) {
@@ -27952,11 +28005,19 @@
         return;
       }
 
+      const group = chartFindingGroupFromControl(control);
+      if (doctor && (group?.memberFindings || [group]).some(finding => normaliseChartFindingSteps(finding?.steps).some(step => step.doctorId))) {
+        alert(currentUiLanguage === 'ar' ? 'ألغِ تعيين جميع أطباء الخطوات أولاً قبل تعيين طبيب للإجراء بالكامل.' : 'Unassign every step doctor before assigning the whole procedure to one doctor.');
+        renderFindingsList();
+        return;
+      }
+
       const previousChartState = JSON.parse(JSON.stringify(patient.chartState || {}));
       const updated = updateChartFindingsByIds(patient, findingIds, finding => ({
         ...finding,
         doctorId: doctor?.userId || null,
-        doctorName: doctor?.fullName || ''
+        doctorName: doctor?.fullName || '',
+        doctorAssignmentMode: doctor ? 'whole' : (normaliseChartFindingSteps(finding.steps).length ? 'steps' : 'whole')
       }));
       if (!updated) return;
       renderFindingsList();
@@ -27971,9 +28032,14 @@
         hrDirectoryLoaded = false;
         financeInvoicesLoaded = false;
         dashboardInvoiceCache.clear();
+        await refreshChartFindingInvoiceState(patient.id);
         showAppointmentNotificationToast(
           doctor ? 'Doctor assigned' : 'Doctor unassigned',
-          doctor ? `${doctor.fullName} will receive the configured salary when this procedure is completed.` : 'This procedure will not be included in doctor payroll.'
+          doctor
+            ? (currentUiLanguage === 'ar' ? `سيُحتسب كامل سعر الإجراء للطبيب ${doctor.fullName} بعد اكتماله وفوترته وتحويله للراتب.` : `${doctor.fullName} receives the whole procedure value after completion, invoicing, and salary transfer.`)
+            : normaliseChartFindingSteps(group?.steps).length
+              ? (currentUiLanguage === 'ar' ? 'يمكنك الآن تعيين أطباء للخطوات، أو ترك الإجراء دون طبيب.' : 'You can now assign doctors to individual steps.')
+              : (currentUiLanguage === 'ar' ? 'لم يعد هناك طبيب معين لهذا الإجراء.' : 'This procedure has no assigned doctor.')
         );
       } catch (error) {
         patient.chartState = previousChartState;
@@ -28388,6 +28454,7 @@
       const patient = getActivePatient();
       const findingIds = chartFindingIdsFromControl(control);
       if (!patient || !findingIds.length) return;
+      const previousChartState = JSON.parse(JSON.stringify(patient.chartState || {}));
       const nextStatus = normaliseOperationStatus(control.value, 'E');
       const completedAt = new Date().toISOString();
       const nowIso = new Date().toISOString();
@@ -28402,7 +28469,14 @@
       })) return;
       renderChartFindingTeeth(chartFindingToothIdsFromControl(control));
       renderFindingsList();
-      await saveActivePatientChart();
+      if (!(await saveActivePatientChart())) {
+        patient.chartState = previousChartState;
+        renderChartFindingTeeth(chartFindingToothIdsFromControl(control));
+        renderFindingsList();
+        alert(currentUiLanguage === 'ar' ? 'تعذر تحديث حالة الإجراء. احذف مصروف راتب الطبيب المرتبط أولاً إذا كان الراتب مدفوعاً.' : 'Could not update the procedure status. Delete its linked doctor salary expense first if salary was paid.');
+        return;
+      }
+      await refreshChartFindingInvoiceState(patient.id);
       findingIds.forEach(fid => {
         Object.entries(patient.chartState || {}).forEach(([toothId, toothData]) => {
           if (toothId === CHART_META_KEY || !toothData || typeof toothData !== 'object') return;
@@ -28555,9 +28629,15 @@
       chartInvoiceStateLoading = true;
       renderFindingInvoiceToolbar(collectDocumentedFindings(getActivePatient()));
       try {
-        const invoices = await fetchInvoiceRecords({ patientId });
+        const [invoices, salaryTransfers] = await Promise.all([
+          fetchInvoiceRecords({ patientId }),
+          fetchPatientDoctorSalaryTransfers(patientId)
+        ]);
         if (chartInvoiceStatePatientId !== patientId || activePatientId !== patientId) return;
         invoicedFindingIds = new Set(invoices.flatMap(invoice => invoice.items.map(item => item.findingId).filter(Boolean)));
+        chartSalaryTransfersByFindingId = new Map(invoices.flatMap(invoice => invoice.items
+          .filter(item => item.findingId && salaryTransfers.has(Number(item.id)))
+          .map(item => [item.findingId, { ...salaryTransfers.get(Number(item.id)), invoiceItemId: item.id }])));
         selectedFindingIds = new Set([...selectedFindingIds].filter(id => !invoicedFindingIds.has(id)));
       } catch (error) {
         console.error('Could not load chart invoice state:', error);
@@ -28829,6 +28909,7 @@
           billingMultiplier: null,
           doctorId: finding.doctorId,
           doctorName: finding.doctorName,
+          doctorAssignmentMode: finding.doctorAssignmentMode,
           notes: finding.notes,
           steps: finding.steps,
           surfaces: [],
@@ -28856,6 +28937,7 @@
             billingMultiplier: finding.billingMultiplier,
             doctorId: finding.doctorId,
             doctorName: finding.doctorName,
+            doctorAssignmentMode: finding.doctorAssignmentMode,
             notes: finding.notes,
             steps: finding.steps,
             surfaces: [],
@@ -28884,6 +28966,7 @@
                 billingMultiplier: finding.billingMultiplier,
                 doctorId: finding.doctorId,
                 doctorName: finding.doctorName,
+                doctorAssignmentMode: finding.doctorAssignmentMode,
                 notes: finding.notes,
                 steps: finding.steps,
                 surfaces: [],
@@ -28991,6 +29074,10 @@
         const findingIds = memberFindings.map(member => member.id).filter(Boolean);
         const procedureSteps = normaliseChartFindingSteps(finding.steps);
         const completedProcedureSteps = procedureSteps.filter(step => step.status === 'C').length;
+        const wholeDoctorAssigned = Boolean(finding.doctorId);
+        const hasStepDoctorAssignments = procedureSteps.some(step => Boolean(step.doctorId));
+        const stepAssignmentEnabled = !wholeDoctorAssigned && finding.doctorAssignmentMode === 'steps';
+        const wholeDoctorLocked = hasStepDoctorAssignments && !wholeDoctorAssigned;
         const procedureStepsExpanded = Boolean(findingIds[0] && expandedFindingProcedureSteps.has(findingIds[0]));
         const toothIds = finding.toothIds || (finding.toothId ? [finding.toothId] : []);
         const isBatch = Boolean(finding.batchId && toothIds.length > 1);
@@ -29008,18 +29095,23 @@
         const isOrthoLocked = invoicedVisitsCount > 0;
 
         const procedureStepsMarkup = procedureSteps.length ? `<div class="${procedureStepsExpanded ? '' : 'hidden '}w-full border-t border-cyan-100 bg-cyan-50/35 px-3 py-3" data-procedure-steps-panel>
-          <div class="mb-2 flex flex-wrap items-center justify-between gap-2"><p class="text-[10px] font-black uppercase tracking-wider text-cyan-700">Procedure steps</p><p class="text-[10px] font-bold text-slate-500">${completedProcedureSteps} of ${procedureSteps.length} completed · ${dentalProcedureStepsTotal(procedureSteps.filter(step => step.status === 'C'))}% earned</p></div>
+          <div class="mb-2 flex flex-wrap items-center justify-between gap-2"><p class="text-[10px] font-black uppercase tracking-wider text-cyan-700">${currentUiLanguage === 'ar' ? 'خطوات الإجراء' : 'Procedure steps'}</p><p class="text-[10px] font-bold text-slate-500">${completedProcedureSteps}/${procedureSteps.length} ${currentUiLanguage === 'ar' ? 'مكتملة' : 'completed'} · ${dentalProcedureStepsTotal(procedureSteps.filter(step => step.status === 'C'))}%</p></div>
+          <p class="mb-3 rounded-lg ${stepAssignmentEnabled ? 'bg-cyan-50 text-cyan-800' : 'bg-slate-100 text-slate-600'} px-3 py-2 text-[10px] font-semibold leading-4">${wholeDoctorAssigned
+            ? (currentUiLanguage === 'ar' ? 'تم تعيين طبيب للإجراء بالكامل. ألغِ تعيينه لتوزيع السعر على أطباء الخطوات.' : 'The whole procedure is assigned to one doctor. Unassign that doctor to split its value across steps.')
+            : stepAssignmentEnabled
+              ? (currentUiLanguage === 'ar' ? 'لتوزيع كامل سعر الإجراء على أطباء الخطوات، عيّن طبيباً لكل خطوة.' : 'Assign a doctor to every step to split the full procedure value by step percentage.')
+              : (currentUiLanguage === 'ar' ? 'الوضع الافتراضي: طبيب واحد للإجراء بالكامل. اختر «بدون طبيب — تعيين الخطوات» لتفعيل أطباء الخطوات.' : 'Default: one doctor for the whole procedure. Choose “Unassigned — assign steps” above to enable step doctors.')}</p>
           <div class="space-y-2">${procedureSteps.map((step, index) => {
             const stepStatus = operationStatusDefinition(step.status);
             const stepValue = Math.round(totalPrice * step.percentage) / 100;
             return `<div class="procedure-step-clinical-row grid items-center gap-2 rounded-xl border border-cyan-100 bg-white p-2.5">
               <span class="flex h-7 w-7 items-center justify-center rounded-lg ${step.status === 'C' ? 'bg-emerald-100 text-emerald-700' : step.status === 'In' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'} text-[10px] font-black">${step.status === 'C' ? '<i data-lucide="check" class="h-3.5 w-3.5"></i>' : index + 1}</span>
               <div class="min-w-0"><p class="truncate text-xs font-black text-slate-800">${escapeHtml(step.name)}</p><p class="mt-0.5 text-[9px] font-bold text-slate-400">${step.percentage}% · ${escapeHtml(formatInvoiceMoney(stepValue))} of this procedure</p></div>
-              <label class="finding-step-doctor-control inline-flex min-w-0 items-center overflow-hidden rounded-lg border border-cyan-200 bg-white focus-within:ring-2 focus-within:ring-cyan-500/20"><span class="border-r border-cyan-100 bg-cyan-50 px-2 py-1.5 text-[9px] font-black text-cyan-700">Doctor</span><select data-procedure-step-id="${escapeHtml(step.id)}" onchange="updateFindingProcedureStepFromControl(this,'doctor')" class="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-[10px] font-bold text-slate-700 outline-none" aria-label="Doctor assigned to ${escapeHtml(step.name)}">${chartDoctorSelectOptions(step)}</select></label>
+              <label class="finding-step-doctor-control inline-flex min-h-11 min-w-0 items-center overflow-hidden rounded-lg border ${stepAssignmentEnabled ? 'border-cyan-200 bg-white focus-within:ring-2 focus-within:ring-cyan-500/20' : 'border-slate-200 bg-slate-100 opacity-60'}" title="${stepAssignmentEnabled ? '' : (currentUiLanguage === 'ar' ? 'اختر «بدون طبيب — تعيين الخطوات» في قائمة طبيب الإجراء أولاً' : 'Choose “Unassigned — assign steps” for the whole procedure first')}"><span class="border-r ${stepAssignmentEnabled ? 'border-cyan-100 bg-cyan-50 text-cyan-700' : 'border-slate-200 bg-slate-100 text-slate-500'} px-2 py-1.5 text-[9px] font-black">${currentUiLanguage === 'ar' ? 'الطبيب' : 'Doctor'}</span><select data-procedure-step-id="${escapeHtml(step.id)}" onchange="updateFindingProcedureStepFromControl(this,'doctor')" ${stepAssignmentEnabled ? '' : 'disabled'} class="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-[10px] font-bold text-slate-700 outline-none disabled:text-slate-400" aria-label="${currentUiLanguage === 'ar' ? 'الطبيب المكلف بخطوة' : 'Doctor assigned to'} ${escapeHtml(step.name)}">${chartDoctorSelectOptions(step)}</select></label>
               <label class="finding-step-status-control inline-flex min-w-0 items-center gap-1.5"><span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${stepStatus.color}"></span><select data-procedure-step-id="${escapeHtml(step.id)}" onchange="updateFindingProcedureStepFromControl(this,'status')" class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[10px] font-black outline-none focus:ring-2 focus:ring-cyan-500/20" style="color:${stepStatus.color}" aria-label="Status of ${escapeHtml(step.name)}">${chartProcedureStepStatusOptions(step.status)}</select></label>
             </div>`;
           }).join('')}</div>
-          <p class="mt-2 text-[9px] font-semibold leading-4 text-slate-400">Percentage-based salary uses each completed step's share. Fixed per-procedure pay ignores the shares and uses the parent procedure after every step is complete.</p>
+          <p class="mt-2 text-[9px] font-semibold leading-4 text-slate-500">${currentUiLanguage === 'ar' ? 'يصبح تحويل الراتب متاحاً بعد اكتمال جميع الخطوات وفوترة الإجراء. يُقسّم السعر والأجر الثابت بحسب نسب الخطوات عند تعيين أطبائها.' : 'Salary transfer becomes available after every step is completed and the procedure is invoiced. Step percentages split both the invoice value and fixed compensation.'}</p>
         </div>` : '';
 
         let orthoVisitsMarkup = '';
@@ -29139,6 +29231,10 @@
               .map(member => member.id);
         const isInvoiced = isOrthoPackage ? isOrthoLocked : invoicedMemberIds.length > 0;
         const isFullyInvoiced = isOrthoPackage ? isOrthoFullyInvoiced : Boolean(findingIds.length && invoicedMemberIds.length === findingIds.length);
+        const eligibleSalaryItems = memberFindings
+          .map(member => ({ member, transfer: chartSalaryTransfersByFindingId.get(member.id) }))
+          .filter(({ transfer }) => transfer?.transfer_status === 'eligible');
+        const doctorSalaryActionMarkup = eligibleSalaryItems.map(({ member, transfer }) => `<button type="button" data-salary-transfer-item="${Number(transfer.invoiceItemId)}" onclick="transferDoctorSalaryInvoiceItem(${Number(transfer.invoiceItemId)})" class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-blue-50 px-3 text-[10px] font-black text-blue-700 transition-all duration-150 ease-out hover:bg-blue-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50" title="${currentUiLanguage === 'ar' ? 'تحويل الإجراء المكتمل والمفوتر لحساب راتب الطبيب' : 'Transfer this completed, invoiced procedure to doctor salary'}${eligibleSalaryItems.length > 1 ? ` · ${escapeHtml(chartFindingNoteTargetLabel(member))}` : ''}"><i data-lucide="arrow-right-left" class="h-4 w-4"></i>${currentUiLanguage === 'ar' ? 'تحويل للراتب' : 'Transfer to salary'}</button>`).join('');
         const isSelected = Boolean(selectableMemberIds.length && selectableMemberIds.every(findingId => selectedFindingIds.has(findingId)));
         const isCheckboxChecked = isFullyInvoiced || isSelected;
         const canSelect = Boolean(selectableMemberIds.length && !chartInvoiceStateLoading);
@@ -29276,9 +29372,9 @@
                 ${createdAtMarkup}
                 ${beginDateMarkup}
               </div>
-              <label class="finding-doctor-control inline-flex min-w-44 items-center overflow-hidden rounded-lg border border-cyan-200 bg-white/85 focus-within:ring-2 focus-within:ring-cyan-500/20" title="${procedureSteps.length ? 'Used only for fixed per-procedure compensation after every step is complete' : 'Assign the completed procedure to a doctor for HR salary calculation'}">
-                <span class="border-r border-cyan-100 bg-cyan-50 px-2 py-1.5 text-[9px] font-black text-cyan-700">${procedureSteps.length ? 'Fixed pay' : 'Doctor'}</span>
-                <select onchange="updateFindingDoctorFromControl(this)" class="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-[11px] font-bold text-slate-700 outline-none" aria-label="Assigned doctor for ${escapeHtml(dentalOperationLabel(finding.code))}">${chartDoctorSelectOptions(finding)}</select>
+              <label class="finding-doctor-control inline-flex min-h-11 min-w-44 items-center overflow-hidden rounded-lg border ${wholeDoctorLocked ? 'border-slate-200 bg-slate-100 opacity-60' : 'border-cyan-200 bg-white/85 focus-within:ring-2 focus-within:ring-cyan-500/20'}" title="${wholeDoctorLocked ? (currentUiLanguage === 'ar' ? 'ألغِ تعيين جميع أطباء الخطوات أولاً' : 'Unassign every step doctor first') : (currentUiLanguage === 'ar' ? 'تعيين كامل الإجراء لطبيب واحد' : 'Assign the whole procedure to one doctor')}">
+                <span class="border-r ${wholeDoctorLocked ? 'border-slate-200 bg-slate-100 text-slate-500' : 'border-cyan-100 bg-cyan-50 text-cyan-700'} px-2 py-1.5 text-[9px] font-black">${procedureSteps.length ? (currentUiLanguage === 'ar' ? 'الإجراء بالكامل' : 'Whole procedure') : (currentUiLanguage === 'ar' ? 'الطبيب' : 'Doctor')}</span>
+                <select onchange="updateFindingDoctorFromControl(this)" ${wholeDoctorLocked ? 'disabled' : ''} class="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-[11px] font-bold text-slate-700 outline-none disabled:text-slate-400" aria-label="${currentUiLanguage === 'ar' ? 'الطبيب المكلف بالإجراء' : 'Assigned doctor for'} ${escapeHtml(dentalOperationLabel(finding.code))}">${chartDoctorSelectOptions(finding, { wholeProcedure: Boolean(procedureSteps.length) })}</select>
               </label>
               ${isOrthoPackage ? `
                 <div class="finding-pricing-group flex flex-col items-end justify-center shrink-0">
@@ -29330,6 +29426,7 @@
                   ${operationStatusSelectOptions(finding.status, false)}
                 </select>
               </label>`}
+              ${doctorSalaryActionMarkup}
               ${isBatch ? '<button type="button" onclick="separateFindingBatch(this)" class="finding-separate-button inline-flex shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[10px] font-black text-violet-700 transition hover:border-violet-300 hover:bg-violet-100" aria-label="Separate this batch into one row per tooth" title="Create one independent documented row for each tooth"><i data-lucide="split" class="h-3 w-3"></i>Separate</button>' : ''}
               <button type="button" data-finding-note-trigger aria-haspopup="dialog" aria-expanded="false" aria-controls="chart-finding-note-popover" onpointerenter="showChartFindingNotePreviewFromPointer(event, this)" onpointerleave="scheduleChartFindingNotePreviewClose(event)" onclick="toggleChartFindingNotePreview(event, this)" class="finding-note-button inline-flex h-8 ${findingNotes.length ? 'px-2' : 'w-8'} sm:h-auto sm:w-auto sm:px-2.5 sm:py-1.5 shrink-0 items-center justify-center gap-1 rounded-lg border text-[10px] font-black transition ${findingNotes.length ? 'border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-100' : 'border-slate-200 bg-white text-slate-500 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700'}" aria-label="${findingNotes.length ? `${findingNotes.length} note${findingNotes.length === 1 ? '' : 's'}` : 'Notes'} for ${escapeHtml(dentalOperationLabel(finding.code))}" title="${findingNotes.length ? `${findingNotes.length} note${findingNotes.length === 1 ? '' : 's'}` : 'Notes'} · ${escapeHtml(dentalOperationLabel(finding.code))}">
                 <i data-lucide="sticky-note" class="h-3.5 w-3.5 shrink-0"></i>
