@@ -19433,8 +19433,8 @@
         ? formatInvoiceDate(range.start)
         : new Intl.DateTimeFormat(currentUiLanguage === 'ar' ? 'ar-EG' : 'en-GB', { month: 'long', year: 'numeric' }).format(new Date(`${range.start}T12:00:00`));
       document.getElementById('hr-doctor-payroll-month-label').textContent = range.scope === 'cases'
-        ? `${rangeLabel} · select any unpaid completed cases to settle together.`
-        : `${rangeLabel} · all unpaid completed cases can be settled now.`;
+        ? `${rangeLabel} · ${currentUiLanguage === 'ar' ? 'اختر الإجراءات المكتملة والمفوتَرة والمحوّلة غير المدفوعة.' : 'Select unpaid cases transferred from completed invoice procedures.'}`
+        : `${rangeLabel} · ${currentUiLanguage === 'ar' ? 'تظهر هنا الإجراءات المكتملة والمفوتَرة بعد تحويلها للراتب.' : 'Completed, invoiced procedures appear here after salary transfer.'}`;
       document.getElementById('hr-doctor-procedure-count').textContent = String(hrDoctorSettlementCases.length);
       document.getElementById('hr-doctor-procedure-value').textContent = formatInvoiceMoney(metrics.grossAmount);
       document.getElementById('hr-doctor-calculated-salary').textContent = formatInvoiceMoney(metrics.payableAmount);
@@ -19481,7 +19481,7 @@
           ? `<span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700"><i data-lucide="circle-check" class="h-3.5 w-3.5"></i>Paid</span>`
           : '<span class="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black text-amber-700">Ready</span>';
         return `<tr class="${isPaid ? 'bg-emerald-50/20' : ''}"><td class="px-4 py-3 text-center">${selection}</td><td class="whitespace-nowrap px-4 py-3 text-[11px] font-bold text-slate-600">${escapeHtml(formatHrDoctorCaseCompletion(line.completed_at))}</td><td class="px-4 py-3"><p class="font-black text-slate-800">${escapeHtml(line.patient_name || 'Patient')}</p></td><td class="px-4 py-3"><p class="font-black text-slate-800">${escapeHtml(line.operation_name || line.operation_code || 'Procedure')}</p><p class="mt-1 text-[10px] font-bold text-slate-400">${escapeHtml(line.operation_code || '')}</p></td><td class="px-4 py-3 font-black text-blue-700">${escapeHtml(formatInvoiceMoney(line.gross_amount))}</td><td class="px-4 py-3"><span class="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-black text-violet-700">${escapeHtml(method)}</span></td><td class="px-4 py-3 text-right font-black text-emerald-700">${escapeHtml(formatInvoiceMoney(line.salary_amount))}</td><td class="px-4 py-3">${paymentStatus}</td></tr>`;
-      }).join('') : '<tr><td colspan="8" class="px-5 py-10 text-center text-xs font-bold text-slate-400">No completed assigned cases with a salary rule in this date selection.</td></tr>';
+      }).join('') : `<tr><td colspan="8" class="px-5 py-10 text-center text-xs font-bold text-slate-400">${currentUiLanguage === 'ar' ? 'لا توجد إجراءات مكتملة ومفوتَرة ومحوّلة للراتب ولها قاعدة تعويض في هذا التاريخ.' : 'No completed, invoiced cases transferred to salary with a compensation rule in this date selection.'}</td></tr>`;
       lucide.createIcons();
     }
 
@@ -22056,6 +22056,42 @@
     const FINANCE_DEPT_INVOICE_SELECT_FIELDS = 'id, patient_id, invoice_date, status, paid_amount, loyalty_discount_amount, created_by, created_at, updated_at, patients!inner(name, phone, patient_number), patient_invoice_items(id, unit_price, quantity), invoice_releases(id, invoice_id, amount, release_date, created_by, created_at)';
     const FINANCE_PAYMENT_SELECT_FIELDS = 'id, invoice_id, patient_id, payment_method_id, payment_method_name, amount, payment_date, created_by, created_at, patients!inner(name, phone, patient_number)';
 
+    async function fetchPatientDoctorSalaryTransfers(patientId) {
+      const { data, error } = await db.rpc('get_patient_doctor_salary_transfers', { p_patient_id: patientId });
+      if (error) throw error;
+      return new Map((data || []).map(item => [Number(item.invoice_item_id), item]));
+    }
+
+    function doctorSalaryExpenseDeletionMessage(items, transfers) {
+      const expenses = [...new Map(items.map(item => transfers.get(Number(item.id)))
+        .filter(item => item?.expense_id)
+        .map(item => [item.expense_id, item])).values()];
+      const lines = expenses.map(item => `${item.expense_name || 'Salary expense'} (${item.expense_id})`);
+      return currentUiLanguage === 'ar'
+        ? `احذف مصروف راتب الطبيب التالي من المالية أولاً، ثم أعد محاولة حذف الفاتورة أو الإجراء:\n${lines.join('\n')}`
+        : `Delete the following doctor salary expense in Finances first, then delete the invoice or procedure:\n${lines.join('\n')}`;
+    }
+
+    async function transferDoctorSalaryInvoiceItem(itemId) {
+      if (!hasPageAccess('patients')) return;
+      const button = document.querySelector(`[data-salary-transfer-item="${Number(itemId)}"]`);
+      if (button) button.disabled = true;
+      try {
+        const { error } = await db.rpc('transfer_doctor_salary_invoice_item', { p_item_id: Number(itemId) });
+        if (error) throw error;
+        await renderPatientInvoices();
+        hrDirectoryLoaded = false;
+        showAppointmentNotificationToast(
+          currentUiLanguage === 'ar' ? 'تم تحويل الإجراء' : 'Procedure transferred',
+          currentUiLanguage === 'ar' ? 'أصبح الإجراء متاحاً لحساب راتب الطبيب.' : 'The procedure is now available for doctor salary calculation.'
+        );
+      } catch (error) {
+        alert((currentUiLanguage === 'ar' ? 'تعذر تحويل الإجراء: ' : 'Could not transfer the procedure: ') + (error?.message || 'Unknown error'));
+      } finally {
+        if (button?.isConnected) button.disabled = false;
+      }
+    }
+
     function formatInvoiceMoney(value) {
       const amount = Number(value) || 0;
       return 'EGP ' + amount.toLocaleString('en-EG', {
@@ -24051,6 +24087,18 @@
       const invoices = await fetchInvoiceRecords({ patientId: activeInvoicePatientId });
       const invoice = invoices.find(item => Number(item.id) === Number(invoiceId));
       if (!invoice) return;
+      let salaryTransfers;
+      try {
+        salaryTransfers = await fetchPatientDoctorSalaryTransfers(invoice.patientId);
+      } catch (error) {
+        alert((currentUiLanguage === 'ar' ? 'تعذر التحقق من مصروفات رواتب الأطباء: ' : 'Could not check doctor salary expenses: ') + (error?.message || 'Unknown error'));
+        return;
+      }
+      const paidItems = invoice.items.filter(item => salaryTransfers.get(Number(item.id))?.transfer_status === 'paid');
+      if (paidItems.length) {
+        alert(doctorSalaryExpenseDeletionMessage(paidItems, salaryTransfers));
+        return;
+      }
       if (invoice.payments.length) {
         alert('Remove all payments before deleting this invoice.');
         return;
@@ -24060,25 +24108,10 @@
         return;
       }
       if (!confirm('Delete ' + invoiceNumber(invoice.id) + ' and all of its operation items? This cannot be undone.')) return;
-      let deleteSuccess = false;
-      try {
-        const { error: rpcError } = await db.rpc('delete_patient_invoice', {
-          p_invoice_id: Number(invoice.id)
-        });
-        if (!rpcError) {
-          deleteSuccess = true;
-        } else {
-          console.warn('RPC delete_patient_invoice failed, falling back to direct delete:', rpcError);
-        }
-      } catch (e) {
-        console.warn('RPC delete_patient_invoice error:', e);
-      }
-      if (!deleteSuccess) {
-        const { data, error } = await db.from('patient_invoices').delete().eq('id', invoice.id).select('id');
-        if (error || !data?.length) {
-          alert('Could not delete the invoice: ' + (error?.message || 'The invoice was not deleted.'));
-          return;
-        }
+      const { error } = await db.rpc('delete_patient_invoice', { p_invoice_id: Number(invoice.id) });
+      if (error) {
+        alert((currentUiLanguage === 'ar' ? 'تعذر حذف الفاتورة: ' : 'Could not delete the invoice: ') + error.message);
+        return;
       }
       await renderPatientInvoices();
       if (activePatientId === invoice.patientId && hasPageAccess('chart')) {
@@ -24148,6 +24181,17 @@
       const invoice = invoices.find(entry => Number(entry.id) === Number(invoiceId));
       const item = invoice?.items.find(entry => Number(entry.id) === Number(itemId));
       if (!invoice || !item) return;
+      let salaryTransfers;
+      try {
+        salaryTransfers = await fetchPatientDoctorSalaryTransfers(invoice.patientId);
+      } catch (error) {
+        alert((currentUiLanguage === 'ar' ? 'تعذر التحقق من مصروفات رواتب الأطباء: ' : 'Could not check doctor salary expenses: ') + (error?.message || 'Unknown error'));
+        return;
+      }
+      if (salaryTransfers.get(Number(item.id))?.transfer_status === 'paid') {
+        alert(doctorSalaryExpenseDeletionMessage([item], salaryTransfers));
+        return;
+      }
       if (invoiceItemPaidAmount(invoice, item.id) > 0) {
         alert('Remove all payments for this procedure before deleting it.');
         return;
@@ -24190,8 +24234,14 @@
       const invoiceBalanceRemaining = invoiceRemaining(invoice);
       const invoiceBalanceReleased = invoice.releasedAmount > 0 && invoiceBalanceRemaining <= 0;
       const payButton = remaining > 0 && invoiceBalanceRemaining > 0 && canRecordInvoicePayment()
-        ? '<button type="button" onclick="openInvoicePaymentModal(' + invoice.id + ',' + item.id + ')" class="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[10px] font-black text-white shadow-sm transition hover:bg-emerald-700"><i data-lucide="badge-dollar-sign" class="h-3 w-3"></i> Pay</button>'
+        ? '<button type="button" onclick="openInvoicePaymentModal(' + invoice.id + ',' + item.id + ')" class="inline-flex min-h-11 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-[10px] font-black text-white shadow-sm transition-all duration-150 ease-out hover:bg-emerald-700 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20"><i data-lucide="badge-dollar-sign" class="h-4 w-4"></i> Pay</button>'
         : '';
+      const salaryStatus = item.salaryTransfer?.transfer_status;
+      const salaryAction = salaryStatus === 'eligible' && hasPageAccess('patients')
+        ? '<button type="button" data-salary-transfer-item="' + item.id + '" onclick="transferDoctorSalaryInvoiceItem(' + item.id + ')" class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-blue-50 px-3 text-[10px] font-black text-blue-700 transition-all duration-150 ease-out hover:bg-blue-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50" title="' + (currentUiLanguage === 'ar' ? 'تحويل الإجراء لحساب راتب الطبيب' : 'Transfer to doctor salary calculation') + '"><i data-lucide="arrow-right-left" class="h-4 w-4"></i>' + (currentUiLanguage === 'ar' ? 'تحويل للراتب' : 'Transfer to salary') + '</button>'
+        : salaryStatus === 'transferred' || salaryStatus === 'paid'
+          ? '<span class="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-[10px] font-black ' + (salaryStatus === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700') + '"><i data-lucide="' + (salaryStatus === 'paid' ? 'circle-check' : 'arrow-right-left') + '" class="h-4 w-4"></i>' + (salaryStatus === 'paid' ? (currentUiLanguage === 'ar' ? 'تم دفع الراتب' : 'Salary paid') : (currentUiLanguage === 'ar' ? 'محول للراتب' : 'Transferred')) + '</span>'
+          : '';
       const deleteDisabled = paidAmount > 0 || invoice.releasedAmount > 0 || invoice.loyaltyDiscount > 0;
       const deleteTitle = invoice.loyaltyDiscount > 0 ? 'Reverse the discount on the patient Loyalty tab before deleting procedures.' : invoice.releasedAmount > 0
         ? 'A released invoice cannot have procedures deleted.'
@@ -24199,12 +24249,12 @@
       const balanceLabel = invoice.loyaltyDiscount > 0 && invoiceBalanceRemaining <= 0 ? 'Settled with loyalty' : invoiceBalanceReleased
         ? 'Invoice balance released'
         : remaining > 0 ? formatInvoiceMoney(remaining) + ' remaining' : 'Paid in full';
-      const deleteButton = '<button type="button" onclick="deletePatientInvoiceItem(' + item.id + ',' + invoice.id + ')" ' + (deleteDisabled ? 'disabled' : '') + ' title="' + escapeHtml(deleteTitle) + '" aria-label="Delete ' + escapeHtml(item.operationName) + ' from invoice" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition ' + (deleteDisabled ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-300' : 'border-red-200 bg-red-50/80 text-red-600 hover:bg-red-100') + '"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button>';
+      const deleteButton = '<button type="button" onclick="deletePatientInvoiceItem(' + item.id + ',' + invoice.id + ')" ' + (deleteDisabled ? 'disabled' : '') + ' title="' + escapeHtml(deleteTitle) + '" aria-label="Delete ' + escapeHtml(item.operationName) + ' from invoice" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg transition-all duration-150 ease-out active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50 ' + (deleteDisabled ? 'cursor-not-allowed bg-slate-100 text-slate-400' : 'bg-rose-50 text-rose-700 hover:bg-rose-100') + '"><i data-lucide="trash-2" class="h-4 w-4"></i></button>';
       return '<article data-invoice-procedure="' + item.id + '" class="mx-2 mb-2 grid gap-2 rounded-xl border border-violet-100/90 bg-gradient-to-br from-white/95 via-violet-50/55 to-blue-50/45 px-3 py-2.5 shadow-sm shadow-violet-900/5 backdrop-blur-sm transition hover:border-violet-200 hover:shadow-md sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">'
         + '<div class="flex min-w-0 items-center gap-3">' + palmerBadge + '<div class="min-w-0 flex-1"><div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5"><h5 class="min-w-0 text-xs font-black tracking-tight text-slate-900 sm:text-sm">' + escapeHtml(item.operationName) + '</h5><span class="rounded-md border px-1.5 py-0.5 text-[9px] font-black ' + status.badgeClass + '">' + escapeHtml(status.key) + ' · ' + escapeHtml(status.label) + '</span></div>'
         + '<div class="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[9px] font-bold text-slate-500"><span>' + escapeHtml(toothMeta) + '</span><span class="text-violet-300">•</span><span>' + escapeHtml(surfaces) + '</span><span class="text-violet-300">•</span><span class="inline-flex items-center gap-1"><i data-lucide="stethoscope" class="h-2.5 w-2.5 text-slate-400"></i>' + escapeHtml(item.doctorName) + '</span></div>'
         + '<div class="mt-1 flex flex-wrap items-center gap-1.5"><span class="inline-flex items-center gap-1 rounded-lg border border-violet-100 bg-white/70 px-2 py-1 text-[9px] font-black text-slate-600"><i data-lucide="calendar-days" class="h-3 w-3 text-violet-500"></i>' + escapeHtml(formatInvoiceDate(invoice.invoiceDate)) + '</span><button type="button" onclick="openInvoiceDateEditor(' + invoice.id + ',\'' + escapeHtml(invoice.invoiceDate) + '\')" class="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-100/65 px-2 py-1 text-[9px] font-black text-violet-700 transition hover:bg-violet-100"><i data-lucide="pencil" class="h-2.5 w-2.5"></i> Edit date</button><span class="text-[9px] font-black ' + (invoiceBalanceReleased ? 'text-rose-600' : remaining > 0 ? 'text-amber-600' : 'text-emerald-600') + '">' + escapeHtml(balanceLabel) + '</span></div></div></div>'
-        + '<div class="flex flex-wrap items-center justify-end gap-1.5 sm:pl-2"><span class="text-[9px] font-bold text-slate-400">× ' + escapeHtml(item.quantity) + '</span><span class="mr-0.5 text-sm font-black text-slate-900">' + escapeHtml(formatInvoiceMoney(invoiceItemTotal(item))) + '</span>' + invoiceItemPaymentIndicatorMarkup(invoice, item) + payButton + deleteButton + '</div></article>';
+        + '<div class="flex flex-wrap items-center justify-end gap-1.5"><span class="text-[9px] font-bold text-slate-400">× ' + escapeHtml(item.quantity) + '</span><span class="me-0.5 text-sm font-black text-slate-900">' + escapeHtml(formatInvoiceMoney(invoiceItemTotal(item))) + '</span>' + invoiceItemPaymentIndicatorMarkup(invoice, item) + payButton + salaryAction + deleteButton + '</div></article>';
     }
 
     function legacyInvoiceCardMarkup(invoice, options = {}) {
@@ -24245,7 +24295,7 @@
         : '';
       const canDeleteInvoice = !invoice.payments.length && !invoice.releases.length && hasPageAccess('patients');
       const deleteInvoiceButton = canDeleteInvoice
-        ? '<button type="button" onclick="deletePatientInvoice(' + invoice.id + ')" title="Delete invoice" aria-label="Delete invoice" class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-xs font-black text-red-600 transition hover:bg-red-100"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i> Delete</button>'
+        ? '<button type="button" onclick="deletePatientInvoice(' + invoice.id + ')" title="Delete invoice" aria-label="Delete invoice" class="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-rose-50 px-3 text-xs font-black text-rose-700 transition-all duration-150 ease-out hover:bg-rose-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20"><i data-lucide="trash-2" class="h-4 w-4"></i> Delete</button>'
         : '';
       return '<article class="overflow-hidden rounded-2xl border transition ' + (complete ? 'border-emerald-200 bg-emerald-50/40 shadow-sm shadow-emerald-900/5' : 'border-slate-200 bg-white hover:border-violet-200') + '">'
         + '<div class="flex flex-col gap-3 border-b border-slate-100 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><div class="flex flex-wrap items-center gap-2"><span class="font-mono text-[11px] font-black text-slate-700">' + escapeHtml(invoiceNumber(invoice.id)) + '</span><span class="text-[10px] font-bold text-slate-400">' + escapeHtml(formatInvoiceDate(invoice.invoiceDate)) + '</span><span class="rounded-lg border px-2.5 py-1 text-[10px] font-black ' + status.className + '">' + escapeHtml(status.label) + '</span>' + (invoice.releasedAmount > 0 ? '<span class="text-[10px] font-black text-rose-600">' + escapeHtml(formatInvoiceMoney(invoice.releasedAmount)) + ' released</span>' : '') + '</div><div class="flex flex-wrap gap-2">' + payButton + releaseButton + undoReleaseButton + deleteInvoiceButton + '</div></div>'
@@ -24272,8 +24322,15 @@
       lucide.createIcons();
 
       try {
-        const invoices = await fetchInvoiceRecords({ patientId: patient.id });
+        const [invoices, salaryTransfers] = await Promise.all([
+          fetchInvoiceRecords({ patientId: patient.id }),
+          fetchPatientDoctorSalaryTransfers(patient.id)
+        ]);
         if (renderToken !== patientInvoiceRenderToken || activeInvoicePatientId !== patient.id) return;
+        invoices.forEach(invoice => invoice.items.forEach(item => {
+          item.salaryTransfer = salaryTransfers.get(Number(item.id)) || null;
+          item.doctorName = item.salaryTransfer?.doctor_name || item.doctorName;
+        }));
         const total = invoices.reduce((sum, invoice) => sum + invoiceTotal(invoice), 0);
         const paid = invoices.reduce((sum, invoice) => sum + invoice.paidAmount, 0);
         const released = invoices.reduce((sum, invoice) => sum + invoice.releasedAmount, 0);
