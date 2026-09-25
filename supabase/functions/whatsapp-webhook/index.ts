@@ -53,6 +53,59 @@ function getPhoneTail(phone: string): string {
   return cleaned.length > 9 ? cleaned.slice(-9) : cleaned;
 }
 
+// Find all patients registered with a given phone number (supports local/international format and duplicates)
+async function findPatientsByPhone(supabase: any, rawPhone: string): Promise<any[]> {
+  if (!rawPhone || isBsuid(rawPhone)) return [];
+  const clean = cleanPhone(rawPhone);
+  if (!clean || clean.length < 6) return [];
+  const tail = getPhoneTail(clean);
+
+  const orParts: string[] = [
+    `phone.eq.${clean}`,
+    `phone.eq.+${clean}`,
+  ];
+
+  if (clean.length > 9) {
+    const last10 = clean.slice(-10);
+    orParts.push(`phone.eq.${last10}`);
+    orParts.push(`phone.eq.0${last10}`);
+    orParts.push(`phone.eq.+${last10}`);
+  }
+
+  if (tail && tail.length >= 7) {
+    orParts.push(`phone.ilike.%${tail}`);
+  }
+
+  const { data, error } = await supabase
+    .from("patients")
+    .select("id, name, first_name, last_name, phone, patient_number")
+    .or(orParts.join(","))
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.warn("findPatientsByPhone error:", error.message || error);
+    return [];
+  }
+
+  if (!Array.isArray(data)) return [];
+
+  const uniqueMap = new Map();
+  for (const p of data) {
+    if (!p || !p.id || uniqueMap.has(p.id)) continue;
+    const pClean = cleanPhone(p.phone || "");
+    if (
+      pClean === clean ||
+      (tail && pClean.endsWith(tail)) ||
+      (clean && pClean && (clean.endsWith(pClean) || pClean.endsWith(clean))) ||
+      (p.phone && tail && p.phone.replace(/[^\d]/g, "").endsWith(tail))
+    ) {
+      uniqueMap.set(p.id, p);
+    }
+  }
+
+  return Array.from(uniqueMap.values());
+}
+
 // Extract sender identifier from wamid (e.g. wamid.HBgTRUcu... -> EG.1016355928130143)
 function extractIdentifierFromWamid(wamid: string): string | null {
   if (!wamid || typeof wamid !== "string" || !wamid.startsWith("wamid.HBg")) return null;
@@ -614,6 +667,7 @@ async function sendAppointmentPushNotification(
     assignedUserId?: string | null;
     dayAr?: string;
     dayEn?: string;
+    durationMinutes?: number;
   }
 ): Promise<any> {
   const appId = "1796b727-661f-43cb-9770-1b3938e4db8c";
@@ -649,6 +703,7 @@ async function sendAppointmentPushNotification(
     assignedUserId,
     dayAr = "",
     dayEn = "",
+    durationMinutes = 60,
   } = params;
 
   if (!assignedUserId) {
@@ -661,9 +716,11 @@ async function sendAppointmentPushNotification(
 
   const dateDisplayAr = dayAr ? `${dayAr} (${date})` : date;
   const dateDisplayEn = dayEn ? `${dayEn} (${date})` : date;
+  const durAr = durationMinutes === 60 ? "ساعة واحدة" : `${durationMinutes} دقيقة`;
+  const durEn = durationMinutes === 60 ? "1 hour" : `${durationMinutes} mins`;
 
-  const bodyAr = `تم حجز موعد جديد عبر واتساب للمريض ${patientName} معك (${doctorName}) يوم ${dateDisplayAr} الساعة ${time} (${visitType}).`;
-  const bodyEn = `New appointment booked via WhatsApp for ${patientName} with you (${doctorName}) on ${dateDisplayEn} at ${time} (${visitType}).`;
+  const bodyAr = `تم حجز موعد جديد عبر واتساب للمريض ${patientName} معك (${doctorName}) يوم ${dateDisplayAr} الساعة ${time} (${visitType} - المدة ${durAr}).`;
+  const bodyEn = `New appointment booked via WhatsApp for ${patientName} with you (${doctorName}) on ${dateDisplayEn} at ${time} (${visitType} - ${durEn}).`;
 
   const payload: Record<string, unknown> = {
     app_id: appId,
@@ -828,10 +885,16 @@ async function sendIncomingWhatsAppPushNotification(
   }
 }
 
+// Clinic week chronological order: Saturday (6), Sunday (0), Monday (1), Tuesday (2), Wednesday (3), Thursday (4), Friday (5)
+const CLINIC_WEEK_ORDER = [6, 0, 1, 2, 3, 4, 5];
+
 function formatDoctorScheduleForPrompt(fullName: string, sched: any): string {
   const days: number[] = Array.isArray(sched?.days)
-    ? sched.days.map(Number).filter((d: number) => d >= 0 && d <= 6).sort()
-    : [0, 1, 2, 3, 4];
+    ? sched.days
+        .map(Number)
+        .filter((d: number) => d >= 0 && d <= 6)
+        .sort((a: number, b: number) => CLINIC_WEEK_ORDER.indexOf(a) - CLINIC_WEEK_ORDER.indexOf(b))
+    : [6, 0, 1, 2, 3, 4];
   if (!days.length) return `- Dr. ${fullName}: No scheduled clinic shifts`;
 
   const legacyStart = sched?.start || "09:00";
@@ -846,6 +909,48 @@ function formatDoctorScheduleForPrompt(fullName: string, sched: any): string {
   return `- Dr. ${fullName}:\n  * ` + shifts.join("\n  * ");
 }
 
+// Resolve appointment duration in minutes. Default is 60 minutes (1 hour) unless specified in admin instructions or passed explicitly.
+function resolveAppointmentDuration(
+  visitType?: string | null,
+  customInstructions?: string | null,
+  explicitDuration?: number | null
+): number {
+  if (explicitDuration && Number.isFinite(explicitDuration) && explicitDuration >= 15) {
+    return Math.min(240, explicitDuration);
+  }
+
+  if (customInstructions && visitType) {
+    const vLower = String(visitType).toLowerCase().trim();
+    const lines = customInstructions.split(/\r?\n/);
+    for (const line of lines) {
+      const lineLower = line.toLowerCase();
+      const isRelevant = lineLower.includes(vLower) ||
+        (vLower.includes("consult") && (lineLower.includes("consult") || lineLower.includes("كشف") || lineLower.includes("فحص") || lineLower.includes("استشارة"))) ||
+        (vLower.includes("clean") && (lineLower.includes("clean") || lineLower.includes("تنظيف"))) ||
+        (vLower.includes("check") && (lineLower.includes("check") || lineLower.includes("كشف") || lineLower.includes("فحص"))) ||
+        (vLower.includes("endo") && (lineLower.includes("endo") || lineLower.includes("عصب") || lineLower.includes("جذور"))) ||
+        (vLower.includes("ortho") && (lineLower.includes("ortho") || lineLower.includes("تقويم"))) ||
+        (vLower.includes("extract") && (lineLower.includes("extract") || lineLower.includes("خلع")));
+
+      if (isRelevant) {
+        const numMatch = line.match(/(\d{1,3})\s*(?:دقيقة|دقائق|min(?:ute)?s?)/i);
+        if (numMatch) {
+          const parsed = parseInt(numMatch[1], 10);
+          if (parsed >= 15 && parsed <= 240) return parsed;
+        }
+        if (line.includes("نصف ساعة") || line.includes("half an hour") || line.includes("half hour")) return 30;
+        if (line.includes("ربع ساعة") || line.includes("quarter hour")) return 15;
+        if (line.includes("ساعة ونصف") || line.includes("hour and a half") || line.includes("1.5 hour")) return 90;
+        if (line.includes("ساعتين") || line.includes("2 hours")) return 120;
+        if (line.includes("ساعة") || line.includes("1 hour") || line.includes("one hour")) return 60;
+      }
+    }
+  }
+
+  // Default duration is 60 minutes (1 hour)
+  return 60;
+}
+
 // Gemini Tools Schema Builder (Dynamically populated with active clinic doctors and services)
 function buildGeminiTools(doctorNames: string[] = [], visitTypeNames: string[] = []) {
   const docExamples = doctorNames.length > 0 ? doctorNames.slice(0, 5).join(", ") : "Mohamed Gazzar, Salma, Mariam";
@@ -856,20 +961,82 @@ function buildGeminiTools(doctorNames: string[] = [], visitTypeNames: string[] =
       functionDeclarations: [
         {
           name: "check_available_slots",
-          description: "Check available appointment slots for a given date according to doctors' actual working days, shift hours, and already booked appointments.",
+          description: "Check available appointment slots for a specific date or across upcoming days (e.g. for a whole week or doctor's next vacancies) according to doctors' actual working days, shift hours, and already booked appointments.",
           parameters: {
             type: "OBJECT",
             properties: {
               date: {
                 type: "STRING",
-                description: "Date in YYYY-MM-DD format (e.g. 2026-09-20)",
+                description: "Start date or specific date in YYYY-MM-DD format (e.g. 2026-09-26)",
+              },
+              days_ahead: {
+                type: "INTEGER",
+                description: "Optional number of days to scan (1 to 7). Set to 7 when patient asks for next week, upcoming vacancies, or availability without specifying an exact day.",
               },
               doctor_name: {
                 type: "STRING",
                 description: `Optional preferred doctor name (e.g. ${docExamples})`,
               },
+              duration_minutes: {
+                type: "INTEGER",
+                description: "Appointment duration in minutes to check slot availability for. Defaults to 60 (1 hour). Use an exception duration (e.g. 30, 45, 90) ONLY if specified in the admin instructions for this service.",
+              },
+              visit_type: {
+                type: "STRING",
+                description: `Optional visit type / service name (e.g. ${vtExamples}) to apply any custom duration rules from admin instructions`,
+              },
             },
             required: ["date"],
+          },
+        },
+        {
+          name: "lookup_patient",
+          description: "Search clinic database for existing registered patient(s) by mobile phone number. Use when the patient mentions or provides a phone number in the chat, or to check for existing profiles. Returns matching patient name(s) and alerts if duplicate records exist.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              phone: {
+                type: "STRING",
+                description: "The mobile phone number to look up (e.g. 07701234567 or +9647701234567 or 01012345678).",
+              },
+            },
+            required: ["phone"],
+          },
+        },
+        {
+          name: "assign_patient",
+          description: "Assign and link an existing registered patient profile to this WhatsApp conversation. Call this when duplicate patients exist for a phone number and the patient specifies which one they are, or when confirming which existing profile this conversation belongs to.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              patient_id: {
+                type: "STRING",
+                description: "The UUID of the existing patient to assign.",
+              },
+              patient_name: {
+                type: "STRING",
+                description: "The name of the patient being assigned.",
+              },
+            },
+            required: ["patient_id"],
+          },
+        },
+        {
+          name: "create_patient",
+          description: "Create a new patient record in the clinic database and assign this mobile number to them. CRITICAL: ONLY call this tool when the patient is confirmed to be a new patient (i.e. not one of the existing duplicate profiles and not already registered), after asking for and receiving their full name.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              patient_name: {
+                type: "STRING",
+                description: "Full name of the new patient (e.g. 'عمر أحمد علي').",
+              },
+              phone: {
+                type: "STRING",
+                description: "Optional mobile number to assign to the new patient. If omitted, uses current conversation's phone number.",
+              },
+            },
+            required: ["patient_name"],
           },
         },
         {
@@ -881,6 +1048,10 @@ function buildGeminiTools(doctorNames: string[] = [], visitTypeNames: string[] =
               patient_name: {
                 type: "STRING",
                 description: "Full name of the patient",
+              },
+              patient_id: {
+                type: "STRING",
+                description: "Optional ID of the patient if already selected or known among duplicates",
               },
               date: {
                 type: "STRING",
@@ -897,6 +1068,10 @@ function buildGeminiTools(doctorNames: string[] = [], visitTypeNames: string[] =
               visit_type: {
                 type: "STRING",
                 description: `Type of visit / service (e.g. ${vtExamples})`,
+              },
+              duration_minutes: {
+                type: "INTEGER",
+                description: "Appointment duration in minutes to reserve on the clinic calendar. Defaults to 60 (1 hour). Use an exception duration (e.g. 30, 45, 90) ONLY if specified in the admin instructions for this service.",
               },
               notes: {
                 type: "STRING",
@@ -930,13 +1105,14 @@ async function handleGeminiToolCall(
   supabase: any,
   call: { name: string; args: any },
   conversation: any,
-  timeZone: string = "Africa/Cairo"
+  timeZone: string = "Africa/Cairo",
+  customInstructions: string = ""
 ): Promise<any> {
   const { name, args } = call;
 
   if (name === "check_available_slots") {
-    const targetDate = String(args.date || "").trim();
-    if (!targetDate || !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+    const rawTargetDate = String(args.date || "").trim();
+    if (!rawTargetDate || !/^\d{4}-\d{2}-\d{2}$/.test(rawTargetDate)) {
       return {
         available: false,
         error: "Invalid date format. Please provide YYYY-MM-DD.",
@@ -945,11 +1121,12 @@ async function handleGeminiToolCall(
       };
     }
 
-    // Target day of week: 0 = Sun, 1 = Mon, ..., 6 = Sat
-    // Noon UTC guarantees correct calendar day in all timezones
-    const targetDayOfWeek = new Date(`${targetDate}T12:00:00Z`).getUTCDay();
-    const dayEn = WEEKDAY_NAMES_EN[targetDayOfWeek];
-    const dayAr = WEEKDAY_NAMES_AR[targetDayOfWeek];
+    const durationMinutes = resolveAppointmentDuration(
+      args.visit_type,
+      customInstructions,
+      Number(args.duration_minutes)
+    );
+    const daysAhead = Math.min(Math.max(Number(args.days_ahead) || 1, 1), 7);
     const clinicNow = getClinicNow(timeZone);
 
     // Fetch active doctors and their HR staff settings (weekly_schedule) in parallel
@@ -969,8 +1146,11 @@ async function handleGeminiToolCall(
     const doctorList = (activeDoctors || []).map((doc: any) => {
       const sched = settingsMap.get(doc.user_id) || {};
       const days: number[] = Array.isArray(sched.days)
-        ? sched.days.map(Number).filter((d: number) => d >= 0 && d <= 6).sort()
-        : [0, 1, 2, 3, 4];
+        ? sched.days
+            .map(Number)
+            .filter((d: number) => d >= 0 && d <= 6)
+            .sort((a: number, b: number) => CLINIC_WEEK_ORDER.indexOf(a) - CLINIC_WEEK_ORDER.indexOf(b))
+        : [6, 0, 1, 2, 3, 4];
       const daily = (sched.daily && typeof sched.daily === "object") ? sched.daily : {};
       return {
         userId: doc.user_id,
@@ -986,195 +1166,473 @@ async function handleGeminiToolCall(
     if (args.doctor_name) {
       const search = String(args.doctor_name).toLowerCase().replace(/^dr\.?\s*/i, "").trim();
       selectedDoctor = doctorList.find((d: any) => d.fullName.toLowerCase().includes(search));
-
-      if (selectedDoctor) {
-        // If doctor is not scheduled to work on requested day
-        if (!selectedDoctor.days.includes(targetDayOfWeek)) {
-          const workingDaysAr = selectedDoctor.days.map((d: number) => WEEKDAY_NAMES_AR[d]).join(" و ");
-          const workingDaysEn = selectedDoctor.days.map((d: number) => WEEKDAY_NAMES_EN[d]).join(", ");
-          return {
-            available: false,
-            date: targetDate,
-            day: `${dayAr} / ${dayEn}`,
-            doctor: `Dr. ${selectedDoctor.fullName}`,
-            message: `د. ${selectedDoctor.fullName} لا يعمل يوم ${dayAr} (${dayEn}). مواعيد عمله في العيادة هي: ${workingDaysAr} (${workingDaysEn}). هل ترغب بالحجز في أحد هذه الأيام، أو الحجز مع طبيب آخر متاح في العيادة يوم ${dayAr}؟`,
-            working_days: workingDaysAr,
-            available_slots: [],
-            occupied_slots: [],
-          };
-        }
-      }
     }
 
-    // Doctors working on target day
-    const workingDoctors = selectedDoctor
-      ? [selectedDoctor]
-      : doctorList.filter((d: any) => d.days.includes(targetDayOfWeek));
+    // Helper for computing slot availability for a single date
+    const computeDateAvailability = async (targetDate: string) => {
+      const targetDayOfWeek = new Date(`${targetDate}T12:00:00Z`).getUTCDay();
+      const dayEn = WEEKDAY_NAMES_EN[targetDayOfWeek];
+      const dayAr = WEEKDAY_NAMES_AR[targetDayOfWeek];
 
-    if (workingDoctors.length === 0) {
-      return {
-        available: false,
-        date: targetDate,
-        day: `${dayAr} / ${dayEn}`,
-        message: `العيادة لا يتوفر بها أطباء مناوبون يوم ${dayAr} (${dayEn}). يرجى اختيار يوم آخر من أيام العمل المتاحة.`,
-        available_slots: [],
-        occupied_slots: [],
-      };
-    }
-
-    // Generate candidate 30-min slots from working doctors
-    const candidateSlotsSet = new Set<string>();
-    for (const doc of workingDoctors) {
-      const daySched = doc.daily[String(targetDayOfWeek)] || { start: doc.start, end: doc.end };
-      const [sh, sm] = (daySched.start || "09:00").split(":").map(Number);
-      const [eh, em] = (daySched.end || "17:00").split(":").map(Number);
-      let m = sh * 60 + sm;
-      const endM = eh * 60 + em;
-      while (m + 30 <= endM) {
-        const hh = String(Math.floor(m / 60)).padStart(2, "0");
-        const mm = String(m % 60).padStart(2, "0");
-        candidateSlotsSet.add(`${hh}:${mm}`);
-        m += 30;
-      }
-    }
-
-    const allCandidateSlots = Array.from(candidateSlotsSet).sort();
-
-    // Query booked appointments for target date across a wide UTC window
-    const queryStartUtc = new Date(Date.parse(`${targetDate}T00:00:00Z`) - 24 * 3600 * 1000).toISOString();
-    const queryEndUtc = new Date(Date.parse(`${targetDate}T23:59:59Z`) + 24 * 3600 * 1000).toISOString();
-
-    let aptQuery = supabase
-      .from("appointments")
-      .select("id, appointment_at, duration_minutes, status, assigned_user_id, appointment_type")
-      .gte("appointment_at", queryStartUtc)
-      .lte("appointment_at", queryEndUtc)
-      .neq("status", "Cancelled");
-
-    if (selectedDoctor) {
-      aptQuery = aptQuery.eq("assigned_user_id", selectedDoctor.userId);
-    }
-
-    const { data: rawBookedAppointments } = await aptQuery;
-
-    // Convert raw booked appointments to local clinic day minutes
-    const bookedAppointments = (rawBookedAppointments || [])
-      .map((apt: any) => {
-        const local = parseLocalAppointmentTime(apt.appointment_at, timeZone);
-        if (local.dateStr !== targetDate) return null;
-        const duration = Number(apt.duration_minutes) || 30;
+      if (selectedDoctor && !selectedDoctor.days.includes(targetDayOfWeek)) {
         return {
-          assigned_user_id: apt.assigned_user_id,
-          startMin: local.startMin,
-          endMin: local.startMin + duration,
-          timeStr: local.timeStr,
+          available: false,
+          doctorWorks: false,
+          date: targetDate,
+          day: `${dayAr} / ${dayEn}`,
+          dayAr,
+          dayEn,
+          duration_minutes: durationMinutes,
+          duration_formatted: durationMinutes === 60 ? "ساعة واحدة (1 hour)" : `${durationMinutes} دقيقة (${durationMinutes} mins)`,
+          doctor: `Dr. ${selectedDoctor.fullName}`,
+          available_slots: [],
+          occupied_slots: [],
+          total_free: 0,
+          total_occupied: 0,
         };
-      })
-      .filter(Boolean);
-
-    // Calculate available and occupied slots
-    const availableSlots: string[] = [];
-    const occupiedSlots: string[] = [];
-    const isToday = targetDate === clinicNow.dateStr;
-
-    for (const slot of allCandidateSlots) {
-      const [h, min] = slot.split(":").map(Number);
-      const slotStartMin = h * 60 + min;
-      const slotEndMin = slotStartMin + 30;
-
-      // Filter out past slots if requested for today (allow at least 15 min buffer)
-      if (isToday && slotStartMin <= (clinicNow.minutesOfDay + 15)) {
-        continue;
       }
 
-      // Find doctors scheduled to work during this specific slot
-      const docsAtThisSlot = workingDoctors.filter((doc: any) => {
+      const workingDoctors = selectedDoctor
+        ? [selectedDoctor]
+        : doctorList.filter((d: any) => d.days.includes(targetDayOfWeek));
+
+      if (workingDoctors.length === 0) {
+        return {
+          available: false,
+          doctorWorks: false,
+          date: targetDate,
+          day: `${dayAr} / ${dayEn}`,
+          dayAr,
+          dayEn,
+          duration_minutes: durationMinutes,
+          duration_formatted: durationMinutes === 60 ? "ساعة واحدة (1 hour)" : `${durationMinutes} دقيقة (${durationMinutes} mins)`,
+          doctor: selectedDoctor ? `Dr. ${selectedDoctor.fullName}` : "All Available Doctors",
+          available_slots: [],
+          occupied_slots: [],
+          total_free: 0,
+          total_occupied: 0,
+        };
+      }
+
+      const candidateSlotsSet = new Set<string>();
+      let maxShiftEndMin = 0;
+      const stepMin = durationMinutes >= 60 ? 60 : 30;
+      for (const doc of workingDoctors) {
         const daySched = doc.daily[String(targetDayOfWeek)] || { start: doc.start, end: doc.end };
         const [sh, sm] = (daySched.start || "09:00").split(":").map(Number);
         const [eh, em] = (daySched.end || "17:00").split(":").map(Number);
-        return slotStartMin >= (sh * 60 + sm) && slotEndMin <= (eh * 60 + em);
-      });
+        let m = sh * 60 + sm;
+        const endM = eh * 60 + em;
+        if (endM > maxShiftEndMin) maxShiftEndMin = endM;
+        while (m + durationMinutes <= endM) {
+          const hh = String(Math.floor(m / 60)).padStart(2, "0");
+          const mm = String(m % 60).padStart(2, "0");
+          candidateSlotsSet.add(`${hh}:${mm}`);
+          m += stepMin;
+        }
+      }
 
-      if (docsAtThisSlot.length === 0) continue;
+      const queryStartUtc = new Date(Date.parse(`${targetDate}T00:00:00Z`) - 24 * 3600 * 1000).toISOString();
+      const queryEndUtc = new Date(Date.parse(`${targetDate}T23:59:59Z`) + 24 * 3600 * 1000).toISOString();
 
-      // Check if at least one doctor has no overlapping appointment at this slot
-      const hasFreeDoctor = docsAtThisSlot.some((doc: any) => {
-        const docApts = bookedAppointments.filter((apt: any) => apt.assigned_user_id === doc.userId);
-        const isConflict = docApts.some((apt: any) => slotStartMin < apt.endMin && slotEndMin > apt.startMin);
-        return !isConflict;
-      });
+      let aptQuery = supabase
+        .from("appointments")
+        .select("id, appointment_at, duration_minutes, status, assigned_user_id, appointment_type")
+        .gte("appointment_at", queryStartUtc)
+        .lte("appointment_at", queryEndUtc)
+        .neq("status", "Cancelled");
 
-      if (hasFreeDoctor) {
-        availableSlots.push(slot);
-      } else {
-        occupiedSlots.push(slot);
+      if (selectedDoctor) {
+        aptQuery = aptQuery.eq("assigned_user_id", selectedDoctor.userId);
+      }
+
+      const { data: rawBookedAppointments } = await aptQuery;
+
+      const bookedAppointments = (rawBookedAppointments || [])
+        .map((apt: any) => {
+          const local = parseLocalAppointmentTime(apt.appointment_at, timeZone);
+          if (local.dateStr !== targetDate) return null;
+          const duration = Number(apt.duration_minutes) || durationMinutes;
+          return {
+            assigned_user_id: apt.assigned_user_id,
+            startMin: local.startMin,
+            endMin: local.startMin + duration,
+            timeStr: local.timeStr,
+          };
+        })
+        .filter(Boolean);
+
+      for (const b of bookedAppointments) {
+        if (b && b.endMin + durationMinutes <= maxShiftEndMin) {
+          const hh = String(Math.floor(b.endMin / 60)).padStart(2, "0");
+          const mm = String(b.endMin % 60).padStart(2, "0");
+          candidateSlotsSet.add(`${hh}:${mm}`);
+        }
+      }
+
+      const allCandidateSlots = Array.from(candidateSlotsSet).sort();
+
+      const availableSlots: string[] = [];
+      const occupiedSlots: string[] = [];
+      const isToday = targetDate === clinicNow.dateStr;
+
+      for (const slot of allCandidateSlots) {
+        const [h, min] = slot.split(":").map(Number);
+        const slotStartMin = h * 60 + min;
+        const slotEndMin = slotStartMin + durationMinutes;
+
+        if (isToday && slotStartMin <= (clinicNow.minutesOfDay + 15)) {
+          continue;
+        }
+
+        const docsAtThisSlot = workingDoctors.filter((doc: any) => {
+          const daySched = doc.daily[String(targetDayOfWeek)] || { start: doc.start, end: doc.end };
+          const [sh, sm] = (daySched.start || "09:00").split(":").map(Number);
+          const [eh, em] = (daySched.end || "17:00").split(":").map(Number);
+          return slotStartMin >= (sh * 60 + sm) && slotEndMin <= (eh * 60 + em);
+        });
+
+        if (docsAtThisSlot.length === 0) continue;
+
+        const hasFreeDoctor = docsAtThisSlot.some((doc: any) => {
+          const docApts = bookedAppointments.filter((apt: any) => apt.assigned_user_id === doc.userId);
+          const isConflict = docApts.some((apt: any) => slotStartMin < apt.endMin && slotEndMin > apt.startMin);
+          return !isConflict;
+        });
+
+        if (hasFreeDoctor) {
+          availableSlots.push(slot);
+        } else {
+          occupiedSlots.push(slot);
+        }
+      }
+
+      const morningSlots = availableSlots.filter((s) => parseInt(s.split(":")[0], 10) < 14);
+      const eveningSlots = availableSlots.filter((s) => parseInt(s.split(":")[0], 10) >= 14);
+
+      return {
+        available: availableSlots.length > 0,
+        doctorWorks: true,
+        date: targetDate,
+        day: `${dayAr} / ${dayEn}`,
+        dayAr,
+        dayEn,
+        duration_minutes: durationMinutes,
+        duration_formatted: durationMinutes === 60 ? "ساعة واحدة (1 hour)" : `${durationMinutes} دقيقة (${durationMinutes} mins)`,
+        doctor: selectedDoctor ? `Dr. ${selectedDoctor.fullName}` : "All Available Doctors",
+        morning_slots: morningSlots.slice(0, 5),
+        evening_slots: eveningSlots.slice(0, 8),
+        available_slots: availableSlots,
+        occupied_slots: occupiedSlots,
+        total_free: availableSlots.length,
+        total_occupied: occupiedSlots.length,
+      };
+    };
+
+    if (daysAhead === 1) {
+      const singleDayRes = await computeDateAvailability(rawTargetDate);
+      if (!singleDayRes.doctorWorks) {
+        const workingDaysAr = selectedDoctor
+          ? selectedDoctor.days.map((d: number) => WEEKDAY_NAMES_AR[d]).join(" و ")
+          : "";
+        const workingDaysEn = selectedDoctor
+          ? selectedDoctor.days.map((d: number) => WEEKDAY_NAMES_EN[d]).join(", ")
+          : "";
+        return {
+          available: false,
+          date: rawTargetDate,
+          day: singleDayRes.day,
+          doctor: selectedDoctor ? `Dr. ${selectedDoctor.fullName}` : "All Available Doctors",
+          message: selectedDoctor
+            ? `د. ${selectedDoctor.fullName} لا يعمل يوم ${singleDayRes.day}. مواعيد عمله في العيادة هي: ${workingDaysAr} (${workingDaysEn}). هل ترغب بالحجز في أحد هذه الأيام، أو الحجز مع طبيب آخر متاح في العيادة يوم ${singleDayRes.day}؟`
+            : `العيادة لا يتوفر بها أطباء مناوبون يوم ${singleDayRes.day}. يرجى اختيار يوم آخر من أيام العمل المتاحة.`,
+          working_days: workingDaysAr,
+          available_slots: [],
+          occupied_slots: [],
+        };
+      }
+
+      return {
+        available: singleDayRes.available,
+        date: singleDayRes.date,
+        day: singleDayRes.day,
+        duration_minutes: durationMinutes,
+        duration_formatted: singleDayRes.duration_formatted,
+        doctor: singleDayRes.doctor,
+        morning_slots: singleDayRes.morning_slots,
+        evening_slots: singleDayRes.evening_slots,
+        available_slots: singleDayRes.available_slots,
+        occupied_slots: singleDayRes.occupied_slots,
+        total_free: singleDayRes.total_free,
+        total_occupied: singleDayRes.total_occupied,
+        rules_and_warnings: singleDayRes.occupied_slots.length > 0
+          ? `IMPORTANT: The following slots are OCCUPIED/ALREADY BOOKED: ${singleDayRes.occupied_slots.join(", ")}. NEVER offer or book any occupied slot. If the patient requested an occupied slot, tell them it is taken and propose alternative slots from available_slots.`
+          : `All scheduled ${durationMinutes}-minute slots on this date are currently available.`,
+      };
+    }
+
+    // Multi-day scan (e.g. days_ahead: 7)
+    const availableDays: any[] = [];
+    const baseMs = Date.parse(`${rawTargetDate}T12:00:00Z`);
+
+    for (let offset = 0; offset < daysAhead; offset++) {
+      const d = new Date(baseMs + offset * 24 * 3600 * 1000);
+      const currDateStr = d.toISOString().slice(0, 10);
+      const dayRes = await computeDateAvailability(currDateStr);
+      if (dayRes.doctorWorks && dayRes.available) {
+        availableDays.push(dayRes);
       }
     }
 
-    const morningSlots = availableSlots.filter((s) => parseInt(s.split(":")[0], 10) < 14);
-    const eveningSlots = availableSlots.filter((s) => parseInt(s.split(":")[0], 10) >= 14);
+    if (availableDays.length === 0) {
+      const workingDaysAr = selectedDoctor
+        ? selectedDoctor.days.map((d: number) => WEEKDAY_NAMES_AR[d]).join(" و ")
+        : "";
+      return {
+        available: false,
+        days_scanned: daysAhead,
+        start_date: rawTargetDate,
+        duration_minutes: durationMinutes,
+        duration_formatted: durationMinutes === 60 ? "ساعة واحدة (1 hour)" : `${durationMinutes} دقيقة (${durationMinutes} mins)`,
+        doctor: selectedDoctor ? `Dr. ${selectedDoctor.fullName}` : "All Available Doctors",
+        message: selectedDoctor
+          ? `لا توجد مواعيد متاحة مع د. ${selectedDoctor.fullName} خلال الأيام الـ ${daysAhead} القادمة بدءاً من ${rawTargetDate}. أيام عمله هي: ${workingDaysAr}.`
+          : `لا توجد مواعيد متاحة في العيادة خلال الأيام الـ ${daysAhead} القادمة بدءاً من ${rawTargetDate}.`,
+        available_days: [],
+      };
+    }
+
+    const summaryParts = availableDays.map((d: any) => {
+      const sample = d.available_slots.slice(0, 4).join(", ");
+      return `${d.day} (${d.date}): ${sample}${d.total_free > 4 ? "..." : ""}`;
+    });
 
     return {
-      available: availableSlots.length > 0,
-      date: targetDate,
-      day: `${dayAr} / ${dayEn}`,
+      available: true,
+      days_scanned: daysAhead,
+      start_date: rawTargetDate,
+      duration_minutes: durationMinutes,
+      duration_formatted: durationMinutes === 60 ? "ساعة واحدة (1 hour)" : `${durationMinutes} دقيقة (${durationMinutes} mins)`,
       doctor: selectedDoctor ? `Dr. ${selectedDoctor.fullName}` : "All Available Doctors",
-      morning_slots: morningSlots.slice(0, 5),
-      evening_slots: eveningSlots.slice(0, 8),
-      available_slots: availableSlots,
-      occupied_slots: occupiedSlots,
-      total_free: availableSlots.length,
-      total_occupied: occupiedSlots.length,
-      rules_and_warnings: occupiedSlots.length > 0
-        ? `IMPORTANT: The following slots are OCCUPIED/ALREADY BOOKED: ${occupiedSlots.join(", ")}. NEVER offer or book any occupied slot. If the patient requested an occupied slot, tell them it is taken and propose alternative slots from available_slots.`
-        : "All scheduled slots on this date are currently available.",
+      available_days: availableDays.map((d: any) => ({
+        date: d.date,
+        day: d.day,
+        total_free: d.total_free,
+        available_slots: d.available_slots,
+        morning_slots: d.morning_slots,
+        evening_slots: d.evening_slots,
+      })),
+      summary: `Found vacancies on ${availableDays.length} day(s) for ${durationMinutes}-minute slots: ${summaryParts.join(" | ")}`,
+      rules_and_warnings: `MANDATORY CHRONOLOGICAL ORDER: Offer the patient the EARLIEST available date first (${availableDays[0].day}), and also present all other available dates (${availableDays.map((d: any) => d.day).join(", ")}) so the patient can choose their preferred day. NEVER skip an earlier day (e.g. Saturday) to jump to a later day (e.g. Tuesday).`,
+    };
+  }
+
+  if (name === "lookup_patient") {
+    const rawPhone = String(args.phone || "").trim();
+    if (!rawPhone) {
+      return {
+        found: false,
+        count: 0,
+        message: "يرجى تزويدنا برقم الهاتف للبحث عنه في سجلات العيادة.",
+      };
+    }
+
+    const matches = await findPatientsByPhone(supabase, rawPhone);
+
+    if (matches.length === 0) {
+      return {
+        found: false,
+        count: 0,
+        phone: rawPhone,
+        message: `لم يتم العثور على أي ملف مريض مسجل برقم الهاتف (${rawPhone}). إذا كان المريض جديداً، اطلب اسمه الكامل، وفقط عندئذ قم بإنشاء ملف جديد عبر create_patient وربط هذا الرقم به.`,
+      };
+    }
+
+    if (matches.length === 1) {
+      const p = matches[0];
+      if (!conversation.patient_id) {
+        conversation.patient_id = p.id;
+        conversation.patient_name = p.name;
+        await supabase
+          .from("whatsapp_conversations")
+          .update({ patient_id: p.id, patient_name: p.name })
+          .eq("id", conversation.id);
+      }
+      return {
+        found: true,
+        count: 1,
+        patient: { id: p.id, name: p.name, phone: p.phone, patient_number: p.patient_number },
+        message: `تم جلب ملف المريض بنجاح: الاسم "${p.name}" (معرّف المريض: ${p.id}). رحب بالمريض باسمه وأكد هويته واستخدم ملفه للحجز.`,
+      };
+    }
+
+    // Multiple matches (Duplicates)
+    return {
+      found: true,
+      count: matches.length,
+      duplicates: matches.map((p: any) => ({ id: p.id, name: p.name, phone: p.phone })),
+      message: `تنبيه: يوجد ${matches.length} مرضى مسجلين بنفس رقم الهاتف (${matches.map((p: any) => `"${p.name}"`).join("، ")}). يجب سؤال المريض: أي من هذه الأسماء المسجلة هو صاحب الطلب (أم أنه مريض جديد)، ولا تقم بتأكيد الحجز أو إنشاء مريض جديد حتى يحدد الاسم المطلوب عبر assign_patient أو يؤكد أنه مريض جديد عبر create_patient.`,
+    };
+  }
+
+  if (name === "assign_patient") {
+    const { patient_id, patient_name } = args;
+    if (!patient_id) {
+      return { success: false, error: "patient_id is required" };
+    }
+
+    const { data: p, error: pErr } = await supabase
+      .from("patients")
+      .select("id, name, phone")
+      .eq("id", patient_id)
+      .maybeSingle();
+
+    if (pErr || !p) {
+      return { success: false, error: `Patient not found with ID ${patient_id}` };
+    }
+
+    const finalName = p.name || patient_name || "Patient";
+
+    await supabase
+      .from("whatsapp_conversations")
+      .update({
+        patient_id: p.id,
+        patient_name: finalName,
+      })
+      .eq("id", conversation.id);
+
+    conversation.patient_id = p.id;
+    conversation.patient_name = finalName;
+
+    return {
+      success: true,
+      patient_id: p.id,
+      patient_name: finalName,
+      message: `تم تعيين وربط المحادثة بنجاح بالملف المسجل للمريض "${finalName}".`,
+    };
+  }
+
+  if (name === "create_patient") {
+    const patientName = String(args.patient_name || "").trim();
+    if (!patientName) {
+      return { success: false, error: "patient_name is required" };
+    }
+
+    const rawTargetPhone = args.phone || conversation.phone || "";
+    const phoneToAssign = isBsuid(rawTargetPhone) ? "" : rawTargetPhone;
+
+    const nameParts = patientName.split(/\s+/).filter(Boolean);
+    const firstName = nameParts[0] || "Patient";
+    const lastName = nameParts.slice(1).join(" ") || "";
+
+    const { data: newPatient, error: createErr } = await supabase
+      .from("patients")
+      .insert({
+        name: patientName,
+        first_name: firstName,
+        last_name: lastName,
+        phone: phoneToAssign,
+        chart_state: {},
+      })
+      .select("id, name, phone")
+      .single();
+
+    if (createErr) {
+      console.error("create_patient error:", createErr);
+      return { success: false, error: createErr.message };
+    }
+
+    await supabase
+      .from("whatsapp_conversations")
+      .update({
+        patient_id: newPatient.id,
+        patient_name: newPatient.name,
+      })
+      .eq("id", conversation.id);
+
+    conversation.patient_id = newPatient.id;
+    conversation.patient_name = newPatient.name;
+
+    return {
+      success: true,
+      patient_id: newPatient.id,
+      patient_name: newPatient.name,
+      phone: newPatient.phone,
+      message: `تم إنشاء ملف جديد بنجاح للمريض "${newPatient.name}" برقم هاتف "${newPatient.phone || "بدون رقم"}"، وتم ربط المحادثة به.`,
     };
   }
 
   if (name === "book_appointment") {
-    const { patient_name, date, time, doctor_name, visit_type, notes } = args;
+    const { patient_name, date, time, doctor_name, visit_type, notes, patient_id } = args;
+    const duration = resolveAppointmentDuration(visit_type, customInstructions, Number(args.duration_minutes));
     const appointmentAtIso = localDateTimeToUtcIso(date, time, timeZone);
     const reqStartMs = Date.parse(appointmentAtIso);
-    const reqEndMs = reqStartMs + 30 * 60 * 1000;
+    const reqEndMs = reqStartMs + duration * 60 * 1000;
 
-    // 1. Find or create patient
-    let patientId = conversation.patient_id;
+    // 1. Resolve patient: prioritize provided patient_id or conversation.patient_id
+    let patientId = patient_id || conversation.patient_id;
+    let finalPatientName = (patient_name || conversation.patient_name || "").trim();
+
     if (!patientId) {
-      let existingPatient = null;
       if (!isBsuid(conversation.phone) && conversation.phone) {
-        const tail = getPhoneTail(conversation.phone);
-        const { data } = await supabase
-          .from("patients")
-          .select("id, name")
-          .or(`phone.eq.${conversation.phone},phone.ilike.%${tail}`)
-          .maybeSingle();
-        existingPatient = data;
+        const matches = await findPatientsByPhone(supabase, conversation.phone);
+        if (matches.length === 1) {
+          patientId = matches[0].id;
+          finalPatientName = matches[0].name || finalPatientName;
+        } else if (matches.length > 1) {
+          // Check if patient_name matches one of the duplicate names
+          const reqNameLower = finalPatientName.toLowerCase();
+          const matchedDup = matches.find((m: any) => {
+            const mName = String(m.name || "").toLowerCase().trim();
+            return mName && (mName === reqNameLower || reqNameLower.includes(mName) || mName.includes(reqNameLower));
+          });
+          if (matchedDup) {
+            patientId = matchedDup.id;
+            finalPatientName = matchedDup.name;
+          } else {
+            return {
+              success: false,
+              error: "DUPLICATE_PATIENTS_EXIST",
+              duplicates: matches.map((m: any) => ({ id: m.id, name: m.name })),
+              message: `يوجد أكثر من مريض مسجل بهذا الرقم (${matches.map((m: any) => m.name).join("، ")}). يرجى سؤال المريض عن الاسم المطلوب لتأكيد الحجز عبر assign_patient، أو توضيح ما إذا كان مريضاً جديداً.`,
+            };
+          }
+        }
       }
 
-      if (existingPatient) {
-        patientId = existingPatient.id;
-      } else {
-        const nameParts = (patient_name || conversation.patient_name || "WhatsApp Patient").trim().split(" ");
+      // If still no patientId, ONLY THEN create a new patient and assign this number
+      if (!patientId) {
+        const effectiveName = finalPatientName || "WhatsApp Patient";
+        const nameParts = effectiveName.split(/\s+/).filter(Boolean);
         const firstName = nameParts[0] || "Patient";
         const lastName = nameParts.slice(1).join(" ") || "";
-        const { data: newPatient } = await supabase
+        const { data: newPatient, error: newPatientErr } = await supabase
           .from("patients")
           .insert({
-            name: patient_name || conversation.patient_name,
+            name: effectiveName,
             first_name: firstName,
             last_name: lastName,
             phone: isBsuid(conversation.phone) ? "" : conversation.phone,
+            chart_state: {},
           })
-          .select("id")
+          .select("id, name")
           .single();
-        patientId = newPatient?.id;
+
+        if (newPatientErr) {
+          console.error("Failed to create new patient in book_appointment:", newPatientErr);
+        } else if (newPatient) {
+          patientId = newPatient.id;
+          finalPatientName = newPatient.name;
+        }
       }
 
       if (patientId) {
         await supabase
           .from("whatsapp_conversations")
-          .update({ patient_id: patientId, patient_name: patient_name || conversation.patient_name })
+          .update({ patient_id: patientId, patient_name: finalPatientName })
           .eq("id", conversation.id);
+        conversation.patient_id = patientId;
+        conversation.patient_name = finalPatientName;
       }
     }
 
@@ -1223,7 +1681,7 @@ async function handleGeminiToolCall(
         const daySched = daily[String(dayOfWeek)] || { start: sched.start || "09:00", end: sched.end || "17:00" };
         const [sh, sm] = (daySched.start || "09:00").split(":").map(Number);
         const [eh, em] = (daySched.end || "17:00").split(":").map(Number);
-        if (reqMin >= (sh * 60 + sm) && (reqMin + 30) <= (eh * 60 + em)) {
+        if (reqMin >= (sh * 60 + sm) && (reqMin + duration) <= (eh * 60 + em)) {
           const checkStartIso = new Date(reqStartMs - 4 * 3600 * 1000).toISOString();
           const checkEndIso = new Date(reqEndMs + 4 * 3600 * 1000).toISOString();
           const { data: conflicts } = await supabase
@@ -1236,7 +1694,7 @@ async function handleGeminiToolCall(
 
           const hasConflict = (conflicts || []).some((apt: any) => {
             const aStart = Date.parse(apt.appointment_at);
-            const aEnd = aStart + (Number(apt.duration_minutes) || 30) * 60 * 1000;
+            const aEnd = aStart + (Number(apt.duration_minutes) || duration) * 60 * 1000;
             return reqStartMs < aEnd && reqEndMs > aStart;
           });
 
@@ -1264,7 +1722,7 @@ async function handleGeminiToolCall(
 
       const hasConflict = (existingApts || []).some((apt: any) => {
         const aStart = Date.parse(apt.appointment_at);
-        const aEnd = aStart + (Number(apt.duration_minutes) || 30) * 60 * 1000;
+        const aEnd = aStart + (Number(apt.duration_minutes) || duration) * 60 * 1000;
         return reqStartMs < aEnd && reqEndMs > aStart;
       });
 
@@ -1303,7 +1761,7 @@ async function handleGeminiToolCall(
         assigned_user_id: assignedUserId,
         status: "Scheduled",
         notes: `Booked via WhatsApp AI Agent. ${notes || ""}`.trim(),
-        duration_minutes: 30,
+        duration_minutes: duration,
       })
       .select("id")
       .single();
@@ -1329,6 +1787,7 @@ async function handleGeminiToolCall(
       assignedUserId,
       dayAr: aptDayAr,
       dayEn: aptDayEn,
+      durationMinutes: duration,
     }).catch((pushErr) => {
       console.warn("sendAppointmentPushNotification error:", pushErr);
     });
@@ -1339,6 +1798,8 @@ async function handleGeminiToolCall(
       patient_name: patient_name || conversation.patient_name,
       date,
       time,
+      duration_minutes: duration,
+      duration: duration === 60 ? "ساعة واحدة (1 hour)" : `${duration} دقيقة (${duration} mins)`,
       doctor: confirmedDoctorName,
       visit_type: confirmedVisitType,
       status: "Confirmed",
@@ -1420,11 +1881,12 @@ async function runGeminiAgentWithModel(
   conversation: any,
   initialContents: any[],
   tools: any[],
-  timeZone: string = "Africa/Cairo"
+  timeZone: string = "Africa/Cairo",
+  customInstructions: string = ""
 ): Promise<string> {
   const contents = JSON.parse(JSON.stringify(initialContents));
 
-  for (let turn = 0; turn < 3; turn++) {
+  for (let turn = 0; turn < 5; turn++) {
     const data = await callGeminiApi(model, apiKey, systemInstruction, contents, tools, 45000);
 
     const candidate = data.candidates?.[0];
@@ -1442,7 +1904,7 @@ async function runGeminiAgentWithModel(
         const call = fcPart.functionCall;
         console.log(`[${model}] Gemini tool call:`, call.name, call.args);
 
-        const toolResult = await handleGeminiToolCall(supabase, call, conversation, timeZone);
+        const toolResult = await handleGeminiToolCall(supabase, call, conversation, timeZone, customInstructions);
         console.log(`[${model}] Tool result:`, toolResult);
 
         functionResponses.push({
@@ -1517,16 +1979,114 @@ async function runGeminiAgent(
 
   const dynamicTools = buildGeminiTools(doctorNames, visitTypeNames);
 
+  // 2. Patient Identity Auto-Sync: Fetch registered patient(s) by mobile number
+  let matchedPatients: any[] = [];
+  if (!isBsuid(conversation?.phone) && conversation?.phone) {
+    matchedPatients = await findPatientsByPhone(supabase, conversation.phone);
+  }
+
+  // Auto-link conversation if exactly 1 patient is registered and conversation is unassigned
+  if (matchedPatients.length === 1 && !conversation?.patient_id) {
+    conversation.patient_id = matchedPatients[0].id;
+    conversation.patient_name = matchedPatients[0].name || conversation.patient_name;
+    await supabase
+      .from("whatsapp_conversations")
+      .update({ patient_id: matchedPatients[0].id, patient_name: conversation.patient_name })
+      .eq("id", conversation.id);
+  }
+
+  let patientContextSection = "";
+  if (isBsuid(conversation?.phone)) {
+    patientContextSection = `PATIENT IDENTIFICATION STATUS (MASKED WHATSAPP USERNAME):
+- This patient is contacting via a masked WhatsApp username (phone number hidden).
+- Current contact name: "${conversation?.patient_name || "WhatsApp User"}"
+- If the patient provides a mobile number in the chat, IMMEDIATELY call the \`lookup_patient\` tool with that number.
+- When booking or registering, politely ask for their mobile phone number and full name.`;
+  } else if (matchedPatients.length > 1) {
+    const dupList = matchedPatients
+      .map((p: any, idx: number) => `  ${idx + 1}. "${p.name}" (ID: ${p.id})`)
+      .join("\n");
+    const assignedNote = conversation?.patient_id
+      ? `Currently assigned profile: "${conversation.patient_name}" (ID: ${conversation.patient_id})`
+      : `Currently unassigned among duplicates`;
+
+    patientContextSection = `CRITICAL PATIENT CONTEXT - DUPLICATE PATIENTS FOUND FOR PHONE +${conversation?.phone}:
+- Status: There are MULTIPLE (${matchedPatients.length}) existing patient records registered with this phone number:
+${dupList}
+- ${assignedNote}
+
+MANDATORY RULES FOR DUPLICATE PATIENTS:
+1. ALWAYS ASK THE PATIENT WHICH ONE TO ASSIGN:
+   ${!conversation?.patient_id ? `Because there are duplicate patient profiles registered under this mobile number, you MUST ask the patient which one of these duplicate profiles they are (or if they are contacting for someone new / a new patient).
+   Ask warmly in their language, for example:
+   "أهلاً بك في عيادة لومين لطب الأسنان! 🦷✨
+   يوجد لدينا أكثر من ملف مسجل بهذا الرقم:
+${matchedPatients.map((p: any, i: number) => `   ${i + 1}. ${p.name}`).join("\n")}
+   هل التواصل بخصوص أحد هذه الأسماء، أم لشخص جديد؟"` : `If the patient indicates they are contacting or booking for another name on the list or a new person, update or create accordingly.`}
+2. ASSIGNING AN EXISTING PROFILE:
+   When the patient indicates which duplicate profile they are (by name or number):
+   - Immediately call \`assign_patient\` with that patient's \`patient_id\` and \`patient_name\`.
+   - Greet or confirm to them warmly by name, and proceed with their requested service.
+3. CREATING A NEW PATIENT:
+   - ONLY IF the patient explicitly clarifies that they are a NEW patient (i.e. not any of the duplicate profiles listed above):
+     Ask for their full name (if not yet provided).
+     ONLY THEN call \`create_patient\` to make a new patient record and assign this mobile number to them!
+   - NEVER create a new patient profile if they match or choose one of the existing duplicate profiles!`;
+  } else if (matchedPatients.length === 1) {
+    const p = matchedPatients[0];
+    patientContextSection = `PATIENT CONTEXT - REGISTERED PATIENT FOUND FOR PHONE +${conversation?.phone}:
+- Fetched Patient Name: "${p.name}"
+- Patient ID: ${p.id}
+- Phone: ${p.phone || conversation?.phone}
+
+RULES:
+1. Address the patient warmly by their fetched name (e.g. "أهلاً بك أستاذ/ة ${p.name}! 🦷✨").
+2. By default, use this patient profile (ID: ${p.id}) for any appointments.
+3. If the patient explicitly states they are contacting on behalf of someone else or a new family member:
+   Ask for that person's full name, and ONLY THEN call \`create_patient\` to register them.`;
+  } else {
+    patientContextSection = `PATIENT CONTEXT - UNREGISTERED PHONE (+${conversation?.phone || "None"}):
+- Status: No existing patient record found with this phone number.
+- Current WhatsApp chat name: "${conversation?.patient_name || "WhatsApp User"}"
+
+RULES:
+1. If the patient provides a different phone number in chat, call \`lookup_patient\` with that number.
+2. If they want to book an appointment or register:
+   Ask for their full name.
+   ONLY THEN call \`create_patient\` (or \`book_appointment\`) to create a new patient record and assign this mobile number to them.`;
+  }
+
+  // 3. Precompute 10-day lookahead calendar reference (strictly Middle Eastern clinic week starting Saturday)
+  const lookaheadDays: string[] = [];
+  const baseLookaheadMs = Date.parse(`${clinicNow.dateStr}T12:00:00Z`);
+  for (let i = 0; i <= 10; i++) {
+    const d = new Date(baseLookaheadMs + i * 24 * 3600 * 1000);
+    const dStr = d.toISOString().slice(0, 10);
+    const dayOfWeek = d.getUTCDay();
+    const label = i === 0 ? " [اليوم / Today]" : i === 1 ? " [غداً / Tomorrow]" : "";
+    lookaheadDays.push(`- ${dStr}: ${WEEKDAY_NAMES_AR[dayOfWeek]} (${WEEKDAY_NAMES_EN[dayOfWeek]})${label}`);
+  }
+  const upcomingCalendarStr = lookaheadDays.join("\n");
+
   const systemInstruction = `You are the polite, welcoming, and efficient AI receptionist for Lumin Dental Clinic (عيادة لومين لطب الأسنان).
 Current clinic date & day of the week: ${todayStr}.
 Current clinic local time: ${clinicNow.timeStr}.
-When a patient asks about a specific day (such as "غداً" / tomorrow, "يوم الأربعاء" / Wednesday, etc.), accurately calculate the exact date based on today (${todayStr}). For example, if today is Monday, tomorrow is Tuesday, and the day after is Wednesday.
+
+Upcoming 10-Day Clinic Calendar Reference (Use this exact table for accurate date calculations):
+${upcomingCalendarStr}
+
 Clinic operating hours: Saturday to Thursday from 10:00 AM to 8:00 PM (10:00 to 20:00). Closed on Fridays.
+Middle Eastern Clinic Week: The working week begins on SATURDAY (السبت) and ends on THURSDAY (الخميس).
 
 Active Clinic Doctors & Live Working Schedules (Directly from Clinic HR Staff Settings):
 ${doctorsScheduleStr}
 
-Rules for Doctor Schedules & Working Hours:
+Rules for Doctor Schedules, Working Hours & Vacancies:
+- Working Week Order: The clinic working week begins on SATURDAY. Saturday is day 1, followed by Sunday, Monday, Tuesday, Wednesday, Thursday.
+- Chronological Order: When a patient asks for a doctor's availability, "next week" (الأسبوع القادم), or general open appointments:
+  1. Call \`check_available_slots\` with \`days_ahead: 7\` to scan all upcoming working days.
+  2. You MUST present vacancies in strict chronological order: Offer SATURDAY first if available, followed by subsequent days (e.g. Saturday before Tuesday). NEVER skip Saturday to jump to Tuesday!
+  3. Clearly state the day name and date for each option (e.g. "يوم السبت 26 سبتمبر أو يوم الثلاثاء 29 سبتمبر").
 - Each doctor only accepts appointments on their scheduled days and during their shift hours listed above.
 - If a patient asks for a doctor on a day they do NOT work, inform them politely of the doctor's exact working days, and suggest booking on one of their working days or seeing another doctor available on that day.
 
@@ -1551,17 +2111,46 @@ Common Arabic translations:
 - تركيبات وتيجان = Crown prep / Procedure
 - متابعة = Follow-up
 
-Rules:
+================================================================================
+PATIENT IDENTITY & PROFILE RULES:
+${patientContextSection}
+
+PHONE NUMBER LOOKUP & ASSIGNMENT RULES:
+1. When a patient provides a mobile number in the chat (or if the sender's phone is masked and they provide their phone number):
+   - You MUST call \`lookup_patient(phone)\` with the provided mobile number.
+   - If 1 patient is found: fetch their name, greet them warmly by name, and call \`assign_patient\`.
+   - If duplicate patients are found: you MUST ask the patient which one of the duplicate patients to assign (or if they are a new patient). When they clarify, call \`assign_patient\`.
+   - ONLY IF they clarify that they are a new patient, ask for their full name, and ONLY THEN call \`create_patient\` to make a new patient and assign this number to him.
+================================================================================
+
+================================================================================
+CRITICAL APPOINTMENT DURATION RULES (1 HOUR DEFAULT):
+1. DEFAULT APPOINTMENT DURATION IS 1 HOUR (60 MINUTES):
+   - By default, ALL appointments given, proposed, and booked by the AI receptionist MUST be 1 HOUR (60 minutes).
+   - When calling \`check_available_slots\`, pass \`duration_minutes: 60\` by default.
+   - When calling \`book_appointment\`, pass \`duration_minutes: 60\` by default.
+   - When offering slots to the patient, propose them with 1 hour duration (e.g. "الساعة 11:00 صباحاً (المدة: ساعة كاملة / من 11:00 إلى 12:00)").
+
+2. EXCEPTIONS SPECIFIED IN THE ADMIN INSTRUCTIONS:
+   - Carefully check the "Additional clinic instruction sections" below (configured in the clinic admin settings).
+   - IF the admin instructions specify a different duration for a specific service or visit type (such as "الكشف 30 دقيقة" / "Consultation is 30 minutes", "التنظيف 45 دقيقة", "علاج العصب 90 دقيقة", etc.):
+     * You MUST follow that specific duration as an exception instead of 1 hour!
+     * Pass that duration in \`check_available_slots(duration_minutes: ...)\` and \`book_appointment(duration_minutes: ...)\`.
+   - IF NO specific duration is mentioned in the admin instructions for a service, ALWAYS default to 1 hour (60 minutes).
+================================================================================
+
+General Rules:
 1. Speak in the patient's language naturally (Arabic or English). If the patient speaks Arabic or Iraqi/Egyptian dialect, respond in warm, polite Arabic.
 2. If the patient wants to book an appointment or asks about availability:
-   - Always call \`check_available_slots\` with the calculated YYYY-MM-DD date to check real-time open slots (and provide doctor_name if the patient asked for a specific doctor).
+   - Determine the appointment duration: check the admin instructions below for any custom duration specified for this service (e.g. consultation 30 mins). If no exception is specified in the admin instructions, the duration MUST be 1 hour (60 minutes).
+   - For general availability, a doctor's schedule, or "next week", call \`check_available_slots\` with \`days_ahead: 7\` and \`duration_minutes\` (default 60). Propose the earliest available working day first (e.g. Saturday before Tuesday), offering 2-3 day options so the patient can choose.
+   - For a specific date, call \`check_available_slots\` with that YYYY-MM-DD date and \`duration_minutes\`.
    - Propose 3 to 5 convenient vacant slots (from available_slots) to the patient.
    - Ask for their full name if not already known.
-   - When the patient agrees on a specific date and time, call \`book_appointment\` to save it to the system with the appropriate doctor and visit type.
-   - Once booked, provide a clear, warm confirmation message summarizing the date, time, doctor, and service.
+   - When the patient agrees on a specific date and time, call \`book_appointment\` with \`duration_minutes\` to save it to the system with the appropriate doctor and visit type.
+   - Once booked, provide a clear, warm confirmation message summarizing the date, time, duration (e.g. 1 hour / ساعة واحدة), doctor, and service.
 3. If the patient has severe medical emergencies, pain that requires immediate triage, or requests to speak to a person, call \`request_human_support\` and politely inform the patient that our clinic team will reply shortly.
 4. Keep your responses concise, friendly, and formatted nicely for WhatsApp (use *bold* and bullet points sparingly). Do not use long markdown tables.
-${isBsuid(conversation?.phone) ? "\n5. SPECIAL PATIENT NOTICE (MASKED WHATSAPP USERNAME): This patient is contacting via a masked WhatsApp Username (their phone number is protected). During the conversation, politely ask them to provide their mobile phone number so the clinic reception can confirm their reservation and contact them if needed." : ""}
 
 ${customInstructions ? `Additional clinic instruction sections:\n${customInstructions}` : ""}`;
 
@@ -1626,7 +2215,8 @@ ${customInstructions ? `Additional clinic instruction sections:\n${customInstruc
         conversation,
         initialContents,
         dynamicTools,
-        timeZone
+        timeZone,
+        customInstructions
       );
     } catch (err: any) {
       console.warn(`Model ${model} failed (attempting next in chain):`, err?.message || err);
@@ -1731,14 +2321,10 @@ Deno.serve(async (req: Request) => {
             let linkedPatientId = patient_id || null;
             let linkedPatientName = patient_name || (targetIsBsuid ? "WhatsApp User" : `+${clean}`);
             if (!linkedPatientId && !targetIsBsuid) {
-              const { data: p } = await supabase
-                .from("patients")
-                .select("id, name")
-                .or(`phone.eq.${clean},phone.ilike.%${tail}`)
-                .maybeSingle();
-              if (p) {
-                linkedPatientId = p.id;
-                linkedPatientName = p.name || linkedPatientName;
+              const matchedPatients = await findPatientsByPhone(supabase, clean);
+              if (matchedPatients.length === 1) {
+                linkedPatientId = matchedPatients[0].id;
+                linkedPatientName = matchedPatients[0].name || linkedPatientName;
               }
             }
 
@@ -2003,14 +2589,10 @@ Deno.serve(async (req: Request) => {
             let linkedPatientId = patient_id || null;
             let linkedPatientName = patient_name || (targetIsBsuid ? "WhatsApp User" : `+${clean}`);
             if (!linkedPatientId && !targetIsBsuid) {
-              const { data: p } = await supabase
-                .from("patients")
-                .select("id, name")
-                .or(`phone.eq.${clean},phone.ilike.%${tail}`)
-                .maybeSingle();
-              if (p) {
-                linkedPatientId = p.id;
-                linkedPatientName = p.name || linkedPatientName;
+              const matchedPatients = await findPatientsByPhone(supabase, clean);
+              if (matchedPatients.length === 1) {
+                linkedPatientId = matchedPatients[0].id;
+                linkedPatientName = matchedPatients[0].name || linkedPatientName;
               }
             }
 
@@ -2250,16 +2832,14 @@ Deno.serve(async (req: Request) => {
                   let patientId = null;
 
                   if (!isMaskedProfile && fromPhone) {
-                    const tail = getPhoneTail(fromPhone);
-                    const { data: patient } = await supabase
-                      .from("patients")
-                      .select("id, name")
-                      .or(`phone.eq.${fromPhone},phone.ilike.%${tail}`)
-                      .maybeSingle();
-
-                    if (patient) {
-                      patientName = patient.name || contactName;
-                      patientId = patient.id || null;
+                    const matchedPatients = await findPatientsByPhone(supabase, fromPhone);
+                    if (matchedPatients.length === 1) {
+                      patientName = matchedPatients[0].name || contactName;
+                      patientId = matchedPatients[0].id;
+                    } else if (matchedPatients.length > 1) {
+                      // Duplicates exist! Leave patientId null so AI agent can prompt user to clarify which one to assign.
+                      patientId = null;
+                      patientName = contactName || `+${fromPhone}`;
                     }
                   }
 
@@ -2284,13 +2864,25 @@ Deno.serve(async (req: Request) => {
                   }
                   conv = newConv;
                 } else {
+                  const updatePayload: any = {
+                    last_message: textContent,
+                    last_message_at: new Date().toISOString(),
+                    unread_count: (conv.unread_count || 0) + 1,
+                  };
+
+                  if (!conv.patient_id && !isMaskedProfile && fromPhone) {
+                    const matchedPatients = await findPatientsByPhone(supabase, fromPhone);
+                    if (matchedPatients.length === 1) {
+                      updatePayload.patient_id = matchedPatients[0].id;
+                      if (matchedPatients[0].name) {
+                        updatePayload.patient_name = matchedPatients[0].name;
+                      }
+                    }
+                  }
+
                   const { data: updatedConv } = await supabase
                     .from("whatsapp_conversations")
-                    .update({
-                      last_message: textContent,
-                      last_message_at: new Date().toISOString(),
-                      unread_count: (conv.unread_count || 0) + 1,
-                    })
+                    .update(updatePayload)
                     .eq("id", conv.id)
                     .select()
                     .single();
