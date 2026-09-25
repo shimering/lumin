@@ -9343,6 +9343,7 @@
     let defaultDiagnosisFee = 0;
     let activeDiagnosisAppointmentId = null;
     let activeDiagnosisFeeState = null;
+    let patientPaymentFocus = null;
     let chartStructureInitialized = false;
     let realtimeChannel = null;
     let realtimeRefreshTimer = null;
@@ -12179,6 +12180,7 @@
         activePaymentInvoice = null;
         activeDiscountInvoice = null;
         activeDiagnosisAppointmentId = null;
+        patientPaymentFocus = null;
         selectedFindingIds = new Set();
         invoicedFindingIds = new Set();
         chartInvoiceItemsByFindingId = new Map();
@@ -12339,6 +12341,7 @@
         activeExpensePayment = null;
         activeInvoicePatientId = null;
         activeDiagnosisAppointmentId = null;
+        patientPaymentFocus = null;
         selectedFindingIds = new Set();
         invoicedFindingIds = new Set();
         chartInvoiceItemsByFindingId = new Map();
@@ -24559,6 +24562,10 @@
       const deleteTitle = invoice.loyaltyDiscount > 0 ? 'Reverse the loyalty discount on the patient Loyalty tab before deleting procedures.' : invoice.releasedAmount > 0
         ? 'A released invoice cannot have procedures deleted.'
         : deleteDisabled ? 'Remove all payments for this procedure before deleting it.' : 'Delete procedure from invoice';
+      const linkedPayments = paidAmount > 0 ? invoice.payments.filter(payment => payment.allocations.some(allocation => Number(allocation.invoiceItemId) === Number(item.id) && allocation.amount > 0)) : [];
+      const linkedPaymentButton = linkedPayments.length && hasPageAccess('patients')
+        ? '<button type="button" onclick="openInvoiceLinkedPayments(' + invoice.id + ',' + item.id + ')" title="' + (currentUiLanguage === 'ar' ? 'عرض الدفعات المرتبطة بهذا الإجراء' : 'View payments linked to this procedure') + '" class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-blue-50 px-3 text-[10px] font-semibold text-blue-700 transition-all duration-150 ease-out hover:bg-blue-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20"><i data-lucide="wallet-cards" class="h-4 w-4"></i>' + (currentUiLanguage === 'ar' ? 'عرض الدفعة' : linkedPayments.length === 1 ? 'View payment' : 'View payments') + '</button>'
+        : '';
       const balanceLabel = invoice.loyaltyDiscount > 0 && invoiceBalanceRemaining <= 0 ? 'Settled with loyalty' : invoice.manualDiscount > 0 && remaining <= 0 ? (currentUiLanguage === 'ar' ? 'تمت تسويته بالخصم' : 'Settled with discount') : invoiceBalanceReleased
         ? 'Invoice balance released'
         : remaining > 0 ? formatInvoiceMoney(remaining) + ' remaining' : 'Paid in full';
@@ -24567,7 +24574,7 @@
         + '<div class="flex min-w-0 items-center gap-3">' + palmerBadge + '<div class="min-w-0 flex-1"><div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5"><h5 class="min-w-0 text-xs font-black tracking-tight text-slate-900 sm:text-sm">' + escapeHtml(item.operationName) + '</h5><span class="rounded-md border px-1.5 py-0.5 text-[9px] font-black ' + status.badgeClass + '">' + escapeHtml(status.key) + ' · ' + escapeHtml(status.label) + '</span></div>'
         + '<div class="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[9px] font-bold text-slate-500"><span>' + escapeHtml(toothMeta) + '</span><span class="text-violet-300">•</span><span>' + escapeHtml(surfaces) + '</span><span class="text-violet-300">•</span><span class="inline-flex items-center gap-1"><i data-lucide="stethoscope" class="h-2.5 w-2.5 text-slate-400"></i>' + escapeHtml(item.doctorName) + '</span></div>'
         + '<div class="mt-1 flex flex-wrap items-center gap-1.5"><span class="inline-flex items-center gap-1 rounded-lg border border-violet-100 bg-white/70 px-2 py-1 text-[9px] font-black text-slate-600"><i data-lucide="calendar-days" class="h-3 w-3 text-violet-500"></i>' + escapeHtml(formatInvoiceDate(invoice.invoiceDate)) + '</span><button type="button" onclick="openInvoiceDateEditor(' + invoice.id + ',\'' + escapeHtml(invoice.invoiceDate) + '\')" class="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-100/65 px-2 py-1 text-[9px] font-black text-violet-700 transition hover:bg-violet-100"><i data-lucide="pencil" class="h-2.5 w-2.5"></i> Edit date</button><span class="text-[9px] font-black ' + (invoiceBalanceReleased ? 'text-rose-600' : remaining > 0 ? 'text-amber-600' : 'text-emerald-600') + '">' + escapeHtml(balanceLabel) + '</span></div></div></div>'
-        + '<div class="flex flex-wrap items-center justify-end gap-1.5"><span class="text-[9px] font-bold text-slate-400">× ' + escapeHtml(item.quantity) + '</span><span class="me-0.5 text-sm font-black text-slate-900">' + escapeHtml(formatInvoiceMoney(invoiceItemTotal(item))) + '</span>' + invoiceItemPaymentIndicatorMarkup(invoice, item) + payButton + salaryAction + deleteButton + '</div></article>';
+        + '<div class="flex flex-wrap items-center justify-end gap-1.5"><span class="text-[9px] font-bold text-slate-400">× ' + escapeHtml(item.quantity) + '</span><span class="me-0.5 text-sm font-black text-slate-900">' + escapeHtml(formatInvoiceMoney(invoiceItemTotal(item))) + '</span>' + invoiceItemPaymentIndicatorMarkup(invoice, item) + payButton + salaryAction + linkedPaymentButton + deleteButton + '</div></article>';
     }
 
     function legacyInvoiceCardMarkup(invoice, options = {}) {
@@ -24699,7 +24706,7 @@
     async function fetchPatientPayments(patientId) {
       const { data, error } = await db
         .from('invoice_payments')
-        .select('id, invoice_id, patient_id, payment_method_id, payment_method_name, amount, payment_date, created_by, created_at')
+        .select('id, invoice_id, patient_id, payment_method_id, payment_method_name, amount, payment_date, created_by, created_at, invoice_payment_allocations(invoice_item_id, amount)')
         .eq('patient_id', patientId)
         .order('payment_date', { ascending: false })
         .order('created_at', { ascending: false });
@@ -24713,14 +24720,26 @@
         amount: Math.max(0, Number(payment.amount) || 0),
         paymentDate: payment.payment_date,
         createdBy: payment.created_by,
-        createdAt: payment.created_at
+        createdAt: payment.created_at,
+        allocations: (payment.invoice_payment_allocations || []).map(allocation => ({
+          invoiceItemId: Number(allocation.invoice_item_id),
+          amount: Math.max(0, Number(allocation.amount) || 0)
+        }))
       }));
     }
 
-    function paymentHistoryCardMarkup(payment) {
+    function paymentHistoryCardMarkup(payment, focus = null) {
+      const appliedAmount = focus ? payment.allocations
+        .filter(allocation => allocation.invoiceItemId === focus.itemId)
+        .reduce((sum, allocation) => sum + allocation.amount, 0) : 0;
+      const linkedDetail = focus
+        ? '<p class="mt-1.5 text-xs font-medium text-blue-700">' + escapeHtml(currentUiLanguage === 'ar'
+          ? `${formatInvoiceMoney(appliedAmount)} من هذه الدفعة يغطي الإجراء. حذف الدفعة يلغي قيمتها الكاملة ${formatInvoiceMoney(payment.amount)}.`
+          : `${formatInvoiceMoney(appliedAmount)} of this payment covers the procedure. Deleting it reverses the full ${formatInvoiceMoney(payment.amount)} payment.`) + '</p>'
+        : '';
       return '<article class="flex flex-col gap-4 p-4 transition hover:bg-emerald-50/30 sm:flex-row sm:items-center sm:justify-between sm:p-5">'
-        + '<div class="flex min-w-0 items-center gap-3"><span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700"><i data-lucide="badge-dollar-sign" class="h-5 w-5"></i></span><div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><h4 class="text-base font-black text-emerald-700">' + escapeHtml(formatInvoiceMoney(payment.amount)) + '</h4><span class="rounded-lg bg-amber-100 px-2.5 py-1 text-[10px] font-black text-amber-800">' + escapeHtml(payment.paymentMethodName) + '</span></div><p class="mt-1 text-xs font-bold text-slate-500">' + escapeHtml(formatInvoiceDate(payment.paymentDate)) + ' · ' + escapeHtml(invoiceNumber(payment.invoiceId)) + '</p></div></div>'
-        + '<div class="flex shrink-0 items-center gap-2"><button type="button" onclick="openPatientInvoices(\'' + payment.patientId + '\')" class="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2.5 text-xs font-black text-violet-700 hover:bg-violet-100"><i data-lucide="receipt-text" class="h-4 w-4"></i> View invoice</button><button type="button" onclick="deleteInvoicePayment(' + payment.id + ', ' + payment.invoiceId + ')" class="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-black text-red-600 hover:bg-red-100"><i data-lucide="trash-2" class="h-4 w-4"></i> Delete payment</button></div></article>';
+        + '<div class="flex min-w-0 items-center gap-3"><span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700"><i data-lucide="badge-dollar-sign" class="h-5 w-5"></i></span><div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><h4 class="text-base font-black text-emerald-700">' + escapeHtml(formatInvoiceMoney(payment.amount)) + '</h4><span class="rounded-lg bg-amber-100 px-2.5 py-1 text-[10px] font-black text-amber-800">' + escapeHtml(payment.paymentMethodName) + '</span></div><p class="mt-1 text-xs font-bold text-slate-500">' + escapeHtml(formatInvoiceDate(payment.paymentDate)) + ' · ' + escapeHtml(invoiceNumber(payment.invoiceId)) + '</p>' + linkedDetail + '</div></div>'
+        + '<div class="flex shrink-0 flex-wrap items-center gap-2"><button type="button" onclick="openPatientInvoices(\'' + payment.patientId + '\')" class="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-violet-50 px-3 text-xs font-semibold text-violet-700 transition-all duration-150 ease-out hover:bg-violet-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20"><i data-lucide="receipt-text" class="h-4 w-4"></i> View invoice</button><button type="button" onclick="deleteInvoicePayment(' + payment.id + ', ' + payment.invoiceId + ', ' + Number(payment.amount) + ')" class="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-rose-50 px-3 text-xs font-semibold text-rose-700 transition-all duration-150 ease-out hover:bg-rose-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20"><i data-lucide="trash-2" class="h-4 w-4"></i> Delete payment</button></div></article>';
     }
 
     async function renderPatientPayments() {
@@ -24744,12 +24763,21 @@
       try {
         const payments = await fetchPatientPayments(patient.id);
         if (renderToken !== patientPaymentsRenderToken || activeWorkspacePatientId !== patient.id) return;
+        const focus = patientPaymentFocus?.patientId === patient.id ? patientPaymentFocus : null;
+        const visiblePayments = focus ? payments.filter(payment => Number(payment.invoiceId) === focus.invoiceId
+          && payment.allocations.some(allocation => allocation.invoiceItemId === focus.itemId && allocation.amount > 0)) : payments;
+        const focusBanner = focus
+          ? '<div class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-blue-50 p-4"><div class="min-w-0"><p class="text-xs font-semibold text-blue-800">' + escapeHtml(currentUiLanguage === 'ar' ? 'الدفعات المرتبطة بالإجراء' : 'Payments linked to this procedure') + '</p><p class="mt-1 text-xs leading-relaxed text-slate-600">' + escapeHtml(invoiceNumber(focus.invoiceId)) + ' · ' + escapeHtml(currentUiLanguage === 'ar' ? 'احذف الدفعة المرتبطة أولاً، ثم ارجع إلى الفاتورة لحذف الإجراء.' : 'Remove the linked payment first, then return to the invoice to delete the procedure.') + '</p></div><div class="flex flex-wrap gap-2"><button type="button" onclick="openPatientInvoices(activeWorkspacePatientId)" class="min-h-11 rounded-lg bg-white px-3 text-xs font-semibold text-blue-700 transition-all duration-150 ease-out hover:bg-blue-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20">' + escapeHtml(currentUiLanguage === 'ar' ? 'العودة للفاتورة' : 'Back to invoice') + '</button><button type="button" onclick="clearPatientPaymentFocus()" class="min-h-11 rounded-lg bg-white px-3 text-xs font-semibold text-slate-700 transition-all duration-150 ease-out hover:bg-slate-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20">' + escapeHtml(currentUiLanguage === 'ar' ? 'عرض كل الدفعات' : 'Show all payments') + '</button></div></div>'
+          : '';
+        const emptyMessage = focus
+          ? (currentUiLanguage === 'ar' ? 'لا توجد دفعات مرتبطة بهذا الإجراء الآن.' : 'No payments remain linked to this procedure.')
+          : (currentUiLanguage === 'ar' ? 'لا توجد دفعات مسجلة لهذا المريض.' : 'No payments recorded for this patient.');
         document.getElementById('patient-payment-total').textContent = formatInvoiceMoney(payments.reduce((sum, payment) => sum + payment.amount, 0));
         document.getElementById('patient-payment-count').textContent = String(payments.length);
         document.getElementById('patient-payment-latest').textContent = payments.length ? formatInvoiceDate(payments[0].paymentDate) : '—';
-        list.innerHTML = payments.length
-          ? payments.map(paymentHistoryCardMarkup).join('')
-          : '<div class="px-6 py-14 text-center"><span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-500"><i data-lucide="wallet-cards" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-700">No payments recorded for this patient.</p></div>';
+        list.innerHTML = focusBanner + (visiblePayments.length
+          ? visiblePayments.map(payment => paymentHistoryCardMarkup(payment, focus)).join('')
+          : '<div class="px-6 py-14 text-center"><span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-500"><i data-lucide="wallet-cards" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-700">' + escapeHtml(emptyMessage) + '</p></div>');
         translateUiTree(document.getElementById('view-payments'), currentUiLanguage);
         lucide.createIcons();
       } catch (error) {
@@ -24758,17 +24786,31 @@
       }
     }
 
-    function openPatientPayments(patientId, returnView = null) {
+    function openPatientPayments(patientId, returnView = null, focus = null) {
       if (!hasPageAccess('patients')) return;
       rememberPatientWorkspaceOrigin(returnView);
       activeWorkspacePatientId = patientId;
       activeInvoicePatientId = patientId;
+      patientPaymentFocus = focus ? { patientId, invoiceId: Number(focus.invoiceId), itemId: Number(focus.itemId) } : null;
       switchView('payments');
     }
 
-    async function deleteInvoicePayment(paymentId, invoiceId) {
+    function openInvoiceLinkedPayments(invoiceId, itemId) {
+      if (!hasPageAccess('patients') || !activeInvoicePatientId) return;
+      openPatientPayments(activeInvoicePatientId, null, { invoiceId, itemId });
+    }
+
+    function clearPatientPaymentFocus() {
+      patientPaymentFocus = null;
+      renderPatientPayments();
+    }
+
+    async function deleteInvoicePayment(paymentId, invoiceId, paymentAmount) {
       if (!hasPageAccess('patients')) return;
-      if (!confirm('Delete this payment from ' + invoiceNumber(invoiceId) + '? Its amount will be restored to the invoice balance.')) return;
+      const message = currentUiLanguage === 'ar'
+        ? `حذف الدفعة كاملة بقيمة ${formatInvoiceMoney(paymentAmount)} من ${invoiceNumber(invoiceId)}؟ سيُلغى توزيعها على جميع إجراءات الفاتورة ويعود المبلغ إلى الرصيد المستحق.`
+        : `Delete the entire ${formatInvoiceMoney(paymentAmount)} payment from ${invoiceNumber(invoiceId)}? This reverses its allocations to every procedure on the invoice and restores the amount to the balance.`;
+      if (!confirm(message)) return;
       const { data, error } = await db.from('invoice_payments').delete().eq('id', paymentId).select('id');
       if (error || !data?.length) {
         alert('Could not delete the payment: ' + (error?.message || 'The payment was not deleted.'));
@@ -24874,6 +24916,15 @@
         button.setAttribute('aria-hidden', allowed ? 'false' : 'true');
         button.tabIndex = allowed && isActive ? 0 : -1;
       });
+      const selectedTab = document.querySelector(`[data-patient-workspace-tab="${activeTab}"]`);
+      const tabList = selectedTab?.closest('[role="tablist"]');
+      if (tabList) {
+        const selectedBounds = selectedTab.getBoundingClientRect();
+        const listBounds = tabList.getBoundingClientRect();
+        if (selectedBounds.left < listBounds.left || selectedBounds.right > listBounds.right) {
+          selectedTab.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
+      }
       translateUiTree(document.getElementById('patient-workspace-header'), currentUiLanguage);
       syncLoyaltyVisibility();
       if (typeof syncVoiceFabVisibility === 'function') syncVoiceFabVisibility();
