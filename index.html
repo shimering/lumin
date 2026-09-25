@@ -8912,14 +8912,16 @@
 
   <!-- ================= MODAL: ADD DIAGNOSIS FEE ================= -->
   <div id="modal-diagnosis-fee" class="fixed inset-0 z-[82] hidden items-center justify-center bg-slate-900/45 p-4 backdrop-blur-xs">
-    <div role="dialog" aria-modal="true" aria-labelledby="diagnosis-fee-modal-title" class="w-full max-w-md overflow-hidden rounded-3xl border border-cyan-100 bg-white shadow-2xl">
+    <div role="dialog" aria-modal="true" aria-labelledby="diagnosis-fee-modal-title" class="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl border border-cyan-100 bg-white shadow-2xl">
       <div class="border-b border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-blue-50/70 p-5">
-        <div class="flex items-start justify-between gap-4"><div><span class="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-700">Appointment billing</span><h3 id="diagnosis-fee-modal-title" class="mt-1 text-lg font-black text-slate-900">Add diagnosis fee</h3><p id="diagnosis-fee-patient-summary" class="mt-1 text-xs font-bold text-slate-500"></p></div><button type="button" onclick="closeDiagnosisFeeModal()" aria-label="Close diagnosis fee form" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-white hover:text-slate-700"><i data-lucide="x" class="h-5 w-5"></i></button></div>
+        <div class="flex items-start justify-between gap-4"><div><span class="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-700">Appointment billing</span><h3 id="diagnosis-fee-modal-title" class="mt-1 text-lg font-black text-slate-900">Add diagnosis fee</h3><p id="diagnosis-fee-patient-summary" class="mt-1 text-xs font-bold text-slate-500"></p></div><button type="button" onclick="closeDiagnosisFeeModal()" aria-label="Close diagnosis fee form" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-white hover:text-slate-700 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20"><i data-lucide="x" class="h-5 w-5"></i></button></div>
       </div>
       <form id="diagnosis-fee-form" onsubmit="saveDiagnosisFee(event)" class="space-y-4 p-5">
         <label class="block"><span class="mb-1.5 block text-xs font-black text-slate-700">Diagnosis fee amount</span><div class="relative"><span class="pointer-events-none absolute left-3.5 top-2.5 text-sm font-black text-slate-400">EGP</span><input id="diagnosis-fee-amount" type="number" inputmode="decimal" min="0.01" max="1000000" step="0.01" required class="w-full rounded-xl border border-cyan-200 bg-cyan-50/30 py-2.5 pl-14 pr-3.5 text-sm font-black text-slate-900 outline-none focus:border-cyan-500 focus:bg-white focus:ring-2 focus:ring-cyan-500/20" /></div><p id="diagnosis-fee-default-hint" class="mt-1.5 text-[10px] font-bold text-slate-400">Confirm the default amount or enter a different fee.</p></label>
+        <label class="block"><span class="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700"><i data-lucide="stethoscope" class="h-4 w-4 text-cyan-700"></i> Assign doctor</span><select id="diagnosis-fee-doctor" required disabled onchange="onDiagnosisFeeDoctorChanged()" class="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-800 transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50"><option value="">Loading doctors...</option></select><span class="mt-1.5 block text-xs leading-relaxed text-slate-500">The assigned doctor can receive salary after this fee is invoiced and the appointment is completed.</span></label>
+        <div id="diagnosis-fee-salary-panel" class="hidden rounded-xl bg-blue-50 p-4"><div class="flex flex-wrap items-center justify-between gap-3"><div class="min-w-0"><p class="text-xs font-semibold uppercase tracking-wider text-blue-700">Doctor salary</p><p id="diagnosis-fee-salary-status" class="mt-1 text-xs leading-relaxed text-slate-700"></p></div><button id="diagnosis-fee-transfer-button" type="button" onclick="transferDiagnosisFeeSalary()" class="hidden min-h-11 items-center gap-1.5 rounded-xl bg-blue-600 px-4 text-xs font-semibold text-white transition-all duration-150 ease-out hover:bg-blue-700 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50"><i data-lucide="arrow-right-left" class="h-4 w-4"></i> Transfer to salary</button></div></div>
         <p id="diagnosis-fee-form-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="alert"></p>
-        <div class="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onclick="closeDiagnosisFeeModal()" class="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 transition hover:bg-slate-50">Cancel</button><button id="diagnosis-fee-save-button" type="submit" class="inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-5 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-cyan-700 disabled:cursor-wait disabled:opacity-60"><i data-lucide="circle-check-big" class="h-4 w-4"></i> Confirm fee</button></div>
+        <div class="sticky bottom-0 flex justify-end gap-2 border-t border-slate-100 bg-white pt-4" style="padding-bottom:max(0.25rem, env(safe-area-inset-bottom));"><button type="button" onclick="closeDiagnosisFeeModal()" class="min-h-11 rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 transition hover:bg-slate-50 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20">Cancel</button><button id="diagnosis-fee-save-button" type="submit" disabled class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-cyan-600 px-5 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-cyan-700 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50"><i data-lucide="circle-check-big" class="h-4 w-4"></i><span id="diagnosis-fee-save-label">Confirm fee</span></button></div>
       </form>
     </div>
   </div>
@@ -9340,6 +9342,7 @@
     let useTwelveHourTime = false;
     let defaultDiagnosisFee = 0;
     let activeDiagnosisAppointmentId = null;
+    let activeDiagnosisFeeState = null;
     let chartStructureInitialized = false;
     let realtimeChannel = null;
     let realtimeRefreshTimer = null;
@@ -9966,6 +9969,32 @@
       'Add diagnosis fee': 'إضافة رسوم التشخيص',
       'Diagnosis fee amount': 'قيمة رسوم التشخيص',
       'Confirm fee': 'تأكيد الرسوم',
+      'Save doctor': 'حفظ الطبيب',
+      'Assign doctor': 'تعيين الطبيب',
+      'Choose a doctor': 'اختر طبيبًا',
+      'Loading doctors...': 'جارٍ تحميل الأطباء...',
+      'Doctor salary': 'راتب الطبيب',
+      'Transfer to salary': 'تحويل إلى الراتب',
+      'The assigned doctor can receive salary after this fee is invoiced and the appointment is completed.': 'يمكن تحويل رسوم التشخيص إلى راتب الطبيب المعين بعد إصدار الفاتورة وإكمال الموعد.',
+      'This fee is already invoiced. You can update its assigned doctor.': 'تم إصدار فاتورة هذه الرسوم. يمكنك تغيير الطبيب المعين لها.',
+      'Complete the appointment to enable salary transfer.': 'أكمل الموعد لتفعيل تحويل الرسوم إلى الراتب.',
+      'Assign a doctor to enable salary transfer.': 'عين طبيبًا لتفعيل تحويل الرسوم إلى الراتب.',
+      'Save the doctor assignment before salary transfer.': 'احفظ تعيين الطبيب قبل تحويل الرسوم إلى الراتب.',
+      'Ready to transfer to the assigned doctor’s salary.': 'جاهزة للتحويل إلى راتب الطبيب المعين.',
+      'Transferred to the assigned doctor’s salary calculation.': 'تم تحويلها إلى حساب راتب الطبيب المعين.',
+      'A doctor salary expense has been created for this fee.': 'تم إنشاء مصروف راتب طبيب لهذه الرسوم.',
+      'This fee is not yet eligible for salary transfer.': 'هذه الرسوم غير مؤهلة بعد للتحويل إلى الراتب.',
+      'Choose a doctor for this diagnosis fee.': 'اختر طبيبًا لرسوم التشخيص.',
+      'Could not load the diagnosis fee.': 'تعذر تحميل رسوم التشخيص.',
+      'Saving the assigned doctor...': 'جارٍ حفظ الطبيب المعين...',
+      'Doctor assignment saved.': 'تم حفظ تعيين الطبيب.',
+      'Doctor assignment saved': 'تم حفظ تعيين الطبيب',
+      'The invoiced fee is assigned to the selected doctor.': 'تم تعيين الرسوم المفوترة للطبيب المختار.',
+      'Transferring the diagnosis fee to doctor salary...': 'جارٍ تحويل رسوم التشخيص إلى راتب الطبيب...',
+      'Diagnosis fee transferred to doctor salary.': 'تم تحويل رسوم التشخيص إلى راتب الطبيب.',
+      'Diagnosis fee transferred': 'تم تحويل رسوم التشخيص',
+      'The fee is available for doctor salary calculation.': 'أصبحت الرسوم متاحة لحساب راتب الطبيب.',
+      'Could not transfer the diagnosis fee.': 'تعذر تحويل رسوم التشخيص.',
       'Close diagnosis fee form': 'إغلاق نافذة رسوم التشخيص',
       'Confirm the default amount or enter a different fee.': 'أكد المبلغ الافتراضي أو أدخل رسومًا مختلفة.',
       'No default fee is configured. Enter the diagnosis fee to confirm.': 'لم يتم تحديد رسوم افتراضية. أدخل رسوم التشخيص للتأكيد.',
@@ -23830,13 +23859,84 @@
       }
     }
 
-    function openDiagnosisFeeModal(appointmentId) {
+    function renderDiagnosisFeeSalaryState(appointment) {
+      const state = activeDiagnosisFeeState;
+      const hasFee = Boolean(state?.invoice_item_id);
+      const amountInput = document.getElementById('diagnosis-fee-amount');
+      const doctorSelect = document.getElementById('diagnosis-fee-doctor');
+      const panel = document.getElementById('diagnosis-fee-salary-panel');
+      const transferButton = document.getElementById('diagnosis-fee-transfer-button');
+      const saveButton = document.getElementById('diagnosis-fee-save-button');
+      const doctorChanged = hasFee && doctorSelect.value !== state.doctor_id;
+      document.getElementById('diagnosis-fee-modal-title').textContent = hasFee ? 'Diagnosis fee' : 'Add diagnosis fee';
+      document.getElementById('diagnosis-fee-save-label').textContent = hasFee ? 'Save doctor' : 'Confirm fee';
+      amountInput.readOnly = hasFee;
+      if (hasFee) {
+        amountInput.value = String(state.unit_price);
+        document.getElementById('diagnosis-fee-default-hint').textContent = 'This fee is already invoiced. You can update its assigned doctor.';
+      }
+      doctorSelect.disabled = state?.transfer_status === 'paid';
+      saveButton.disabled = doctorSelect.disabled || !doctorSelect.value || (hasFee && !doctorChanged);
+      panel.classList.toggle('hidden', !hasFee);
+      const readyToTransfer = state?.transfer_status === 'eligible' && !doctorChanged;
+      transferButton.classList.toggle('hidden', !readyToTransfer);
+      transferButton.classList.toggle('inline-flex', readyToTransfer);
+      const status = state?.transfer_status === 'paid'
+        ? 'A doctor salary expense has been created for this fee.'
+        : doctorChanged && doctorSelect.value
+          ? 'Save the doctor assignment before salary transfer.'
+        : state?.transfer_status === 'transferred'
+          ? 'Transferred to the assigned doctor’s salary calculation.'
+          : state?.transfer_status === 'eligible'
+            ? 'Ready to transfer to the assigned doctor’s salary.'
+            : !doctorSelect.value
+              ? 'Assign a doctor to enable salary transfer.'
+              : canonicalAppointmentStatus(appointment.status) !== 'Completed'
+                ? 'Complete the appointment to enable salary transfer.'
+                : 'This fee is not yet eligible for salary transfer.';
+      document.getElementById('diagnosis-fee-salary-status').textContent = status;
+      translateUiTree(document.getElementById('modal-diagnosis-fee'), currentUiLanguage);
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function onDiagnosisFeeDoctorChanged() {
+      const appointment = appointments.find(item => item.id === activeDiagnosisAppointmentId);
+      if (appointment) renderDiagnosisFeeSalaryState(appointment);
+    }
+
+    async function loadDiagnosisFeeModalState(appointment) {
+      const [doctorsResult, feeResult] = await Promise.all([
+        db.rpc('list_diagnosis_fee_doctors'),
+        db.rpc('get_diagnosis_fee_salary_state', { p_appointment_id: appointment.id })
+      ]);
+      if (doctorsResult.error) throw doctorsResult.error;
+      if (feeResult.error) throw feeResult.error;
+      if (activeDiagnosisAppointmentId !== appointment.id) return;
+      const doctors = doctorsResult.data || [];
+      activeDiagnosisFeeState = (feeResult.data || [])[0] || null;
+      const select = document.getElementById('diagnosis-fee-doctor');
+      select.replaceChildren(new Option('Choose a doctor', ''));
+      doctors.forEach(doctor => select.add(new Option(doctor.full_name, doctor.user_id)));
+      const assignedDoctorId = activeDiagnosisFeeState?.doctor_id || appointment.assignedUserId;
+      if (doctors.some(doctor => doctor.user_id === assignedDoctorId)) select.value = assignedDoctorId;
+      renderDiagnosisFeeSalaryState(appointment);
+      if (!activeDiagnosisFeeState) document.getElementById('diagnosis-fee-amount').focus();
+    }
+
+    async function openDiagnosisFeeModal(appointmentId) {
       if (!hasPageAccess('dashboard')) return;
       const appointment = appointments.find(item => item.id === appointmentId);
       if (!appointment || canonicalAppointmentStatus(appointment.status) === 'Cancelled') return;
       activeDiagnosisAppointmentId = appointment.id;
+      activeDiagnosisFeeState = null;
       const amountInput = document.getElementById('diagnosis-fee-amount');
+      amountInput.readOnly = false;
       amountInput.value = defaultDiagnosisFee > 0 ? String(defaultDiagnosisFee) : '';
+      const doctorSelect = document.getElementById('diagnosis-fee-doctor');
+      doctorSelect.replaceChildren(new Option('Loading doctors...', ''));
+      doctorSelect.disabled = true;
+      document.getElementById('diagnosis-fee-save-button').disabled = true;
+      document.getElementById('diagnosis-fee-salary-panel').classList.add('hidden');
       document.getElementById('diagnosis-fee-patient-summary').textContent = `${appointment.patient} · ${appointmentDayFormatter.format(new Date(appointment.startAt))} · ${appointmentTimeRange(appointment)}`;
       document.getElementById('diagnosis-fee-default-hint').textContent = defaultDiagnosisFee > 0
         ? `${formatInvoiceMoney(defaultDiagnosisFee)} is the clinic default. Confirm it or enter a different fee.`
@@ -23846,8 +23946,14 @@
       modal.classList.remove('hidden');
       modal.classList.add('flex');
       translateUiTree(modal, currentUiLanguage);
-      lucide.createIcons();
-      setTimeout(() => amountInput.focus(), 0);
+      if (window.lucide) lucide.createIcons();
+      try {
+        await loadDiagnosisFeeModalState(appointment);
+      } catch (error) {
+        if (activeDiagnosisAppointmentId === appointment.id) {
+          setAdminMessage('diagnosis-fee-form-message', error.message || 'Could not load the diagnosis fee.', 'error');
+        }
+      }
     }
 
     function closeDiagnosisFeeModal() {
@@ -23855,6 +23961,7 @@
       modal.classList.add('hidden');
       modal.classList.remove('flex');
       activeDiagnosisAppointmentId = null;
+      activeDiagnosisFeeState = null;
       document.getElementById('diagnosis-fee-form').reset();
       setAdminMessage('diagnosis-fee-form-message', '');
     }
@@ -23863,6 +23970,11 @@
       event.preventDefault();
       if (!hasPageAccess('dashboard') || !activeDiagnosisAppointmentId) return;
       const appointmentId = activeDiagnosisAppointmentId;
+      const doctorId = document.getElementById('diagnosis-fee-doctor').value;
+      if (!doctorId) {
+        setAdminMessage('diagnosis-fee-form-message', 'Choose a doctor for this diagnosis fee.', 'error');
+        return;
+      }
       const amount = Number(document.getElementById('diagnosis-fee-amount').value);
       if (!Number.isFinite(amount) || amount <= 0 || amount > 1000000) {
         setAdminMessage('diagnosis-fee-form-message', 'Enter a diagnosis fee greater than EGP 0 and no more than EGP 1,000,000.', 'error');
@@ -23870,30 +23982,38 @@
       }
       const button = document.getElementById('diagnosis-fee-save-button');
       button.disabled = true;
-      setAdminMessage('diagnosis-fee-form-message', 'Adding the diagnosis fee...');
+      setAdminMessage('diagnosis-fee-form-message', activeDiagnosisFeeState ? 'Saving the assigned doctor...' : 'Adding the diagnosis fee...');
       try {
-        const { data, error } = await db.rpc('add_diagnosis_fee_to_patient_invoice', {
+        const { data, error } = await db.rpc('add_assigned_diagnosis_fee_to_patient_invoice', {
           p_appointment_id: appointmentId,
-          p_amount: amount
+          p_amount: amount,
+          p_doctor_id: doctorId
         });
         if (error) throw error;
         if (activeDiagnosisAppointmentId !== appointmentId) return;
         const result = Array.isArray(data) ? data[0] : data;
         financeInvoicesLoaded = false;
         financeDeptsLoaded = false;
+        financeOverviewLoaded = false;
         dashboardInvoiceCache.clear();
-        closeDiagnosisFeeModal();
+        hrDirectoryLoaded = false;
+        await loadDiagnosisFeeModalState(appointments.find(item => item.id === appointmentId));
+        if (activeDiagnosisAppointmentId !== appointmentId) return;
+        setAdminMessage('diagnosis-fee-form-message', 'Doctor assignment saved.');
         renderDashboard();
         showAppointmentNotificationToast(
-          result?.created === false ? 'Diagnosis fee already added' : 'Diagnosis fee added',
-          result?.created === false
-            ? `${formatInvoiceMoney(result?.unit_price)} is already on this appointment’s invoice.`
-            : `${formatInvoiceMoney(amount)} was added to the patient invoice.`
+          result?.created === false ? 'Doctor assignment saved' : 'Diagnosis fee added',
+          result?.created === false ? 'The invoiced fee is assigned to the selected doctor.'
+            : `${formatInvoiceMoney(amount)} was added to the patient invoice for the selected doctor.`
         );
       } catch (error) {
         setAdminMessage('diagnosis-fee-form-message', error.message || 'Could not add the diagnosis fee.', 'error');
       } finally {
-        button.disabled = false;
+        if (activeDiagnosisAppointmentId === appointmentId) {
+          const select = document.getElementById('diagnosis-fee-doctor');
+          button.disabled = activeDiagnosisFeeState?.transfer_status === 'paid' || !select.value
+            || (Boolean(activeDiagnosisFeeState?.invoice_item_id) && select.value === activeDiagnosisFeeState.doctor_id);
+        }
       }
     }
 
@@ -23974,6 +24094,33 @@
         showAppointmentNotificationToast(currentUiLanguage === 'ar' ? 'تم تحديث الخصم' : 'Discount updated', invoiceNumber(invoice.id));
       } catch (error) {
         setAdminMessage('invoice-discount-message', error.message || 'Could not save discount.', 'error');
+        button.disabled = false;
+      }
+    }
+
+    async function transferDiagnosisFeeSalary() {
+      const appointmentId = activeDiagnosisAppointmentId;
+      const itemId = activeDiagnosisFeeState?.invoice_item_id;
+      if (!hasPageAccess('dashboard') || !appointmentId || !itemId
+        || activeDiagnosisFeeState.transfer_status !== 'eligible'
+        || document.getElementById('diagnosis-fee-doctor').value !== activeDiagnosisFeeState.doctor_id) return;
+      const button = document.getElementById('diagnosis-fee-transfer-button');
+      button.disabled = true;
+      setAdminMessage('diagnosis-fee-form-message', 'Transferring the diagnosis fee to doctor salary...');
+      try {
+        const { error } = await db.rpc('transfer_doctor_salary_invoice_item', { p_item_id: Number(itemId) });
+        if (error) throw error;
+        if (activeDiagnosisAppointmentId !== appointmentId) return;
+        hrDirectoryLoaded = false;
+        await loadDiagnosisFeeModalState(appointments.find(item => item.id === appointmentId));
+        if (activeDiagnosisAppointmentId !== appointmentId) return;
+        setAdminMessage('diagnosis-fee-form-message', 'Diagnosis fee transferred to doctor salary.');
+        showAppointmentNotificationToast('Diagnosis fee transferred', 'The fee is available for doctor salary calculation.');
+      } catch (error) {
+        if (activeDiagnosisAppointmentId === appointmentId) {
+          setAdminMessage('diagnosis-fee-form-message', error.message || 'Could not transfer the diagnosis fee.', 'error');
+        }
+      } finally {
         button.disabled = false;
       }
     }

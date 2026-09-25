@@ -760,4 +760,9 @@ body.lumin-raised #app-header button { border: 1px solid ButtonText; }
     }
     body.lumin-raised #view-dashboard .dashboard-patient-link:hover:not(:disabled) { color: hsl(var(--lumin-hue) calc(70% * var(--lumin-chroma)) 30%); }
 
+    @media (max-width: 639px) {
+      #modal-diagnosis-fee { align-items: flex-end; padding: 0; }
+      #modal-diagnosis-fee > [role="dialog"] { border-radius: 1.25rem 1.25rem 0 0; }
+    }
+
 }
