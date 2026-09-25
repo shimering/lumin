@@ -69,8 +69,44 @@ test('initWhatsAppChatSwipeToClose supports both left and right swipes to close 
   );
   assert.match(
     html,
-    /activeChatEl\.style\.transform = `translateX\(\$\{exitDirection\}\)`;[\s\S]*?closeActiveWhatsAppChat\(\);/,
-    'Exit animation should slide active chat and call closeActiveWhatsAppChat()'
+    /targetSheet\.style\.transform = `translateX\(\$\{exitDirection\}\)`;[\s\S]*?closeActiveWhatsAppChat\(\);/,
+    'Exit animation should slide target sheet and call closeActiveWhatsAppChat()'
+  );
+});
+
+test('mobile CSS enables real-time conversation list peeking underneath active chat', () => {
+  assert.match(
+    html,
+    /body\.whatsapp-mobile-chat-open #whatsapp-sidebar\s*\{[^}]*position:\s*absolute\s*!important;[^}]*z-index:\s*10\s*!important;/s,
+    'Mobile CSS should keep sidebar rendered at z-index 10 under the active chat sheet'
+  );
+  assert.match(
+    html,
+    /body\.whatsapp-mobile-chat-open #whatsapp-main-chat\s*\{[^}]*position:\s*absolute\s*!important;[^}]*z-index:\s*20\s*!important;/s,
+    'Mobile CSS should elevate main chat sheet at z-index 20 with transform preparation'
+  );
+});
+
+test('swipe-to-close provides interactive parallax peek, dynamic brightness, and edge shadow', () => {
+  assert.match(
+    html,
+    /const sidebarOffset = \(deltaX > 0 \? -25 : 25\) \* \(1 - progress\);/,
+    'Sidebar should translate with iOS-style interactive parallax offset'
+  );
+  assert.match(
+    html,
+    /sidebarEl\.style\.filter = `brightness\(\$\{\(0\.88 \+ 0\.12 \* progress\)\.toFixed\(3\)\}\)`;/,
+    'Sidebar should smoothly transition brightness as active chat sheet is dragged'
+  );
+  assert.match(
+    html,
+    /targetSheet\.style\.boxShadow = '-8px 0 28px rgba\(15, 23, 42, 0\.16\)';/,
+    'Target sheet should apply directional edge drop shadow over the peeked sidebar for right swipe'
+  );
+  assert.match(
+    html,
+    /targetSheet\.style\.boxShadow = '8px 0 28px rgba\(15, 23, 42, 0\.16\)';/,
+    'Target sheet should apply directional edge drop shadow over the peeked sidebar for left swipe'
   );
 });
 
@@ -82,12 +118,14 @@ test('message bubble swipe yields when horizontal chat swipe-to-close is active'
   );
 });
 
-test('simulated swipe-to-close gesture logic accurately resolves swipe directions and vertical locks', () => {
-  function simulateGesture({ startX, startY, moves, duration, targetIsInput = false, targetInReply = false }) {
+test('simulated swipe-to-close gesture logic accurately resolves swipe directions, peek parallax, and vertical locks', () => {
+  function simulateGesture({ startX, startY, moves, duration, viewportWidth = 360, targetIsInput = false, targetInReply = false }) {
     let closed = false;
     let axis = null;
-    let activeChatTransform = '';
-    let activeChatOpacity = '';
+    let targetSheetTransform = '';
+    let targetSheetBoxShadow = '';
+    let sidebarTransform = '';
+    let sidebarFilter = '';
 
     const isEligibleTarget = !targetIsInput && !targetInReply;
     if (!isEligibleTarget) return { closed: false, axis: null };
@@ -112,8 +150,15 @@ test('simulated swipe-to-close gesture logic accurately resolves swipe direction
       }
 
       if (axis === 'horizontal') {
-        activeChatTransform = `translateX(${deltaX * 0.75}px)`;
-        activeChatOpacity = String(Math.max(0.35, 1 - distanceX / 450));
+        const progress = Math.min(1, Math.max(0, distanceX / viewportWidth));
+        const sidebarOffset = (deltaX > 0 ? -25 : 25) * (1 - progress);
+
+        targetSheetTransform = `translateX(${deltaX}px)`;
+        targetSheetBoxShadow = deltaX > 0
+          ? '-8px 0 28px rgba(15, 23, 42, 0.16)'
+          : '8px 0 28px rgba(15, 23, 42, 0.16)';
+        sidebarTransform = `translateX(${sidebarOffset}%)`;
+        sidebarFilter = `brightness(${(0.88 + 0.12 * progress).toFixed(3)})`;
       }
     }
 
@@ -132,30 +177,55 @@ test('simulated swipe-to-close gesture logic accurately resolves swipe direction
       }
     }
 
-    return { closed, axis, activeChatTransform, activeChatOpacity };
+    return { closed, axis, targetSheetTransform, targetSheetBoxShadow, sidebarTransform, sidebarFilter };
   }
 
-  // 1. Right swipe (close chat)
+  // 1. Right swipe (close chat with parallax peek)
   const rightSwipe = simulateGesture({
     startX: 100,
     startY: 200,
     moves: [{ x: 120, y: 202 }, { x: 150, y: 203 }, { x: 180, y: 205 }], // deltaX = +80
-    duration: 180
+    duration: 180,
+    viewportWidth: 360
   });
   assert.equal(rightSwipe.axis, 'horizontal');
   assert.equal(rightSwipe.closed, true, 'Right swipe with deltaX=80 should close the chat');
+  assert.equal(rightSwipe.targetSheetTransform, 'translateX(80px)');
+  assert.match(rightSwipe.targetSheetBoxShadow, /-8px 0 28px/);
+  // progress = 80/360 ≈ 0.222, sidebarOffset = -25 * (1 - 0.222) ≈ -19.44%
+  assert.match(rightSwipe.sidebarTransform, /translateX\(-19\./);
+  assert.match(rightSwipe.sidebarFilter, /brightness\(0\.90/);
 
-  // 2. Left swipe (close chat)
+  // 2. Left swipe (close chat with RTL parallax peek)
   const leftSwipe = simulateGesture({
     startX: 250,
     startY: 200,
     moves: [{ x: 230, y: 201 }, { x: 200, y: 203 }, { x: 170, y: 204 }], // deltaX = -80
-    duration: 180
+    duration: 180,
+    viewportWidth: 360
   });
   assert.equal(leftSwipe.axis, 'horizontal');
   assert.equal(leftSwipe.closed, true, 'Left swipe with deltaX=-80 should close the chat');
+  assert.equal(leftSwipe.targetSheetTransform, 'translateX(-80px)');
+  assert.match(leftSwipe.targetSheetBoxShadow, /8px 0 28px/);
+  assert.match(leftSwipe.sidebarTransform, /translateX\(19\./);
 
-  // 3. Vertical message scroll (should NOT close chat)
+  // 3. Mid-swipe peek and hold (e.g. deltaX = 40, distance < threshold)
+  const midSwipePeek = simulateGesture({
+    startX: 100,
+    startY: 200,
+    moves: [{ x: 120, y: 201 }, { x: 140, y: 202 }], // deltaX = 40
+    duration: 400,
+    viewportWidth: 400
+  });
+  assert.equal(midSwipePeek.axis, 'horizontal');
+  assert.equal(midSwipePeek.closed, false, 'Mid-swipe peek without crossing threshold does not close chat');
+  assert.equal(midSwipePeek.targetSheetTransform, 'translateX(40px)');
+  // progress = 40/400 = 0.1, sidebarOffset = -25 * (1 - 0.1) = -22.5%
+  assert.equal(midSwipePeek.sidebarTransform, 'translateX(-22.5%)');
+  assert.equal(midSwipePeek.sidebarFilter, 'brightness(0.892)');
+
+  // 4. Vertical message scroll (should NOT close chat)
   const verticalScroll = simulateGesture({
     startX: 150,
     startY: 200,
@@ -164,8 +234,9 @@ test('simulated swipe-to-close gesture logic accurately resolves swipe direction
   });
   assert.equal(verticalScroll.axis, 'vertical');
   assert.equal(verticalScroll.closed, false, 'Vertical scroll should not close chat');
+  assert.equal(verticalScroll.targetSheetTransform, '');
 
-  // 4. Touch starting in reply panel (should NOT close chat)
+  // 5. Touch starting in reply panel (should NOT close chat)
   const replyPanelTouch = simulateGesture({
     startX: 100,
     startY: 550,
@@ -174,16 +245,6 @@ test('simulated swipe-to-close gesture logic accurately resolves swipe direction
     targetInReply: true
   });
   assert.equal(replyPanelTouch.closed, false, 'Reply panel touches must not close chat');
-
-  // 5. Short drag below threshold (springs back, does NOT close)
-  const shortDrag = simulateGesture({
-    startX: 100,
-    startY: 200,
-    moves: [{ x: 115, y: 201 }, { x: 125, y: 202 }], // deltaX = 25
-    duration: 400 // slow, low velocity
-  });
-  assert.equal(shortDrag.axis, 'horizontal');
-  assert.equal(shortDrag.closed, false, 'Short drag below threshold should not close chat');
 
   // 6. Fast flick above flick threshold (deltaX = 40 in 80ms => velocity = 0.5 px/ms)
   const fastFlick = simulateGesture({

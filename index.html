@@ -3127,18 +3127,37 @@
         body.whatsapp-view-active .whatsapp-chat-shell {
           display: flex !important;
           flex-direction: column !important;
+          position: relative !important;
+          overflow: hidden !important;
         }
         body.whatsapp-view-active:not(.whatsapp-mobile-chat-open) #whatsapp-sidebar {
           display: flex !important;
+          position: relative !important;
+          width: 100% !important;
+          height: 100% !important;
+          pointer-events: auto !important;
         }
         body.whatsapp-view-active:not(.whatsapp-mobile-chat-open) #whatsapp-main-chat {
           display: none !important;
         }
         body.whatsapp-view-active.whatsapp-mobile-chat-open #whatsapp-sidebar {
-          display: none !important;
+          display: flex !important;
+          position: absolute !important;
+          inset: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+          z-index: 10 !important;
+          pointer-events: none;
         }
         body.whatsapp-view-active.whatsapp-mobile-chat-open #whatsapp-main-chat {
           display: flex !important;
+          position: absolute !important;
+          inset: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+          z-index: 20 !important;
+          background-color: #ffffff !important;
+          will-change: transform;
         }
       }
       @media (min-width: 768px) and (max-width: 1023px) {
@@ -4595,17 +4614,34 @@
         height: 100% !important;
         min-height: 0 !important;
       }
-      .whatsapp-mobile-chat-open #whatsapp-sidebar {
-        display: none !important;
-      }
-      .whatsapp-mobile-chat-open #whatsapp-main-chat {
+      body.whatsapp-mobile-chat-open #whatsapp-sidebar {
         display: flex !important;
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        z-index: 10 !important;
+        pointer-events: none;
+      }
+      body.whatsapp-mobile-chat-open #whatsapp-main-chat {
+        display: flex !important;
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        z-index: 20 !important;
+        background-color: #ffffff !important;
+        will-change: transform;
       }
       body:not(.whatsapp-mobile-chat-open) #whatsapp-main-chat {
         display: none !important;
       }
       body:not(.whatsapp-mobile-chat-open) #whatsapp-sidebar {
         display: flex !important;
+        position: relative !important;
+        width: 100% !important;
+        height: 100% !important;
+        pointer-events: auto !important;
       }
 
       /* Full-bleed native mobile chat experience */
@@ -4667,15 +4703,34 @@
         border: none !important;
         border-radius: 0 !important;
         box-shadow: none !important;
+        position: relative !important;
+        overflow: hidden !important;
+      }
+      body.whatsapp-mobile-chat-open #whatsapp-sidebar {
+        display: flex !important;
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: var(--whatsapp-mobile-viewport-height, calc(100dvh - var(--mobile-nav-height))) !important;
+        max-height: var(--whatsapp-mobile-viewport-height, calc(100dvh - var(--mobile-nav-height))) !important;
+        min-height: 0 !important;
+        z-index: 10 !important;
+        pointer-events: none;
+        overflow: hidden !important;
       }
       body.whatsapp-mobile-chat-open #whatsapp-main-chat,
       body.whatsapp-mobile-chat-open #whatsapp-chat-active {
         display: flex !important;
         flex-direction: column !important;
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100% !important;
         height: var(--whatsapp-mobile-viewport-height, calc(100dvh - var(--mobile-nav-height))) !important;
         max-height: var(--whatsapp-mobile-viewport-height, calc(100dvh - var(--mobile-nav-height))) !important;
         min-height: 0 !important;
         border-radius: 0 !important;
+        z-index: 20 !important;
+        background-color: #ffffff !important;
       }
       #whatsapp-reply-panel {
         padding: 0.5rem 0.75rem !important;
@@ -36714,6 +36769,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       mainChat.setAttribute('data-swipe-close-bound', 'true');
 
       const getActiveChatEl = () => document.getElementById('whatsapp-chat-active');
+      const getSidebarEl = () => document.getElementById('whatsapp-sidebar');
 
       const isEligibleTarget = (target) => {
         if (!target) return false;
@@ -36790,11 +36846,30 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
 
         if (gesture.axis === 'horizontal') {
           if (e.cancelable) e.preventDefault();
-          const activeChatEl = getActiveChatEl();
-          if (activeChatEl) {
-            activeChatEl.style.transition = 'none';
-            activeChatEl.style.transform = `translateX(${deltaX * 0.75}px)`;
-            activeChatEl.style.opacity = String(Math.max(0.35, 1 - distanceX / 450));
+          const isMobile = window.innerWidth < 768 || document.body.classList.contains('whatsapp-mobile-chat-open');
+          const targetSheet = isMobile ? mainChat : getActiveChatEl();
+          const sidebarEl = getSidebarEl();
+
+          if (targetSheet) {
+            targetSheet.style.transition = 'none';
+            targetSheet.style.transform = `translateX(${deltaX}px)`;
+            // Subtle edge drop shadow giving layered sheet elevation over the peeked sidebar
+            if (deltaX > 0) {
+              targetSheet.style.boxShadow = '-8px 0 28px rgba(15, 23, 42, 0.16)';
+            } else {
+              targetSheet.style.boxShadow = '8px 0 28px rgba(15, 23, 42, 0.16)';
+            }
+          }
+
+          if (isMobile && sidebarEl) {
+            const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 360;
+            const progress = Math.min(1, Math.max(0, distanceX / viewportWidth));
+            // iOS-style interactive parallax peek: sidebar starts offset by 25% and tracks smoothly to 0%
+            const sidebarOffset = (deltaX > 0 ? -25 : 25) * (1 - progress);
+            sidebarEl.style.transition = 'none';
+            sidebarEl.style.transform = `translateX(${sidebarOffset}%)`;
+            sidebarEl.style.filter = `brightness(${(0.88 + 0.12 * progress).toFixed(3)})`;
+            sidebarEl.style.pointerEvents = 'none';
           }
         }
       };
@@ -36804,8 +36879,12 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         if (!gesture) return;
         waChatSwipeGesture = null;
 
+        const isMobile = window.innerWidth < 768 || document.body.classList.contains('whatsapp-mobile-chat-open');
         const activeChatEl = getActiveChatEl();
-        if (!activeChatEl) return;
+        const targetSheet = isMobile ? mainChat : activeChatEl;
+        const sidebarEl = getSidebarEl();
+
+        if (!targetSheet) return;
 
         if (gesture.axis !== 'horizontal') {
           return;
@@ -36829,36 +36908,99 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
 
         if (isSwipeClose && isDominant) {
           const exitDirection = deltaX > 0 ? '100%' : '-100%';
-          activeChatEl.style.transition = 'transform 0.16s ease-out, opacity 0.16s ease-out';
-          activeChatEl.style.transform = `translateX(${exitDirection})`;
-          activeChatEl.style.opacity = '0';
+          targetSheet.style.transition = 'transform 0.22s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.22s ease-out';
+          targetSheet.style.transform = `translateX(${exitDirection})`;
+          if (activeChatEl && activeChatEl !== targetSheet) {
+            activeChatEl.style.transform = `translateX(${exitDirection})`;
+            activeChatEl.style.transition = 'transform 0.22s cubic-bezier(0.25, 1, 0.5, 1)';
+          }
+          if (isMobile && sidebarEl) {
+            sidebarEl.style.transition = 'transform 0.22s cubic-bezier(0.25, 1, 0.5, 1), filter 0.22s ease-out';
+            sidebarEl.style.transform = 'translateX(0)';
+            sidebarEl.style.filter = 'brightness(1)';
+          }
           setTimeout(() => {
             closeActiveWhatsAppChat();
+            targetSheet.style.transform = '';
+            targetSheet.style.transition = '';
+            targetSheet.style.boxShadow = '';
+            targetSheet.style.opacity = '';
+            if (activeChatEl) {
+              activeChatEl.style.transform = '';
+              activeChatEl.style.transition = '';
+              activeChatEl.style.opacity = '';
+            }
+            if (sidebarEl) {
+              sidebarEl.style.transform = '';
+              sidebarEl.style.transition = '';
+              sidebarEl.style.filter = '';
+              sidebarEl.style.pointerEvents = '';
+            }
+          }, 220);
+        } else {
+          // Spring back smoothly if threshold not met (interactive peek dismissed)
+          targetSheet.style.transition = 'transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.15), box-shadow 0.25s ease-out';
+          targetSheet.style.transform = '';
+          targetSheet.style.boxShadow = '';
+          if (activeChatEl && activeChatEl !== targetSheet) {
             activeChatEl.style.transform = '';
             activeChatEl.style.transition = '';
-            activeChatEl.style.opacity = '';
-          }, 160);
-        } else {
-          // Spring back smoothly if threshold not met
-          activeChatEl.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.15), opacity 0.2s ease-out';
-          activeChatEl.style.transform = '';
-          activeChatEl.style.opacity = '';
+          }
+          if (isMobile && sidebarEl) {
+            sidebarEl.style.transition = 'transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.15), filter 0.25s ease-out';
+            sidebarEl.style.transform = '';
+            sidebarEl.style.filter = '';
+          }
           setTimeout(() => {
-            if (activeChatEl) activeChatEl.style.transition = '';
-          }, 210);
+            if (targetSheet) {
+              targetSheet.style.transition = '';
+              targetSheet.style.boxShadow = '';
+            }
+            if (sidebarEl) {
+              sidebarEl.style.transition = '';
+              sidebarEl.style.filter = '';
+              sidebarEl.style.transform = '';
+              sidebarEl.style.pointerEvents = '';
+            }
+          }, 260);
         }
       };
 
       const onTouchCancel = () => {
         waChatSwipeGesture = null;
+        const isMobile = window.innerWidth < 768 || document.body.classList.contains('whatsapp-mobile-chat-open');
         const activeChatEl = getActiveChatEl();
-        if (activeChatEl) {
-          activeChatEl.style.transition = 'transform 0.18s ease-out, opacity 0.18s ease-out';
-          activeChatEl.style.transform = '';
-          activeChatEl.style.opacity = '';
+        const targetSheet = isMobile ? mainChat : activeChatEl;
+        const sidebarEl = getSidebarEl();
+
+        if (targetSheet) {
+          targetSheet.style.transition = 'transform 0.2s ease-out, box-shadow 0.2s ease-out';
+          targetSheet.style.transform = '';
+          targetSheet.style.boxShadow = '';
           setTimeout(() => {
-            if (activeChatEl) activeChatEl.style.transition = '';
-          }, 190);
+            if (targetSheet) {
+              targetSheet.style.transition = '';
+              targetSheet.style.boxShadow = '';
+            }
+          }, 210);
+        }
+        if (sidebarEl) {
+          sidebarEl.style.transition = 'transform 0.2s ease-out, filter 0.2s ease-out';
+          sidebarEl.style.transform = '';
+          sidebarEl.style.filter = '';
+          setTimeout(() => {
+            if (sidebarEl) {
+              sidebarEl.style.transition = '';
+              sidebarEl.style.filter = '';
+              sidebarEl.style.transform = '';
+              sidebarEl.style.pointerEvents = '';
+            }
+          }, 210);
+        }
+        if (activeChatEl && activeChatEl !== targetSheet) {
+          activeChatEl.style.transform = '';
+          activeChatEl.style.transition = '';
+          activeChatEl.style.opacity = '';
         }
       };
 
@@ -37139,12 +37281,26 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       }, 100);
     }
 
-    function closeActiveWhatsAppChat() {
+        function closeActiveWhatsAppChat() {
       closeActiveWhatsAppChatOnMobile();
       if (typeof cancelWhatsAppVoiceRecording === 'function') {
         cancelWhatsAppVoiceRecording();
       }
       clearWhatsAppReplyMessage();
+      const mainChat = document.getElementById('whatsapp-main-chat');
+      if (mainChat) {
+        mainChat.style.transform = '';
+        mainChat.style.transition = '';
+        mainChat.style.boxShadow = '';
+        mainChat.style.opacity = '';
+      }
+      const sidebarEl = document.getElementById('whatsapp-sidebar');
+      if (sidebarEl) {
+        sidebarEl.style.transform = '';
+        sidebarEl.style.transition = '';
+        sidebarEl.style.filter = '';
+        sidebarEl.style.pointerEvents = '';
+      }
       const activeChatEl = document.getElementById('whatsapp-chat-active');
       if (activeChatEl) {
         activeChatEl.style.transform = '';
@@ -37169,6 +37325,20 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       document.documentElement.style.removeProperty('--whatsapp-mobile-viewport-height');
       resetWhatsAppWindowScroll();
       scheduleWhatsAppMobileViewportUpdate();
+      const mainChat = document.getElementById('whatsapp-main-chat');
+      if (mainChat) {
+        mainChat.style.transform = '';
+        mainChat.style.transition = '';
+        mainChat.style.boxShadow = '';
+        mainChat.style.opacity = '';
+      }
+      const sidebarEl = document.getElementById('whatsapp-sidebar');
+      if (sidebarEl) {
+        sidebarEl.style.transform = '';
+        sidebarEl.style.transition = '';
+        sidebarEl.style.filter = '';
+        sidebarEl.style.pointerEvents = '';
+      }
       const activeChatEl = document.getElementById('whatsapp-chat-active');
       if (activeChatEl) {
         activeChatEl.style.transform = '';
