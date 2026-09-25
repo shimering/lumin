@@ -23917,7 +23917,9 @@
       const select = document.getElementById('diagnosis-fee-doctor');
       select.replaceChildren(new Option('Choose a doctor', ''));
       doctors.forEach(doctor => select.add(new Option(doctor.full_name, doctor.user_id)));
-      const assignedDoctorId = activeDiagnosisFeeState?.doctor_id || appointment.assignedUserId;
+      const feeDoctorId = activeDiagnosisFeeState?.doctor_id;
+      const assignedDoctorId = doctors.some(doctor => doctor.user_id === feeDoctorId)
+        ? feeDoctorId : appointment.assignedUserId;
       if (doctors.some(doctor => doctor.user_id === assignedDoctorId)) select.value = assignedDoctorId;
       renderDiagnosisFeeSalaryState(appointment);
       if (!activeDiagnosisFeeState) document.getElementById('diagnosis-fee-amount').focus();
