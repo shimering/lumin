@@ -5217,6 +5217,45 @@
   </style>
   <link rel="stylesheet" href="lumin-theme.css?v=18" />
   <link rel="stylesheet" href="lumin-finance-sync.css?v=2" />
+  <style id="finance-ledger-styles">
+    #finance-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    #finance-summary-cards > div { min-width: 0; }
+    #finance-summary-cards p[id] { overflow-wrap: anywhere; white-space: normal; }
+    #finance-summary-net-card { background: linear-gradient(135deg, var(--lumin-face, #fff), #eff6ff); color: #1d4ed8; }
+    #finance-summary-net-card[data-loss=true] { background: linear-gradient(135deg, var(--lumin-face, #fff), #fff1f2); color: #be123c; }
+    #finance-expenses-table { min-width: 1080px; border-collapse: separate; border-spacing: 0; }
+    #finance-expenses-table .finance-expense-actions-cell { position: sticky; inset-inline-end: 0; min-width: 124px; padding-inline: 12px; background: var(--lumin-face, #fff); box-shadow: -8px 0 16px -16px #64748b; }
+    html[dir=rtl] #finance-expenses-table .finance-expense-actions-cell { box-shadow: 8px 0 16px -16px #64748b; }
+    .finance-expense-actions { display: inline-flex; gap: 8px; align-items: center; }
+    .finance-expense-action { display: inline-flex; justify-content: center; align-items: center; width: 44px; height: 44px; flex-shrink: 0; border: 0; border-radius: 12px; cursor: pointer; transition: background .15s, transform .15s; }
+    .finance-expense-action svg { width: 18px; height: 18px; }
+    .finance-expense-edit { background: #eff6ff; color: #1d4ed8; }
+    .finance-expense-delete { background: #fff1f2; color: #be123c; }
+    .finance-expense-edit:hover { background: #dbeafe; }
+    .finance-expense-delete:hover { background: #ffe4e6; }
+    .finance-expense-pay { min-height: 44px; cursor: pointer; transition: background .15s, transform .15s; }
+    .finance-expense-pay:hover { background: #d1fae5; }
+    .finance-expense-action:active, .finance-expense-pay:active { transform: scale(.98); }
+    .finance-expense-action:focus-visible, .finance-expense-pay:focus-visible { outline: 2px solid #93c5fd; outline-offset: 3px; }
+    .finance-expense-action:disabled, .finance-expense-pay:disabled { opacity: .5; pointer-events: none; }
+    #expense-form [readonly], #expense-form select:disabled { background: #f1f5f9; color: #64748b; }
+    #modal-expense button[onclick="closeExpenseModal()"] { min-width: 44px; min-height: 44px; }
+    @media (min-width: 1024px) { #finance-summary-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+    @media (max-width: 767px) {
+      #finance-expenses-table { display: block; min-width: 0; }
+      #finance-expenses-table thead { display: none; }
+      #finance-expenses-table tbody { display: grid; gap: 12px; padding: 12px; }
+      #finance-expenses-table tbody tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; border: 1px solid #e2e8f0; border-radius: 16px; background: var(--lumin-face, #fff); }
+      #finance-expenses-table tbody td { display: grid; gap: 6px; min-width: 0; padding: 12px 16px; text-align: start; overflow-wrap: anywhere; border-top: 1px solid #f1f5f9; }
+      #finance-expenses-table tbody td::before { content: attr(data-label); color: #94a3b8; font-size: 10px; font-weight: 500; }
+      #finance-expenses-table tbody td:first-child { grid-column: 1 / -1; border-top: 0; padding: 16px; background: #f8fafc; }
+      #finance-expenses-table tbody td:first-child::before, #finance-expenses-table tbody td[colspan]::before { display: none; }
+      #finance-expenses-table .finance-expense-payment-cell, #finance-expenses-table .finance-expense-confirmed-cell, #finance-expenses-table .finance-expense-actions-cell, #finance-expenses-table tbody td[colspan] { grid-column: 1 / -1; }
+      #finance-expenses-table .finance-expense-actions-cell { position: static; display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; box-shadow: none; background: #f8fafc; }
+      #finance-expenses-table tbody td[colspan] { text-align: center; }
+    }
+    @media (prefers-reduced-motion: reduce) { .finance-expense-action, .finance-expense-pay { transition: none; } }
+  </style>
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 font-sans antialiased selection:bg-blue-100">
 
@@ -5721,7 +5760,7 @@
 
       </div>
 
-      <div id="finance-summary-cards" class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div id="finance-summary-cards" class="grid gap-3">
         <div class="rounded-2xl border border-emerald-200 bg-gradient-to-br from-white to-emerald-50/80 p-4 shadow-xs">
           <span class="text-[10px] font-black uppercase tracking-wider text-emerald-600">Total payments</span>
           <p id="finance-summary-payment-total" class="mt-2 truncate text-xl font-black text-slate-900" aria-live="polite">EGP 0</p>
@@ -5733,6 +5772,11 @@
         <div class="rounded-2xl border border-amber-200 bg-gradient-to-br from-white to-amber-50/80 p-4 shadow-xs">
           <span class="text-[10px] font-black uppercase tracking-wider text-amber-600">Total expenses</span>
           <p id="finance-summary-expense-total" class="mt-2 truncate text-xl font-black text-slate-900" aria-live="polite">EGP 0</p>
+        </div>
+        <div id="finance-summary-net-card" class="rounded-2xl border border-slate-200 p-4 shadow-xs">
+          <span class="text-[10px] font-black uppercase tracking-wider">Net profit</span>
+          <p id="finance-summary-net-total" class="mt-2 text-xl font-black" aria-live="polite">EGP 0</p>
+          <p class="mt-1 text-[10px] font-medium text-slate-400">Payments minus expenses</p>
         </div>
       </div>
 
@@ -5890,9 +5934,9 @@
       <div id="finance-expenses-results" class="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/60 px-4 py-3 sm:px-5"><div><h3 class="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-600"><i data-lucide="list-filter" class="h-4 w-4 text-emerald-600"></i> All expenses</h3><p id="finance-expense-results-summary" class="mt-1 text-[11px] font-semibold text-slate-400" aria-live="polite">Loading expenses...</p></div><span class="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-600"><span class="h-2 w-2 rounded-full bg-emerald-500"></span> Live updates</span></div>
         <div class="mobile-scroll-region overflow-x-auto">
-          <table id="finance-expenses-table" class="w-full min-w-[1280px] text-left text-xs">
-            <thead class="border-b border-slate-200 bg-white text-[10px] font-black uppercase tracking-wider text-slate-400"><tr><th class="px-5 py-3.5">Expense</th><th class="px-5 py-3.5">Type</th><th class="px-5 py-3.5">Date</th><th class="px-5 py-3.5 text-right">Total</th><th class="px-5 py-3.5 text-right">Paid expense</th><th class="px-5 py-3.5 text-right">Remaining</th><th class="px-5 py-3.5">Payment</th><th class="px-5 py-3.5">Confirmed</th><th class="px-5 py-3.5">Description</th><th class="px-5 py-3.5 text-right">Actions</th></tr></thead>
-            <tbody id="finance-expenses-table-body" class="divide-y divide-slate-100 font-medium text-slate-700"><tr><td colspan="10" class="px-5 py-12 text-center text-sm font-bold text-slate-400">Loading expenses...</td></tr></tbody>
+          <table id="finance-expenses-table" class="w-full text-left text-xs">
+            <thead class="border-b border-slate-200 bg-white text-[10px] font-black uppercase tracking-wider text-slate-400"><tr><th class="px-5 py-3.5">Expense</th><th class="px-5 py-3.5">Type</th><th class="px-5 py-3.5">Date</th><th class="px-5 py-3.5 text-right">Total</th><th class="px-5 py-3.5 text-right">Paid expense</th><th class="px-5 py-3.5 text-right">Remaining</th><th class="px-5 py-3.5">Payment</th><th class="px-5 py-3.5">Confirmed</th><th class="finance-expense-actions-cell px-5 py-3.5 text-right">Actions</th></tr></thead>
+            <tbody id="finance-expenses-table-body" class="divide-y divide-slate-100 font-medium text-slate-700"><tr><td colspan="9" class="px-5 py-12 text-center text-sm font-bold text-slate-400">Loading expenses...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -9200,6 +9244,7 @@
         </div>
         <label class="block"><span class="mb-1.5 block text-xs font-black text-slate-700">Description</span><textarea id="expense-description" maxlength="1000" rows="4" placeholder="Add supplier, lab, employee, invoice reference, or other details" class="w-full resize-y rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm leading-6 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"></textarea></label>
         <div class="grid gap-3 sm:grid-cols-2"><label class="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"><span><span class="block text-xs font-black text-slate-700">Confirmed</span><span class="mt-0.5 block text-[10px] text-slate-400">The expense has been approved</span></span><input id="expense-confirmed" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600" /></label><label class="block rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3"><span class="block text-xs font-black text-emerald-800">Paid amount</span><div class="relative mt-1.5"><span class="pointer-events-none absolute left-3 top-2 text-xs font-black text-emerald-500">EGP</span><input id="expense-paid-amount" type="number" inputmode="decimal" min="0" step="0.01" value="0" required class="w-full rounded-lg border border-emerald-200 bg-white py-2 pl-12 pr-3 text-sm font-black text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" /></div><span class="mt-1 block text-[10px] font-semibold text-emerald-700/70">Only the amount already paid is counted as an expense.</span></label></div>
+        <p id="expense-salary-hint" class="hidden rounded-xl bg-slate-100 px-3 py-3 text-xs leading-relaxed text-slate-600">Salary amounts are managed in HR. You can edit the name, description, and confirmation here.</p>
         <p id="expense-form-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="alert"></p>
         <label class="sync-field"><span>Payment method for additional paid amount</span><select id="expense-sync-payment-method"><option value="">Choose a payment method...</option></select><small>Choose a method when adding a paid amount. Existing installments keep their original methods.</small></label>
         <div class="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onclick="closeExpenseModal()" class="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 transition hover:bg-slate-50">Cancel</button><button id="expense-save-button" type="submit" class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60"><i data-lucide="save" class="h-4 w-4"></i> Create expense</button></div>
@@ -10134,6 +10179,8 @@
       'Paid expenses': 'المصروفات المدفوعة',
       'Paid amounts only': 'المبالغ المدفوعة فقط',
       'Net profit': 'صافي الربح',
+      'Payments minus expenses': 'المدفوعات ناقص المصروفات',
+      'Salary amounts are managed in HR. You can edit the name, description, and confirmation here.': 'تُدار مبالغ الرواتب في الموارد البشرية. يمكنك تعديل الاسم والوصف والتأكيد هنا.',
       'Net loss': 'صافي الخسارة',
       'Income less paid expenses': 'الدخل ناقص المصروفات المدفوعة',
       'Net margin': 'هامش الربح الصافي',
@@ -22536,12 +22583,16 @@
       const paymentTotal = document.getElementById('finance-summary-payment-total');
       const releaseTotal = document.getElementById('finance-summary-release-total');
       const expenseTotal = document.getElementById('finance-summary-expense-total');
-      if (!paymentTotal || !releaseTotal || !expenseTotal) return;
+      const netTotal = document.getElementById('finance-summary-net-total');
+      const netCard = document.getElementById('finance-summary-net-card');
+      if (!paymentTotal || !releaseTotal || !expenseTotal || !netTotal || !netCard) return;
       if (options.refresh) financeOverviewLoaded = false;
       if (financeOverviewLoaded) return;
       paymentTotal.textContent = '—';
       releaseTotal.textContent = '—';
       expenseTotal.textContent = '—';
+      netTotal.textContent = '—';
+      delete netCard.dataset.loss;
       const requestToken = ++financeOverviewRenderToken;
       const loadPromise = fetchFinanceOverviewSummary();
       financeOverviewLoadPromise = loadPromise;
@@ -22551,9 +22602,13 @@
         paymentTotal.textContent = formatInvoiceMoney(summary.paymentTotal);
         releaseTotal.textContent = formatInvoiceMoney(summary.releaseTotal);
         expenseTotal.textContent = formatInvoiceMoney(summary.expenseTotal);
+        const netProfit = Math.round((summary.paymentTotal - summary.expenseTotal) * 100) / 100;
+        netTotal.textContent = formatInvoiceMoney(netProfit);
+        netCard.dataset.loss = String(netProfit < 0);
         paymentTotal.removeAttribute('title');
         releaseTotal.removeAttribute('title');
         expenseTotal.removeAttribute('title');
+        netTotal.removeAttribute('title');
         financeOverviewLoaded = true;
       } catch (error) {
         if (requestToken !== financeOverviewRenderToken) return;
@@ -22561,10 +22616,12 @@
         paymentTotal.textContent = '—';
         releaseTotal.textContent = '—';
         expenseTotal.textContent = '—';
+        netTotal.textContent = '—';
         const message = error?.message || 'Could not calculate finance totals.';
         paymentTotal.title = message;
         releaseTotal.title = message;
         expenseTotal.title = message;
+        netTotal.title = message;
       } finally {
         if (financeOverviewLoadPromise === loadPromise) financeOverviewLoadPromise = null;
       }
@@ -23345,6 +23402,7 @@
         updatedAt: record.updated_at,
         type: relatedType ? normaliseExpenseType(relatedType) : null,
         salaryPayment: relatedSalaryPayment || null,
+        linkedSalary: Boolean(relatedSalaryPayment),
         linkedDoctorSalary: Boolean(relatedSalaryPayment && String(relatedSalaryPayment.payment_kind || '').startsWith('doctor_'))
       };
     }
@@ -23363,7 +23421,7 @@
       }
       let doctorSalaryByExpenseId = new Map();
       if (canModifyHr()) {
-        const { data, error } = await db.from('hr_salary_payments').select('id, expense_id, user_id, payment_kind, scope_start, scope_end, case_count').in('payment_kind', ['doctor_month', 'doctor_day', 'doctor_cases']);
+        const { data, error } = await db.from('hr_salary_payments').select('id, expense_id, user_id, payment_kind, scope_start, scope_end, case_count');
         if (error) throw error;
         doctorSalaryByExpenseId = new Map((data || []).map(payment => [String(payment.expense_id), payment]));
       }
@@ -23421,27 +23479,51 @@
       const remaining = expenseRemaining(expense);
       const quantityLabel = Number.isInteger(expense.quantity) ? String(expense.quantity) : expense.quantity.toFixed(2);
       const payButton = remaining > 0.005
-        ? '<button type="button" onclick="openExpensePaymentModal(\'' + escapeHtml(expense.id) + '\')" class="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[10px] font-black text-white shadow-sm transition hover:bg-emerald-700"><i data-lucide="badge-dollar-sign" class="h-3.5 w-3.5"></i> Pay</button>'
+        ? '<button type="button" onclick="openExpensePaymentModal(\'' + escapeHtml(expense.id) + '\')" class="finance-expense-pay inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-3 text-xs font-semibold text-emerald-700"><i data-lucide="badge-dollar-sign" class="h-4 w-4"></i> Pay</button>'
         : '<span class="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-[10px] font-black text-emerald-700"><i data-lucide="circle-check" class="h-3.5 w-3.5"></i> Paid</span>';
-      const actionButton = expense.linkedDoctorSalary
-        ? canModifyHr()
-          ? `<button type="button" onclick="deleteDoctorSalaryExpense('${escapeHtml(expense.id)}')" class="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-black text-red-700 transition hover:bg-red-100"><i data-lucide="unlock" class="h-3.5 w-3.5"></i> Delete & reopen</button>`
-          : '<span class="text-[10px] font-bold text-slate-400">Linked salary</span>'
-        : `<button type="button" onclick="openExpenseModal('${escapeHtml(expense.id)}')" class="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[10px] font-black text-blue-700 transition hover:bg-blue-100"><i data-lucide="pencil" class="h-3.5 w-3.5"></i> Edit</button>`;
+      const isArabic = currentUiLanguage === 'ar';
+      const editLabel = `${isArabic ? 'تعديل المصروف' : 'Edit expense'}: ${expense.name}`;
+      const deleteLabel = `${isArabic ? 'حذف المصروف' : 'Delete expense'}: ${expense.name}`;
+      const actionButtons = `<span class="finance-expense-actions"><button type="button" onclick="openExpenseModal('${escapeHtml(expense.id)}')" class="finance-expense-action finance-expense-edit" aria-label="${escapeHtml(editLabel)}" title="${escapeHtml(editLabel)}"><i data-lucide="pencil"></i></button><button type="button" onclick="deleteFinanceExpense('${escapeHtml(expense.id)}', this)" class="finance-expense-action finance-expense-delete" aria-label="${escapeHtml(deleteLabel)}" title="${escapeHtml(deleteLabel)}" ${expense.linkedSalary && !canModifyHr() ? 'disabled' : ''}><i data-lucide="trash-2"></i></button></span>`;
       return `
         <tr class="transition hover:bg-emerald-50/25">
-          <td data-label="Expense" class="px-5 py-4"><span class="block font-black text-slate-800">${escapeHtml(expense.name)}</span><span class="mt-1 block font-mono text-[9px] font-bold uppercase tracking-wider text-slate-400">${escapeHtml(String(expense.id).slice(0, 8))} · Qty ${escapeHtml(quantityLabel)}</span></td>
-          <td data-label="Type" class="px-5 py-4"><span class="inline-flex rounded-lg border px-2.5 py-1 text-[10px] font-black" style="border-color:${typeColor}40;background-color:${typeColor}12;color:${typeColor}">${escapeHtml(typeName)}</span></td>
-          <td data-label="Date" class="px-5 py-4 font-bold text-slate-600">${escapeHtml(formatInvoiceDate(expense.expenseDate))}</td>
-          <td data-label="Total" class="px-5 py-4 text-right font-black text-slate-800">${escapeHtml(formatInvoiceMoney(expense.total))}</td>
-          <td data-label="Paid expense" class="px-5 py-4 text-right font-black text-emerald-700">${escapeHtml(formatInvoiceMoney(expense.paidAmount))}</td>
-          <td data-label="Remaining" class="px-5 py-4 text-right font-black ${remaining > 0.005 ? 'text-amber-700' : 'text-emerald-700'}">${escapeHtml(formatInvoiceMoney(remaining))}</td>
-          <td data-label="Payment" class="px-5 py-4"><span class="inline-flex items-center gap-2">${expensePaymentIndicatorMarkup(expense)}${payButton}</span></td>
-          <td data-label="Confirmed" class="px-5 py-4"><span class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-black ${expense.confirmed ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'}"><i data-lucide="${expense.confirmed ? 'badge-check' : 'circle-dashed'}" class="h-3.5 w-3.5"></i>${expense.confirmed ? 'Confirmed' : 'Not confirmed'}</span></td>
-          <td data-label="Description" class="max-w-[260px] px-5 py-4 text-[11px] font-semibold leading-5 text-slate-500">${expense.description ? escapeHtml(expense.description) : '<span class="text-slate-300">—</span>'}</td>
-          <td data-label="Actions" class="px-5 py-4 text-right">${actionButton}</td>
+          <td data-label="${isArabic ? 'المصروف' : 'Expense'}" class="px-5 py-4"><span class="block font-black text-slate-800">${escapeHtml(expense.name)}</span><span class="mt-1 block font-mono text-[9px] font-bold uppercase tracking-wider text-slate-400">${escapeHtml(String(expense.id).slice(0, 8))} · ${isArabic ? 'الكمية' : 'Qty'} ${escapeHtml(quantityLabel)}</span></td>
+          <td data-label="${isArabic ? 'النوع' : 'Type'}" class="px-5 py-4"><span class="inline-flex rounded-lg px-2.5 py-1 text-[10px] font-black" style="background-color:${typeColor}12;color:${typeColor}">${escapeHtml(typeName)}</span></td>
+          <td data-label="${isArabic ? 'التاريخ' : 'Date'}" class="px-5 py-4 font-bold text-slate-600">${escapeHtml(formatInvoiceDate(expense.expenseDate))}</td>
+          <td data-label="${isArabic ? 'الإجمالي' : 'Total'}" class="px-5 py-4 text-right font-black text-slate-800">${escapeHtml(formatInvoiceMoney(expense.total))}</td>
+          <td data-label="${isArabic ? 'المصروف المدفوع' : 'Paid expense'}" class="px-5 py-4 text-right font-black text-emerald-700">${escapeHtml(formatInvoiceMoney(expense.paidAmount))}</td>
+          <td data-label="${isArabic ? 'المتبقي' : 'Remaining'}" class="px-5 py-4 text-right font-black ${remaining > 0.005 ? 'text-amber-700' : 'text-emerald-700'}">${escapeHtml(formatInvoiceMoney(remaining))}</td>
+          <td data-label="${isArabic ? 'الدفع' : 'Payment'}" class="finance-expense-payment-cell px-5 py-4"><span class="inline-flex items-center gap-2">${expensePaymentIndicatorMarkup(expense)}${payButton}</span></td>
+          <td data-label="${isArabic ? 'التأكيد' : 'Confirmed'}" class="finance-expense-confirmed-cell px-5 py-4"><span class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-black ${expense.confirmed ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'}"><i data-lucide="${expense.confirmed ? 'badge-check' : 'circle-dashed'}" class="h-3.5 w-3.5"></i>${expense.confirmed ? 'Confirmed' : 'Not confirmed'}</span></td>
+          <td data-label="${isArabic ? 'الإجراءات' : 'Actions'}" class="finance-expense-actions-cell px-5 py-4 text-right">${actionButtons}</td>
         </tr>
       `;
+    }
+
+    async function deleteFinanceExpense(expenseId, button) {
+      if (!hasPageAccess('finances')) return false;
+      const expense = financeExpenses.find(item => String(item.id) === String(expenseId));
+      if (!expense) return false;
+      const isArabic = currentUiLanguage === 'ar';
+      const linkedWarning = expense.linkedDoctorSalary
+        ? (isArabic ? ' سيتم إلغاء دفعة الطبيب وإعادة الحالات لمراجعة الراتب.' : ' This will undo the doctor payment and reopen its cases for salary review.')
+        : expense.linkedSalary ? (isArabic ? ' سيتم إلغاء دفعة الراتب وإعادة فتحها في الموارد البشرية.' : ' This will undo the salary payment and reopen it in HR.') : '';
+      if (!confirm((isArabic ? `حذف المصروف «${expense.name}» (${formatInvoiceMoney(expense.total)})؟` : `Delete expense “${expense.name}” (${formatInvoiceMoney(expense.total)})?`) + linkedWarning + (isArabic ? ' سيتم أيضاً عكس القيود المرتبطة في بيتنا بعد المزامنة.' : ' Any linked Baytna entries will also be reversed after synchronization.'))) return false;
+      if (button) button.disabled = true;
+      try {
+        const { data, error } = await db.rpc('delete_finance_expense', { p_expense_id: expense.id });
+        if (error) throw error;
+        financeExpensesLoaded = false;
+        financeOverviewLoaded = false;
+        incomeStatementLoadedRange = '';
+        if (data?.salary_kind) hrDirectoryLoaded = false;
+        await Promise.all([renderFinanceOverview({ refresh: true }), renderFinanceExpenses({ refresh: true })]);
+        showAppointmentNotificationToast(isArabic ? 'تم حذف المصروف.' : 'Expense deleted.');
+        return true;
+      } catch (error) {
+        alert((isArabic ? 'تعذر حذف المصروف: ' : 'Could not delete the expense: ') + (error?.message || 'Unknown error'));
+        return false;
+      } finally { if (button) button.disabled = false; }
     }
 
     async function deleteDoctorSalaryExpense(expenseId) {
@@ -23479,7 +23561,7 @@
       summary.textContent = currentUiLanguage === 'ar'
         ? `عرض ${filtered.length} من ${financeExpenses.length} مصروف · المصروف المدفوع ${formatInvoiceMoney(paidTotal)} · المتبقي ${formatInvoiceMoney(remainingTotal)}`
         : `Showing ${filtered.length} of ${financeExpenses.length} expenses · Paid expenses ${formatInvoiceMoney(paidTotal)} · Outstanding ${formatInvoiceMoney(remainingTotal)}`;
-      body.innerHTML = filtered.length ? filtered.map(financeExpenseRowMarkup).join('') : '<tr><td colspan="10" class="px-5 py-14 text-center"><span class="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"><i data-lucide="search-x" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-600">No expenses match these filters.</p></td></tr>';
+      body.innerHTML = filtered.length ? filtered.map(financeExpenseRowMarkup).join('') : '<tr><td colspan="9" class="px-5 py-14 text-center"><span class="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"><i data-lucide="search-x" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-600">No expenses match these filters.</p></td></tr>';
       translateUiTree(document.getElementById('view-finances'), currentUiLanguage);
       lucide.createIcons();
     }
@@ -23492,7 +23574,7 @@
       if (options.refresh) financeExpensesLoaded = false;
       await ensureExpenseTypesLoaded();
       if (!financeExpensesLoaded) {
-        body.innerHTML = '<tr><td colspan="10" class="px-5 py-12 text-center text-sm font-bold text-slate-400"><span class="inline-flex items-center gap-2"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Loading expenses...</span></td></tr>';
+        body.innerHTML = '<tr><td colspan="9" class="px-5 py-12 text-center text-sm font-bold text-slate-400"><span class="inline-flex items-center gap-2"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Loading expenses...</span></td></tr>';
         summary.textContent = 'Loading expenses...';
         lucide.createIcons();
         const loadPromise = financeExpenseLoadPromise || fetchFinanceExpenseRecords();
@@ -23502,7 +23584,7 @@
           financeExpensesLoaded = true;
         } catch (error) {
           financeExpensesLoaded = false;
-          body.innerHTML = '<tr><td colspan="10" class="px-5 py-12 text-center text-sm font-bold text-red-600">Could not load expenses: ' + escapeHtml(error.message || 'Unknown error') + '</td></tr>';
+          body.innerHTML = '<tr><td colspan="9" class="px-5 py-12 text-center text-sm font-bold text-red-600">Could not load expenses: ' + escapeHtml(error.message || 'Unknown error') + '</td></tr>';
           summary.textContent = 'Could not load expenses.';
           return;
         } finally {
@@ -23810,6 +23892,11 @@
       const form = document.getElementById('expense-form');
       form.reset();
       form.dataset.previousPaidAmount = '0';
+      form.dataset.linkedSalary = 'false';
+      document.getElementById('expense-salary-hint').classList.add('hidden');
+      document.getElementById('expense-sync-payment-method').closest('label')?.classList.remove('hidden');
+      ['expense-date', 'expense-total', 'expense-quantity', 'expense-paid-amount'].forEach(id => { document.getElementById(id).readOnly = false; });
+      document.getElementById('expense-type').disabled = false;
       document.getElementById('expense-date').value = financeInvoiceDateInputValue(new Date());
       document.getElementById('expense-quantity').value = '1';
       document.getElementById('expense-paid-amount').value = '0';
@@ -23838,6 +23925,13 @@
         document.getElementById('expense-confirmed').checked = Boolean(expense.confirmed);
         document.getElementById('expense-paid-amount').value = String(expense.paidAmount);
         form.dataset.previousPaidAmount = String(expense.paidAmount);
+        if (expense.linkedSalary) {
+          form.dataset.linkedSalary = 'true';
+          document.getElementById('expense-salary-hint').classList.remove('hidden');
+          document.getElementById('expense-sync-payment-method').closest('label')?.classList.add('hidden');
+          ['expense-date', 'expense-total', 'expense-quantity', 'expense-paid-amount'].forEach(id => { document.getElementById(id).readOnly = true; });
+          document.getElementById('expense-type').disabled = true;
+        }
         modalTitle.textContent = 'Edit expense';
         saveButton.innerHTML = '<i data-lucide="save" class="h-4 w-4"></i> Update expense';
       } else {
@@ -23889,6 +23983,9 @@
         confirmed: document.getElementById('expense-confirmed').checked
       };
       if (paidAmount > previousPaidAmount) payload.sync_payment_method_id = expenseMethodId;
+      if (document.getElementById('expense-form').dataset.linkedSalary === 'true') {
+        ['expense_type_id', 'total', 'paid_amount', 'quantity', 'expense_date'].forEach(key => delete payload[key]);
+      }
       button.disabled = true;
       setAdminMessage('expense-form-message', 'Saving expense...');
       try {
