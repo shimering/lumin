@@ -73,6 +73,7 @@
   <script src="vendor/lucide.min.js"></script>
   <script src="vendor/supabase.js"></script>
   <script src="lumin-loyalty.js?v=5"></script>
+  <script src="lumin-finance-sync.js?v=1"></script>
   <script src="lumin-patient-swipe.js?v=1"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   
@@ -5215,6 +5216,7 @@
     }
   </style>
   <link rel="stylesheet" href="lumin-theme.css?v=18" />
+  <link rel="stylesheet" href="lumin-finance-sync.css?v=1" />
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 font-sans antialiased selection:bg-blue-100">
 
@@ -6720,6 +6722,7 @@
         <button id="admin-tab-payments" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-payments" onclick="switchAdminTab('payments')" class="inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black text-slate-500 transition hover:bg-slate-100 hover:text-slate-800">
           <i data-lucide="wallet-cards" class="h-4 w-4"></i> Payment methods
         </button>
+        <button id="admin-tab-finance-sync" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-finance-sync" onclick="switchAdminTab('finance-sync')" class="finance-sync-tab inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-500"><i data-lucide="arrow-right-left" class="h-4 w-4"></i><span>Finance sync</span></button>
         <button id="admin-tab-expense-types" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-expense-types" onclick="switchAdminTab('expense-types')" class="inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black text-slate-500 transition hover:bg-slate-100 hover:text-slate-800">
           <i data-lucide="tags" class="h-4 w-4"></i> Expense types
         </button>
@@ -6736,6 +6739,7 @@
       </div>
 
       <div id="admin-panel-loyalty" role="tabpanel" aria-labelledby="admin-tab-loyalty" class="hidden space-y-6"></div>
+      <div id="admin-panel-finance-sync" role="tabpanel" aria-labelledby="admin-tab-finance-sync" class="hidden finance-sync-panel" translate="no"></div>
 
       <div id="admin-panel-storage" role="tabpanel" aria-labelledby="admin-tab-storage" class="hidden space-y-6">
         <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
@@ -9197,6 +9201,7 @@
         <label class="block"><span class="mb-1.5 block text-xs font-black text-slate-700">Description</span><textarea id="expense-description" maxlength="1000" rows="4" placeholder="Add supplier, lab, employee, invoice reference, or other details" class="w-full resize-y rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm leading-6 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"></textarea></label>
         <div class="grid gap-3 sm:grid-cols-2"><label class="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"><span><span class="block text-xs font-black text-slate-700">Confirmed</span><span class="mt-0.5 block text-[10px] text-slate-400">The expense has been approved</span></span><input id="expense-confirmed" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600" /></label><label class="block rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3"><span class="block text-xs font-black text-emerald-800">Paid amount</span><div class="relative mt-1.5"><span class="pointer-events-none absolute left-3 top-2 text-xs font-black text-emerald-500">EGP</span><input id="expense-paid-amount" type="number" inputmode="decimal" min="0" step="0.01" value="0" required class="w-full rounded-lg border border-emerald-200 bg-white py-2 pl-12 pr-3 text-sm font-black text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" /></div><span class="mt-1 block text-[10px] font-semibold text-emerald-700/70">Only the amount already paid is counted as an expense.</span></label></div>
         <p id="expense-form-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="alert"></p>
+        <label class="sync-field"><span>Payment method for additional paid amount</span><select id="expense-sync-payment-method"><option value="">Choose a payment method...</option></select><small>Choose a method when adding a paid amount. Existing installments keep their original methods.</small></label>
         <div class="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onclick="closeExpenseModal()" class="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 transition hover:bg-slate-50">Cancel</button><button id="expense-save-button" type="submit" class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60"><i data-lucide="save" class="h-4 w-4"></i> Create expense</button></div>
       </form>
     </div>
@@ -9212,6 +9217,7 @@
       <form id="expense-payment-form" onsubmit="saveExpensePayment(event)" class="space-y-4 p-5">
         <label class="block"><span class="mb-1.5 block text-xs font-black text-slate-700">Amount being paid</span><div class="relative"><span class="pointer-events-none absolute left-3.5 top-2.5 text-sm font-black text-slate-400">EGP</span><input id="expense-payment-amount" type="number" inputmode="decimal" min="0.01" step="0.01" required class="w-full rounded-xl border border-slate-200 py-2.5 pl-14 pr-3.5 text-sm font-black text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" /></div><p id="expense-payment-amount-hint" class="mt-1.5 text-[10px] font-bold text-slate-400"></p></label>
         <p id="expense-payment-form-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="alert"></p>
+        <div class="grid gap-4 sm:grid-cols-2"><label class="sync-field"><span>Payment method</span><select id="expense-payment-method" required><option value="">Choose a payment method...</option></select></label><label class="sync-field"><span>Payment date</span><input id="expense-payment-date" type="date" required /></label></div>
         <div class="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onclick="closeExpensePaymentModal()" class="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 transition hover:bg-slate-50">Cancel</button><button id="expense-payment-save-button" type="submit" class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60"><i data-lucide="badge-dollar-sign" class="h-4 w-4"></i> Add payment</button></div>
       </form>
     </div>
@@ -9900,6 +9906,9 @@
     const uiAttributeStates = new WeakMap();
     const TRANSLATABLE_ATTRIBUTES = ['placeholder', 'title', 'aria-label'];
     const ARABIC_UI_TEXT = Object.freeze({
+      'Finance sync': 'المزامنة المالية',
+      'Payment method for additional paid amount': 'طريقة دفع المبلغ الإضافي',
+      'Choose a method when adding a paid amount. Existing installments keep their original methods.': 'اختر طريقة الدفع عند إضافة مبلغ مدفوع. تحتفظ الدفعات السابقة بطرق الدفع الأصلية.',
       'WhatsApp': 'واتساب',
       'WhatsApp Center': 'مركز واتساب',
       'AI Booking Agent & Live Patient Chat': 'وكيل الحجز بالذكاء الاصطناعي والمحادثة المباشرة',
@@ -10832,6 +10841,7 @@
         time: appointmentTimeFormatter.format(new Date(entry.startAt))
       }));
       translateUiTree(document.body, currentUiLanguage);
+      if (financeSyncSnapshot && hasPageAccess('admin')) renderFinanceSyncSnapshot();
       if (typeof syncVoiceFabBadge === 'function') syncVoiceFabBadge();
       if (typeof syncVoiceEngineSettingsUI === 'function') syncVoiceEngineSettingsUI();
       if (refreshViews && currentUserAccess) {
@@ -12140,6 +12150,7 @@
         currentSession = null;
         currentUserAccess = null;
         resetLoyaltyState();
+        resetFinanceSyncState();
         patients = [];
         patientsLoaded = false;
         patientsLoadPromise = null;
@@ -16135,7 +16146,13 @@
     function switchAdminTab(tabName) {
       if (!hasPageAccess('admin')) return;
       if (tabName === 'whatsapp') tabName = 'templates';
-      adminActiveTab = ['access', 'templates', 'print-forms', 'payments', 'expense-types', 'attendance', 'customization', 'loyalty', 'storage'].includes(tabName) ? tabName : 'access';
+      adminActiveTab = ['access', 'templates', 'print-forms', 'payments', 'expense-types', 'attendance', 'customization', 'loyalty', 'storage', 'finance-sync'].includes(tabName) ? tabName : 'access';
+      const showFinanceSync = adminActiveTab === 'finance-sync';
+      document.getElementById('admin-tab-finance-sync').classList.toggle('finance-sync-tab-active', showFinanceSync);
+      document.getElementById('admin-tab-finance-sync').setAttribute('aria-selected', String(showFinanceSync));
+      document.getElementById('admin-panel-finance-sync').classList.toggle('hidden', !showFinanceSync);
+      if (showFinanceSync) void renderAdminFinanceSync();
+      else stopFinanceSyncPolling();
       const showTemplates = adminActiveTab === 'templates';
       const showPrintForms = adminActiveTab === 'print-forms';
       const showPayments = adminActiveTab === 'payments';
@@ -18362,6 +18379,7 @@
         currentSession = null;
         currentUserAccess = null;
         resetLoyaltyState();
+        resetFinanceSyncState();
         await db.auth.signOut({ scope: 'local' });
         showAuthGate(error.message || 'Your access changed. Please sign in again.');
         return false;
@@ -23787,14 +23805,16 @@
     async function openExpenseModal(expenseId = null) {
       if (!hasPageAccess('finances')) return;
       closeQuickCreateMenu();
-      await ensureExpenseTypesLoaded();
+      await Promise.all([ensureExpenseTypesLoaded(), ensurePaymentMethodsLoaded()]);
       editingExpenseId = expenseId ? String(expenseId) : null;
       const form = document.getElementById('expense-form');
       form.reset();
+      form.dataset.previousPaidAmount = '0';
       document.getElementById('expense-date').value = financeInvoiceDateInputValue(new Date());
       document.getElementById('expense-quantity').value = '1';
       document.getElementById('expense-paid-amount').value = '0';
       refreshExpenseTypeSelectors();
+      populateExpenseSyncMethod('expense-sync-payment-method');
       setAdminMessage('expense-form-message', '');
       const modalTitle = document.getElementById('expense-modal-title');
       const saveButton = document.getElementById('expense-save-button');
@@ -23817,6 +23837,7 @@
         document.getElementById('expense-description').value = expense.description || '';
         document.getElementById('expense-confirmed').checked = Boolean(expense.confirmed);
         document.getElementById('expense-paid-amount').value = String(expense.paidAmount);
+        form.dataset.previousPaidAmount = String(expense.paidAmount);
         modalTitle.textContent = 'Edit expense';
         saveButton.innerHTML = '<i data-lucide="save" class="h-4 w-4"></i> Update expense';
       } else {
@@ -23847,6 +23868,12 @@
       const wasEditing = Boolean(editingExpenseId);
       const total = Number(document.getElementById('expense-total').value);
       const paidAmount = Number(document.getElementById('expense-paid-amount').value);
+      const previousPaidAmount = Number(document.getElementById('expense-form').dataset.previousPaidAmount || 0);
+      const expenseMethodId = document.getElementById('expense-sync-payment-method').value;
+      if (paidAmount > previousPaidAmount && !expenseMethodId) {
+        setAdminMessage('expense-form-message', currentUiLanguage === 'ar' ? 'اختر طريقة الدفع للمبلغ الإضافي.' : 'Choose a payment method for the additional paid amount.', 'error');
+        return;
+      }
       if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(paidAmount) || paidAmount < 0 || paidAmount > total) {
         setAdminMessage('expense-form-message', 'Paid amount must be between EGP 0 and the expense total.', 'error');
         return;
@@ -23861,6 +23888,7 @@
         description: document.getElementById('expense-description').value.trim(),
         confirmed: document.getElementById('expense-confirmed').checked
       };
+      if (paidAmount > previousPaidAmount) payload.sync_payment_method_id = expenseMethodId;
       button.disabled = true;
       setAdminMessage('expense-form-message', 'Saving expense...');
       try {
@@ -23881,14 +23909,17 @@
       }
     }
 
-    function openExpensePaymentModal(expenseId) {
+    async function openExpensePaymentModal(expenseId) {
       if (!hasPageAccess('finances')) return;
+      await ensurePaymentMethodsLoaded();
       const expense = financeExpenses.find(item => String(item.id) === String(expenseId));
       if (!expense) return;
       const remaining = expenseRemaining(expense);
       if (remaining <= 0.005) return;
       activeExpensePaymentId = String(expense.id);
       activeExpensePayment = expense;
+      populateExpenseSyncMethod('expense-payment-method');
+      document.getElementById('expense-payment-date').value = financeInvoiceDateInputValue(new Date());
       document.getElementById('expense-payment-modal-summary').textContent = expense.name;
       document.getElementById('expense-payment-modal-total').textContent = formatInvoiceMoney(expense.total);
       document.getElementById('expense-payment-modal-paid').textContent = formatInvoiceMoney(expense.paidAmount);
@@ -23921,6 +23952,11 @@
       if (!hasPageAccess('finances') || !activeExpensePaymentId || !activeExpensePayment) return;
       const amount = Number(document.getElementById('expense-payment-amount').value);
       const remaining = expenseRemaining(activeExpensePayment);
+      const expensePaymentMethodId = document.getElementById('expense-payment-method').value;
+      if (!expensePaymentMethodId) {
+        setAdminMessage('expense-payment-form-message', currentUiLanguage === 'ar' ? 'اختر طريقة الدفع.' : 'Choose a payment method.', 'error');
+        return;
+      }
       if (!Number.isFinite(amount) || amount <= 0 || amount > remaining + 0.005) {
         setAdminMessage('expense-payment-form-message', 'Enter an amount greater than zero and not more than ' + formatInvoiceMoney(remaining) + '.', 'error');
         return;
@@ -23931,7 +23967,9 @@
       try {
         const { error } = await db.rpc('record_expense_payment', {
           p_expense_id: activeExpensePaymentId,
-          p_amount: amount
+          p_amount: amount,
+          p_payment_method_id: expensePaymentMethodId,
+          p_payment_date: document.getElementById('expense-payment-date').value
         });
         if (error) throw error;
         financeExpensesLoaded = false;

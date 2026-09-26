@@ -14,6 +14,9 @@ supabase/*
 !supabase/migrations/*.sql
 !supabase/functions/
 !supabase/functions/**
+!supabase/tests/
+!supabase/tests/*.sql
 supabase/functions/appointment-push/
 supabase/functions/google-calendar/
 supabase/functions/hr-attendance-push/
+integrations/baytna/supabase/.temp/
