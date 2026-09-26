@@ -19,6 +19,16 @@ begin
   if settings.payment_routes->>cash::text is null or settings.payment_routes->>bank::text is null or settings.payment_routes->>card::text is not null then
     raise exception 'Cash/InstaPay/Card routing defaults are incorrect';
   end if;
+  perform private.queue_finance_sync_at('income:900000101','income',cash,1,'2026-09-26','Time verification',settings.income_category,false,'2026-09-26T16:09:35.483948Z');
+  select e.* into last_event from public.finance_sync_events e order by id desc limit 1;
+  if (last_event.payload->>'occurred_at')::timestamptz<>'2026-09-26T16:09:35.483948Z'::timestamptz then
+    raise exception 'A current payment lost its actual entry time';
+  end if;
+  perform private.queue_finance_sync_at('income:900000102','income',cash,1,'2026-01-10','Backdated time verification',settings.income_category,false,'2026-09-26T16:09:35.483948Z');
+  select e.* into last_event from public.finance_sync_events e order by id desc limit 1;
+  if (last_event.payload->>'occurred_at')::timestamptz<>'2026-01-10T17:09:35.483948Z'::timestamptz then
+    raise exception 'A backdated payment lost its Cairo date/time across daylight saving';
+  end if;
   select count(*) into count_before from public.finance_sync_events;
   select p.id into historical from public.invoice_payments p where not exists(select 1 from public.finance_sync_events e where e.source_key='income:'||p.id) limit 1;
   if historical is not null then
@@ -33,6 +43,9 @@ begin
     values(v_invoice,v_patient,cash,'Cash',1,current_date) returning id into v_payment;
     select e.* into last_event from public.finance_sync_events e order by id desc limit 1;
     if last_event.source_key<>'income:'||v_payment or last_event.payload->>'account_id'<>settings.payment_routes->>cash::text then raise exception 'New income capture failed'; end if;
+    if (last_event.payload->>'occurred_at')::timestamptz<>(select (p.payment_date+(p.created_at at time zone 'Africa/Cairo')::time) at time zone 'Africa/Cairo' from public.invoice_payments p where p.id=v_payment) then
+      raise exception 'Income capture did not preserve the original receipt time';
+    end if;
     update public.finance_sync_settings set sync_income=false where id;
     update public.invoice_payments set amount=2 where id=v_payment;
     select e.* into last_event from public.finance_sync_events e order by id desc limit 1;
@@ -51,6 +64,9 @@ begin
   if (select count(*) from public.expense_payment_entries where expense_id=expense)<>2 then raise exception 'Installments must remain distinct'; end if;
   select e.* into last_event from public.finance_sync_events e order by id desc limit 1;
   if last_event.payload->>'account_id'<>settings.payment_routes->>bank::text or (last_event.payload->>'amount_minor')::bigint<>25000 then raise exception 'InstaPay amount/account incorrect'; end if;
+  if (last_event.payload->>'occurred_at')::timestamptz<>(select (p.payment_date+(p.created_at at time zone 'Africa/Cairo')::time) at time zone 'Africa/Cairo' from public.expense_payment_entries p where p.expense_id=expense and p.payment_method_id=bank) then
+    raise exception 'Expense capture did not preserve the original installment time';
+  end if;
   perform public.record_expense_payment(expense,50,card,current_date);
   select e.* into last_event from public.finance_sync_events e order by id desc limit 1;
   if last_event.status<>'skipped' then raise exception 'Card must remain excluded'; end if;
@@ -86,7 +102,8 @@ begin
     raise exception 'A deleted payment still needs a method';
   end if;
   if has_function_privilege('authenticated','public.configure_baytna_sync(text,jsonb,jsonb)','execute') or
-     has_function_privilege('authenticated','private.dispatch_baytna_sync()','execute') then raise exception 'Privileged integration functions are exposed'; end if;
+     has_function_privilege('authenticated','private.dispatch_baytna_sync()','execute') or
+     has_function_privilege('authenticated','private.queue_finance_sync_at(text,text,uuid,numeric,date,text,text,boolean,timestamptz)','execute') then raise exception 'Privileged integration functions are exposed'; end if;
   insert into public.finance_sync_events(source_key,operation,status) values('catalog','catalog','pending');
   perform private.dispatch_baytna_sync();
   if exists(select 1 from net.http_request_queue where headers ? 'x-lumin-sync-token') then raise exception 'Reusable credential entered the HTTP queue'; end if;

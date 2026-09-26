@@ -10,6 +10,7 @@ The live Lumin and Baytna database migrations and Baytna's `lumin-finance-sync` 
 - Admins can change these mappings, pause/resume delivery, separately include new income/expenses, map categories, refresh destination accounts/categories, retry failures, and assign missing expense methods.
 - Existing Baytna categories are reused. Income initially uses **Clinic salary**; expenses default to **Clinic**, with matching categories for expense types such as Salary and Dental Lab. These defaults are editable.
 - Expense installments retain distinct payment methods and Cairo payment dates. Reducing an expense's paid total corrects its newest tracked installments first. Reductions affecting only pre-integration payments are excluded.
+- Imported receipts and installments combine their selected Cairo payment date with their original entry time, so newly recorded payments appear correctly in recent activity.
 - Salary expenses and payments recorded by older clients without a method appear as **Choose method**. No destination account is guessed.
 - Changed mappings apply to subsequent activity. Previously posted transactions are not moved automatically. A future historical-import feature must be explicitly invoked and reconcile amounts already included in opening balances; no historical-import endpoint is installed.
 
