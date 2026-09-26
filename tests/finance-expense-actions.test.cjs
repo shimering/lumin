@@ -17,11 +17,11 @@ function context(extra = {}) {
   for (const name of ['expenseRemaining','expensePaymentPercent','expensePaymentIndicatorMarkup','financeExpenseRowMarkup','renderFinanceOverview','deleteFinanceExpense']) vm.runInContext(functionSource(name),ctx);
   return ctx;
 }
-test('Every expense has accessible icon-only edit and delete actions in nine columns', () => {
+test('Every expense has accessible icon-only edit and delete actions in eight columns', () => {
   for (const record of [expense,{...expense,linkedSalary:true,linkedDoctorSalary:true}]) {
     const row = context().financeExpenseRowMarkup(record);
-    assert.equal((row.match(/<td /g)||[]).length,9);
-    assert.doesNotMatch(row,/data-label="Description"|Private supplier details|Delete & reopen/);
+    assert.equal((row.match(/<td /g)||[]).length,8);
+    assert.doesNotMatch(row,/data-label="Description"|Private supplier details|Delete & reopen|Confirmed|Not confirmed/);
     const buttons = [...row.matchAll(/<button[^>]*class="finance-expense-action [^>]*>(.*?)<\/button>/g)];
     assert.equal(buttons.length,2);
     buttons.forEach(button=>assert.equal(button[1].replace(/<[^>]*>/g,'').trim(),''));
@@ -68,13 +68,30 @@ test('Editing a linked salary never writes altered settlement amounts or dates',
   const values={'expense-total':'1000','expense-paid-amount':'80','expense-sync-payment-method':'','expense-name':'Revised salary label','expense-type':'salary','expense-quantity':'3','expense-date':'2026-01-01','expense-description':'Revised note'};
   const nodes=Object.fromEntries(Object.entries(values).map(([id,value])=>[id,{value}]));
   nodes['expense-form']={dataset:{previousPaidAmount:'100',linkedSalary:'true'}};
-  nodes['expense-confirmed']={checked:false};
   nodes['expense-save-button']={disabled:false};
   let saved;
   const ctx=context({document:{getElementById:id=>nodes[id]},editingExpenseId:'salary',setAdminMessage:()=>{},closeExpenseModal:()=>{},renderFinanceExpenses:async()=>{},showAppointmentNotificationToast:()=>{},db:{from:()=>({update:payload=>{saved=payload;return{eq:async()=>({error:null})};}})}});
   ctx.renderFinanceOverview=async()=>{};
   vm.runInContext(functionSource('saveExpense'),ctx);
   await ctx.saveExpense({preventDefault(){}});
-  assert.deepEqual(JSON.parse(JSON.stringify(saved)),{name:'Revised salary label',description:'Revised note',confirmed:false});
+  assert.deepEqual(JSON.parse(JSON.stringify(saved)),{name:'Revised salary label',description:'Revised note'});
   assert.equal(nodes['expense-save-button'].disabled,false);
+});
+
+test('New paid and unpaid expenses save without an approval field and keep payment routing', async () => {
+  for (const paidAmount of ['0','80']) {
+    const values={'expense-total':'100','expense-paid-amount':paidAmount,'expense-sync-payment-method':'cash-method','expense-name':'Supplies','expense-type':'materials','expense-quantity':'1','expense-date':'2026-09-26','expense-description':''};
+    const nodes=Object.fromEntries(Object.entries(values).map(([id,value])=>[id,{value}]));
+    nodes['expense-form']={dataset:{previousPaidAmount:'0',linkedSalary:'false'}};
+    nodes['expense-save-button']={disabled:false};
+    let saved;
+    const ctx=context({document:{getElementById:id=>nodes[id]},editingExpenseId:null,setAdminMessage:()=>{},closeExpenseModal:()=>{},renderFinanceExpenses:async()=>{},showAppointmentNotificationToast:()=>{},db:{from:()=>({insert:async payload=>{saved=payload;return{error:null};}})}});
+    ctx.renderFinanceOverview=async()=>{};
+    vm.runInContext(functionSource('saveExpense'),ctx);
+    await ctx.saveExpense({preventDefault(){}});
+    assert.equal(saved.paid_amount,Number(paidAmount));
+    assert.equal(Object.hasOwn(saved,'confirmed'),false);
+    assert.equal(saved.sync_payment_method_id,paidAmount==='0'?undefined:'cash-method');
+    assert.equal(nodes['expense-save-button'].disabled,false);
+  }
 });

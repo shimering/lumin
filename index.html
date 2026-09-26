@@ -4182,7 +4182,8 @@
       will-change: transform, filter;
     }
     body.patient-swipe-active #chart-voice-fab-container { visibility: hidden; }
-    .patient-workspace-tabs { overscroll-behavior-inline: contain; scroll-padding-inline: 0.25rem; }
+    .patient-workspace-tabs { overscroll-behavior-inline: contain; scroll-padding-inline: 0.25rem; scrollbar-width: none; }
+    .patient-workspace-tabs::-webkit-scrollbar { display: none; }
     .patient-workspace-tab {
       height: 3.5rem;
       min-width: 5.5rem;
@@ -4193,16 +4194,23 @@
       white-space: nowrap;
     }
     .patient-workspace-tab[data-patient-workspace-tab="profile"] {
-      width: clamp(9rem, 16vw, 14rem);
+      width: clamp(9rem, 12vw, 11rem);
       min-width: 0;
       flex: 0 0 auto;
     }
     .patient-workspace-identity { display: block; width: 100%; min-width: 0; text-align: start; }
-    .patient-workspace-name { display: block; overflow: hidden; font-size: 0.875rem; font-weight: 700; line-height: 1.25rem; text-overflow: ellipsis; }
+    .patient-workspace-name { display: block; overflow: hidden; font-size: 1rem; font-weight: 700; line-height: 1.5rem; text-align: left; text-overflow: ellipsis; }
+    html[dir="rtl"] .patient-workspace-name { text-align: right; }
     .patient-workspace-meta { display: block; margin-top: 0.125rem; font-size: 0.6875rem; font-weight: 500; line-height: 1rem; opacity: 0.8; }
+    .patient-workspace-profile-icon { display: none; }
     html[dir="rtl"] [data-patient-workspace-back] svg { transform: rotate(180deg); }
-    @media (max-width: 639px) {
-      .patient-workspace-tab[data-patient-workspace-tab="profile"] { width: min(12rem, 50vw); }
+    @media (max-width: 767px) {
+      #patient-workspace-header { position: sticky; top: max(0.5rem, env(safe-area-inset-top)); z-index: 35; }
+      .patient-workspace-tab,
+      .patient-workspace-tab[data-patient-workspace-tab="profile"] { width: 2.75rem; min-width: 2.75rem; height: 2.75rem; flex: 1 0 2.75rem; padding: 0.5rem; gap: 0; }
+      .patient-workspace-tab > span { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+      .patient-workspace-tab > :is(svg, img) { width: 1.25rem; height: 1.25rem; }
+      .patient-workspace-profile-icon { display: block; }
     }
     /* One compact title row for every page, independent of appearance preference. */
     #app-shell .app-page-bar {
@@ -5223,7 +5231,9 @@
     #finance-summary-cards p[id] { overflow-wrap: anywhere; white-space: normal; }
     #finance-summary-net-card { background: linear-gradient(135deg, var(--lumin-face, #fff), #eff6ff); color: #1d4ed8; }
     #finance-summary-net-card[data-loss=true] { background: linear-gradient(135deg, var(--lumin-face, #fff), #fff1f2); color: #be123c; }
-    #finance-expenses-table { min-width: 1080px; border-collapse: separate; border-spacing: 0; }
+    #finance-invoices-table .finance-invoice-total { display: block; white-space: nowrap; }
+    #finance-invoices-table .finance-invoice-discount { display: block; margin-top: 4px; color: #64748b; font-size: 11px; font-weight: 500; line-height: 1.4; }
+    #finance-expenses-table { min-width: 960px; border-collapse: separate; border-spacing: 0; }
     #finance-expenses-table .finance-expense-actions-cell { position: sticky; inset-inline-end: 0; min-width: 124px; padding-inline: 12px; background: var(--lumin-face, #fff); box-shadow: -8px 0 16px -16px #64748b; }
     html[dir=rtl] #finance-expenses-table .finance-expense-actions-cell { box-shadow: 8px 0 16px -16px #64748b; }
     .finance-expense-actions { display: inline-flex; gap: 8px; align-items: center; }
@@ -5250,7 +5260,7 @@
       #finance-expenses-table tbody td::before { content: attr(data-label); color: #94a3b8; font-size: 10px; font-weight: 500; }
       #finance-expenses-table tbody td:first-child { grid-column: 1 / -1; border-top: 0; padding: 16px; background: #f8fafc; }
       #finance-expenses-table tbody td:first-child::before, #finance-expenses-table tbody td[colspan]::before { display: none; }
-      #finance-expenses-table .finance-expense-payment-cell, #finance-expenses-table .finance-expense-confirmed-cell, #finance-expenses-table .finance-expense-actions-cell, #finance-expenses-table tbody td[colspan] { grid-column: 1 / -1; }
+      #finance-expenses-table .finance-expense-payment-cell, #finance-expenses-table .finance-expense-actions-cell, #finance-expenses-table tbody td[colspan] { grid-column: 1 / -1; }
       #finance-expenses-table .finance-expense-actions-cell { position: static; display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; box-shadow: none; background: #f8fafc; }
       #finance-expenses-table tbody td[colspan] { text-align: center; }
     }
@@ -5776,7 +5786,6 @@
         <div id="finance-summary-net-card" class="rounded-2xl border border-slate-200 p-4 shadow-xs">
           <span class="text-[10px] font-black uppercase tracking-wider">Net profit</span>
           <p id="finance-summary-net-total" class="mt-2 text-xl font-black" aria-live="polite">EGP 0</p>
-          <p class="mt-1 text-[10px] font-medium text-slate-400">Payments minus expenses</p>
         </div>
       </div>
 
@@ -5935,8 +5944,8 @@
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/60 px-4 py-3 sm:px-5"><div><h3 class="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-600"><i data-lucide="list-filter" class="h-4 w-4 text-emerald-600"></i> All expenses</h3><p id="finance-expense-results-summary" class="mt-1 text-[11px] font-semibold text-slate-400" aria-live="polite">Loading expenses...</p></div><span class="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-600"><span class="h-2 w-2 rounded-full bg-emerald-500"></span> Live updates</span></div>
         <div class="mobile-scroll-region overflow-x-auto">
           <table id="finance-expenses-table" class="w-full text-left text-xs">
-            <thead class="border-b border-slate-200 bg-white text-[10px] font-black uppercase tracking-wider text-slate-400"><tr><th class="px-5 py-3.5">Expense</th><th class="px-5 py-3.5">Type</th><th class="px-5 py-3.5">Date</th><th class="px-5 py-3.5 text-right">Total</th><th class="px-5 py-3.5 text-right">Paid expense</th><th class="px-5 py-3.5 text-right">Remaining</th><th class="px-5 py-3.5">Payment</th><th class="px-5 py-3.5">Confirmed</th><th class="finance-expense-actions-cell px-5 py-3.5 text-right">Actions</th></tr></thead>
-            <tbody id="finance-expenses-table-body" class="divide-y divide-slate-100 font-medium text-slate-700"><tr><td colspan="9" class="px-5 py-12 text-center text-sm font-bold text-slate-400">Loading expenses...</td></tr></tbody>
+            <thead class="border-b border-slate-200 bg-white text-[10px] font-black uppercase tracking-wider text-slate-400"><tr><th class="px-5 py-3.5">Expense</th><th class="px-5 py-3.5">Type</th><th class="px-5 py-3.5">Date</th><th class="px-5 py-3.5 text-right">Total</th><th class="px-5 py-3.5 text-right">Paid expense</th><th class="px-5 py-3.5 text-right">Remaining</th><th class="px-5 py-3.5">Payment</th><th class="finance-expense-actions-cell px-5 py-3.5 text-right">Actions</th></tr></thead>
+            <tbody id="finance-expenses-table-body" class="divide-y divide-slate-100 font-medium text-slate-700"><tr><td colspan="8" class="px-5 py-12 text-center text-sm font-bold text-slate-400">Loading expenses...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -6253,14 +6262,14 @@
           <i data-lucide="arrow-left" class="h-4 w-4"></i>
         </button>
         <div role="tablist" aria-label="Patient record sections" class="patient-workspace-tabs flex min-w-0 flex-1 gap-1 overflow-x-auto p-1">
-          <button type="button" role="tab" aria-controls="view-patient-profile" data-patient-workspace-tab="profile" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('profile')"><span class="patient-workspace-identity"><span class="patient-workspace-name" dir="auto">Patient</span><span id="patient-workspace-meta" class="patient-workspace-meta">—</span></span></button>
-          <button type="button" role="tab" aria-controls="view-chart" data-patient-workspace-tab="chart" data-workspace-requires="chart" onclick="openPatientWorkspaceTab('chart')"><img src="icons/dental-chart-icon.webp" alt="" aria-hidden="true" class="dental-chart-button-icon h-5 w-5 shrink-0 object-contain" /><span>Dental chart</span></button>
-          <button type="button" role="tab" aria-controls="view-patient-media" data-patient-workspace-tab="media" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('media')"><i data-lucide="images" class="h-4 w-4"></i><span>X-Rays & Media</span></button>
-          <button type="button" role="tab" aria-controls="view-patient-appointments" data-patient-workspace-tab="appointments" data-workspace-requires="appointments" onclick="openPatientWorkspaceTab('appointments')"><i data-lucide="calendar-days" class="h-4 w-4"></i><span>Appointments</span></button>
-          <button type="button" role="tab" aria-controls="view-prescriptions" data-patient-workspace-tab="prescriptions" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('prescriptions')"><i data-lucide="notebook-tabs" class="h-4 w-4"></i><span>Prescriptions</span></button>
-          <button type="button" role="tab" aria-controls="view-invoices" data-patient-workspace-tab="invoices" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('invoices')"><i data-lucide="receipt-text" class="h-4 w-4"></i><span>Invoices</span></button>
-          <button type="button" role="tab" aria-controls="view-payments" data-patient-workspace-tab="payments" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('payments')"><i data-lucide="wallet-cards" class="h-4 w-4"></i><span>Payments</span></button>
-          <button type="button" role="tab" hidden aria-controls="view-loyalty" data-patient-workspace-tab="loyalty" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('loyalty')"><i data-lucide="badge-check" class="h-4 w-4"></i><span>Loyalty</span></button>
+          <button type="button" role="tab" aria-controls="view-patient-profile" data-patient-workspace-tab="profile" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('profile')" aria-label="Patient Info" title="Patient Info"><i data-lucide="contact-round" aria-hidden="true" class="patient-workspace-profile-icon h-5 w-5"></i><span class="patient-workspace-identity"><span class="patient-workspace-name" dir="auto">Patient</span><span id="patient-workspace-meta" class="patient-workspace-meta">—</span></span></button>
+          <button type="button" role="tab" aria-controls="view-chart" data-patient-workspace-tab="chart" data-workspace-requires="chart" onclick="openPatientWorkspaceTab('chart')" aria-label="Dental chart" title="Dental chart"><img src="icons/dental-chart-icon.webp" alt="" aria-hidden="true" class="dental-chart-button-icon h-5 w-5 shrink-0 object-contain" /><span>Dental chart</span></button>
+          <button type="button" role="tab" aria-controls="view-patient-media" data-patient-workspace-tab="media" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('media')" aria-label="X-Rays & Media" title="X-Rays & Media"><i data-lucide="images" class="h-4 w-4"></i><span>X-Rays & Media</span></button>
+          <button type="button" role="tab" aria-controls="view-patient-appointments" data-patient-workspace-tab="appointments" data-workspace-requires="appointments" onclick="openPatientWorkspaceTab('appointments')" aria-label="Appointments" title="Appointments"><i data-lucide="calendar-days" class="h-4 w-4"></i><span>Appointments</span></button>
+          <button type="button" role="tab" aria-controls="view-prescriptions" data-patient-workspace-tab="prescriptions" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('prescriptions')" aria-label="Prescriptions" title="Prescriptions"><i data-lucide="notebook-tabs" class="h-4 w-4"></i><span>Prescriptions</span></button>
+          <button type="button" role="tab" aria-controls="view-invoices" data-patient-workspace-tab="invoices" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('invoices')" aria-label="Invoices" title="Invoices"><i data-lucide="receipt-text" class="h-4 w-4"></i><span>Invoices</span></button>
+          <button type="button" role="tab" aria-controls="view-payments" data-patient-workspace-tab="payments" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('payments')" aria-label="Payments" title="Payments"><i data-lucide="wallet-cards" class="h-4 w-4"></i><span>Payments</span></button>
+          <button type="button" role="tab" hidden aria-controls="view-loyalty" data-patient-workspace-tab="loyalty" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('loyalty')" aria-label="Loyalty" title="Loyalty"><i data-lucide="badge-check" class="h-4 w-4"></i><span>Loyalty</span></button>
         </div>
       </div>
     </header>
@@ -9243,8 +9252,8 @@
           <label class="block"><span class="mb-1.5 block text-xs font-black text-slate-700">Quantity</span><input id="expense-quantity" type="number" inputmode="decimal" min="0.01" step="0.01" value="1" required class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" /></label>
         </div>
         <label class="block"><span class="mb-1.5 block text-xs font-black text-slate-700">Description</span><textarea id="expense-description" maxlength="1000" rows="4" placeholder="Add supplier, lab, employee, invoice reference, or other details" class="w-full resize-y rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm leading-6 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"></textarea></label>
-        <div class="grid gap-3 sm:grid-cols-2"><label class="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"><span><span class="block text-xs font-black text-slate-700">Confirmed</span><span class="mt-0.5 block text-[10px] text-slate-400">The expense has been approved</span></span><input id="expense-confirmed" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600" /></label><label class="block rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3"><span class="block text-xs font-black text-emerald-800">Paid amount</span><div class="relative mt-1.5"><span class="pointer-events-none absolute left-3 top-2 text-xs font-black text-emerald-500">EGP</span><input id="expense-paid-amount" type="number" inputmode="decimal" min="0" step="0.01" value="0" required class="w-full rounded-lg border border-emerald-200 bg-white py-2 pl-12 pr-3 text-sm font-black text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" /></div><span class="mt-1 block text-[10px] font-semibold text-emerald-700/70">Only the amount already paid is counted as an expense.</span></label></div>
-        <p id="expense-salary-hint" class="hidden rounded-xl bg-slate-100 px-3 py-3 text-xs leading-relaxed text-slate-600">Salary amounts are managed in HR. You can edit the name, description, and confirmation here.</p>
+        <label class="block rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3"><span class="block text-xs font-black text-emerald-800">Paid amount</span><div class="relative mt-1.5"><span class="pointer-events-none absolute top-2 text-xs font-black text-emerald-500" style="inset-inline-start: 0.75rem;">EGP</span><input id="expense-paid-amount" type="number" inputmode="decimal" min="0" step="0.01" value="0" required class="w-full rounded-lg border border-emerald-200 bg-white py-2 text-sm font-black text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" style="min-height: 44px; padding-inline: 3rem 0.75rem;" /></div><span class="mt-1 block text-[10px] font-semibold text-emerald-700/70">Only the amount already paid is counted as an expense.</span></label>
+        <p id="expense-salary-hint" class="hidden rounded-xl bg-slate-100 px-3 py-3 text-xs leading-relaxed text-slate-600">Salary amounts are managed in HR. You can edit the name and description here.</p>
         <p id="expense-form-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="alert"></p>
         <label class="sync-field"><span>Payment method for additional paid amount</span><select id="expense-sync-payment-method"><option value="">Choose a payment method...</option></select><small>Choose a method when adding a paid amount. Existing installments keep their original methods.</small></label>
         <div class="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onclick="closeExpenseModal()" class="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 transition hover:bg-slate-50">Cancel</button><button id="expense-save-button" type="submit" class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60"><i data-lucide="save" class="h-4 w-4"></i> Create expense</button></div>
@@ -10179,8 +10188,7 @@
       'Paid expenses': 'المصروفات المدفوعة',
       'Paid amounts only': 'المبالغ المدفوعة فقط',
       'Net profit': 'صافي الربح',
-      'Payments minus expenses': 'المدفوعات ناقص المصروفات',
-      'Salary amounts are managed in HR. You can edit the name, description, and confirmation here.': 'تُدار مبالغ الرواتب في الموارد البشرية. يمكنك تعديل الاسم والوصف والتأكيد هنا.',
+      'Salary amounts are managed in HR. You can edit the name and description here.': 'تُدار مبالغ الرواتب في الموارد البشرية. يمكنك تعديل الاسم والوصف هنا.',
       'Net loss': 'صافي الخسارة',
       'Income less paid expenses': 'الدخل ناقص المصروفات المدفوعة',
       'Net margin': 'هامش الربح الصافي',
@@ -22412,6 +22420,19 @@
       return `<span class="inline-flex rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-800">${label}${percent}: ${escapeHtml(formatInvoiceMoney(invoice.manualDiscount))}</span>`;
     }
 
+    function financeInvoiceDiscountDetails(invoice) {
+      const isArabic = currentUiLanguage === 'ar';
+      const notes = [];
+      if (invoice.manualDiscount > 0) {
+        const percent = invoice.manualDiscountType === 'percent' ? ` ${invoice.manualDiscountValue}%` : '';
+        notes.push(`${isArabic ? 'خصم' : 'Discount'}${percent} · ${formatInvoiceMoney(invoice.manualDiscount)}`);
+      }
+      if (invoice.loyaltyDiscount > 0) {
+        notes.push(`${isArabic ? 'خصم الولاء' : 'Loyalty'} · ${formatInvoiceMoney(invoice.loyaltyDiscount)}`);
+      }
+      return notes.map(note => `<span class="finance-invoice-discount">${escapeHtml(note)}</span>`).join('');
+    }
+
     function invalidateLoyaltyInvoiceViews() {
       financeInvoicesLoaded = false;
       financeDeptsLoaded = false;
@@ -22784,7 +22805,7 @@
           <td data-label="Invoice" class="px-5 py-4"><span class="rounded-lg bg-slate-100 px-2.5 py-1 font-mono text-[11px] font-black text-slate-700">${escapeHtml(invoiceNumber(invoice.id))}</span></td>
           <td data-label="Patient" class="px-5 py-4"><span class="block font-black text-slate-800">${escapeHtml(patientName)}</span><span class="mt-1 block text-[10px] font-bold text-slate-400">${escapeHtml(patientMeta)}</span></td>
           <td data-label="Date" class="px-5 py-4 font-bold text-slate-600">${escapeHtml(formatInvoiceDate(invoice.invoiceDate))}</td>
-          <td data-label="Total" class="px-5 py-4 text-right font-black text-slate-800">${escapeHtml(formatInvoiceMoney(total))}${invoiceLoyaltyBadge(invoice)}${invoiceManualDiscountBadge(invoice)}</td>
+          <td data-label="Total" class="px-5 py-4 text-right font-black text-slate-800"><span class="finance-invoice-total">${escapeHtml(formatInvoiceMoney(total))}</span>${financeInvoiceDiscountDetails(invoice)}</td>
           <td data-label="Paid" class="px-5 py-4 text-right font-black text-emerald-700">${escapeHtml(formatInvoiceMoney(invoice.paidAmount))}</td>
           <td data-label="Released" class="px-5 py-4 text-right font-black text-rose-700">${escapeHtml(formatInvoiceMoney(invoice.releasedAmount))}</td>
           <td data-label="Remaining" class="px-5 py-4 text-right font-black ${remaining > 0 ? 'text-amber-700' : 'text-emerald-700'}">${escapeHtml(formatInvoiceMoney(remaining))}</td>
@@ -23396,7 +23417,6 @@
         quantity: Math.max(0, Number(record.quantity) || 0),
         expenseDate: String(record.expense_date || '').slice(0, 10),
         description: String(record.description || '').trim(),
-        confirmed: record.confirmed === true,
         paid: total > 0 && paidAmount >= total - 0.005,
         createdAt: record.created_at,
         updatedAt: record.updated_at,
@@ -23412,7 +23432,7 @@
       const records = [];
       let offset = 0;
       while (true) {
-        const { data, error } = await db.from('expenses').select('id, expense_type_id, name, total, paid_amount, quantity, expense_date, description, confirmed, paid, created_at, updated_at, expense_types(id, name, color, active, sort_order)').order('expense_date', { ascending: false }).order('created_at', { ascending: false }).range(offset, offset + batchSize - 1);
+        const { data, error } = await db.from('expenses').select('id, expense_type_id, name, total, paid_amount, quantity, expense_date, description, paid, created_at, updated_at, expense_types(id, name, color, active, sort_order)').order('expense_date', { ascending: false }).order('created_at', { ascending: false }).range(offset, offset + batchSize - 1);
         if (error) throw error;
         const batch = data || [];
         records.push(...batch);
@@ -23494,7 +23514,6 @@
           <td data-label="${isArabic ? 'المصروف المدفوع' : 'Paid expense'}" class="px-5 py-4 text-right font-black text-emerald-700">${escapeHtml(formatInvoiceMoney(expense.paidAmount))}</td>
           <td data-label="${isArabic ? 'المتبقي' : 'Remaining'}" class="px-5 py-4 text-right font-black ${remaining > 0.005 ? 'text-amber-700' : 'text-emerald-700'}">${escapeHtml(formatInvoiceMoney(remaining))}</td>
           <td data-label="${isArabic ? 'الدفع' : 'Payment'}" class="finance-expense-payment-cell px-5 py-4"><span class="inline-flex items-center gap-2">${expensePaymentIndicatorMarkup(expense)}${payButton}</span></td>
-          <td data-label="${isArabic ? 'التأكيد' : 'Confirmed'}" class="finance-expense-confirmed-cell px-5 py-4"><span class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-black ${expense.confirmed ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'}"><i data-lucide="${expense.confirmed ? 'badge-check' : 'circle-dashed'}" class="h-3.5 w-3.5"></i>${expense.confirmed ? 'Confirmed' : 'Not confirmed'}</span></td>
           <td data-label="${isArabic ? 'الإجراءات' : 'Actions'}" class="finance-expense-actions-cell px-5 py-4 text-right">${actionButtons}</td>
         </tr>
       `;
@@ -23561,7 +23580,7 @@
       summary.textContent = currentUiLanguage === 'ar'
         ? `عرض ${filtered.length} من ${financeExpenses.length} مصروف · المصروف المدفوع ${formatInvoiceMoney(paidTotal)} · المتبقي ${formatInvoiceMoney(remainingTotal)}`
         : `Showing ${filtered.length} of ${financeExpenses.length} expenses · Paid expenses ${formatInvoiceMoney(paidTotal)} · Outstanding ${formatInvoiceMoney(remainingTotal)}`;
-      body.innerHTML = filtered.length ? filtered.map(financeExpenseRowMarkup).join('') : '<tr><td colspan="9" class="px-5 py-14 text-center"><span class="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"><i data-lucide="search-x" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-600">No expenses match these filters.</p></td></tr>';
+      body.innerHTML = filtered.length ? filtered.map(financeExpenseRowMarkup).join('') : '<tr><td colspan="8" class="px-5 py-14 text-center"><span class="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"><i data-lucide="search-x" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-600">No expenses match these filters.</p></td></tr>';
       translateUiTree(document.getElementById('view-finances'), currentUiLanguage);
       lucide.createIcons();
     }
@@ -23574,7 +23593,7 @@
       if (options.refresh) financeExpensesLoaded = false;
       await ensureExpenseTypesLoaded();
       if (!financeExpensesLoaded) {
-        body.innerHTML = '<tr><td colspan="9" class="px-5 py-12 text-center text-sm font-bold text-slate-400"><span class="inline-flex items-center gap-2"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Loading expenses...</span></td></tr>';
+        body.innerHTML = '<tr><td colspan="8" class="px-5 py-12 text-center text-sm font-bold text-slate-400"><span class="inline-flex items-center gap-2"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Loading expenses...</span></td></tr>';
         summary.textContent = 'Loading expenses...';
         lucide.createIcons();
         const loadPromise = financeExpenseLoadPromise || fetchFinanceExpenseRecords();
@@ -23584,7 +23603,7 @@
           financeExpensesLoaded = true;
         } catch (error) {
           financeExpensesLoaded = false;
-          body.innerHTML = '<tr><td colspan="9" class="px-5 py-12 text-center text-sm font-bold text-red-600">Could not load expenses: ' + escapeHtml(error.message || 'Unknown error') + '</td></tr>';
+          body.innerHTML = '<tr><td colspan="8" class="px-5 py-12 text-center text-sm font-bold text-red-600">Could not load expenses: ' + escapeHtml(error.message || 'Unknown error') + '</td></tr>';
           summary.textContent = 'Could not load expenses.';
           return;
         } finally {
@@ -23908,7 +23927,7 @@
       if (editingExpenseId) {
         let expense = financeExpenses.find(item => String(item.id) === editingExpenseId);
         if (!expense) {
-          const { data, error } = await db.from('expenses').select('id, expense_type_id, name, total, paid_amount, quantity, expense_date, description, confirmed, paid, created_at, updated_at, expense_types(id, name, color, active, sort_order)').eq('id', editingExpenseId).single();
+          const { data, error } = await db.from('expenses').select('id, expense_type_id, name, total, paid_amount, quantity, expense_date, description, paid, created_at, updated_at, expense_types(id, name, color, active, sort_order)').eq('id', editingExpenseId).single();
           if (error) {
             editingExpenseId = null;
             alert(error.message || 'Could not load the expense.');
@@ -23922,7 +23941,6 @@
         document.getElementById('expense-total').value = String(expense.total);
         document.getElementById('expense-quantity').value = String(expense.quantity);
         document.getElementById('expense-description').value = expense.description || '';
-        document.getElementById('expense-confirmed').checked = Boolean(expense.confirmed);
         document.getElementById('expense-paid-amount').value = String(expense.paidAmount);
         form.dataset.previousPaidAmount = String(expense.paidAmount);
         if (expense.linkedSalary) {
@@ -23979,8 +23997,7 @@
         paid_amount: paidAmount,
         quantity: Number(document.getElementById('expense-quantity').value),
         expense_date: document.getElementById('expense-date').value,
-        description: document.getElementById('expense-description').value.trim(),
-        confirmed: document.getElementById('expense-confirmed').checked
+        description: document.getElementById('expense-description').value.trim()
       };
       if (paidAmount > previousPaidAmount) payload.sync_payment_method_id = expenseMethodId;
       if (document.getElementById('expense-form').dataset.linkedSalary === 'true') {
