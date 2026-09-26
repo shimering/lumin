@@ -104,8 +104,14 @@ begin
   if has_function_privilege('authenticated','public.configure_baytna_sync(text,jsonb,jsonb)','execute') or
      has_function_privilege('authenticated','private.dispatch_baytna_sync()','execute') or
      has_function_privilege('authenticated','private.queue_finance_sync_at(text,text,uuid,numeric,date,text,text,boolean,timestamptz)','execute') then raise exception 'Privileged integration functions are exposed'; end if;
-  insert into public.finance_sync_events(source_key,operation,status) values('catalog','catalog','pending');
+  -- Refresh categories automatically while financial delivery is paused, without duplicate fetches.
+  update public.finance_sync_events set status='synced' where operation='catalog' and status in ('pending','sending','failed');
+  update public.finance_sync_settings set catalogue_refreshed_at=now()-interval '2 minutes' where id;
+  select count(*) into count_before from public.finance_sync_events where operation='catalog';
   perform private.dispatch_baytna_sync();
+  if (select count(*) from public.finance_sync_events where operation='catalog')<>count_before+1 then raise exception 'A stale category catalogue did not refresh automatically'; end if;
+  perform private.dispatch_baytna_sync();
+  if (select count(*) from public.finance_sync_events where operation='catalog')<>count_before+1 then raise exception 'Concurrent refreshes created duplicate catalogue requests'; end if;
   if exists(select 1 from net.http_request_queue where headers ? 'x-lumin-sync-token') then raise exception 'Reusable credential entered the HTTP queue'; end if;
   if not exists(select 1 from net.http_request_queue where headers ? 'x-lumin-sync-signature') then raise exception 'Outgoing event is not signed'; end if;
   if has_table_privilege('anon','vault.decrypted_secrets','select') or has_table_privilege('authenticated','vault.decrypted_secrets','select') then raise exception 'Signing key is exposed'; end if;

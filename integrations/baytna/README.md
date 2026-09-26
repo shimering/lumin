@@ -8,6 +8,7 @@ The live Lumin and Baytna database migrations and Baytna's `lumin-finance-sync` 
 
 - Cash → the personal **Cash wallet** account; InstaPay → **Main bank**; Card and unknown methods → **Do not sync**.
 - Admins can change these mappings, pause/resume delivery, separately include new income/expenses, map categories, refresh destination accounts/categories, retry failures, and assign missing expense methods.
+- Baytna's active categories, subcategories, names, and hierarchy refresh automatically about once a minute, including while delivery is paused. A manual refresh is also available. Category selectors have search, parent groups, subcategory labels, and full selected paths; polling preserves an open selector and unsaved mappings.
 - Existing Baytna categories are reused. Income initially uses **Clinic salary**; expenses default to **Clinic**, with matching categories for expense types such as Salary and Dental Lab. These defaults are editable.
 - Expense installments retain distinct payment methods and Cairo payment dates. Reducing an expense's paid total corrects its newest tracked installments first. Reductions affecting only pre-integration payments are excluded.
 - Imported receipts and installments combine their selected Cairo payment date with their original entry time, so newly recorded payments appear correctly in recent activity.

@@ -4,10 +4,12 @@ let financeSyncPoll = null;
 let financeSyncLoading = false;
 let financeSyncDirty = false;
 let financeSyncUserId = null;
+let financeSyncCategoryPicker = null;
 const syncText = (en, ar) => currentUiLanguage === 'ar' ? ar : en;
 const syncEscape = value => escapeHtml(String(value ?? ''));
 
 function stopFinanceSyncPolling() {
+  closeFinanceSyncCategoryPicker(false);
   if (financeSyncPoll) clearInterval(financeSyncPoll);
   financeSyncPoll = null;
 }
@@ -49,6 +51,132 @@ function financeSyncOptions(items, selected, placeholder) {
   }).join('');
 }
 
+function financeSyncCategoryChoices(kind, categories = financeSyncSnapshot?.settings.categories || []) {
+  const items = categories.filter(item => item.kind === kind);
+  const byKey = new Map(items.map(item => [item.key, item]));
+  const name = item => currentUiLanguage === 'ar' ? item.name_ar || item.name : item.name;
+  const choices = items.map(item => {
+    const chain = [item];
+    const visited = new Set([item.key]);
+    let parent = byKey.get(item.parent_key);
+    while (parent && !visited.has(parent.key)) {
+      chain.unshift(parent);
+      visited.add(parent.key);
+      parent = byKey.get(parent.parent_key);
+    }
+    const parentName = item.parent_key ? (byKey.has(item.parent_key) ? name(byKey.get(item.parent_key)) : currentUiLanguage === 'ar' ? item.parent_name_ar || item.parent_name : item.parent_name) : '';
+    const names = chain.map(name);
+    if (chain.length === 1 && parentName) names.unshift(parentName);
+    return { ...item, label: name(item), path: names.join(' › '), parentName, depth: Math.max(chain.length - 1, item.parent_key ? 1 : 0), group: names[0], groupKey: chain.length === 1 && item.parent_key ? item.parent_key : chain[0].key };
+  });
+  return choices.sort((a, b) => a.group.localeCompare(b.group, currentUiLanguage) || a.groupKey.localeCompare(b.groupKey) || a.depth - b.depth || a.path.localeCompare(b.path, currentUiLanguage));
+}
+
+function financeSyncCategoryField(id, title, kind, selected, placeholder, attribute) {
+  const choices = financeSyncCategoryChoices(kind);
+  const choice = choices.find(item => item.key === selected);
+  const label = choice?.path || (selected ? syncText('Unavailable category', 'تصنيف غير متاح') : placeholder);
+  const caption = choice?.depth ? syncText(`Subcategory of ${choice.parentName}`, `تصنيف فرعي من ${choice.parentName}`) : choice ? syncText('Main category', 'تصنيف رئيسي') : selected ? syncText('Choose another category', 'اختر تصنيفاً آخر') : syncText('Choose from Baytna', 'اختر من بيتنا');
+  return `<div class="sync-field"><span id="${id}-label">${syncEscape(title)}</span><select hidden id="${id}" ${attribute} tabindex="-1" aria-hidden="true"><option value="">${syncEscape(placeholder)}</option>${selected && !choice ? `<option value="${syncEscape(selected)}" selected>${syncEscape(label)}</option>` : ''}${choices.map(item => `<option value="${syncEscape(item.key)}" ${item.key === selected ? 'selected' : ''}>${syncEscape(item.path)}</option>`).join('')}</select><button id="${id}-trigger" type="button" class="sync-category-trigger" data-category-select="${id}" data-category-kind="${kind}" data-category-placeholder="${syncEscape(placeholder)}" aria-labelledby="${id}-label ${id}-value" aria-haspopup="dialog" aria-expanded="false" onclick="openFinanceSyncCategoryPicker(this)"><span class="sync-category-icon"><i data-lucide="${choice?.depth ? 'corner-down-right' : 'folder'}"></i></span><span class="sync-category-selection"><strong id="${id}-value">${syncEscape(label)}</strong><small>${syncEscape(caption)}</small></span><i data-lucide="chevrons-up-down"></i></button></div>`;
+}
+
+function closeFinanceSyncCategoryPicker(restoreFocus = true) {
+  const state = financeSyncCategoryPicker;
+  if (!state) return;
+  financeSyncCategoryPicker = null;
+  window.removeEventListener('resize', positionFinanceSyncCategoryPicker);
+  window.removeEventListener('scroll', positionFinanceSyncCategoryPicker, true);
+  state.dialog.close();
+  state.dialog.remove();
+  const trigger = document.getElementById(`${state.id}-trigger`);
+  trigger?.setAttribute('aria-expanded', 'false');
+  if (restoreFocus) trigger?.focus();
+}
+
+function positionFinanceSyncCategoryPicker() {
+  if (!financeSyncCategoryPicker) return;
+  const { dialog, id } = financeSyncCategoryPicker;
+  if (window.innerWidth < 640) {
+    dialog.style.removeProperty('left'); dialog.style.removeProperty('top');
+    dialog.style.removeProperty('width'); dialog.style.removeProperty('max-height');
+    return;
+  }
+  const trigger = document.getElementById(`${id}-trigger`);
+  if (!trigger) return closeFinanceSyncCategoryPicker(false);
+  const rect = trigger.getBoundingClientRect();
+  const width = Math.min(Math.max(rect.width, 360), 440, window.innerWidth - 32);
+  const height = Math.min(540, window.innerHeight - 32);
+  dialog.style.width = `${width}px`;
+  dialog.style.maxHeight = `${height}px`;
+  dialog.style.left = `${Math.max(16, Math.min(currentUiLanguage === 'ar' ? rect.right - width : rect.left, window.innerWidth - width - 16))}px`;
+  const desiredHeight = Math.min(dialog.scrollHeight || height, height);
+  dialog.style.top = `${Math.max(16, Math.min(rect.bottom + 8, window.innerHeight - desiredHeight - 16))}px`;
+}
+
+function openFinanceSyncCategoryPicker(trigger) {
+  closeFinanceSyncCategoryPicker(false);
+  const id = trigger.dataset.categorySelect;
+  const dialog = document.createElement('dialog');
+  dialog.id = 'finance-sync-category-picker';
+  dialog.className = 'sync-category-dialog';
+  dialog.dir = currentUiLanguage === 'ar' ? 'rtl' : 'ltr';
+  dialog.lang = currentUiLanguage;
+  dialog.setAttribute('aria-labelledby', 'sync-category-picker-title');
+  dialog.innerHTML = `<header class="sync-category-header"><div><p>${syncText('BAYTNA CATEGORIES', 'تصنيفات بيتنا')}</p><h4 id="sync-category-picker-title">${syncEscape(document.getElementById(`${id}-label`).textContent)}</h4></div><button class="sync-button sync-category-close" type="button" aria-label="${syncText('Close category selector', 'إغلاق اختيار التصنيف')}" onclick="closeFinanceSyncCategoryPicker()"><i data-lucide="x"></i></button></header><label class="sync-category-search"><i data-lucide="search"></i><input id="sync-category-search" type="search" autocomplete="off" placeholder="${syncText('Search categories and subcategories…', 'ابحث عن تصنيف أو تصنيف فرعي…')}" aria-label="${syncText('Search categories and subcategories', 'البحث في التصنيفات والتصنيفات الفرعية')}" oninput="renderFinanceSyncCategoryResults()" /></label><div class="sync-category-results" id="sync-category-results"></div><footer>${syncText('Updates automatically from Baytna.', 'يتم تحديثها تلقائياً من بيتنا.')}</footer>`;
+  document.body.append(dialog);
+  financeSyncCategoryPicker = { id, dialog, kind: trigger.dataset.categoryKind, placeholder: trigger.dataset.categoryPlaceholder, signature: '' };
+  dialog.addEventListener('cancel', event => { event.preventDefault(); closeFinanceSyncCategoryPicker(); });
+  dialog.addEventListener('click', event => {
+    const bounds = dialog.getBoundingClientRect();
+    if (event.target === dialog && (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom)) closeFinanceSyncCategoryPicker();
+  });
+  dialog.addEventListener('keydown', event => {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+    const buttons = [...dialog.querySelectorAll('[data-category-key]')];
+    const index = buttons.indexOf(document.activeElement);
+    if (document.activeElement?.id === 'sync-category-search' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : event.key === 'ArrowDown' ? (index + 1) % buttons.length : (index - 1 + buttons.length) % buttons.length;
+    buttons[next]?.focus();
+  });
+  renderFinanceSyncCategoryResults();
+  dialog.showModal();
+  trigger.setAttribute('aria-expanded', 'true');
+  positionFinanceSyncCategoryPicker();
+  window.addEventListener('resize', positionFinanceSyncCategoryPicker);
+  window.addEventListener('scroll', positionFinanceSyncCategoryPicker, true);
+  document.getElementById('sync-category-search').focus();
+  if (window.lucide) lucide.createIcons();
+}
+
+function renderFinanceSyncCategoryResults() {
+  const state = financeSyncCategoryPicker;
+  if (!state) return;
+  const query = document.getElementById('sync-category-search').value.trim().toLocaleLowerCase(currentUiLanguage);
+  const choices = financeSyncCategoryChoices(state.kind);
+  state.signature = JSON.stringify(choices);
+  const selected = document.getElementById(state.id)?.value || '';
+  const focusedKey = document.activeElement?.dataset.categoryKey;
+  const matches = choices.filter(item => item.path.toLocaleLowerCase(currentUiLanguage).includes(query));
+  const option = (key, label, detail, depth) => `<button type="button" class="sync-category-option ${depth ? 'sync-category-child' : ''}" data-category-key="${syncEscape(key)}" aria-pressed="${selected === key}" onclick="selectFinanceSyncCategory(this.dataset.categoryKey)"><span class="sync-category-icon"><i data-lucide="${depth ? 'corner-down-right' : key ? 'folder' : 'circle-slash'}"></i></span><span class="sync-category-selection"><strong>${syncEscape(label)}</strong><small>${syncEscape(detail)}</small></span>${selected === key ? '<i data-lucide="check" class="sync-category-check"></i>' : ''}</button>`;
+  const groups = [...new Set(matches.map(item => item.groupKey))];
+  document.getElementById('sync-category-results').innerHTML = (!query ? option('', state.placeholder, syncText('No category selected', 'بدون تصنيف محدد'), 0) : '') + groups.map(groupKey => `<section class="sync-category-group"><h5>${syncEscape(matches.find(item => item.groupKey === groupKey).group)}</h5>${matches.filter(item => item.groupKey === groupKey).map(item => option(item.key, item.label, item.depth ? syncText(`Subcategory · ${item.parentName}`, `تصنيف فرعي · ${item.parentName}`) : syncText('Main category', 'تصنيف رئيسي'), item.depth)).join('')}</section>`).join('') + (!matches.length ? `<div class="sync-category-empty"><i data-lucide="search-x"></i><strong>${syncText('No matching categories', 'لا توجد تصنيفات مطابقة')}</strong><span>${syncText('Try a different name.', 'جرّب اسماً آخر.')}</span></div>` : '');
+  if (focusedKey !== undefined) ([...state.dialog.querySelectorAll('[data-category-key]')].find(button => button.dataset.categoryKey === focusedKey) || document.getElementById('sync-category-search')).focus();
+  positionFinanceSyncCategoryPicker();
+  if (window.lucide) lucide.createIcons();
+}
+
+function selectFinanceSyncCategory(key) {
+  const state = financeSyncCategoryPicker;
+  const select = state && document.getElementById(state.id);
+  if (!select) return;
+  select.value = key;
+  financeSyncDirty = true;
+  closeFinanceSyncCategoryPicker(false);
+  renderFinanceSyncSnapshot();
+  document.getElementById(`${state.id}-trigger`)?.focus();
+}
+
 function renderFinanceSyncSnapshot() {
   if (!hasPageAccess('admin') || !financeSyncSnapshot) return;
   const panel = document.getElementById('admin-panel-finance-sync');
@@ -60,7 +188,6 @@ function renderFinanceSyncSnapshot() {
   const settings = { ...data.settings, ...(draft || {}) };
   const counts = data.counts || {};
   const pending = (counts.pending || 0) + (counts.sending || 0);
-  const categoryOptions = kind => settings.categories.filter(category => category.kind === kind);
   const paused = !data.settings.enabled;
   const time = data.last_synced_at ? new Date(data.last_synced_at).toLocaleString(currentUiLanguage === 'ar' ? 'ar-EG' : 'en-GB') : syncText('No entries sent yet', 'لم يتم إرسال قيود بعد');
   panel.innerHTML = `
@@ -78,8 +205,8 @@ function renderFinanceSyncSnapshot() {
       </div>
       <div class="sync-section-heading"><div><h4>${syncText('Payment methods → destination accounts', 'طرق الدفع ← الحسابات المستقبلة')}</h4><p>${syncText('Excluded methods never change Baytna balances. Card can be mapped here later.', 'الطرق المستبعدة لا تؤثر على أرصدة بيتنا. يمكنك ربط البطاقة لاحقاً من هنا.')}</p></div></div>
       <div class="sync-mapping-grid">${data.methods.map(method => `<label class="sync-field"><span>${syncEscape(method.name)}${method.active ? '' : ` <small>${syncText('(inactive)', '(غير نشطة)')}</small>`}</span><select data-sync-method="${syncEscape(method.id)}">${financeSyncOptions(settings.accounts, settings.payment_routes[method.id], syncText('Do not sync', 'عدم المزامنة'))}</select></label>`).join('')}</div>
-      <div class="sync-section-heading"><div><h4>${syncText('Baytna categories', 'تصنيفات بيتنا')}</h4><p>${syncText('Choose how clinic income and expenses appear in analytics.', 'اختر تصنيف دخل العيادة ومصروفاتها في التحليلات.')}</p></div></div>
-      <div class="sync-mapping-grid"><label class="sync-field"><span>${syncText('Patient income', 'دخل المرضى')}</span><select name="income_category">${financeSyncOptions(categoryOptions('income'), settings.income_category, syncText('Uncategorized', 'بدون تصنيف'))}</select></label><label class="sync-field"><span>${syncText('Default expense category', 'تصنيف المصروفات الافتراضي')}</span><select data-sync-category="default">${financeSyncOptions(categoryOptions('expense'), settings.expense_categories.default, syncText('Uncategorized', 'بدون تصنيف'))}</select></label>${data.expense_types.map(type => `<label class="sync-field"><span>${syncEscape(type.name)}</span><select data-sync-category="${syncEscape(type.id)}">${financeSyncOptions(categoryOptions('expense'), settings.expense_categories[type.id], syncText('Use default expense category', 'استخدام التصنيف الافتراضي'))}</select></label>`).join('')}</div>
+      <div class="sync-section-heading"><div><h4>${syncText('Baytna categories', 'تصنيفات بيتنا')}</h4><p>${syncText('Categories and subcategories update automatically, usually within a minute.', 'يتم تحديث التصنيفات والتصنيفات الفرعية تلقائياً، عادة خلال دقيقة.')}</p><p class="sync-catalogue-time">${syncText('Last checked:', 'آخر تحديث:')} ${settings.catalogue_refreshed_at ? syncEscape(new Date(settings.catalogue_refreshed_at).toLocaleString(currentUiLanguage === 'ar' ? 'ar-EG' : 'en-GB')) : syncText('Waiting for Baytna', 'في انتظار بيتنا')}</p></div><button class="sync-button" type="button" onclick="refreshFinanceSyncCatalogue()"><i data-lucide="refresh-cw"></i>${syncText('Refresh categories', 'تحديث التصنيفات')}</button></div>
+      <div class="sync-mapping-grid">${financeSyncCategoryField('sync-income-category', syncText('Patient income', 'دخل المرضى'), 'income', settings.income_category, syncText('Uncategorized', 'بدون تصنيف'), 'name="income_category"')}${financeSyncCategoryField('sync-default-category', syncText('Default expense category', 'تصنيف المصروفات الافتراضي'), 'expense', settings.expense_categories.default, syncText('Uncategorized', 'بدون تصنيف'), 'data-sync-category="default"')}${data.expense_types.map(type => financeSyncCategoryField(`sync-type-${type.id}`, type.name, 'expense', settings.expense_categories[type.id], syncText('Use default expense category', 'استخدام التصنيف الافتراضي'), `data-sync-category="${syncEscape(type.id)}"`)).join('')}</div>
       <p class="sync-hint">${syncText('Mapping changes apply to subsequent activity. Previously posted entries are not moved automatically.', 'تغييرات الربط تنطبق على الحركات التالية. لا يتم نقل القيود السابقة تلقائياً.')}</p>
       <div class="sync-actions"><span id="finance-sync-save-message" role="status">${financeSyncDirty ? syncText('Unsaved changes', 'تغييرات غير محفوظة') : ''}</span><button class="sync-button sync-primary" type="submit" ${!data.connected ? 'disabled' : ''}><i data-lucide="save"></i>${syncText('Save settings', 'حفظ الإعدادات')}</button></div>
     </form>
@@ -88,6 +215,11 @@ function renderFinanceSyncSnapshot() {
     </section>
     <div class="sync-card sync-history"><span class="sync-icon"><i data-lucide="history"></i></span><div><h4>${syncText('Existing history stays separate', 'السجل السابق منفصل')}</h4><p>${syncText('Only activity recorded after this connection was created is tracked. Historical import will be a separate action, so existing balances are not counted twice.', 'يتم تتبع الحركات المسجلة بعد إنشاء الاتصال فقط. استيراد السجل السابق سيكون إجراءً منفصلاً لتجنب احتساب الأرصدة مرتين.')}</p></div></div>`;
   if (window.lucide) lucide.createIcons();
+  if (financeSyncCategoryPicker) {
+    document.getElementById(`${financeSyncCategoryPicker.id}-trigger`)?.setAttribute('aria-expanded', 'true');
+    if (JSON.stringify(financeSyncCategoryChoices(financeSyncCategoryPicker.kind)) !== financeSyncCategoryPicker.signature) renderFinanceSyncCategoryResults();
+    positionFinanceSyncCategoryPicker();
+  }
 }
 
 function financeSyncEventHtml(event, methods) {

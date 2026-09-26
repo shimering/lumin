@@ -6,10 +6,39 @@ do $$
 declare
   config private.lumin_import_config; token text:='integration-test-only-token-never-used-for-production';
   account uuid; other_account uuid; response jsonb; event jsonb; entry uuid; manual_entry uuid;
+  category_root uuid; category_child uuid; legacy_parent uuid; legacy_child uuid; legacy_parent_key text;
 begin
   select * into config from private.lumin_import_config where id;
   if config is null then raise exception 'Configure the receiver before verification'; end if;
   update private.lumin_import_config set token_hash=encode(extensions.digest(token,'sha256'),'hex') where id;
+  perform set_config('request.jwt.claim.sub',config.owner_id::text,true);
+  perform set_config('request.jwt.claims',jsonb_build_object('sub',config.owner_id,'role','authenticated')::text,true);
+  insert into public.finance_categories(space_id,kind,name,name_ar,created_by)
+    values(config.space_id,'income','Sync catalogue root fixture','تصنيف اختبار رئيسي',config.owner_id) returning id into category_root;
+  insert into public.finance_categories(space_id,kind,parent_id,name,name_ar,created_by)
+    values(config.space_id,'income',category_root,'Sync catalogue child fixture','تصنيف اختبار فرعي',config.owner_id) returning id into category_child;
+  event:=jsonb_build_object('source_project',config.source_project,'version',900000020,'operation','catalog','payload','{}'::jsonb);
+  response:=pg_temp.test_lumin_import(event);
+  if not exists(select 1 from jsonb_array_elements(response->'catalog'->'categories') c where c->>'key'=category_child::text and c->>'parent_key'=category_root::text and c->>'name_ar'='تصنيف اختبار فرعي') then
+    raise exception 'New subcategory hierarchy or Arabic label is absent from the catalogue';
+  end if;
+  select id,legacy_key into legacy_parent,legacy_parent_key from public.finance_categories where space_id=config.space_id and kind='income' and legacy_key is not null and archived_at is null and parent_id is null limit 1;
+  if legacy_parent is not null then
+    insert into public.finance_categories(space_id,kind,parent_id,name,name_ar,created_by)
+      values(config.space_id,'income',legacy_parent_key,'Sync legacy-parent child fixture','اختبار التصنيف الأساسي',config.owner_id) returning id into legacy_child;
+    response:=pg_temp.test_lumin_import(event);
+    if not exists(select 1 from jsonb_array_elements(response->'catalog'->'categories') c where c->>'key'=legacy_child::text and c->>'parent_key'=legacy_parent_key) then
+      raise exception 'A subcategory failed to resolve its legacy parent key';
+    end if;
+  end if;
+  update public.finance_categories set name='Renamed catalogue child fixture' where id=category_child;
+  response:=pg_temp.test_lumin_import(event);
+  if not exists(select 1 from jsonb_array_elements(response->'catalog'->'categories') c where c->>'key'=category_child::text and c->>'name'='Renamed catalogue child fixture') then raise exception 'Category rename was not reflected'; end if;
+  insert into public.finance_categories(space_id,kind,parent_id,name,name_ar,created_by,archived_at)
+    values(config.space_id,'income',category_root,'Archived catalogue fixture','تصنيف مؤرشف للاختبار',config.owner_id,now()) returning id into category_child;
+  response:=pg_temp.test_lumin_import(event);
+  if exists(select 1 from jsonb_array_elements(response->'catalog'->'categories') c where c->>'key'=category_child::text) then raise exception 'Archived category remained available'; end if;
+  if has_function_privilege('authenticated','private.lumin_finance_catalog(uuid)','execute') then raise exception 'Private catalogue is exposed'; end if;
   select id into account from public.accounts where space_id=config.space_id and name='Cash wallet';
   select id into other_account from public.accounts where space_id<>config.space_id limit 1;
   event:=jsonb_build_object('source_project',config.source_project,'version',900000001,'source_key','income:900000001','operation','upsert',
