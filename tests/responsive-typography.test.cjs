@@ -28,7 +28,9 @@ test('iPad scale and touch-safe form text are defined at the app breakpoints', (
 });
 
 test('the updated theme is cache-busted in the page and service worker', () => {
-  assert.match(html, /lumin-theme\.css\?v=16/);
-  assert.match(serviceWorker, /lumin-dental-shell-v114/);
-  assert.match(serviceWorker, /lumin-theme\.css\?v=16/);
+  const themeVersion = html.match(/href="lumin-theme\.css\?v=(\d+)"/)?.[1];
+  const shellVersion = serviceWorker.match(/lumin-dental-shell-v(\d+)/)?.[1];
+  assert.ok(Number(themeVersion) >= 16, 'the page must use the updated typography theme');
+  assert.ok(Number(shellVersion) >= 114, 'the shell must invalidate older typography assets');
+  assert.ok(serviceWorker.includes(`"/lumin-theme.css?v=${themeVersion}"`), 'the cached theme must match the page');
 });

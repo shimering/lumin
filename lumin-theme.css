@@ -228,8 +228,7 @@
       border-color: #ffffff;
       box-shadow: var(--lumin-raised);
     }
-    body.lumin-raised #patient-workspace-header,
-    body.lumin-raised #patient-workspace-header [role="tablist"] {
+    body.lumin-raised #patient-workspace-header {
       background: var(--lumin-face);
       border-color: hsl(var(--lumin-hue) calc(54.4% * var(--lumin-chroma)) 88.8%);
       box-shadow: var(--lumin-small-raised);

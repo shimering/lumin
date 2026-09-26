@@ -3621,7 +3621,6 @@
         padding: 0 !important;
       }
 
-      #patient-workspace-header .patient-workspace-name { font-size: 1.05rem; line-height: 1.35rem; overflow-wrap: anywhere; }
       #view-chart .arch-scroll {
         max-width: 100%;
         margin-inline: 0;
@@ -4158,6 +4157,29 @@
     }
     @media (max-width: 639px) {
       #view-dashboard .dashboard-patient-name { font-size: calc(0.9rem + 2pt - var(--dashboard-card-font-reduction, 0pt)); }
+    }
+    /* Patient identity and section navigation share one compact row. */
+    .patient-workspace-tabs { overscroll-behavior-inline: contain; scroll-padding-inline: 0.25rem; }
+    .patient-workspace-tab {
+      height: 3.5rem;
+      min-width: 5.5rem;
+      flex: 1 0 auto;
+      flex-direction: column;
+      gap: 0.25rem;
+      padding: 0.375rem 0.75rem;
+      white-space: nowrap;
+    }
+    .patient-workspace-tab[data-patient-workspace-tab="profile"] {
+      width: clamp(9rem, 16vw, 14rem);
+      min-width: 0;
+      flex: 0 0 auto;
+    }
+    .patient-workspace-identity { display: block; width: 100%; min-width: 0; text-align: start; }
+    .patient-workspace-name { display: block; overflow: hidden; font-size: 0.875rem; font-weight: 700; line-height: 1.25rem; text-overflow: ellipsis; }
+    .patient-workspace-meta { display: block; margin-top: 0.125rem; font-size: 0.6875rem; font-weight: 500; line-height: 1rem; opacity: 0.8; }
+    html[dir="rtl"] [data-patient-workspace-back] svg { transform: rotate(180deg); }
+    @media (max-width: 639px) {
+      .patient-workspace-tab[data-patient-workspace-tab="profile"] { width: min(12rem, 50vw); }
     }
     /* One compact title row for every page, independent of appearance preference. */
     #app-shell .app-page-bar {
@@ -5170,7 +5192,7 @@
       .wa-settings-primary-button { flex: 1 1 0; }
     }
   </style>
-  <link rel="stylesheet" href="lumin-theme.css?v=17" />
+  <link rel="stylesheet" href="lumin-theme.css?v=18" />
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 font-sans antialiased selection:bg-blue-100">
 
@@ -6156,29 +6178,13 @@
     </section>
 
     <!-- ================= SHARED PATIENT WORKSPACE HEADER ================= -->
-    <header id="patient-workspace-header" class="patient-workspace-header relative mb-4 hidden overflow-hidden rounded-2xl border border-blue-900 bg-gradient-to-br from-slate-950 via-blue-950 to-cyan-950 text-white shadow-xl shadow-blue-950/10">
-      <div class="pointer-events-none absolute -right-14 -top-20 h-56 w-56 rounded-full bg-cyan-400/15 blur-3xl"></div>
-      <div class="pointer-events-none absolute -bottom-24 left-1/3 h-48 w-48 rounded-full bg-blue-500/10 blur-3xl"></div>
-      <div class="relative flex items-center justify-between gap-3 px-3 py-2.5 sm:px-4 sm:py-3">
-        <div class="flex min-w-0 flex-1 items-center gap-2.5">
-          <button type="button" data-patient-workspace-back onclick="returnFromPatientWorkspace()" aria-label="Back" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white transition hover:border-white/25 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
-            <i data-lucide="arrow-left" class="h-4 w-4"></i>
-          </button>
-          <h2 class="patient-workspace-name min-w-0 truncate text-lg font-black tracking-tight text-white sm:text-xl">Patient</h2>
-        </div>
-        <div class="flex shrink-0 items-center justify-end gap-2">
-          <button id="patient-workspace-voice-btn" type="button" onclick="handlePatientWorkspaceVoiceClick()" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-sm transition hover:from-blue-700 hover:to-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 active:scale-95" title="Voice Scribe: Dictate procedures to this patient's chart" aria-label="Start voice dictation for this patient">
-            <i data-lucide="mic" class="h-5 w-5"></i>
-          </button>
-          <button type="button" data-patient-workspace-action="payments" onclick="renderPatientPayments()" class="hidden h-9 items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-3 text-xs font-black text-white transition hover:bg-white/20"><i data-lucide="refresh-cw" class="h-3.5 w-3.5"></i> Refresh</button>
-          <button id="profile-edit-patient-button" type="button" onclick="openEditPatientModal(activeWorkspacePatientId)" class="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-white px-3 text-xs font-black text-blue-900 shadow-sm transition hover:bg-cyan-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
-            <i data-lucide="user-pen" class="h-3.5 w-3.5"></i> Edit
-          </button>
-        </div>
-      </div>
-      <div class="relative px-2 pb-2 sm:px-3 sm:pb-3">
-        <div role="tablist" aria-label="Patient record sections" class="flex w-full gap-1 overflow-x-auto rounded-xl border border-white/10 bg-white/10 p-1">
-          <button type="button" role="tab" aria-controls="view-patient-profile" data-patient-workspace-tab="profile" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('profile')"><i data-lucide="user-round" class="h-4 w-4"></i><span>Profile</span></button>
+    <header id="patient-workspace-header" class="patient-workspace-header mb-4 hidden overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+      <div class="flex min-w-0 items-center gap-2">
+        <button type="button" data-patient-workspace-back onclick="returnFromPatientWorkspace()" aria-label="Back" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 transition-all duration-150 ease-out hover:bg-blue-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50">
+          <i data-lucide="arrow-left" class="h-4 w-4"></i>
+        </button>
+        <div role="tablist" aria-label="Patient record sections" class="patient-workspace-tabs flex min-w-0 flex-1 gap-1 overflow-x-auto p-1">
+          <button type="button" role="tab" aria-controls="view-patient-profile" data-patient-workspace-tab="profile" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('profile')"><span class="patient-workspace-identity"><span class="patient-workspace-name" dir="auto">Patient</span><span id="patient-workspace-meta" class="patient-workspace-meta">—</span></span></button>
           <button type="button" role="tab" aria-controls="view-chart" data-patient-workspace-tab="chart" data-workspace-requires="chart" onclick="openPatientWorkspaceTab('chart')"><img src="icons/dental-chart-icon.webp" alt="" aria-hidden="true" class="dental-chart-button-icon h-5 w-5 shrink-0 object-contain" /><span>Dental chart</span></button>
           <button type="button" role="tab" aria-controls="view-patient-media" data-patient-workspace-tab="media" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('media')"><i data-lucide="images" class="h-4 w-4"></i><span>X-Rays & Media</span></button>
           <button type="button" role="tab" aria-controls="view-patient-appointments" data-patient-workspace-tab="appointments" data-workspace-requires="appointments" onclick="openPatientWorkspaceTab('appointments')"><i data-lucide="calendar-days" class="h-4 w-4"></i><span>Appointments</span></button>
@@ -6302,7 +6308,7 @@
 
     <!-- ================= PATIENT WORKSPACE: PROFILE ================= -->
     <section id="view-patient-profile" class="hidden space-y-4">
-      <div class="app-page-bar"><div class="app-page-heading"><span class="app-page-icon" aria-hidden="true"><i data-lucide="contact-round"></i></span><h2 class="app-page-title">Patient Info</h2></div></div>
+      <div class="app-page-bar"><div class="app-page-heading"><span class="app-page-icon" aria-hidden="true"><i data-lucide="contact-round"></i></span><h2 class="app-page-title">Patient Info</h2></div><button id="profile-edit-patient-button" type="button" onclick="openEditPatientModal(activeWorkspacePatientId)" class="inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-blue-50 px-3 text-xs font-semibold text-blue-700 transition-all duration-150 ease-out hover:bg-blue-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50"><i data-lucide="user-pen" class="h-4 w-4"></i> Edit</button></div>
 
       <div class="grid gap-4 lg:grid-cols-3">
         <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs lg:col-span-2">
@@ -6346,7 +6352,7 @@
 
     <!-- ================= PATIENT PAYMENT HISTORY ================= -->
     <section id="view-payments" class="hidden space-y-6">
-      <div class="app-page-bar"><div class="app-page-heading"><span class="app-page-icon" aria-hidden="true"><i data-lucide="wallet-cards"></i></span><h2 class="app-page-title">Payments</h2></div></div>
+      <div class="app-page-bar"><div class="app-page-heading"><span class="app-page-icon" aria-hidden="true"><i data-lucide="wallet-cards"></i></span><h2 class="app-page-title">Payments</h2></div><button type="button" onclick="renderPatientPayments()" class="inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-blue-50 px-3 text-xs font-semibold text-blue-700 transition-all duration-150 ease-out hover:bg-blue-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50"><i data-lucide="refresh-cw" class="h-4 w-4"></i> Refresh</button></div>
       <div class="grid gap-3 sm:grid-cols-3">
         <div class="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 shadow-xs"><span class="text-[10px] font-black uppercase tracking-wider text-emerald-600">Total paid</span><p id="patient-payment-total" class="mt-2 text-xl font-black text-emerald-700">EGP 0</p></div>
         <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs"><span class="text-[10px] font-black uppercase tracking-wider text-slate-400">Payments</span><p id="patient-payment-count" class="mt-2 text-xl font-black text-slate-900">0</p></div>
@@ -10631,7 +10637,7 @@
 
     function isUiTranslationExcluded(node) {
       const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
-      return Boolean(element?.closest('#view-chart, #view-admin, #view-prices'));
+      return Boolean(element?.closest('#view-chart, #view-admin, #view-prices, .patient-workspace-name'));
     }
 
     function arabicUiPhrase(source) {
@@ -24889,14 +24895,14 @@
         button.setAttribute('aria-label', returnLabel);
         button.title = returnLabel;
       });
-      document.querySelectorAll('.patient-workspace-name').forEach(element => { element.textContent = patient.name; });
-      document.querySelectorAll('[data-patient-workspace-action]').forEach(element => {
-        const isVisible = element.dataset.patientWorkspaceAction === activeTab;
-        element.classList.toggle('hidden', !isVisible);
-        element.classList.toggle('inline-flex', isVisible);
+      document.querySelectorAll('.patient-workspace-name').forEach(element => {
+        element.textContent = patient.name;
+        element.title = patient.name;
       });
-      document.getElementById('profile-edit-patient-button')?.classList.toggle('hidden', !hasPageAccess('patients'));
-      document.getElementById('patient-workspace-voice-btn')?.classList.toggle('hidden', !hasPageAccess('chart'));
+      const patientAge = currentPatientAge(patient);
+      document.getElementById('patient-workspace-meta').textContent = formatPatientNumber(patient)
+        + (patientAge == null ? '' : ` · ${patientAgeLabel(patient)}`);
+      document.getElementById('profile-edit-patient-button')?.classList.toggle('hidden', activeTab !== 'profile' || !hasPageAccess('patients'));
       document.querySelectorAll('[data-patient-workspace-tab]').forEach(button => {
         const allowed = button.dataset.patientWorkspaceTab === 'loyalty'
           ? canViewPatientLoyalty()
@@ -24912,11 +24918,14 @@
             ? hasPageAccess('chart')
             : hasPageAccess('patients');
         const isActive = button.dataset.patientWorkspaceTab === activeTab;
-        button.hidden = !allowed;
-        button.style.display = allowed ? '' : 'none';
-        button.className = `patient-workspace-tab inline-flex h-10 min-w-max flex-1 items-center justify-center gap-1.5 rounded-lg px-2.5 text-[11px] font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 sm:text-xs ${isActive ? 'bg-white text-blue-900 shadow-sm ring-1 ring-white' : 'text-slate-200 hover:bg-white/10 hover:text-white'}`;
+        const isIdentityTab = button.dataset.patientWorkspaceTab === 'profile';
+        const visible = allowed || isIdentityTab;
+        button.hidden = !visible;
+        button.style.display = visible ? '' : 'none';
+        button.disabled = !allowed;
+        button.className = `patient-workspace-tab inline-flex items-center justify-center rounded-xl text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50 sm:text-xs ${isActive ? 'bg-blue-50 text-blue-800 shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`;
         button.setAttribute('aria-selected', isActive ? 'true' : 'false');
-        button.setAttribute('aria-hidden', allowed ? 'false' : 'true');
+        button.setAttribute('aria-hidden', visible ? 'false' : 'true');
         button.tabIndex = allowed && isActive ? 0 : -1;
       });
       const selectedTab = document.querySelector(`[data-patient-workspace-tab="${activeTab}"]`);
@@ -30107,7 +30116,6 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       const fabIcon = document.getElementById('chart-voice-fab-icon');
       const actionBtn = document.getElementById('chart-voice-action-btn');
       const actionBtnIcon = document.getElementById('chart-voice-action-btn-icon');
-      const patientVoiceBtn = document.getElementById('patient-workspace-voice-btn');
       const statusCard = document.getElementById('chart-voice-status-card');
 
       syncVoiceFabBadge();
@@ -30122,7 +30130,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         if (fabIcon) fabIcon.setAttribute('data-lucide', 'mic');
 
         const recordingLabel = currentUiLanguage === 'ar' ? 'إيقاف الإملاء الصوتي' : 'Stop voice dictation';
-        [fab, actionBtn, patientVoiceBtn].forEach(button => {
+        [fab, actionBtn].forEach(button => {
           if (!button) return;
           button.setAttribute('aria-label', recordingLabel);
           button.title = recordingLabel;
@@ -30175,7 +30183,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         if (fabIcon) fabIcon.setAttribute('data-lucide', 'loader-2');
 
         const processingLabel = currentUiLanguage === 'ar' ? 'جارٍ تحليل الإملاء الصوتي' : 'Analyzing voice dictation';
-        [fab, actionBtn, patientVoiceBtn].forEach(button => {
+        [fab, actionBtn].forEach(button => {
           if (!button) return;
           button.setAttribute('aria-label', processingLabel);
           button.title = processingLabel;
@@ -30228,7 +30236,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         if (fabIcon) fabIcon.setAttribute('data-lucide', 'mic');
 
         const idleLabel = currentUiLanguage === 'ar' ? 'بدء الإملاء الصوتي' : 'Start voice dictation';
-        [fab, actionBtn, patientVoiceBtn].forEach(button => {
+        [fab, actionBtn].forEach(button => {
           if (!button) return;
           button.setAttribute('aria-label', idleLabel);
           button.title = currentUiLanguage === 'ar' ? 'مساعد الصوت للمخطط السني' : 'Dental chart Voice Scribe';
