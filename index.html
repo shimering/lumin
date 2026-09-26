@@ -73,6 +73,7 @@
   <script src="vendor/lucide.min.js"></script>
   <script src="vendor/supabase.js"></script>
   <script src="lumin-loyalty.js?v=5"></script>
+  <script src="lumin-patient-swipe.js?v=1"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   
   <style>
@@ -4159,6 +4160,27 @@
       #view-dashboard .dashboard-patient-name { font-size: calc(0.9rem + 2pt - var(--dashboard-card-font-reduction, 0pt)); }
     }
     /* Patient identity and section navigation share one compact row. */
+    .patient-swipe-source {
+      position: fixed !important;
+      z-index: 32;
+      background: var(--lumin-surface, #f8fafc);
+      box-shadow: -12px 0 32px rgba(15, 23, 42, 0.12);
+      will-change: transform;
+    }
+    .patient-swipe-destination {
+      display: flex !important;
+      position: fixed !important;
+      z-index: 31;
+      flex-direction: column;
+      gap: 1.5rem;
+      overflow: hidden;
+      pointer-events: none;
+      background: var(--lumin-surface, #f8fafc);
+      padding-bottom: max(5rem, env(safe-area-inset-bottom));
+      box-sizing: border-box;
+      will-change: transform, filter;
+    }
+    body.patient-swipe-active #chart-voice-fab-container { visibility: hidden; }
     .patient-workspace-tabs { overscroll-behavior-inline: contain; scroll-padding-inline: 0.25rem; }
     .patient-workspace-tab {
       height: 3.5rem;
@@ -6178,6 +6200,7 @@
     </section>
 
     <!-- ================= SHARED PATIENT WORKSPACE HEADER ================= -->
+    <div id="patient-workspace-sheet" class="hidden">
     <header id="patient-workspace-header" class="patient-workspace-header mb-4 hidden overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
       <div class="flex min-w-0 items-center gap-2">
         <button type="button" data-patient-workspace-back onclick="returnFromPatientWorkspace()" aria-label="Back" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 transition-all duration-150 ease-out hover:bg-blue-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50">
@@ -6543,6 +6566,7 @@
       </button>
     </section>
 
+    </div>
     <!-- Chairside Floating Voice Assistant Control & Feedback Card (Positioned safely above iPad & mobile nav bars) -->
     <div id="chart-voice-fab-container" class="hidden fixed flex flex-col items-end gap-2.5 pointer-events-none" style="z-index: 90;">
       <!-- Live Voice Status / Confirmation Toast with Undo -->
@@ -24697,11 +24721,37 @@
       return patientWorkspaceReturnView;
     }
 
-    function returnFromPatientWorkspace() {
+    let patientWorkspaceSwipe = null;
+
+    function patientWorkspaceBackDestination() {
       const fallbackView = hasPageAccess('patients') ? 'patients' : firstAuthorizedView();
-      const returnView = patientWorkspaceOriginView(patientWorkspaceReturnView) || fallbackView;
-      if (returnView) switchView(returnView);
+      return patientWorkspaceOriginView(patientWorkspaceReturnView) || fallbackView;
+    }
+
+    async function returnFromPatientWorkspace() {
+      const returnView = patientWorkspaceBackDestination();
+      if (returnView) await switchView(returnView);
       if (typeof syncVoiceFabVisibility === 'function') syncVoiceFabVisibility();
+    }
+
+    function setupPatientWorkspaceSwipeBack() {
+      if (patientWorkspaceSwipe || !window.LuminPatientSwipe) return;
+      patientWorkspaceSwipe = LuminPatientSwipe.create({
+        surface: document.getElementById('patient-workspace-sheet'),
+        enabled: () => LuminPatientSwipe.isSupportedDevice({
+          userAgent: navigator.userAgent, platform: navigator.userAgentData?.platform || navigator.platform,
+          maxTouchPoints: navigator.maxTouchPoints, mobile: navigator.userAgentData?.mobile, width: window.innerWidth
+        }),
+        isBlocked: () => Array.from(document.querySelectorAll('[aria-modal="true"], [role="dialog"]'))
+          .some(dialog => dialog.getClientRects().length && getComputedStyle(dialog).visibility !== 'hidden'),
+        getDestination: () => {
+          const view = patientWorkspaceBackDestination();
+          if (view === 'patients') runPatientQuery();
+          const destination = document.getElementById(`view-${view === 'finances' ? 'clinic-management' : view}`);
+          return destination;
+        },
+        onBack: returnFromPatientWorkspace
+      });
     }
 
     function openPatientInvoices(patientId, returnView = null) {
@@ -26674,6 +26724,7 @@
     }
 
     async function switchView(viewName) {
+      patientWorkspaceSwipe?.cancel();
       closeMobileHeaderOverlay();
       closeWhatsAppTemplatePicker();
       closeQuickCreateMenu();
@@ -26772,6 +26823,7 @@
       viewHr.classList.add('hidden');
       viewImplants?.classList.add('hidden');
       patientWorkspaceHeader.classList.toggle('hidden', !['patient-profile', 'chart', 'invoices', 'payments', 'loyalty', 'patient-appointments', 'patient-prescriptions', 'patient-media'].includes(viewName));
+      document.getElementById('patient-workspace-sheet').classList.toggle('hidden', patientWorkspaceHeader.classList.contains('hidden'));
       document.getElementById('view-patient-appointments').classList.add('hidden');
       if (viewName !== 'patient-appointments') resetPatientAppointmentsState();
       viewPrescriptions.classList.add('hidden');
@@ -39179,6 +39231,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     // Startup Initialization
     window.addEventListener('DOMContentLoaded', async () => {
       syncNavMountLocation();
+      setupPatientWorkspaceSwipeBack();
       postToLuminHost({ type: 'lumin:request-host-state' });
       startUiTranslationObserver();
       setupAppointmentDaySwipeNavigation();
