@@ -4182,14 +4182,15 @@
       will-change: transform, filter;
     }
     body.patient-swipe-active #chart-voice-fab-container { visibility: hidden; }
+    #patient-workspace-header { position: sticky; top: max(0.5rem, env(safe-area-inset-top)); z-index: 35; }
     .patient-workspace-tabs { overscroll-behavior-inline: contain; scroll-padding-inline: 0.25rem; scrollbar-width: none; }
     .patient-workspace-tabs::-webkit-scrollbar { display: none; }
     .patient-workspace-tab {
       height: 3.5rem;
       min-width: 5.5rem;
       flex: 1 0 auto;
-      flex-direction: column;
-      gap: 0.25rem;
+      flex-direction: row;
+      gap: 0.5rem;
       padding: 0.375rem 0.75rem;
       white-space: nowrap;
     }
@@ -4202,15 +4203,13 @@
     .patient-workspace-name { display: block; overflow: hidden; font-size: 1rem; font-weight: 700; line-height: 1.5rem; text-align: left; text-overflow: ellipsis; }
     html[dir="rtl"] .patient-workspace-name { text-align: right; }
     .patient-workspace-meta { display: block; margin-top: 0.125rem; font-size: 0.6875rem; font-weight: 500; line-height: 1rem; opacity: 0.8; }
-    .patient-workspace-profile-icon { display: none; }
     html[dir="rtl"] [data-patient-workspace-back] svg { transform: rotate(180deg); }
     @media (max-width: 767px) {
-      #patient-workspace-header { position: sticky; top: max(0.5rem, env(safe-area-inset-top)); z-index: 35; }
-      .patient-workspace-tab,
-      .patient-workspace-tab[data-patient-workspace-tab="profile"] { width: 2.75rem; min-width: 2.75rem; height: 2.75rem; flex: 1 0 2.75rem; padding: 0.5rem; gap: 0; }
-      .patient-workspace-tab > span { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+      .patient-workspace-tab { width: 2.75rem; min-width: 2.75rem; height: 2.75rem; flex: 1 0 2.75rem; padding: 0.5rem; gap: 0; }
+      .patient-workspace-tab[data-patient-workspace-tab="profile"] { width: clamp(6rem, 30vw, 9rem); min-width: 0; flex: 0 0 auto; padding-inline: 0.75rem; }
+      .patient-workspace-tab:not([data-patient-workspace-tab="profile"]) > span { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
       .patient-workspace-tab > :is(svg, img) { width: 1.25rem; height: 1.25rem; }
-      .patient-workspace-profile-icon { display: block; }
+      .patient-workspace-meta { display: none; }
     }
     /* One compact title row for every page, independent of appearance preference. */
     #app-shell .app-page-bar {
@@ -6262,7 +6261,7 @@
           <i data-lucide="arrow-left" class="h-4 w-4"></i>
         </button>
         <div role="tablist" aria-label="Patient record sections" class="patient-workspace-tabs flex min-w-0 flex-1 gap-1 overflow-x-auto p-1">
-          <button type="button" role="tab" aria-controls="view-patient-profile" data-patient-workspace-tab="profile" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('profile')" aria-label="Patient Info" title="Patient Info"><i data-lucide="contact-round" aria-hidden="true" class="patient-workspace-profile-icon h-5 w-5"></i><span class="patient-workspace-identity"><span class="patient-workspace-name" dir="auto">Patient</span><span id="patient-workspace-meta" class="patient-workspace-meta">—</span></span></button>
+          <button type="button" role="tab" aria-controls="view-patient-profile" data-patient-workspace-tab="profile" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('profile')"><span class="patient-workspace-identity"><span class="patient-workspace-name" dir="auto">Patient</span><span id="patient-workspace-meta" class="patient-workspace-meta">—</span></span></button>
           <button type="button" role="tab" aria-controls="view-chart" data-patient-workspace-tab="chart" data-workspace-requires="chart" onclick="openPatientWorkspaceTab('chart')" aria-label="Dental chart" title="Dental chart"><img src="icons/dental-chart-icon.webp" alt="" aria-hidden="true" class="dental-chart-button-icon h-5 w-5 shrink-0 object-contain" /><span>Dental chart</span></button>
           <button type="button" role="tab" aria-controls="view-patient-media" data-patient-workspace-tab="media" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('media')" aria-label="X-Rays & Media" title="X-Rays & Media"><i data-lucide="images" class="h-4 w-4"></i><span>X-Rays & Media</span></button>
           <button type="button" role="tab" aria-controls="view-patient-appointments" data-patient-workspace-tab="appointments" data-workspace-requires="appointments" onclick="openPatientWorkspaceTab('appointments')" aria-label="Appointments" title="Appointments"><i data-lucide="calendar-days" class="h-4 w-4"></i><span>Appointments</span></button>
@@ -6390,11 +6389,7 @@
 
       <div class="grid gap-4 lg:grid-cols-3">
         <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs lg:col-span-2">
-          <div class="flex items-center gap-2 border-b border-slate-100 pb-4">
-            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><i data-lucide="contact-round" class="h-4 w-4"></i></span>
-            <div><h3 class="text-sm font-black text-slate-900">Basic information</h3><p class="mt-0.5 text-[11px] text-slate-400">Patient identity and contact details</p></div>
-          </div>
-          <dl class="mt-4 grid gap-3 sm:grid-cols-2">
+          <dl class="grid gap-3 sm:grid-cols-2">
             <div class="rounded-xl border border-slate-100 bg-slate-50/80 p-4"><dt class="text-[10px] font-black uppercase tracking-wider text-slate-400">Primary phone</dt><dd class="patient-phone-value-row mt-1.5 text-sm font-black text-slate-800"><span id="profile-patient-phone" class="break-words">--</span><span id="profile-patient-phone-actions" class="patient-phone-actions" aria-label="Primary phone actions"></span></dd></div>
             <div class="rounded-xl border border-slate-100 bg-slate-50/80 p-4"><dt class="text-[10px] font-black uppercase tracking-wider text-slate-400">Second phone</dt><dd class="patient-phone-value-row mt-1.5 text-sm font-black text-slate-800"><span id="profile-patient-secondary-phone" class="break-words">--</span><span id="profile-patient-secondary-phone-actions" class="patient-phone-actions" aria-label="Second phone actions"></span></dd></div>
             <div class="rounded-xl border border-slate-100 bg-slate-50/80 p-4"><dt class="text-[10px] font-black uppercase tracking-wider text-slate-400">Age</dt><dd id="profile-patient-age" class="mt-1.5 text-sm font-black text-slate-800">--</dd></div>
