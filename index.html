@@ -75,7 +75,7 @@
   <script src="lumin-loyalty.js?v=5"></script>
   <script src="lumin-finance-sync.js?v=2"></script>
   <script src="lumin-patient-swipe.js?v=1"></script>
-  <script src="lumin-patients.js?v=1"></script>
+  <script src="lumin-patients.js?v=3"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   
   <style>
@@ -5225,7 +5225,7 @@
     }
   </style>
   <link rel="stylesheet" href="lumin-theme.css?v=18" />
-  <link rel="stylesheet" href="lumin-patients.css?v=1" />
+  <link rel="stylesheet" href="lumin-patients.css?v=3" />
   <link rel="stylesheet" href="lumin-finance-sync.css?v=2" />
   <style id="finance-ledger-styles">
     #finance-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -5697,18 +5697,16 @@
           </div>
           <div class="patients-filter-grid">
             <label><span>Time range</span><select id="patient-procedure-period" aria-label="Time range" class="patients-control" onchange="updatePatientProcedureRange()"><option value="month">Last month</option><option value="quarter">Last 3 months</option><option value="year">Last year</option><option value="custom">Custom range</option></select></label>
-            <label><span>Procedure</span><select id="patient-procedure-code" aria-label="Procedure" class="patients-control"><option value="all">All procedures</option></select></label>
+            <label><span>Procedure</span><select id="patient-procedure-code" aria-label="Procedure" aria-describedby="patient-procedure-group-help" class="patients-control"><option value="all">All procedures</option></select><small id="patient-procedure-group-help" class="patients-control-help">Grouped by category and treatment type.</small></label>
             <label><span>Procedure status</span><select id="patient-procedure-status" aria-label="Procedure status" class="patients-control"><option value="all">All statuses</option><option value="P">Planned</option><option value="In">In progress</option><option value="C">Completed</option><option value="E">Existed</option></select></label>
-            <label><span>Invoice status</span><select id="patient-procedure-billing" aria-label="Invoice status" class="patients-control"><option value="all">Invoiced + uninvoiced</option><option value="invoiced">Invoiced only</option><option value="uninvoiced">Uninvoiced only</option></select></label>
           </div>
           <div id="patient-procedure-custom-range" class="patients-custom-range hidden">
             <label><span>From date</span><input id="patient-procedure-from" aria-label="From date" class="patients-control" type="date" onchange="updatePatientProcedureDateBounds()" /></label>
             <label><span>To date</span><input id="patient-procedure-to" aria-label="To date" class="patients-control" type="date" onchange="updatePatientProcedureDateBounds()" /></label>
           </div>
           <p id="patient-procedure-range-summary" class="patients-range-summary"></p>
-          <p class="patients-date-help">Uses completion date for completed procedures, start date for other treatments, then recorded date. Invoice-only procedures use the invoice date.</p>
           <div class="patients-filter-footer">
-            <p id="patient-procedure-message" role="status" class="text-xs text-slate-500"></p>
+            <p id="patient-procedure-message" role="status" class="patients-filter-message text-xs text-slate-500"></p>
             <div class="patients-filter-actions"><button type="button" class="patients-action" onclick="resetPatientProcedureFilters()"><i data-lucide="rotate-ccw" class="w-4 h-4"></i><span>Reset filters</span></button><button id="patient-procedure-submit" type="submit" class="patients-action patients-action-primary"><i data-lucide="search" class="w-4 h-4"></i><span>Find patients</span></button></div>
           </div>
         </form>

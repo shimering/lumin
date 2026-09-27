@@ -18,10 +18,63 @@ function helpers(overrides = {}) {
     ...overrides
   });
   vm.runInContext(source, context);
-  return vm.runInContext('({ patientProcedureRange, patientProcedureDate, patientProcedureDay, collectPatientProcedureRecords, filterPatientProcedureRecords, fetchPatientProcedurePages, canOpenPatientsPage, allowedPatientsTab, loadPatientProcedureRecords })', context);
+  return vm.runInContext('({ patientProcedureRange, patientProcedureDate, patientProcedureDay, collectPatientProcedureRecords, filterPatientProcedureRecords, fetchPatientProcedurePages, canOpenPatientsPage, allowedPatientsTab, loadPatientProcedureRecords, patientProcedureOptionGroups, populatePatientProcedureOptions })', context);
 }
 
-const baseFilters = { from: '2026-09-01', to: '2026-09-30', code: 'implant', status: 'C', billing: 'all' };
+test('procedure groups follow catalog categories and distinguish treatment families without losing old procedures', () => {
+  const { patientProcedureOptionGroups } = helpers();
+  const operations = [
+    { code: 're-treat', name: 'Root canal re-treatment (molar)', specialtyId: 'endo' },
+    { code: 'treat', name: 'Root canal treatment (anterior)', specialtyId: 'endo' },
+    { code: 'comp', name: 'Composite filling (minimal)', specialtyId: 'restoration', active: false },
+    { code: 'ionomer', name: 'Resin reinforced glass inomer', specialtyId: 'restoration' },
+    { code: 'custom', name: 'Custom procedure', specialtyId: 'missing' }
+  ];
+  const records = [{ code: 'comp', name: 'Old invoice label' }, { code: 'legacy', name: 'Old treatment' }];
+  const groups = patientProcedureOptionGroups(operations, records, [
+    { id: 'endo', name: 'Endo', sortOrder: 2 }, { id: 'restoration', name: 'Restoration', sortOrder: 1 }
+  ]);
+  assert.deepEqual(Array.from(groups, group => [group.category, group.subcategory]), [
+    ['Restoration', 'Composite restorations'], ['Restoration', 'Glass ionomer restorations'],
+    ['Endo', 'Root canal retreatment'], ['Endo', 'Root canal treatment'],
+    ['Other procedures', 'Other procedures'], ['Historical procedures', 'Other procedures']
+  ]);
+  assert.deepEqual(Array.from(groups.flatMap(group => group.procedures), operation => operation.code).sort(),
+    ['comp', 'custom', 'ionomer', 'legacy', 're-treat', 'treat']);
+  assert.equal(groups[0].procedures[0].name, 'Composite filling (minimal)');
+});
+
+test('Arabic groups translate category and family labels and prioritize braces over extraction mentioned in their names', () => {
+  const { patientProcedureOptionGroups } = helpers({ currentUiLanguage: 'ar',
+    dentalTranslate: name => ({ Orthodontics: 'تقويم الأسنان' }[name] || name) });
+  const groups = patientProcedureOptionGroups([
+    { code: 'ceramic', name: 'Traditional ceramic braces - Requires extraction', specialtyId: 'ortho' },
+    { code: 'metal', name: 'تقويم معدني', specialtyId: 'ortho' }
+  ], [], [{ id: 'ortho', name: 'Orthodontics' }]);
+  assert.equal(groups.length, 2);
+  assert.ok(groups.every(group => group.category === 'تقويم الأسنان'));
+  assert.deepEqual(Array.from(groups, group => group.subcategory).sort(), ['التقويم السيراميكي', 'التقويم المعدني'].sort());
+});
+
+test('native grouped options escape catalog text and preserve the exact selected procedure across refreshes', () => {
+  const select = { value: 'custom', innerHTML: '' };
+  const escapeHtml = value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;');
+  const { populatePatientProcedureOptions } = helpers({
+    document: { getElementById: () => select }, escapeHtml,
+    dentalOperations: [{ code: 'custom', name: '<Procedure "A">', specialtyId: 'special' }],
+    dentalSpecialties: [{ id: 'special', name: 'Custom "category"' }]
+  });
+  populatePatientProcedureOptions();
+  assert.equal(select.value, 'custom');
+  assert.match(select.innerHTML, /<optgroup label="Custom &quot;category&quot; · Other procedures">/);
+  assert.match(select.innerHTML, /&lt;Procedure &quot;A&quot;>/);
+  assert.doesNotMatch(select.innerHTML, /<Procedure/);
+  select.value = 'removed';
+  populatePatientProcedureOptions();
+  assert.equal(select.value, 'all');
+});
+
+const baseFilters = { from: '2026-09-01', to: '2026-09-30', code: 'implant', status: 'C' };
 const patientA = { id: 'a', name: 'Patient A' };
 const patientB = { id: 'b', name: 'Patient B' };
 
@@ -39,8 +92,7 @@ test('all filters apply to one procedure rather than separate findings on the pa
   assert.equal(all.length, 1);
   assert.equal(all[0].patient.id, 'b');
   assert.equal(all[0].procedures.length, 2);
-  assert.equal(filterPatientProcedureRecords(records, { ...baseFilters, billing: 'invoiced' })[0].procedures.length, 1);
-  assert.equal(filterPatientProcedureRecords(records, { ...baseFilters, billing: 'uninvoiced' })[0].procedures.length, 1);
+  assert.deepEqual(Array.from(all[0].procedures, record => record.invoiced), [false, true]);
 });
 
 test('chart records take precedence over stale invoice status and dates without duplicates', () => {
@@ -84,7 +136,7 @@ test('batch members retain separate dates, statuses, and invoice states', () => 
     { id: 'second', code: 'implant', status: 'C', completedAt: '2026-09-10', toothId: '2' }
   ] }] };
   const records = collectPatientProcedureRecords([patient], [{ id: 1, finding_id: 'first', patient_invoices: { patient_id: 'a', invoice_date: '2026-08-04' } }]);
-  const matches = filterPatientProcedureRecords(records, { ...baseFilters, billing: 'uninvoiced' });
+  const matches = filterPatientProcedureRecords(records, baseFilters);
   assert.equal(matches[0].procedures.length, 1);
   assert.equal(matches[0].procedures[0].tooth, '2');
 });

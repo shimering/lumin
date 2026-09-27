@@ -5,15 +5,28 @@ const PATIENTS_UI_AR = Object.freeze({
   'Match treatment dates, procedures, and clinical status across all patients.': 'ابحث حسب تاريخ العلاج والإجراء والحالة السريرية بين جميع المرضى.',
   'Time range': 'الفترة الزمنية', 'Last month': 'آخر شهر', 'Last 3 months': 'آخر ٣ أشهر',
   'Last year': 'آخر سنة', 'Custom range': 'فترة مخصصة', 'All procedures': 'جميع الإجراءات',
-  'Procedure status': 'حالة الإجراء', 'All statuses': 'جميع الحالات', 'Invoice status': 'حالة الفاتورة',
+  'Other procedures': 'إجراءات أخرى', 'Historical procedures': 'إجراءات سابقة',
+  'Grouped by category and treatment type.': 'مرتبة حسب التخصص ونوع العلاج.',
+  'Bleaching': 'تبييض الأسنان', 'Veneers': 'قشور تجميلية', 'Smile appliances': 'أجهزة تجميل الابتسامة',
+  'Crowns': 'تيجان الأسنان', 'Cementation': 'تثبيت التركيبات', 'Inlays and onlays': 'إنلاي وأونلاي',
+  'Imaging': 'الأشعة', 'Examinations and consultations': 'الكشف والاستشارات', 'Laboratory tests': 'التحاليل',
+  'Root canal treatment': 'علاج الجذور', 'Root canal retreatment': 'إعادة علاج الجذور',
+  'Pulp therapy': 'علاج لب الأسنان', 'Abscess treatment': 'علاج الخراج',
+  'Implants': 'زراعة الأسنان', 'Bone grafting': 'زراعة العظم',
+  'Clear aligners': 'التقويم الشفاف', 'Ceramic braces': 'التقويم السيراميكي', 'Metal braces': 'التقويم المعدني',
+  'Orthodontic follow-up': 'متابعة التقويم', 'Orthodontic appliances': 'أجهزة التقويم',
+  'Cleaning and polishing': 'التنظيف والتلميع', 'Gum treatment': 'علاج اللثة',
+  'Dentures': 'أطقم الأسنان', 'Night guards': 'واقيات ليلية',
+  'Composite restorations': 'حشوات الكومبوزيت', 'Glass ionomer restorations': 'حشوات الجلاس أيونومر',
+  'Amalgam restorations': 'حشوات الأملجم', 'Posts and cores': 'الأوتاد وبناء السن',
+  'Preventive treatments': 'علاجات وقائية', 'Extractions': 'خلع الأسنان', 'Oral surgery': 'جراحة الفم',
+  'Procedure status': 'حالة الإجراء', 'All statuses': 'جميع الحالات',
   'Planned': 'مخطط', 'In progress': 'قيد العلاج', 'Completed': 'مكتمل', 'Existed': 'موجود سابقاً',
-  'Invoiced + uninvoiced': 'بفاتورة وبدون فاتورة', 'Invoiced only': 'بفاتورة فقط',
-  'Uninvoiced only': 'بدون فاتورة فقط', 'From date': 'من تاريخ', 'To date': 'إلى تاريخ',
+  'From date': 'من تاريخ', 'To date': 'إلى تاريخ',
   'Reset filters': 'إعادة ضبط الفلاتر', 'Find patients': 'البحث عن المرضى',
   'Matching patients': 'المرضى المطابقون', 'Refresh procedure records': 'تحديث سجلات الإجراءات',
   'Previous patients': 'المرضى السابقون', 'Next patients': 'المرضى التاليون',
   'Swipe horizontally to view all filters and procedure details.': 'اسحب أفقياً لعرض جميع الفلاتر وتفاصيل الإجراءات.',
-  'Uses completion date for completed procedures, start date for other treatments, then recorded date. Invoice-only procedures use the invoice date.': 'يُستخدم تاريخ الإكمال للإجراءات المكتملة وتاريخ البدء للعلاجات الأخرى، ثم تاريخ التسجيل. إجراءات الفواتير فقط تستخدم تاريخ الفاتورة.',
   'Loading procedure records…': 'جارٍ تحميل سجلات الإجراءات…',
   'Search across your patients': 'ابحث بين مرضاك',
   'Choose a time range, procedure, and status to find matching patients.': 'اختر الفترة والإجراء والحالة للعثور على المرضى المطابقين.',
@@ -25,7 +38,6 @@ const PATIENTS_UI_AR = Object.freeze({
   'Open patient': 'فتح المريض', 'Open chart': 'فتح المخطط',
   'Choose both dates for the custom range.': 'اختر تاريخ البداية والنهاية للفترة المخصصة.',
   'The start date must be on or before the end date.': 'يجب أن يكون تاريخ البداية قبل تاريخ النهاية أو مطابقاً له.',
-  'Procedures without a recorded date are excluded.': 'الإجراءات التي لا تحتوي على تاريخ مسجل لا تُدرج في النتائج.',
   'Filters changed. Select Find patients to apply them.': 'تغيرت الفلاتر. اضغط البحث عن المرضى لتطبيقها.'
 });
 
@@ -141,7 +153,7 @@ function formatPatientProcedureDay(value) {
 
 function readPatientProcedureFilters() {
   const get = id => document.getElementById(`patient-procedure-${id}`).value;
-  return { ...patientProcedureRange(get('period'), get('from'), get('to')), code: get('code'), status: get('status'), billing: get('billing') };
+  return { ...patientProcedureRange(get('period'), get('from'), get('to')), code: get('code'), status: get('status') };
 }
 
 function updatePatientProcedureDateBounds() {
@@ -169,7 +181,7 @@ function patientProcedureFiltersChanged() {
 }
 
 function resetPatientProcedureFilters(search = true) {
-  ['code', 'status', 'billing'].forEach(name => { document.getElementById(`patient-procedure-${name}`).value = 'all'; });
+  ['code', 'status'].forEach(name => { document.getElementById(`patient-procedure-${name}`).value = 'all'; });
   document.getElementById('patient-procedure-period').value = 'month';
   const range = patientProcedureRange('month');
   document.getElementById('patient-procedure-from').value = range.from;
@@ -239,9 +251,7 @@ function filterPatientProcedureRecords(records, filters) {
   records.forEach(record => {
     if (!record.date || record.date < filters.from || record.date > filters.to
       || (filters.code !== 'all' && record.code !== filters.code)
-      || (filters.status !== 'all' && record.status !== filters.status)
-      || (filters.billing === 'invoiced' && !record.invoiced)
-      || (filters.billing === 'uninvoiced' && record.invoiced)) return;
+      || (filters.status !== 'all' && record.status !== filters.status)) return;
     if (!groups.has(record.patient.id)) groups.set(record.patient.id, { patient: record.patient, procedures: [] });
     groups.get(record.patient.id).procedures.push(record);
   });
@@ -270,14 +280,80 @@ function patientProcedureName(record) {
   return currentUiLanguage === 'ar' ? dentalTranslate(record.name, 'ar') : record.name;
 }
 
+// The catalog stores specialties, but no subcategory field. Treatment families
+// organize its existing names without changing procedure codes or catalog data.
+const PATIENT_PROCEDURE_FAMILIES = [
+  ['Orthodontic follow-up', /ortho.*follow|follow.*ortho|متابعة.*تقويم/iu],
+  ['Clear aligners', /invisalign|aligner|k\s*line|تقويم.*شفاف|إنفزلاين/iu],
+  ['Ceramic braces', /ceramic.*braces|braces.*ceramic|تقويم.*سيراميك/iu],
+  ['Metal braces', /metal.*braces|braces.*metal|تقويم.*معدني/iu],
+  ['Orthodontic appliances', /bracket|braces|orthodont|براكيت|تقويم/iu],
+  ['Cementation', /cement|تثبيت.*(?:تاج|تركيب)/iu],
+  ['Veneers', /veneer|فينير|قشور/iu],
+  ['Inlays and onlays', /inlay|onlay|overlay|إنلاي|أونلاي|أوفرلاي/iu],
+  ['Crowns', /crown|zircomax|zircon|كراون|تاج|زركون/iu],
+  ['Root canal retreatment', /(?:root\s*canal|endo).*re\s*treat|إعادة.*(?:جذور|عصب)/iu],
+  ['Root canal treatment', /root\s*canal|\bendo\b|علاج.*(?:جذور|عصب)/iu],
+  ['Pulp therapy', /pulp|عصب.*مباشر|تغطية.*عصب|لب.*الأسنان/iu],
+  ['Abscess treatment', /abscess|خراج/iu],
+  ['Bone grafting', /bone.*graft|زراعة.*عظم/iu],
+  ['Implants', /implant|fixture|زرع|زراعة/iu],
+  ['Bleaching', /bleach|whiten|تبييض/iu],
+  ['Smile appliances', /snap\s*on|سناب|ابتسامة.*متحركة/iu],
+  ['Imaging', /x\s*ray|conebeam|\bcbct\b|أشعة/iu],
+  ['Laboratory tests', /blood|lab.*test|تحليل|تحاليل/iu],
+  ['Examinations and consultations', /diagnos|examin|consult|كشف|فحص|تشخيص|استشارة/iu],
+  ['Cleaning and polishing', /scal|clean|polish|تنظيف|تلميع/iu],
+  ['Gum treatment', /gingiv|gum|periodontal|operculect|\bprf\b|لثة|لثوي/iu],
+  ['Night guards', /night\s*guard|واقي.*ليلي/iu],
+  ['Dentures', /denture|removable|طقم|أطقم|تركيبة.*متحرك/iu],
+  ['Posts and cores', /post.*core|وتد|أوتاد/iu],
+  ['Glass ionomer restorations', /(?:glass|g\s*\.)\s*i(?:o)?nomer|جلاس|أيونومر|أينومر/iu],
+  ['Amalgam restorations', /amalgam|أملجم/iu],
+  ['Composite restorations', /composite|كومبوزيت/iu],
+  ['Preventive treatments', /sealant|fluoride|وقائي|فلورايد/iu],
+  ['Extractions', /extract|خلع/iu],
+  ['Oral surgery', /cyst|excision|استئصال|كيس.*فك/iu]
+];
+
+function patientProcedureFamily(operation) {
+  const name = `${operation.name || ''} ${operation.code || ''}`.replace(/[_-]+/g, ' ');
+  return PATIENT_PROCEDURE_FAMILIES.find(([, pattern]) => pattern.test(name))?.[0] || 'Other procedures';
+}
+
+function patientProcedureOptionGroups(operations, records, specialties) {
+  const options = new Map(operations.filter(operation => operation.code).map(operation => [operation.code, operation]));
+  records.forEach(record => { if (record.code && !options.has(record.code)) options.set(record.code, record); });
+  const categoryOrder = [...specialties].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)
+    || patientProcedureName(a).localeCompare(patientProcedureName(b), currentUiLanguage));
+  const catalogCodes = new Set(operations.map(operation => operation.code));
+  const categories = new Map(categoryOrder.map(category => [category.id, { name: patientProcedureName(category), groups: new Map() }]));
+  const other = { name: patientsText('Other procedures'), groups: new Map() };
+  const historical = { name: patientsText('Historical procedures'), groups: new Map() };
+  options.forEach(operation => {
+    const category = categories.get(operation.specialtyId) || (catalogCodes.has(operation.code) ? other : historical);
+    const family = patientProcedureFamily(operation);
+    if (!category.groups.has(family)) category.groups.set(family, []);
+    category.groups.get(family).push(operation);
+  });
+  return [...categories.values(), other, historical].flatMap(category => [...category.groups]
+    .sort(([a], [b]) => a === 'Other procedures' ? 1 : b === 'Other procedures' ? -1
+      : patientsText(a).localeCompare(patientsText(b), currentUiLanguage))
+    .map(([family, procedures]) => ({ category: category.name, subcategory: patientsText(family),
+      procedures: procedures.sort((a, b) => patientProcedureName(a).localeCompare(patientProcedureName(b), currentUiLanguage)) })));
+}
+
 function populatePatientProcedureOptions() {
   const select = document.getElementById('patient-procedure-code');
+  if (!select) return;
   const selected = select.value;
-  const options = new Map(dentalOperations.map(operation => [operation.code, { code: operation.code, name: operation.name }]));
-  patientProcedureState.records.forEach(record => { if (!options.has(record.code)) options.set(record.code, record); });
-  const sorted = [...options.values()].sort((a, b) => patientProcedureName(a).localeCompare(patientProcedureName(b), currentUiLanguage));
-  select.innerHTML = `<option value="all">${patientsText('All procedures')}</option>` + sorted.map(record => `<option value="${escapeHtml(record.code)}">${escapeHtml(patientProcedureName(record))}</option>`).join('');
-  select.value = options.has(selected) ? selected : 'all';
+  const groups = patientProcedureOptionGroups(dentalOperations, patientProcedureState.records, dentalSpecialties);
+  // Native selects support one optgroup level, so each accessible heading includes
+  // the full category → subcategory path (also works with mobile native pickers).
+  select.innerHTML = `<option value="all">${patientsText('All procedures')}</option>` + groups.map(group =>
+    `<optgroup label="${escapeHtml(group.category === group.subcategory ? group.category : `${group.category} · ${group.subcategory}`)}">${group.procedures.map(operation =>
+      `<option value="${escapeHtml(operation.code)}">${escapeHtml(patientProcedureName(operation))}</option>`).join('')}</optgroup>`).join('');
+  select.value = groups.some(group => group.procedures.some(operation => operation.code === selected)) ? selected : 'all';
 }
 
 async function searchPatientProcedures({ force = false } = {}) {
@@ -307,7 +383,6 @@ async function searchPatientProcedures({ force = false } = {}) {
     state.results = filterPatientProcedureRecords(state.records, filters);
     state.page = 1;
     renderPatientProcedureResults();
-    message.textContent = patientsText('Procedures without a recorded date are excluded.');
   } catch (error) {
     if (patientProcedureState !== state || request !== state.request) return;
     console.error('Could not load patient procedures:', error);
