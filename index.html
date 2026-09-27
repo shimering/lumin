@@ -75,6 +75,7 @@
   <script src="lumin-loyalty.js?v=5"></script>
   <script src="lumin-finance-sync.js?v=2"></script>
   <script src="lumin-patient-swipe.js?v=1"></script>
+  <script src="lumin-patients.js?v=1"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   
   <style>
@@ -5224,6 +5225,7 @@
     }
   </style>
   <link rel="stylesheet" href="lumin-theme.css?v=18" />
+  <link rel="stylesheet" href="lumin-patients.css?v=1" />
   <link rel="stylesheet" href="lumin-finance-sync.css?v=2" />
   <style id="finance-ledger-styles">
     #finance-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -5617,15 +5619,24 @@
     <!-- ================= VIEW 1: PATIENT QUERY & DIRECTORY ================= -->
     <section id="view-patients" class="hidden">
       
-      <!-- Patient Search Toolbar -->
+      <!-- Patient page heading and sections -->
       <div id="patient-query-toolbar" class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
         <div class="app-page-bar app-page-bar-embedded">
           <div class="app-page-heading shrink-0">
             <span class="app-page-icon" aria-hidden="true"><i data-lucide="users-round"></i></span>
             <h2 class="app-page-title">Patients</h2>
           </div>
-          <div class="relative min-w-0 flex-1">
-            <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+        </div>
+        <div id="patients-tabs" class="patients-tabs" role="tablist" aria-label="Patient sections" onkeydown="handlePatientsTabKeydown(event)">
+          <button id="patients-tab-browse" class="patients-tab" type="button" role="tab" aria-selected="true" aria-controls="patients-panel-browse" onclick="switchPatientsTab('browse')"><i data-lucide="users-round" class="w-4 h-4"></i><span>Browse</span></button>
+          <button id="patients-tab-implants" class="patients-tab" type="button" role="tab" aria-selected="false" aria-controls="view-implants" tabindex="-1" onclick="switchPatientsTab('implants')"><i data-lucide="activity" class="w-4 h-4"></i><span>Implant Progress</span></button>
+          <button id="patients-tab-procedures" class="patients-tab" type="button" role="tab" aria-selected="false" aria-controls="patients-panel-procedures" tabindex="-1" onclick="switchPatientsTab('procedures')"><i data-lucide="list-filter" class="w-4 h-4"></i><span>Procedure Search</span></button>
+        </div>
+      </div>
+
+      <div id="patients-panel-browse" class="patients-browse-panel" role="tabpanel" aria-labelledby="patients-tab-browse">
+          <div class="patients-search-field">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400" aria-hidden="true"></i>
             <input 
               type="text" 
               id="patient-query-input" 
@@ -5633,13 +5644,9 @@
               aria-label="Search patients"
               title="Search by patient number, name, either phone, address, medical alert, or diagnosis"
               placeholder="Search patients..."
-              class="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition"
+              class="patients-control"
             />
           </div>
-        </div>
-
-
-      </div>
 
       <!-- Patients Table -->
       <div id="patient-query-results-panel" class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
@@ -5679,6 +5686,38 @@
           </div>
         </div>
       </div>
+      </div>
+
+      <section id="patients-panel-procedures" class="patients-procedure-panel hidden" role="tabpanel" tabindex="0" aria-labelledby="patients-tab-procedures">
+        <p class="patients-scroll-hint"><i data-lucide="move-horizontal" class="w-4 h-4" aria-hidden="true"></i><span>Swipe horizontally to view all filters and procedure details.</span></p>
+        <form id="patient-procedure-form" class="patients-filter-card" onsubmit="event.preventDefault(); searchPatientProcedures()" onchange="patientProcedureFiltersChanged()">
+          <div class="patients-filter-heading">
+            <div><h3 class="text-lg font-semibold tracking-tight text-slate-900">Find patients by procedure</h3><p class="mt-1 text-sm text-slate-500">Match treatment dates, procedures, and clinical status across all patients.</p></div>
+            <button id="patient-procedure-refresh" type="button" class="patients-action" onclick="searchPatientProcedures({ force: true })" aria-label="Refresh procedure records" title="Refresh procedure records"><i data-lucide="refresh-cw" class="w-4 h-4"></i></button>
+          </div>
+          <div class="patients-filter-grid">
+            <label><span>Time range</span><select id="patient-procedure-period" aria-label="Time range" class="patients-control" onchange="updatePatientProcedureRange()"><option value="month">Last month</option><option value="quarter">Last 3 months</option><option value="year">Last year</option><option value="custom">Custom range</option></select></label>
+            <label><span>Procedure</span><select id="patient-procedure-code" aria-label="Procedure" class="patients-control"><option value="all">All procedures</option></select></label>
+            <label><span>Procedure status</span><select id="patient-procedure-status" aria-label="Procedure status" class="patients-control"><option value="all">All statuses</option><option value="P">Planned</option><option value="In">In progress</option><option value="C">Completed</option><option value="E">Existed</option></select></label>
+            <label><span>Invoice status</span><select id="patient-procedure-billing" aria-label="Invoice status" class="patients-control"><option value="all">Invoiced + uninvoiced</option><option value="invoiced">Invoiced only</option><option value="uninvoiced">Uninvoiced only</option></select></label>
+          </div>
+          <div id="patient-procedure-custom-range" class="patients-custom-range hidden">
+            <label><span>From date</span><input id="patient-procedure-from" aria-label="From date" class="patients-control" type="date" onchange="updatePatientProcedureDateBounds()" /></label>
+            <label><span>To date</span><input id="patient-procedure-to" aria-label="To date" class="patients-control" type="date" onchange="updatePatientProcedureDateBounds()" /></label>
+          </div>
+          <p id="patient-procedure-range-summary" class="patients-range-summary"></p>
+          <p class="patients-date-help">Uses completion date for completed procedures, start date for other treatments, then recorded date. Invoice-only procedures use the invoice date.</p>
+          <div class="patients-filter-footer">
+            <p id="patient-procedure-message" role="status" class="text-xs text-slate-500"></p>
+            <div class="patients-filter-actions"><button type="button" class="patients-action" onclick="resetPatientProcedureFilters()"><i data-lucide="rotate-ccw" class="w-4 h-4"></i><span>Reset filters</span></button><button id="patient-procedure-submit" type="submit" class="patients-action patients-action-primary"><i data-lucide="search" class="w-4 h-4"></i><span>Find patients</span></button></div>
+          </div>
+        </form>
+        <div class="patients-procedure-results-card">
+          <div class="patients-results-heading"><h3 class="text-sm font-semibold text-slate-900">Matching patients</h3><span id="patient-procedure-count" class="patients-count" aria-live="polite"></span></div>
+          <div id="patient-procedure-results" class="patients-procedure-results mobile-scroll-region" aria-busy="false"></div>
+          <div id="patient-procedure-pagination" class="patients-results-pagination hidden"><span id="patient-procedure-page-summary" class="text-xs text-slate-500"></span><div><button id="patient-procedure-previous" class="patients-action" type="button" onclick="changePatientProcedurePage(-1)" aria-label="Previous patients"><i data-lucide="chevron-left" class="w-4 h-4"></i></button><button id="patient-procedure-next" class="patients-action" type="button" onclick="changePatientProcedurePage(1)" aria-label="Next patients"><i data-lucide="chevron-right" class="w-4 h-4"></i></button></div></div>
+        </div>
+      </section>
     </section>
 
     <!-- ================= CLINIC MANAGEMENT ================= -->
@@ -5697,9 +5736,6 @@
             </button>
             <button id="clinic-management-tab-hr" data-clinic-management-tab="hr" type="button" role="tab" aria-selected="false" aria-controls="view-hr" onclick="switchClinicManagementTab('hr')" class="inline-flex shrink-0 min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-[11px] font-black text-slate-500 transition hover:bg-white/70 hover:text-rose-700 sm:px-4 sm:text-xs">
               <i data-lucide="briefcase-business" class="h-4 w-4"></i><span>HR</span>
-            </button>
-            <button id="clinic-management-tab-implants" data-clinic-management-tab="implants" type="button" role="tab" aria-selected="false" aria-controls="view-implants" onclick="switchClinicManagementTab('implants')" class="inline-flex shrink-0 min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-[11px] font-black text-slate-500 transition hover:bg-white/70 hover:text-cyan-700 sm:px-4 sm:text-xs">
-              <i data-lucide="activity" class="h-4 w-4"></i><span>Implant Progress</span>
             </button>
           </div>
         </div>
@@ -9956,6 +9992,7 @@
     const uiAttributeStates = new WeakMap();
     const TRANSLATABLE_ATTRIBUTES = ['placeholder', 'title', 'aria-label'];
     const ARABIC_UI_TEXT = Object.freeze({
+      ...PATIENTS_UI_AR,
       'Finance sync': 'المزامنة المالية',
       'Payment method for additional paid amount': 'طريقة دفع المبلغ الإضافي',
       'Choose a method when adding a paid amount. Existing installments keep their original methods.': 'اختر طريقة الدفع عند إضافة مبلغ مدفوع. تحتفظ الدفعات السابقة بطرق الدفع الأصلية.',
@@ -10898,6 +10935,7 @@
       if (refreshViews && currentUserAccess) {
         if (hasPageAccess('dashboard')) renderDashboard();
         if (hasPageAccess('patients')) runPatientQuery();
+        if (patientProcedureState.loaded) { populatePatientProcedureOptions(); renderPatientProcedureResults(); updatePatientProcedureRange(); }
         if (hasPageAccess('appointments')) renderAppointments();
         if (canViewPatientLoyalty() && window.location.hash === '#loyalty') void renderPatientLoyalty();
         if (!loyaltySettingsDirty) {
@@ -11197,7 +11235,6 @@
           || currentUserAccess.permissions.has('finances')
           || currentUserAccess.permissions.has('analytics')
           || currentUserAccess.permissions.has('hr')
-          || currentUserAccess.permissions.has('implants')
         );
       }
       if (pageKey === 'implants') {
@@ -11268,7 +11305,7 @@
 
     function firstAuthorizedView() {
       if (hasPageAccess('dashboard')) return 'dashboard';
-      if (hasPageAccess('patients')) return 'patients';
+      if (canOpenPatientsPage()) return 'patients';
       if (hasPageAccess('chart')) return 'chart';
       if (hasPageAccess('appointments')) return 'appointments';
       if (hasPageAccess('whatsapp')) return 'whatsapp';
@@ -11462,7 +11499,7 @@
       if (mobileTriggerLabel) mobileTriggerLabel.textContent = currentUiLanguage === 'ar' ? 'لومين' : 'Lumin';
       document.getElementById('nav-btn-dashboard').classList.toggle('hidden', !hasPageAccess('dashboard'));
       ['patients', 'appointments'].forEach(pageKey => {
-        document.getElementById(`nav-btn-${pageKey}`).classList.toggle('hidden', !hasPageAccess(pageKey));
+        document.getElementById(`nav-btn-${pageKey}`).classList.toggle('hidden', !(pageKey === 'patients' ? canOpenPatientsPage() : hasPageAccess(pageKey)));
       });
       document.getElementById('nav-btn-whatsapp')?.classList.toggle('hidden', !hasPageAccess('whatsapp'));
       updateWhatsAppNavBadge();
@@ -12205,6 +12242,7 @@
         patients = [];
         patientsLoaded = false;
         patientsLoadPromise = null;
+        resetPatientsPageState();
         patientDirectoryRows = [];
         patientDirectoryTotal = 0;
         patientDirectoryLoaded = false;
@@ -12388,6 +12426,7 @@
         patients = [];
         patientsLoaded = false;
         patientsLoadPromise = null;
+        resetPatientsPageState();
         patientDirectoryRows = [];
         patientDirectoryTotal = 0;
         patientDirectoryLoaded = false;
@@ -14419,7 +14458,7 @@
     }
 
     async function fetchDentalCustomization() {
-      if (!currentSession || (!hasPageAccess('chart') && !hasPageAccess('prices') && !hasPageAccess('implants') && !hasPageAccess('admin') && !hasPageAccess('hr'))) {
+      if (!currentSession || (!hasPageAccess('patients') && !hasPageAccess('chart') && !hasPageAccess('prices') && !hasPageAccess('implants') && !hasPageAccess('admin') && !hasPageAccess('hr'))) {
         dentalSpecialties = [];
         dentalOperations = [];
         dentalCustomizationLoaded = false;
@@ -14453,7 +14492,7 @@
 
     async function ensureDentalCustomizationLoaded() {
       if (dentalCustomizationLoaded) return true;
-      if (!currentSession || (!hasPageAccess('chart') && !hasPageAccess('prices') && !hasPageAccess('implants') && !hasPageAccess('admin') && !hasPageAccess('hr'))) return false;
+      if (!currentSession || (!hasPageAccess('patients') && !hasPageAccess('chart') && !hasPageAccess('prices') && !hasPageAccess('implants') && !hasPageAccess('admin') && !hasPageAccess('hr'))) return false;
       if (!dentalCustomizationLoadPromise) {
         dentalCustomizationLoadPromise = fetchDentalCustomization()
           .finally(() => { dentalCustomizationLoadPromise = null; });
@@ -18384,9 +18423,10 @@
             .forEach(tableName => realtimePendingTables.add(tableName));
         } else if (activeClinicManagementTab === 'hr') {
           REALTIME_HR_TABLES.forEach(tableName => realtimePendingTables.add(tableName));
-        } else if (activeClinicManagementTab === 'implants') {
-          REALTIME_IMPLANT_TABLES.forEach(tableName => realtimePendingTables.add(tableName));
         }
+      }
+      if (realtimeViewIsVisible('patients') && activePatientsTab === 'procedures') {
+        ['patients', 'patient_invoices', 'patient_invoice_items', ...REALTIME_DENTAL_CUSTOMIZATION_TABLES].forEach(tableName => realtimePendingTables.add(tableName));
       }
       if (realtimeViewIsVisible('admin')) {
         REALTIME_APP_TABLES.forEach(tableName => realtimePendingTables.add(tableName));
@@ -18405,19 +18445,22 @@
         const access = await loadCurrentUserAccess(currentSession);
         currentUserAccess = access;
         if (previousAccessSignature === accessRefreshSignature(access)) return true;
+        resetPatientsPageState();
         if (access.language !== previousLanguage) applyUiLanguage(access.language, false);
         renderAuthorizedNavigation();
         refreshWhatsAppTemplatePickerAnchor();
         const currentView = window.location.hash.slice(1);
         const permissionView = ['invoices', 'payments', 'patient-profile', 'loyalty', 'patient-appointments', 'patient-prescriptions'].includes(currentView) ? 'patients' : currentView;
         syncLoyaltyVisibility();
-        if (!hasPageAccess(permissionView) || (currentView === 'patient-appointments' && !canViewPatientAppointments()) || (currentView === 'patient-prescriptions' && !canViewPatientPrescriptions())) {
+        if (!(currentView === 'patients' ? canOpenPatientsPage() : hasPageAccess(permissionView)) || (currentView === 'patient-appointments' && !canViewPatientAppointments()) || (currentView === 'patient-prescriptions' && !canViewPatientPrescriptions())) {
           resetPatientAppointmentsState();
           if (currentView === 'patient-prescriptions') resetPatientPrescriptionsState();
           const fallbackView = firstAuthorizedView();
           if (fallbackView) await switchView(fallbackView);
         } else if (currentView === 'clinic-management') {
           await switchClinicManagementTab(activeClinicManagementTab, { updateHash: false });
+        } else if (currentView === 'patients') {
+          await switchPatientsTab();
         } else if (currentView === 'dashboard') {
           renderDashboard();
         } else if (currentView === 'appointments') {
@@ -18520,13 +18563,17 @@
           await fetchWhatsAppTemplates();
         }
         const dentalCustomizationChanged = [...changedTables].some(table => REALTIME_DENTAL_CUSTOMIZATION_TABLES.has(table));
-        if ((refreshLoadedResourcesForAccess || dentalCustomizationChanged) && dentalCustomizationLoaded && (hasPageAccess('chart') || hasPageAccess('hr'))) {
+        if ((refreshLoadedResourcesForAccess || dentalCustomizationChanged) && dentalCustomizationLoaded && (hasPageAccess('patients') || hasPageAccess('chart') || hasPageAccess('hr') || hasPageAccess('implants'))) {
           await fetchDentalCustomization();
         }
         if (accessChanged && chartDoctorsLoaded && hasPageAccess('chart')) {
           await fetchChartDoctors();
         }
         const invoicesChanged = [...changedTables].some(table => REALTIME_INVOICE_TABLES.has(table));
+        if (accessChanged || changedTables.has('patients') || invoicesChanged || dentalCustomizationChanged) {
+          patientProcedureState.loaded = false;
+          if (hasPageAccess('patients') && realtimeViewIsVisible('patients') && activePatientsTab === 'procedures') await searchPatientProcedures({ force: true });
+        }
         if (invoicesChanged) {
           financeInvoicesLoaded = false;
           financePaymentsLoaded = false;
@@ -19236,6 +19283,7 @@
       if (!patientId) return null;
       return (Array.isArray(patients) && patients.find(p => p.id === patientId))
         || (Array.isArray(patientDirectoryRows) && patientDirectoryRows.find(p => p.id === patientId))
+        || patientProcedureState.patientsById.get(patientId)
         || null;
     }
 
@@ -21630,7 +21678,7 @@
 
     function openPatientChartFromImplant(patientId) {
       if (!patientId) return;
-      openPatientWorkspace(patientId, 'chart', 'clinic-management');
+      openPatientWorkspace(patientId, 'chart', 'patients');
     }
 
     function openNewImplantModal() {
@@ -24858,7 +24906,7 @@
 
     function patientWorkspaceOriginView(preferredView = null) {
       const candidate = preferredView || window.location.hash.slice(1);
-      return ['dashboard', 'appointments', 'patients', 'finances'].includes(candidate) && hasPageAccess(candidate)
+      return ['dashboard', 'appointments', 'patients', 'finances'].includes(candidate) && (candidate === 'patients' ? canOpenPatientsPage() : hasPageAccess(candidate))
         ? candidate
         : null;
     }
@@ -24872,7 +24920,7 @@
     let patientWorkspaceSwipe = null;
 
     function patientWorkspaceBackDestination() {
-      const fallbackView = hasPageAccess('patients') ? 'patients' : firstAuthorizedView();
+      const fallbackView = canOpenPatientsPage() ? 'patients' : firstAuthorizedView();
       return patientWorkspaceOriginView(patientWorkspaceReturnView) || fallbackView;
     }
 
@@ -26152,13 +26200,13 @@
     }
 
     function firstAuthorizedClinicManagementTab(preferredTab = activeClinicManagementTab) {
-      const orderedTabs = [preferredTab, 'finances', 'analytics', 'hr', 'implants'];
+      const orderedTabs = [preferredTab, 'finances', 'analytics', 'hr'].filter(tab => ['finances', 'analytics', 'hr'].includes(tab));
       return orderedTabs.find((tabName, index) => orderedTabs.indexOf(tabName) === index && hasPageAccess(tabName)) || null;
     }
 
     async function switchClinicManagementTab(tabName, options = {}) {
       const { updateHash = true } = options;
-      const authorizedTab = hasPageAccess(tabName) ? tabName : firstAuthorizedClinicManagementTab();
+      const authorizedTab = ['finances', 'analytics', 'hr'].includes(tabName) && hasPageAccess(tabName) ? tabName : firstAuthorizedClinicManagementTab();
       if (!authorizedTab) {
         const fallbackView = firstAuthorizedView();
         if (fallbackView && fallbackView !== 'clinic-management') await switchView(fallbackView);
@@ -26168,10 +26216,9 @@
       const tabStyles = {
         finances: 'text-emerald-700',
         analytics: 'text-indigo-700',
-        hr: 'text-rose-700',
-        implants: 'text-cyan-700'
+        hr: 'text-rose-700'
       };
-      ['finances', 'analytics', 'hr', 'implants'].forEach(candidate => {
+      ['finances', 'analytics', 'hr'].forEach(candidate => {
         const allowed = hasPageAccess(candidate);
         const isActive = candidate === authorizedTab;
         const button = document.getElementById(`clinic-management-tab-${candidate}`);
@@ -26188,7 +26235,6 @@
       }
       else if (authorizedTab === 'analytics') await refreshIncomeStatement();
       else if (authorizedTab === 'hr') await Promise.allSettled([refreshHrDirectory(), ensureDentalCustomizationLoaded()]);
-      else if (authorizedTab === 'implants') await refreshImplantProgress();
       if (updateHash) window.location.hash = 'clinic-management';
       lucide.createIcons();
     }
@@ -26876,11 +26922,16 @@
       closeMobileHeaderOverlay();
       closeWhatsAppTemplatePicker();
       closeQuickCreateMenu();
-      if (['finances', 'analytics', 'hr', 'implants'].includes(viewName)) {
+      if (viewName === 'implants') {
+        activePatientsTab = 'implants';
+        viewName = 'patients';
+      }
+      if (['finances', 'analytics', 'hr'].includes(viewName)) {
         activeClinicManagementTab = viewName;
         viewName = 'clinic-management';
       }
-      const canOpenRequestedView = viewName === 'invoices'
+      const canOpenRequestedView = viewName === 'patients' ? canOpenPatientsPage()
+        : viewName === 'invoices'
         ? canViewPatientInvoices()
         : viewName === 'patient-appointments' ? canViewPatientAppointments()
         : viewName === 'patient-prescriptions' ? canViewPatientPrescriptions()
@@ -26911,7 +26962,7 @@
       for (const item of navBtnMap) {
         const btn = document.getElementById(item.id);
         if (!btn) continue;
-        const permitted = item.view === 'settings' || hasPageAccess(item.view);
+        const permitted = item.view === 'settings' || (item.view === 'patients' ? canOpenPatientsPage() : hasPageAccess(item.view));
         const isActive = item.view === primaryNavTarget;
         btn.className = `${permitted ? '' : 'hidden '}${isActive ? activeNavClass : inactiveNavClass}`;
         if (isActive) {
@@ -26928,7 +26979,7 @@
       if (viewName === 'dashboard') {
         await ensureAppointmentsLoaded();
       } else if (viewName === 'patients') {
-        await ensurePatientDirectoryPageLoaded();
+        if (activePatientsTab === 'browse' && hasPageAccess('patients')) await ensurePatientDirectoryPageLoaded();
       } else if (['patient-profile', 'invoices', 'payments', 'loyalty', 'patient-appointments', 'patient-media'].includes(viewName) || viewName === 'patient-prescriptions') {
         await ensurePatientsLoaded();
       } else if (viewName === 'chart') {
@@ -27016,7 +27067,7 @@
         scheduleDashboardViewportUpdate();
       } else if (viewName === 'patients') {
         viewPatients.classList.remove('hidden');
-        runPatientQuery();
+        await switchPatientsTab();
         schedulePatientQueryViewportUpdate();
       } else if (viewName === 'patient-profile') {
         viewPatientProfile.classList.remove('hidden');
