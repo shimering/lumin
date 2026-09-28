@@ -53,6 +53,41 @@ function getPhoneTail(phone: string): string {
   return cleaned.length > 9 ? cleaned.slice(-9) : cleaned;
 }
 
+// Normalize Arabic names for robust fuzzy matching across Hamzas, Taa Marbouta, Alef Maksura, and titles
+function normalizeArabicName(name: string): string {
+  if (!name) return "";
+  return String(name)
+    .trim()
+    .toLowerCase()
+    .replace(/[\u064B-\u065F\u0670]/g, "") // remove tashkeel / diacritics
+    .replace(/^(دكتور|دكتورة|د\.?|أستاذ|أستاذة|سيد|سيدة|م\.?|mr\.?|mrs\.?|dr\.?)\s+/i, "") // remove titles/honorifics
+    .replace(/[إأآا]/g, "ا") // normalize alefs to bare alef
+    .replace(/[ة]/g, "ه") // normalize taa marbouta to haa
+    .replace(/[ى]/g, "ي") // normalize alef maksura to yaa
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Compute match score between a requested patient name and an existing candidate name (0 to 100)
+function matchPatientNameScore(targetName: string, candidateName: string): number {
+  const n1 = normalizeArabicName(targetName);
+  const n2 = normalizeArabicName(candidateName);
+  if (!n1 || !n2) return 0;
+  if (n1 === n2) return 100;
+  const w1 = n1.split(" ").filter(Boolean);
+  const w2 = n2.split(" ").filter(Boolean);
+  if (w1[0] && w2[0] && w1[0] === w2[0]) {
+    if (w1.length > 1 && w2.length > 1 && w1[1] === w2[1]) return 90;
+  }
+  if (n1.includes(n2) || n2.includes(n1)) return 80;
+  if (w1[0] && w2[0] && w1[0] === w2[0] && (w1.length === 1 || w2.length === 1)) return 60;
+  return 0;
+}
+
+function namesMatch(name1: string, name2: string): boolean {
+  return matchPatientNameScore(name1, name2) >= 60;
+}
+
 // Find all patients registered with a given phone number (supports local/international format and duplicates)
 async function findPatientsByPhone(supabase: any, rawPhone: string): Promise<any[]> {
   if (!rawPhone || isBsuid(rawPhone)) return [];
@@ -1005,25 +1040,24 @@ function buildGeminiTools(doctorNames: string[] = [], visitTypeNames: string[] =
         },
         {
           name: "assign_patient",
-          description: "Assign and link an existing registered patient profile to this WhatsApp conversation. Call this when duplicate patients exist for a phone number and the patient specifies which one they are, or when confirming which existing profile this conversation belongs to.",
+          description: "Assign and link an existing registered patient profile to this WhatsApp conversation by patient_id OR by patient_name. Call this when multiple profiles exist for a phone number and the patient clarifies which name they are.",
           parameters: {
             type: "OBJECT",
             properties: {
               patient_id: {
                 type: "STRING",
-                description: "The UUID of the existing patient to assign.",
+                description: "Optional ID of the patient if already selected or known among duplicates",
               },
               patient_name: {
                 type: "STRING",
                 description: "The name of the patient being assigned.",
               },
             },
-            required: ["patient_id"],
           },
         },
         {
           name: "create_patient",
-          description: "Create a new patient record in the clinic database and assign this mobile number to them. CRITICAL: ONLY call this tool when the patient is confirmed to be a new patient (i.e. not one of the existing duplicate profiles and not already registered), after asking for and receiving their full name.",
+          description: "Create a new patient record in the clinic database and assign this mobile number to them. CRITICAL: ONLY call this tool when the patient is confirmed to be a new patient (i.e. not one of the existing duplicate profiles and not already registered), after asking for and receiving their full name. FORBIDDEN to call this if a patient name was already fetched or attached to this phone number (call book_appointment directly instead).",
           parameters: {
             type: "OBJECT",
             properties: {
@@ -1041,7 +1075,7 @@ function buildGeminiTools(doctorNames: string[] = [], visitTypeNames: string[] =
         },
         {
           name: "book_appointment",
-          description: "Book an appointment for a patient in the clinic calendar. ONLY call this tool after verifying that the requested slot is present in available_slots and NOT in occupied_slots.",
+          description: "Book an appointment for a patient in the clinic calendar. Automatically re-uses and links the existing patient profile attached to this phone number. ONLY call this tool after verifying that the requested slot is present in available_slots and NOT in occupied_slots.",
           parameters: {
             type: "OBJECT",
             properties: {
@@ -1450,19 +1484,23 @@ async function handleGeminiToolCall(
 
     if (matches.length === 1) {
       const p = matches[0];
-      if (!conversation.patient_id) {
-        conversation.patient_id = p.id;
-        conversation.patient_name = p.name;
-        await supabase
-          .from("whatsapp_conversations")
-          .update({ patient_id: p.id, patient_name: p.name })
-          .eq("id", conversation.id);
+      conversation.patient_id = p.id;
+      conversation.patient_name = p.name;
+      const updatePayload: any = { patient_id: p.id, patient_name: p.name };
+      if (isBsuid(conversation.phone) && rawPhone) {
+        updatePayload.phone = cleanPhone(rawPhone);
+        conversation.phone = cleanPhone(rawPhone);
       }
+      await supabase
+        .from("whatsapp_conversations")
+        .update(updatePayload)
+        .eq("id", conversation.id);
+
       return {
         found: true,
         count: 1,
         patient: { id: p.id, name: p.name, phone: p.phone, patient_number: p.patient_number },
-        message: `تم جلب ملف المريض بنجاح: الاسم "${p.name}" (معرّف المريض: ${p.id}). رحب بالمريض باسمه وأكد هويته واستخدم ملفه للحجز.`,
+        message: `تم جلب ملف المريض بنجاح: الاسم "${p.name}" (معرّف المريض: ${p.id}). رحب بالمريض باسمه وأكد هويته واستخدم ملفه للحجز مباشرة عبر book_appointment دون استدعاء create_patient.`,
       };
     }
 
@@ -1471,27 +1509,41 @@ async function handleGeminiToolCall(
       found: true,
       count: matches.length,
       duplicates: matches.map((p: any) => ({ id: p.id, name: p.name, phone: p.phone })),
-      message: `تنبيه: يوجد ${matches.length} مرضى مسجلين بنفس رقم الهاتف (${matches.map((p: any) => `"${p.name}"`).join("، ")}). يجب سؤال المريض: أي من هذه الأسماء المسجلة هو صاحب الطلب (أم أنه مريض جديد)، ولا تقم بتأكيد الحجز أو إنشاء مريض جديد حتى يحدد الاسم المطلوب عبر assign_patient أو يؤكد أنه مريض جديد عبر create_patient.`,
+      message: `تنبيه: يوجد ${matches.length} مرضى مسجلين بنفس رقم الهاتف (${matches.map((p: any) => `"${p.name}" (ID: ${p.id})`).join("، ")}). اسأل المريض أي من هذه الأسماء المسجلة هو صاحب الحجز، واستخدم اسمه في book_appointment (أو assign_patient). ممنوع تماماً استدعاء create_patient لأي اسم من هذه الأسماء المسجلة.`,
     };
   }
 
   if (name === "assign_patient") {
     const { patient_id, patient_name } = args;
-    if (!patient_id) {
-      return { success: false, error: "patient_id is required" };
+    let targetPatientId = patient_id;
+    let targetPatientName = patient_name;
+
+    if (!targetPatientId && targetPatientName) {
+      const matches = await findPatientsByPhone(supabase, conversation.phone);
+      const best = matches
+        .map((m: any) => ({ m, score: matchPatientNameScore(targetPatientName, m.name) }))
+        .sort((a: any, b: any) => b.score - a.score)[0];
+      if (best && best.score >= 60) {
+        targetPatientId = best.m.id;
+        targetPatientName = best.m.name;
+      }
+    }
+
+    if (!targetPatientId) {
+      return { success: false, error: "patient_id or valid patient_name is required" };
     }
 
     const { data: p, error: pErr } = await supabase
       .from("patients")
       .select("id, name, phone")
-      .eq("id", patient_id)
+      .eq("id", targetPatientId)
       .maybeSingle();
 
     if (pErr || !p) {
-      return { success: false, error: `Patient not found with ID ${patient_id}` };
+      return { success: false, error: `Patient not found with ID ${targetPatientId}` };
     }
 
-    const finalName = p.name || patient_name || "Patient";
+    const finalName = p.name || targetPatientName || "Patient";
 
     await supabase
       .from("whatsapp_conversations")
@@ -1520,6 +1572,105 @@ async function handleGeminiToolCall(
 
     const rawTargetPhone = args.phone || conversation.phone || "";
     const phoneToAssign = isBsuid(rawTargetPhone) ? "" : rawTargetPhone;
+
+    // GUARD AGAINST DUPLICATE CREATION:
+    // If patient(s) already exist with this phone number, re-use the existing profile!
+    const existingMatches = phoneToAssign ? await findPatientsByPhone(supabase, phoneToAssign) : [];
+
+    if (existingMatches.length === 1) {
+      const existing = existingMatches[0];
+      await supabase
+        .from("whatsapp_conversations")
+        .update({
+          patient_id: existing.id,
+          patient_name: existing.name || patientName,
+        })
+        .eq("id", conversation.id);
+
+      conversation.patient_id = existing.id;
+      conversation.patient_name = existing.name || patientName;
+
+      return {
+        success: true,
+        already_existed: true,
+        patient_id: existing.id,
+        patient_name: existing.name,
+        phone: existing.phone,
+        message: `تم استخدام الملف المسجل مسبقاً للمريض "${existing.name}" المربوط بهذا الرقم بنجاح دون إنشاء مريض مكرر.`,
+      };
+    }
+
+    if (existingMatches.length > 1) {
+      const best = existingMatches
+        .map((p: any) => ({ p, score: matchPatientNameScore(patientName, p.name) }))
+        .sort((a: any, b: any) => b.score - a.score)[0];
+
+      if (best && best.score >= 60) {
+        await supabase
+          .from("whatsapp_conversations")
+          .update({
+            patient_id: best.p.id,
+            patient_name: best.p.name,
+          })
+          .eq("id", conversation.id);
+
+        conversation.patient_id = best.p.id;
+        conversation.patient_name = best.p.name;
+
+        return {
+          success: true,
+          already_existed: true,
+          patient_id: best.p.id,
+          patient_name: best.p.name,
+          phone: best.p.phone,
+          message: `تم استخدام الملف المسجل مسبقاً للمريض "${best.p.name}" المربوط بهذا الرقم بنجاح دون إنشاء مريض مكرر.`,
+        };
+      }
+    }
+
+    // Also check if a patient with this exact or normalized name already exists in the database
+    if (patientName) {
+      const normReq = normalizeArabicName(patientName);
+      const firstWord = normReq.split(" ")[0];
+      const { data: nameCandidates } = await supabase
+        .from("patients")
+        .select("id, name, phone")
+        .ilike("name", `%${firstWord}%`)
+        .limit(10);
+
+      if (Array.isArray(nameCandidates) && nameCandidates.length > 0) {
+        const bestNameMatch = nameCandidates
+          .map((c: any) => ({ c, score: matchPatientNameScore(patientName, c.name) }))
+          .filter((x: any) => x.score >= 80)
+          .sort((a: any, b: any) => b.score - a.score)[0];
+
+        if (bestNameMatch) {
+          const existing = bestNameMatch.c;
+          if (!existing.phone && phoneToAssign) {
+            await supabase.from("patients").update({ phone: phoneToAssign }).eq("id", existing.id);
+          }
+          await supabase
+            .from("whatsapp_conversations")
+            .update({
+              patient_id: existing.id,
+              patient_name: existing.name,
+            })
+            .eq("id", conversation.id);
+
+          conversation.patient_id = existing.id;
+          conversation.patient_name = existing.name;
+
+          return {
+            success: true,
+            already_existed: true,
+            patient_id: existing.id,
+            patient_name: existing.name,
+            phone: existing.phone || phoneToAssign,
+            message: `تم العثور على ملف مسجل مسبقاً للمريض "${existing.name}" واستخدامه بنجاح دون إنشاء مريض مكرر.`,
+          };
+        }
+      }
+    }
 
     const nameParts = patientName.split(/\s+/).filter(Boolean);
     const firstName = nameParts[0] || "Patient";
@@ -1573,34 +1724,90 @@ async function handleGeminiToolCall(
     let patientId = patient_id || conversation.patient_id;
     let finalPatientName = (patient_name || conversation.patient_name || "").trim();
 
+    // If patientId is provided, verify it exists
+    if (patientId) {
+      const { data: existingP } = await supabase
+        .from("patients")
+        .select("id, name")
+        .eq("id", patientId)
+        .maybeSingle();
+      if (existingP) {
+        patientId = existingP.id;
+        finalPatientName = existingP.name || finalPatientName;
+      } else {
+        patientId = null;
+      }
+    }
+
+    // Search by phone attached to conversation or args if patientId not yet resolved
     if (!patientId) {
-      if (!isBsuid(conversation.phone) && conversation.phone) {
-        const matches = await findPatientsByPhone(supabase, conversation.phone);
+      const phoneToSearch = conversation.phone || args.phone || "";
+      if (!isBsuid(phoneToSearch) && phoneToSearch) {
+        const matches = await findPatientsByPhone(supabase, phoneToSearch);
         if (matches.length === 1) {
+          // Exactly 1 patient attached to this phone: ALWAYS re-use this existing patient
           patientId = matches[0].id;
           finalPatientName = matches[0].name || finalPatientName;
         } else if (matches.length > 1) {
-          // Check if patient_name matches one of the duplicate names
-          const reqNameLower = finalPatientName.toLowerCase();
-          const matchedDup = matches.find((m: any) => {
-            const mName = String(m.name || "").toLowerCase().trim();
-            return mName && (mName === reqNameLower || reqNameLower.includes(mName) || mName.includes(reqNameLower));
-          });
-          if (matchedDup) {
-            patientId = matchedDup.id;
-            finalPatientName = matchedDup.name;
+          // Check if patient_name matches one of the duplicate names using Arabic normalization & scoring
+          const scoredMatches = matches
+            .map((m: any) => ({
+              patient: m,
+              score: Math.max(
+                matchPatientNameScore(finalPatientName, m.name),
+                matchPatientNameScore(conversation.patient_name, m.name)
+              ),
+            }))
+            .sort((a: any, b: any) => b.score - a.score);
+
+          if (scoredMatches[0] && scoredMatches[0].score >= 60) {
+            patientId = scoredMatches[0].patient.id;
+            finalPatientName = scoredMatches[0].patient.name;
+          } else if (conversation.patient_id && matches.some((m: any) => m.id === conversation.patient_id)) {
+            patientId = conversation.patient_id;
+            const matched = matches.find((m: any) => m.id === conversation.patient_id);
+            finalPatientName = matched?.name || finalPatientName;
           } else {
             return {
               success: false,
               error: "DUPLICATE_PATIENTS_EXIST",
               duplicates: matches.map((m: any) => ({ id: m.id, name: m.name })),
-              message: `يوجد أكثر من مريض مسجل بهذا الرقم (${matches.map((m: any) => m.name).join("، ")}). يرجى سؤال المريض عن الاسم المطلوب لتأكيد الحجز عبر assign_patient، أو توضيح ما إذا كان مريضاً جديداً.`,
+              message: `يوجد أكثر من مريض مسجل بهذا الرقم (${matches.map((m: any) => m.name).join("، ")}). يرجى سؤال المريض عن الاسم المطلوب لتأكيد الحجز، أو استخدام أحد هذه الأسماء المسجلة.`,
             };
           }
         }
       }
 
-      // If still no patientId, ONLY THEN create a new patient and assign this number
+      // If still no patientId, search patients table by name to find existing registered patient
+      if (!patientId && finalPatientName && finalPatientName !== "WhatsApp Patient" && finalPatientName !== "Patient") {
+        const normReq = normalizeArabicName(finalPatientName);
+        const firstWord = normReq.split(" ")[0];
+        const { data: nameCandidates } = await supabase
+          .from("patients")
+          .select("id, name, phone")
+          .ilike("name", `%${firstWord}%`)
+          .limit(10);
+
+        if (Array.isArray(nameCandidates) && nameCandidates.length > 0) {
+          const scored = nameCandidates
+            .map((c: any) => ({
+              patient: c,
+              score: matchPatientNameScore(finalPatientName, c.name),
+            }))
+            .filter((x: any) => x.score >= 70)
+            .sort((a: any, b: any) => b.score - a.score);
+
+          if (scored.length > 0) {
+            patientId = scored[0].patient.id;
+            finalPatientName = scored[0].patient.name;
+            if (!scored[0].patient.phone && !isBsuid(conversation.phone) && conversation.phone) {
+              await supabase.from("patients").update({ phone: conversation.phone }).eq("id", patientId);
+            }
+          }
+        }
+      }
+
+      // ONLY IF ABSOLUTELY NO MATCHING PATIENT WAS FOUND ANYWHERE:
       if (!patientId) {
         const effectiveName = finalPatientName || "WhatsApp Patient";
         const nameParts = effectiveName.split(/\s+/).filter(Boolean);
@@ -1633,6 +1840,15 @@ async function handleGeminiToolCall(
           .eq("id", conversation.id);
         conversation.patient_id = patientId;
         conversation.patient_name = finalPatientName;
+      }
+    } else {
+      if (conversation.patient_id !== patientId || conversation.patient_name !== finalPatientName) {
+        conversation.patient_id = patientId;
+        conversation.patient_name = finalPatientName;
+        await supabase
+          .from("whatsapp_conversations")
+          .update({ patient_id: patientId, patient_name: finalPatientName })
+          .eq("id", conversation.id);
       }
     }
 
