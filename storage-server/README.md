@@ -42,7 +42,9 @@ Double-click `start-tunnel.bat`.
 * It will output a public HTTPS address like:
   `https://random-words.trycloudflare.com`
 
-Alternatively, double-click `start-storage.bat` to prepare Python, start the local server, and start the correctly matched Cloudflare Tunnel together.
+Alternatively, double-click `start-storage.bat` to prepare Python, start the local server, and start the correctly matched Cloudflare Tunnel together. It waits for the server and verifies the public health endpoint before automatically syncing the new URL to Lumin. Keep its window open while storage is in use.
+
+All tunnel launchers use the port from `config.json` and monitor the connection continuously. The separate `start-tunnel.bat` requires the local server to be running and leaves saving the verified URL to you.
 
 ### Step 3: Connect in Lumin App
 1. Open **Lumin Dental Clinic** in your browser.
@@ -61,3 +63,13 @@ You can edit `config.json` in Notepad to customize:
 * `"clinic_secret_key"`: Your private clinic authentication password.
 * `"port"`: Default is 5000.
 * `"max_file_size_mb"`: Default 50 MB per file.
+
+## Troubleshooting tunnel errors
+
+* `server.log` contains local server startup errors when using `start-storage.bat`.
+* `tunnel.log` contains Cloudflare output, including errors after the tunnel starts. These logs stay in the `storage-server` folder and are excluded from Git.
+* A generated `trycloudflare.com` address alone does not mean the tunnel is connected. Wait for `[OK] Storage server is reachable through ...`.
+* If QUIC fails during startup, the launcher retries once using HTTP/2. To use HTTP/2 immediately, run `start-storage.bat --http2` (or `start-tunnel.bat --http2` for a separately started server).
+* Cloudflare needs outbound access to `api.trycloudflare.com` on port 443 to create a quick tunnel and to its tunnel endpoints on port 7844 (UDP for QUIC, TCP for HTTP/2). HTTP/2 cannot fix a network that blocks both protocols. See [Cloudflare connection troubleshooting](https://developers.cloudflare.com/tunnel/troubleshooting/).
+* If the server is not ready, check `http://127.0.0.1:5000/api/health` on the storage computer, substituting the configured port if different. Check `server.log` or the `start-server.bat` window for the underlying error.
+* Quick tunnel URLs change after restarting. Use the URL verified by the current running launcher; `start-storage.bat` syncs it automatically when the database is reachable.

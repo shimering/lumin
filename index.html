@@ -5224,7 +5224,7 @@
       .wa-settings-primary-button { flex: 1 1 0; }
     }
   </style>
-  <link rel="stylesheet" href="lumin-theme.css?v=18" />
+  <link rel="stylesheet" href="lumin-theme.css?v=19" />
   <link rel="stylesheet" href="lumin-patients.css?v=3" />
   <link rel="stylesheet" href="lumin-finance-sync.css?v=2" />
   <style id="finance-ledger-styles">
@@ -9307,6 +9307,9 @@
     </div>
   </div>
 
+  <!-- ================= MODAL: CONFIRM HR SALARY PAYMENT ================= -->
+  <div id="modal-hr-salary-payment" class="hr-salary-payment-modal hidden" onclick="if (event.target === this) closeHrSalaryPaymentDialog()" onkeydown="handleHrSalaryPaymentKeydown(event)"></div>
+
   <!-- ================= MODAL: STAFF SHIFT & SALARY SETTINGS ================= -->
   <div id="modal-hr-staff-settings" class="fixed inset-0 z-[90] hidden items-center justify-center bg-slate-900/45 p-4 backdrop-blur-xs">
     <div role="dialog" aria-modal="true" aria-labelledby="hr-staff-settings-title" class="max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl">
@@ -9610,6 +9613,7 @@
     let activeHrStaffDetailsId = null;
     let activeHrDoctorDetailsId = null;
     let activeHrDoctorDetailTab = 'salary';
+    let hrSalaryPaymentDialog = null;
     let hrDoctorDetailDraft = null;
     let activeHrDayDate = '';
     let clinicAttendanceSettings = {
@@ -10220,6 +10224,14 @@
       'Paid amounts only': 'المبالغ المدفوعة فقط',
       'Net profit': 'صافي الربح',
       'Salary amounts are managed in HR. You can edit the name and description here.': 'تُدار مبالغ الرواتب في الموارد البشرية. يمكنك تعديل الاسم والوصف هنا.',
+      'Choose an active payment method.': 'اختر طريقة دفع نشطة.',
+      'Sign in to pay salaries.': 'سجّل الدخول لدفع الرواتب.',
+      'The calculated salary changed. Close this dialog and refresh HR before paying.': 'تغير الراتب المحسوب. أغلق هذه النافذة وحدّث الموارد البشرية قبل الدفع.',
+      'This salary has already been paid.': 'تم دفع هذا الراتب بالفعل.',
+      'Lock the payroll month before paying salaries.': 'اقفل شهر الرواتب قبل دفعها.',
+      'One or more selected cases are no longer payable or were already paid.': 'حالة أو أكثر من الحالات المحددة لم تعد قابلة للدفع أو تم دفعها بالفعل.',
+      'One or more selected cases were paid by another settlement. Refresh and review the cases again.': 'تم دفع حالة أو أكثر بتسوية أخرى. حدّث البيانات وراجع الحالات مجدداً.',
+      'HR modify access is required.': 'يلزم الحصول على صلاحية تعديل الموارد البشرية.',
       'Net loss': 'صافي الخسارة',
       'Income less paid expenses': 'الدخل ناقص المصروفات المدفوعة',
       'Net margin': 'هامش الربح الصافي',
@@ -20848,17 +20860,186 @@
       }
     }
 
-    async function payHrSalary(userId, options = {}) {
-      if (!canModifyHr()) return false;
+    function hrSalaryPaymentText(en, ar) {
+      return currentUiLanguage === 'ar' || document.documentElement.dir === 'rtl' ? ar : en;
+    }
+
+    function hrSalaryPaymentMethodLabel(method) {
+      const arabic = { cash: 'نقداً', instapay: 'إنستاباي', card: 'بطاقة' }[String(method.name).toLowerCase().replaceAll(' ', '')];
+      return hrSalaryPaymentText(method.name, arabic || method.name);
+    }
+
+    function openHrSalaryPaymentDialog(review) {
+      if (!canModifyHr() || hrSalaryPaymentDialog || !Number.isFinite(review.amount) || review.amount <= 0) return Promise.resolve(false);
+      const modal = document.getElementById('modal-hr-salary-payment');
+      return new Promise(resolve => {
+        const state = { ...review, resolve, busy: false, routes: null, previousFocus: document.activeElement, previousOverflow: document.body.style.overflow };
+        hrSalaryPaymentDialog = state;
+        const t = hrSalaryPaymentText;
+        modal.dir = currentUiLanguage === 'ar' || document.documentElement.dir === 'rtl' ? 'rtl' : 'ltr';
+        modal.innerHTML = `<section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="hr-salary-payment-title" aria-describedby="hr-salary-payment-description" class="hr-salary-payment-panel">
+          <header class="hr-salary-payment-header"><span class="hr-salary-payment-icon"><i data-lucide="wallet-cards"></i></span><div class="hr-salary-payment-heading"><h3 id="hr-salary-payment-title">${t('Confirm salary payment', 'تأكيد دفع الراتب')}</h3><p id="hr-salary-payment-description">${t('Review the payment and choose how it was paid.', 'راجع الدفعة واختر طريقة سدادها.')}</p></div><button type="button" class="hr-salary-payment-close" onclick="closeHrSalaryPaymentDialog()" aria-label="${t('Close salary payment', 'إغلاق دفع الراتب')}"><i data-lucide="x"></i></button></header>
+          <form onsubmit="confirmHrSalaryPayment(event)"><div class="hr-salary-payment-body">
+            <div class="hr-salary-payment-summary"><small>${t('Amount to pay', 'المبلغ المطلوب دفعه')}</small><strong>${escapeHtml(formatInvoiceMoney(review.amount))}</strong><p>${escapeHtml(review.summary)}</p><div class="hr-salary-payment-recipients">${review.recipients.map(name => `<span>${escapeHtml(name)}</span>`).join('')}</div></div>
+            <label class="hr-salary-payment-field" for="hr-salary-payment-method">${t('Payment method', 'طريقة الدفع')}<select id="hr-salary-payment-method" required disabled onchange="updateHrSalaryPaymentRoute()"><option value="">${t('Loading payment methods…', 'جارٍ تحميل طرق الدفع…')}</option></select></label>
+            <div id="hr-salary-payment-loading" class="hr-salary-payment-loading" role="status" aria-label="${t('Loading payment methods', 'جارٍ تحميل طرق الدفع')}"></div>
+            <div class="hr-salary-payment-route" data-tone="muted"><i data-lucide="arrow-right-left"></i><p id="hr-salary-payment-route" aria-live="polite">${t('Choose a payment method to see the Baytna destination.', 'اختر طريقة الدفع لعرض الحساب المقابل في بيتنا.')}</p></div>
+            <p id="hr-salary-payment-message" class="hr-salary-payment-message" role="alert"></p>
+            <button id="hr-salary-payment-retry" type="button" class="hidden" onclick="loadHrSalaryPaymentMethods()"><i data-lucide="refresh-cw"></i>${t('Retry loading methods', 'إعادة تحميل طرق الدفع')}</button>
+            <p class="text-xs text-slate-500 leading-relaxed">${t('Each salary creates one linked expense in Finances. Baytna uses your saved payment method mappings.', 'ينشئ كل راتب مصروفاً مرتبطاً في المالية. يستخدم بيتنا ربط الحسابات المحفوظ لكل طريقة دفع.')}</p>
+          </div><footer class="hr-salary-payment-footer"><button type="button" onclick="closeHrSalaryPaymentDialog()">${t('Cancel', 'إلغاء')}</button><button id="hr-salary-payment-confirm" type="submit" class="hr-salary-payment-confirm" disabled><i data-lucide="check"></i><span id="hr-salary-payment-confirm-label">${t('Confirm payment', 'تأكيد الدفع')}</span></button></footer></form>
+        </section>`;
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        if (window.lucide) lucide.createIcons();
+        modal.querySelector('.hr-salary-payment-close').focus();
+        void loadHrSalaryPaymentMethods();
+      });
+    }
+
+    async function loadHrSalaryPaymentMethods() {
+      const state = hrSalaryPaymentDialog;
+      if (!state || state.busy || state.loading) return;
+      state.loading = true;
+      const select = document.getElementById('hr-salary-payment-method');
+      const message = document.getElementById('hr-salary-payment-message');
+      const loading = document.getElementById('hr-salary-payment-loading');
+      const retry = document.getElementById('hr-salary-payment-retry');
+      select.disabled = true;
+      message.textContent = '';
+      loading.classList.remove('hidden');
+      retry.classList.add('hidden');
       try {
-        const { error } = await db.rpc('hr_pay_salary', { p_user_id: userId, p_pay_month: hrMonthBounds().start });
+        const { data, error } = await db.rpc('get_hr_salary_payment_methods');
         if (error) throw error;
-        financeExpensesLoaded = false; financeOverviewLoaded = false; incomeStatementLoadedRange = '';
-        if (!options.quiet) showAppointmentNotificationToast('Salary paid', 'A linked Salary expense was added to Finances.');
-        hrDirectoryLoaded = false;
-        if (!options.deferRefresh) await refreshHrDirectory({ refresh: true });
-        return true;
-      } catch (error) { if (!options.quiet) alert('Could not pay salary: ' + error.message); return false; }
+        if (hrSalaryPaymentDialog !== state) return;
+        state.routes = data;
+        const methods = data?.methods || [];
+        select.innerHTML = `<option value="">${hrSalaryPaymentText('Choose a payment method…', 'اختر طريقة الدفع…')}</option>` + methods.map(method => `<option value="${escapeHtml(method.id)}">${escapeHtml(hrSalaryPaymentMethodLabel(method))}</option>`).join('');
+        select.disabled = !methods.length;
+        if (!methods.length) message.textContent = hrSalaryPaymentText('No active payment methods. Add one in Admin → Payment methods, then retry.', 'لا توجد طرق دفع نشطة. أضف طريقة في الإدارة ← طرق الدفع ثم أعد المحاولة.');
+        retry.classList.toggle('hidden', methods.length > 0);
+        updateHrSalaryPaymentRoute();
+        if (document.activeElement?.closest('#modal-hr-salary-payment') && methods.length) select.focus();
+      } catch (error) {
+        if (hrSalaryPaymentDialog !== state) return;
+        message.textContent = hrSalaryPaymentText('Could not load payment methods. Retry before paying.', 'تعذر تحميل طرق الدفع. أعد المحاولة قبل الدفع.');
+        retry.classList.remove('hidden');
+      } finally {
+        state.loading = false;
+        if (hrSalaryPaymentDialog === state) loading.classList.add('hidden');
+      }
+    }
+
+    function updateHrSalaryPaymentRoute() {
+      const state = hrSalaryPaymentDialog;
+      if (!state) return;
+      const method = state.routes?.methods?.find(item => item.id === document.getElementById('hr-salary-payment-method').value);
+      const route = document.getElementById('hr-salary-payment-route');
+      const t = hrSalaryPaymentText;
+      document.getElementById('hr-salary-payment-confirm').disabled = state.busy || !method;
+      let tone = 'muted';
+      let text = t('Choose a payment method to see the Baytna destination.', 'اختر طريقة الدفع لعرض الحساب المقابل في بيتنا.');
+      if (method) {
+        if (!method.account_id) {
+          tone = 'warning';
+          text = t('This method is excluded from Baytna sync. To sync it, map an account in Admin → Finance sync.', 'هذه الطريقة مستبعدة من مزامنة بيتنا. لمزامنتها، اربطها بحساب في الإدارة ← المزامنة المالية.');
+        } else {
+          const name = (currentUiLanguage === 'ar' ? method.account_name_ar : method.account_name) || method.account_name || t('Mapped account', 'الحساب المرتبط');
+          tone = state.routes.sync_expenses && state.routes.enabled ? 'success' : 'warning';
+          text = t('Baytna account: ', 'حساب بيتنا: ') + name + '. ';
+          text += !state.routes.sync_expenses
+            ? t('Expense synchronization is disabled; this payment will stay in Lumin.', 'مزامنة المصروفات معطلة؛ ستبقى هذه الدفعة في لومين.')
+            : !state.routes.enabled
+              ? t('Synchronization is paused; this payment will queue until it resumes.', 'المزامنة متوقفة مؤقتاً؛ ستنتظر هذه الدفعة حتى استئنافها.')
+              : t('This expense will be sent automatically after confirmation.', 'سيتم إرسال هذا المصروف تلقائياً بعد التأكيد.');
+        }
+      }
+      route.textContent = text;
+      route.parentElement.dataset.tone = tone;
+    }
+
+    function closeHrSalaryPaymentDialog(paid = false) {
+      const state = hrSalaryPaymentDialog;
+      if (!state || state.busy) return;
+      hrSalaryPaymentDialog = null;
+      document.getElementById('modal-hr-salary-payment').classList.add('hidden');
+      document.body.style.overflow = state.previousOverflow;
+      if (state.previousFocus?.isConnected) state.previousFocus.focus();
+      state.resolve(paid);
+    }
+
+    function handleHrSalaryPaymentKeydown(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        closeHrSalaryPaymentDialog();
+      } else if (event.key === 'Tab') {
+        const controls = [...document.getElementById('modal-hr-salary-payment').querySelectorAll('button:not(:disabled), select:not(:disabled)')].filter(node => !node.classList.contains('hidden'));
+        const first = controls[0], last = controls[controls.length - 1];
+        if (!controls.length) { event.preventDefault(); return; }
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
+    }
+
+    async function confirmHrSalaryPayment(event) {
+      event.preventDefault();
+      const state = hrSalaryPaymentDialog;
+      if (!state || state.busy || !canModifyHr()) return;
+      const methodId = document.getElementById('hr-salary-payment-method').value;
+      if (!state.routes?.methods?.some(method => method.id === methodId)) {
+        document.getElementById('hr-salary-payment-message').textContent = hrSalaryPaymentText('Choose a payment method.', 'اختر طريقة الدفع.');
+        return;
+      }
+      state.busy = true;
+      const modal = document.getElementById('modal-hr-salary-payment');
+      modal.querySelector('form').setAttribute('aria-busy', 'true');
+      modal.querySelectorAll('button, select').forEach(node => { node.disabled = true; });
+      modal.querySelector('[role="dialog"]').focus();
+      document.getElementById('hr-salary-payment-message').textContent = '';
+      document.getElementById('hr-salary-payment-confirm-label').textContent = hrSalaryPaymentText('Recording payment…', 'جارٍ تسجيل الدفع…');
+      try {
+        await state.pay(methodId);
+        financeExpensesLoaded = false; financeOverviewLoaded = false; incomeStatementLoadedRange = ''; hrDirectoryLoaded = false;
+        state.busy = false;
+        closeHrSalaryPaymentDialog(true);
+      } catch (error) {
+        state.busy = false;
+        modal.querySelector('form').setAttribute('aria-busy', 'false');
+        modal.querySelectorAll('button, select').forEach(node => { node.disabled = false; });
+        const message = error?.message || hrSalaryPaymentText('Could not record the salary payment. Please retry.', 'تعذر تسجيل دفع الراتب. حاول مرة أخرى.');
+        document.getElementById('hr-salary-payment-message').textContent = currentUiLanguage === 'ar' ? arabicUiPhrase(message) : message;
+        document.getElementById('hr-salary-payment-confirm-label').textContent = hrSalaryPaymentText('Confirm payment', 'تأكيد الدفع');
+        updateHrSalaryPaymentRoute();
+        document.getElementById('hr-salary-payment-method').focus();
+      }
+    }
+
+    async function refreshHrAfterSalaryPayment() {
+      try { await refreshHrDirectory({ refresh: true }); }
+      catch (_) { showAppointmentNotificationToast(hrSalaryPaymentText('Payment saved', 'تم حفظ الدفعة'), hrSalaryPaymentText('Reload HR to see updated salaries.', 'أعد تحميل الموارد البشرية لعرض الرواتب المحدثة.')); }
+    }
+
+    async function payHrSalary(userId) {
+      if (!canModifyHr() || hrPayrollPeriod?.status !== 'locked') return false;
+      const user = hrDirectoryUsers.find(item => item.userId === userId && item.active && !item.isDoctor);
+      if (!user) return false;
+      const metrics = hrUserMetrics(user);
+      if (metrics.paid || metrics.salary <= 0) return false;
+      const month = hrMonthBounds().start;
+      const amount = Math.round(metrics.salary * 100) / 100;
+      const paid = await openHrSalaryPaymentDialog({
+        amount, recipients: [user.fullName], summary: hrDateLabel(month, { short: true }),
+        pay: async methodId => {
+          const { error } = await db.rpc('hr_pay_salary_with_method', { p_user_id: userId, p_pay_month: month, p_payment_method_id: methodId, p_expected_amount: amount });
+          if (error) throw error;
+        }
+      });
+      if (!paid) return false;
+      showAppointmentNotificationToast(hrSalaryPaymentText('Salary paid', 'تم دفع الراتب'), hrSalaryPaymentText('A linked Salary expense was added to Finances.', 'تمت إضافة مصروف راتب مرتبط إلى المالية.'));
+      await refreshHrAfterSalaryPayment();
+      return true;
     }
 
     async function payHrDoctorSalary(userId = activeHrDoctorDetailsId) {
@@ -20869,55 +21050,52 @@
       const metrics = hrDoctorSettlementMetrics();
       if (!metrics.payableCases.length || metrics.payableAmount <= 0) return false;
       const findingIds = metrics.scope === 'cases' ? metrics.payableCases.map(item => item.finding_id) : null;
-      const scopeLabel = metrics.scope === 'month' ? 'this month' : metrics.scope === 'day' ? 'this day' : `${metrics.payableCases.length} selected case${metrics.payableCases.length === 1 ? '' : 's'}`;
-      if (!confirm(`Pay ${formatInvoiceMoney(metrics.payableAmount)} to ${user.fullName} for ${scopeLabel} and add one linked Salary expense?`)) return false;
-      const button = document.getElementById('hr-doctor-pay-salary');
-      if (button) button.disabled = true;
-      try {
-        const { error } = await db.rpc('hr_pay_doctor_procedures', {
-          p_user_id: userId,
-          p_scope: metrics.scope,
-          p_start_date: range.start,
-          p_end_date: range.end,
-          p_finding_ids: findingIds
-        });
-        if (error) throw error;
-        financeExpensesLoaded = false;
-        financeOverviewLoaded = false;
-        incomeStatementLoadedRange = '';
-        hrDirectoryLoaded = false;
-        await refreshHrDirectory({ refresh: true });
+      const amount = Math.round(metrics.payableAmount * 100) / 100;
+      const scopeLabel = hrSalaryPaymentText(`${metrics.payableCases.length} completed case${metrics.payableCases.length === 1 ? '' : 's'}`, `${metrics.payableCases.length} حالات مكتملة`);
+      const paid = await openHrSalaryPaymentDialog({
+        amount, recipients: [user.fullName], summary: `${scopeLabel} · ${hrDateLabel(range.start, { short: true })}${range.end !== range.start ? ' — ' + hrDateLabel(range.end, { short: true }) : ''}`,
+        pay: async methodId => {
+          const { error } = await db.rpc('hr_pay_doctor_procedures_with_method', {
+            p_user_id: userId,
+            p_scope: metrics.scope,
+            p_start_date: range.start,
+            p_end_date: range.end,
+            p_finding_ids: findingIds,
+            p_payment_method_id: methodId,
+            p_expected_amount: amount
+          });
+          if (error) throw error;
+        }
+      });
+      if (!paid) return false;
+      showAppointmentNotificationToast(hrSalaryPaymentText('Doctor salary paid', 'تم دفع راتب الطبيب'), hrSalaryPaymentText('Selected cases were settled and a linked Salary expense was added.', 'تمت تسوية الحالات المحددة وإضافة مصروف راتب مرتبط.'));
+      await refreshHrAfterSalaryPayment();
+      if (activeHrDoctorDetailsId === userId) {
         hrDoctorSelectedCaseIds = new Set();
         hrDoctorSettlementRangeKey = '';
-        await loadHrDoctorSettlementCases({ refresh: true });
-        if (activeHrDoctorDetailsId === userId) renderHrDoctorDetails();
-        showAppointmentNotificationToast('Doctor cases paid', `${metrics.payableCases.length} case${metrics.payableCases.length === 1 ? '' : 's'} settled for ${user.fullName}.`);
-        return true;
-      } catch (error) {
-        alert('Could not settle doctor cases: ' + (error?.message || 'Unknown error'));
-        return false;
-      } finally {
-        if (button?.isConnected) button.disabled = false;
+        try { await loadHrDoctorSettlementCases({ refresh: true }); renderHrDoctorDetails(); } catch (_) {}
       }
+      return true;
     }
 
     async function payAllHrSalaries() {
       if (!canModifyHr() || hrPayrollPeriod?.status !== 'locked') return;
       const payable = hrDirectoryUsers.filter(user => user.active && !user.isDoctor).map(user => ({ user, metrics: hrUserMetrics(user) })).filter(item => item.metrics.settings.attendanceEnabled && !item.metrics.paid && item.metrics.salary > 0);
-      if (!payable.length) return alert('There are no unpaid calculated salaries in this month.');
-      if (!confirm(`Pay ${payable.length} calculated salaries and add them to Finance expenses?`)) return;
-      let paidCount = 0;
-      for (const item of payable) if (await payHrSalary(item.user.userId, { quiet: true, deferRefresh: true })) paidCount += 1;
-      hrDirectoryLoaded = false;
-      await refreshHrDirectory({ refresh: true });
-      if (paidCount === payable.length) {
-        try {
-          const { data, error } = await db.rpc('hr_finalize_payroll_period', { p_pay_month: hrMonthBounds().start });
-          if (!error) hrPayrollPeriod = Array.isArray(data) ? data[0] : data;
-        } catch (_) {}
-      }
-      renderHrDirectory();
-      showAppointmentNotificationToast('Payroll updated', `${paidCount} salary payment${paidCount === 1 ? '' : 's'} added to Finance expenses.`);
+      if (!payable.length) return alert(hrSalaryPaymentText('There are no unpaid calculated salaries in this month.', 'لا توجد رواتب محسوبة غير مدفوعة في هذا الشهر.'));
+      const month = hrMonthBounds().start;
+      const salaries = payable.map(item => ({ user_id: item.user.userId, expected_amount: Math.round(item.metrics.salary * 100) / 100 }));
+      const paid = await openHrSalaryPaymentDialog({
+        amount: Math.round(salaries.reduce((sum, item) => sum + item.expected_amount, 0) * 100) / 100,
+        recipients: payable.map(item => item.user.fullName),
+        summary: hrSalaryPaymentText(`${payable.length} staff salaries`, `رواتب ${payable.length} موظفين`) + ' · ' + hrDateLabel(month, { short: true }),
+        pay: async methodId => {
+          const { error } = await db.rpc('hr_pay_staff_batch_with_method', { p_pay_month: month, p_payment_method_id: methodId, p_salaries: salaries });
+          if (error) throw error;
+        }
+      });
+      if (!paid) return;
+      showAppointmentNotificationToast(hrSalaryPaymentText('Payroll paid', 'تم دفع الرواتب'), hrSalaryPaymentText(`${payable.length} salary expenses added to Finances.`, `تمت إضافة ${payable.length} مصروفات رواتب إلى المالية.`));
+      await refreshHrAfterSalaryPayment();
     }
 
     function renderMyAttendanceState() {

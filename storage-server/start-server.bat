@@ -13,7 +13,7 @@ if errorlevel 1 goto :PYTHON_FAILED
 if /i "%~1"=="--check-only" exit /b 0
 
 echo [*] Starting Storage Server...
-echo [*] Accessible locally on: http://localhost:5000
+echo [*] The server uses the port configured in config.json (default: 5000).
 echo [*] Press Ctrl+C anytime to stop.
 echo.
 "%~dp0.venv\Scripts\python.exe" "%~dp0server.py"

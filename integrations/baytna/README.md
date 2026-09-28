@@ -12,6 +12,7 @@ The live Lumin and Baytna database migrations and Baytna's `lumin-finance-sync` 
 - Existing Baytna categories are reused. Income initially uses **Clinic salary**; expenses default to **Clinic**, with matching categories for expense types such as Salary and Dental Lab. These defaults are editable.
 - Expense installments retain distinct payment methods and Cairo payment dates. Reducing an expense's paid total corrects its newest tracked installments first. Reductions affecting only pre-integration payments are excluded.
 - Imported receipts and installments combine their selected Cairo payment date with their original entry time, so newly recorded payments appear correctly in recent activity.
+- HR doctor, staff, and bulk payroll payments require a confirmation dialog with an active payment method. The dialog previews its saved Baytna destination and warns about excluded methods, paused delivery, or disabled expense sync. The method is saved on the salary expense before the payment capture trigger runs. Bulk staff payroll is atomic, and a changed salary amount requires a fresh review.
 - Salary expenses and payments recorded by older clients without a method appear as **Choose method**. No destination account is guessed.
 - Changed mappings apply to subsequent activity. Previously posted transactions are not moved automatically. A future historical-import feature must be explicitly invoked and reconcile amounts already included in opening balances; no historical-import endpoint is installed.
 
@@ -29,6 +30,7 @@ Baytna recalculates balances through its existing ledger view and refreshes visi
 
 - `node --test tests/*.test.cjs` in Lumin; syntax-check `lumin-finance-sync.js` and the inline application scripts.
 - Run `supabase/tests/finance_sync.test.sql` on Lumin and `integrations/baytna/supabase/tests/lumin_receiver.test.sql` on Baytna. Both use transactions and roll back every fixture and outgoing test request.
+- Run `supabase/tests/hr_salary_payment_methods.test.sql` on Lumin to verify salary routing, duplicate prevention, batch rollback, and HR access; all fixtures roll back.
 - In Baytna's project, run `pnpm test` and `pnpm build`.
 - Check desktop, tablet, phone, English, and Arabic layouts. Verify cash/InstaPay mappings, excluded Card, settings persistence, 44px controls, missing-method review, and no page overflow.
 

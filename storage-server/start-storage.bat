@@ -16,7 +16,7 @@ if errorlevel 1 goto :TUNNEL_FAILED
 title Lumin Storage ^& Universal Access
 if /i "%~1"=="--check-only" exit /b 0
 
-"%~dp0.venv\Scripts\python.exe" "%~dp0tunnel_sync.py"
+"%~dp0.venv\Scripts\python.exe" -u "%~dp0tunnel_sync.py" %*
 set "STORAGE_EXIT=%errorlevel%"
 
 if not "%STORAGE_EXIT%"=="0" echo [!] Storage and tunnel process stopped with error code %STORAGE_EXIT%.

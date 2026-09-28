@@ -49,18 +49,13 @@ echo.
 if /i "%~1"=="--check-only" exit /b 0
 
 echo.
-echo [*] Starting Cloudflare Tunnel connected to http://localhost:5000 ...
-echo [*] Look for the line containing: https://xxxx.trycloudflare.com
-echo [*] Copy that URL into Lumin Admin -^> Storage ^& X-Rays.
+echo [*] Checking storage server and monitoring Cloudflare Tunnel...
+echo [*] Connection errors are saved in tunnel.log.
 echo ==============================================================
 echo.
 
-"%CLOUDFLARED_EXE%" tunnel --url http://localhost:5000
-set "TUNNEL_EXIT=%errorlevel%"
-echo.
-if not "%TUNNEL_EXIT%"=="0" echo [!] Cloudflare Tunnel stopped with error code %TUNNEL_EXIT%.
-pause
-exit /b %TUNNEL_EXIT%
+call "%~dp0run-tunnel.bat" %*
+exit /b %errorlevel%
 
 :DOWNLOAD_FAILED
 echo.

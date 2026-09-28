@@ -426,13 +426,31 @@ def serve_file(filename):
     resp.headers["Cache-Control"] = "public, max-age=86400"
     return resp
 
+def get_local_ip() -> str:
+    """Detect the local machine IP on the clinic LAN."""
+    try:
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0.2)
+        s.connect(('10.254.254.254', 1))
+        ip = s.getsockname()[0]
+        s.close()
+        if ip and ip != '127.0.0.1':
+            return ip
+    except Exception:
+        pass
+    return ""
+
 if __name__ == "__main__":
     port = int(config.get("port", 5000))
+    local_ip = get_local_ip()
     print("=" * 60)
     print("  LUMIN DENTAL CLINIC - LOCAL STORAGE SERVER")
     print("=" * 60)
     print(f"  Storage Directory: {STORAGE_ROOT}")
-    print(f"  Local Port:        http://localhost:{port}")
+    print(f"  Local Host:        http://localhost:{port}")
+    if local_ip:
+        print(f"  Clinic LAN Access: http://{local_ip}:{port}")
     print(f"  Secret Clinic Key: {config.get('clinic_secret_key')}")
     print("=" * 60)
     app.run(host="0.0.0.0", port=port, debug=False)
