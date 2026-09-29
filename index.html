@@ -8002,9 +8002,14 @@
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-2 flex-wrap">
                     <h4 id="whatsapp-chat-patient-name" class="truncate text-sm sm:text-base font-bold text-slate-900 tracking-tight">Patient Name</h4>
-                    <button type="button" id="whatsapp-chat-patient-file-btn" onclick="openActiveChatPatientFile()" class="shrink-0 inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100 transition shadow-2xs" title="Open patient chart">
-                      <i data-lucide="user" class="h-3 w-3"></i> <span>File</span>
-                    </button>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                      <button type="button" id="whatsapp-chat-patient-file-btn" onclick="openActiveChatPatientFile()" class="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100 transition shadow-2xs active:scale-[0.98]" title="Open patient profile">
+                        <i data-lucide="user" class="h-3.5 w-3.5"></i> <span>File</span>
+                      </button>
+                      <button type="button" id="whatsapp-chat-relink-patient-btn" onclick="openLinkWhatsAppPatientModal()" class="shrink-0 inline-flex items-center justify-center h-7 w-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition shadow-2xs" title="Link or change patient profile" aria-label="Link patient">
+                        <i data-lucide="link-2" class="h-3.5 w-3.5"></i>
+                      </button>
+                    </div>
                   </div>
                   <p id="whatsapp-chat-patient-phone" class="truncate text-xs font-medium text-slate-500 mt-0.5" dir="ltr">+964 770 000 0000</p>
                 </div>
@@ -8148,6 +8153,126 @@
     </section>
 
   </main>
+
+  <!-- ================= MODAL: LINK WHATSAPP TO PATIENT ================= -->
+  <div id="modal-link-whatsapp-patient" onclick="if (event.target === this) closeLinkWhatsAppPatientModal()" class="fixed inset-0 z-[95] hidden items-end sm:items-center justify-center bg-slate-900/40 p-0 sm:p-4 backdrop-blur-sm">
+    <div role="dialog" aria-modal="true" aria-labelledby="link-wa-modal-title" class="flex flex-col max-h-[92vh] sm:max-h-[85vh] w-full max-w-lg overflow-hidden rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl border border-slate-200" style="padding-bottom: max(0.5rem, env(safe-area-inset-bottom));">
+      
+      <!-- Modal Header -->
+      <header class="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-6 sm:py-5 shrink-0">
+        <div class="flex min-w-0 items-center gap-3">
+          <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+            <i data-lucide="user-plus" class="h-5 w-5"></i>
+          </span>
+          <div class="min-w-0">
+            <h3 id="link-wa-modal-title" class="text-lg font-semibold tracking-tight text-slate-900">Link WhatsApp to Patient</h3>
+            <div class="mt-1 flex items-center gap-2 flex-wrap text-xs text-slate-500">
+              <span id="link-wa-contact-chip" class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs font-semibold text-slate-800"></span>
+              <span id="link-wa-contact-name" class="font-medium text-slate-600 truncate max-w-[200px]"></span>
+            </div>
+          </div>
+        </div>
+        <button type="button" onclick="closeLinkWhatsAppPatientModal()" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 active:scale-[0.98]" title="Close" aria-label="Close">
+          <i data-lucide="x" class="h-5 w-5"></i>
+        </button>
+      </header>
+
+      <!-- Segmented Tab Switcher (Existing vs New) -->
+      <div class="px-5 pt-4 sm:px-6 shrink-0">
+        <div class="flex rounded-xl bg-slate-100 p-1">
+          <button type="button" id="tab-btn-link-wa-existing" onclick="setLinkWhatsAppTab('existing')" class="flex-1 rounded-lg py-2 text-xs sm:text-sm font-bold transition shadow-xs bg-white text-slate-900">
+            <span id="tab-label-link-wa-existing">Existing Patient</span>
+          </button>
+          <button type="button" id="tab-btn-link-wa-new" onclick="setLinkWhatsAppTab('new')" class="flex-1 rounded-lg py-2 text-xs sm:text-sm font-bold transition text-slate-500 hover:text-slate-900">
+            <span id="tab-label-link-wa-new">Create New Patient</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <div class="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 space-y-4">
+        
+        <!-- Tab 1: Link to Existing Patient -->
+        <div id="tab-content-link-wa-existing" class="space-y-3.5">
+          <div>
+            <label class="mb-1.5 block text-xs font-semibold text-slate-700" id="label-link-wa-search">Search patient by name, phone, or file #</label>
+            <div class="relative">
+              <i data-lucide="search" class="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none"></i>
+              <input type="text" id="link-wa-search-input" oninput="filterLinkWhatsAppPatients(this.value)" placeholder="e.g. Sarah, 0101234, or #1042" class="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20" />
+            </div>
+          </div>
+
+          <!-- Live Results List -->
+          <div>
+            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5" id="label-link-wa-select-patient">Select patient to link</p>
+            <div id="link-wa-patients-results" class="max-h-56 overflow-y-auto space-y-2 rounded-xl border border-slate-100 p-1 bg-slate-50/50">
+              <!-- Rendered items here -->
+            </div>
+          </div>
+
+          <!-- Selection Confirmation Banner -->
+          <div id="link-wa-selected-banner" class="hidden rounded-xl bg-blue-50 p-3.5 text-xs text-blue-900 space-y-2">
+            <div class="flex items-center gap-2 font-bold text-blue-950">
+              <i data-lucide="check-circle" class="h-4 w-4 text-blue-600 shrink-0"></i>
+              <span id="link-wa-selected-summary">Selected Patient</span>
+            </div>
+            <p id="link-wa-selected-desc" class="text-slate-600 leading-relaxed"></p>
+            <label class="flex items-center gap-2 cursor-pointer pt-1 border-t border-blue-200">
+              <input type="checkbox" id="link-wa-update-username-check" checked class="rounded text-blue-600 focus:ring-blue-500 h-4 w-4" />
+              <span class="font-semibold text-slate-700" id="label-link-wa-update-username">Update patient's WhatsApp username/code on file</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Tab 2: Create New Patient -->
+        <div id="tab-content-link-wa-new" class="hidden space-y-3.5">
+          <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+            <label class="block sm:col-span-2">
+              <span class="mb-1 block text-xs font-semibold text-slate-700" id="label-link-new-name">Patient Full Name <span class="text-rose-500">*</span></span>
+              <input type="text" id="link-new-patient-name" required placeholder="e.g. Sarah Connor" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20" />
+            </label>
+
+            <label class="block">
+              <span class="mb-1 block text-xs font-semibold text-slate-700" id="label-link-new-phone">Phone Number <span class="font-normal text-slate-400">(optional)</span></span>
+              <input type="tel" id="link-new-patient-phone" placeholder="e.g. 01001234567" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20" />
+            </label>
+
+            <label class="block">
+              <span class="mb-1 block text-xs font-semibold text-slate-700" id="label-link-new-gender">Gender</span>
+              <select id="link-new-patient-gender" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20">
+                <option value="female">Female / أنثى</option>
+                <option value="male">Male / ذكر</option>
+              </select>
+            </label>
+
+            <label class="block">
+              <span class="mb-1 block text-xs font-semibold text-slate-700" id="label-link-new-username">WhatsApp Username</span>
+              <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-xs">@</span>
+                <input type="text" id="link-new-patient-username" placeholder="username" class="w-full rounded-xl border border-slate-200 bg-slate-50 pl-7 pr-3.5 py-2.5 text-sm font-mono text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20" />
+              </div>
+            </label>
+
+            <label class="block">
+              <span class="mb-1 block text-xs font-semibold text-slate-700" id="label-link-new-code">WhatsApp Code (BSUID)</span>
+              <input type="text" id="link-new-patient-code" placeholder="+EG.4631528857091458" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-mono text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20" />
+            </label>
+          </div>
+        </div>
+
+        <p id="link-wa-modal-error" class="hidden rounded-xl bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700"></p>
+      </div>
+
+      <!-- Modal Footer -->
+      <footer class="flex items-center justify-end gap-2.5 border-t border-slate-100 bg-slate-50 px-5 py-4 sm:px-6 shrink-0">
+        <button type="button" onclick="closeLinkWhatsAppPatientModal()" class="min-h-11 rounded-xl px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-200 active:scale-[0.98]">Cancel</button>
+        <button id="btn-submit-link-wa" type="button" onclick="submitLinkWhatsAppPatient()" class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none">
+          <i data-lucide="check" class="h-4 w-4"></i>
+          <span id="btn-submit-link-wa-text">Link Patient</span>
+        </button>
+      </footer>
+    </div>
+  </div>
 
   <!-- ================= MODAL: WHATSAPP LOCATION ================= -->
   <div id="modal-whatsapp-location" onclick="if (event.target === this) closeWhatsAppLocationSheet()" class="fixed inset-0 z-[95] hidden items-end justify-center bg-slate-900/40 p-0 backdrop-blur-sm sm:items-center sm:p-4">
@@ -37965,20 +38090,24 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         document.getElementById('whatsapp-chat-patient-name').textContent = displayName;
 
         const fileBtn = document.getElementById('whatsapp-chat-patient-file-btn');
+        const relinkBtn = document.getElementById('whatsapp-chat-relink-patient-btn');
         if (fileBtn) {
           const fileSpan = fileBtn.querySelector('span');
           if (resolvedPatient?.patientNumber) {
             if (fileSpan) fileSpan.textContent = `#${resolvedPatient.patientNumber}`;
-            fileBtn.title = currentUiLanguage === 'ar' ? `فتح ملف المريض #${resolvedPatient.patientNumber}` : `Open patient file #${resolvedPatient.patientNumber}`;
-            fileBtn.className = 'shrink-0 inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100 transition shadow-2xs';
+            fileBtn.title = currentUiLanguage === 'ar' ? `فتح ملف المريض #${resolvedPatient.patientNumber}` : `Open patient profile #${resolvedPatient.patientNumber}`;
+            fileBtn.className = 'shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100 transition shadow-2xs active:scale-[0.98]';
+            if (relinkBtn) relinkBtn.classList.remove('hidden');
           } else if (activeWhatsAppConversation.patient_id || resolvedPatient) {
             if (fileSpan) fileSpan.textContent = currentUiLanguage === 'ar' ? 'الملف' : 'File';
-            fileBtn.title = currentUiLanguage === 'ar' ? 'فتح ملف المريض' : 'Open patient file';
-            fileBtn.className = 'shrink-0 inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100 transition shadow-2xs';
+            fileBtn.title = currentUiLanguage === 'ar' ? 'فتح ملف المريض' : 'Open patient profile';
+            fileBtn.className = 'shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100 transition shadow-2xs active:scale-[0.98]';
+            if (relinkBtn) relinkBtn.classList.remove('hidden');
           } else {
-            if (fileSpan) fileSpan.textContent = currentUiLanguage === 'ar' ? '+ ربط / إنشاء' : '+ Link / New';
-            fileBtn.title = currentUiLanguage === 'ar' ? 'ربط أو إنشاء ملف مريض' : 'Link or create patient file';
-            fileBtn.className = 'shrink-0 inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-200 transition shadow-2xs';
+            if (fileSpan) fileSpan.textContent = currentUiLanguage === 'ar' ? '+ ربط / مريض جديد' : '+ Link / New Patient';
+            fileBtn.title = currentUiLanguage === 'ar' ? 'ربط جهة الاتصال بمريض موجود أو إنشاء مريض جديد' : 'Link to existing patient or create new patient';
+            fileBtn.className = 'shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition shadow-2xs active:scale-[0.98]';
+            if (relinkBtn) relinkBtn.classList.add('hidden');
           }
         }
 
@@ -39197,12 +39326,14 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     async function openActiveChatPatientFile() {
       if (!activeWhatsAppConversation) return;
 
+      // 1. If already linked to a patient profile in local state
       if (activeWhatsAppConversation.patient_id) {
         activePatientId = activeWhatsAppConversation.patient_id;
         await switchView('patient-profile');
         return;
       }
 
+      // 2. Check if a patient record exists in memory or DB matching this conversation
       const matchedPatient = await ensurePatientForWhatsApp(activeWhatsAppConversation);
       if (matchedPatient) {
         activeWhatsAppConversation.patient_id = matchedPatient.id;
@@ -39211,59 +39342,534 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         return;
       }
 
+      // 3. No patient found: open the popup modal window to link to an existing patient or create a new patient
+      openLinkWhatsAppPatientModal();
+    }
+
+    let linkWaActiveTab = 'existing';
+    let linkWaSelectedPatientId = null;
+    let linkWaSearchDebounceTimer = null;
+
+    function setLinkWhatsAppTab(tab) {
+      linkWaActiveTab = tab;
+      const isAr = currentUiLanguage === 'ar';
+      const existingTabBtn = document.getElementById('tab-btn-link-wa-existing');
+      const newTabBtn = document.getElementById('tab-btn-link-wa-new');
+      const existingContent = document.getElementById('tab-content-link-wa-existing');
+      const newContent = document.getElementById('tab-content-link-wa-new');
+      const submitBtnText = document.getElementById('btn-submit-link-wa-text');
+      const errorEl = document.getElementById('link-wa-modal-error');
+      if (errorEl) {
+        errorEl.classList.add('hidden');
+        errorEl.textContent = '';
+      }
+
+      if (tab === 'existing') {
+        existingTabBtn?.classList.remove('text-slate-500', 'hover:text-slate-900');
+        existingTabBtn?.classList.add('bg-white', 'text-slate-900', 'shadow-xs');
+        newTabBtn?.classList.remove('bg-white', 'text-slate-900', 'shadow-xs');
+        newTabBtn?.classList.add('text-slate-500', 'hover:text-slate-900');
+
+        existingContent?.classList.remove('hidden');
+        newContent?.classList.add('hidden');
+        if (submitBtnText) submitBtnText.textContent = isAr ? 'ربط الملف' : 'Link Patient';
+      } else {
+        newTabBtn?.classList.remove('text-slate-500', 'hover:text-slate-900');
+        newTabBtn?.classList.add('bg-white', 'text-slate-900', 'shadow-xs');
+        existingTabBtn?.classList.remove('bg-white', 'text-slate-900', 'shadow-xs');
+        existingTabBtn?.classList.add('text-slate-500', 'hover:text-slate-900');
+
+        newContent?.classList.remove('hidden');
+        existingContent?.classList.add('hidden');
+        if (submitBtnText) submitBtnText.textContent = isAr ? 'إنشاء وربط ملف المريض' : 'Create & Link Patient';
+      }
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function renderLinkWaPatientItems(matches, container, isAr) {
+      if (!matches || matches.length === 0) {
+        container.innerHTML = `
+          <div class="p-6 text-center text-xs text-slate-500">
+            <p class="font-medium">${isAr ? 'لم يتم العثور على مريض مطابق.' : 'No matching patients found.'}</p>
+            <p class="mt-1 text-slate-400">${isAr ? 'يمكنك التبديل إلى "إنشاء مريض جديد" لإنشاء ملف فوري.' : 'You can switch to "Create New Patient" to create a profile.'}</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = matches.map(p => {
+        const isSelected = String(linkWaSelectedPatientId) === String(p.id);
+        const name = escapeHtml(p.name || (isAr ? 'مريض بدون اسم' : 'Unnamed Patient'));
+        const fileBadge = p.patientNumber ? `<span class="shrink-0 rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700">#${escapeHtml(String(p.patientNumber))}</span>` : '';
+        const initials = (p.name || 'P').trim().split(/\s+/).map(x => x[0]).slice(0, 2).join('').toUpperCase();
+        
+        let metaParts = [];
+        if (p.phone) metaParts.push(escapeHtml(p.phone));
+        if (p.whatsappUsername) metaParts.push(`@${escapeHtml(cleanWhatsAppUsername(p.whatsappUsername))}`);
+        if (p.whatsappCode) metaParts.push(escapeHtml(formatWhatsAppCode(p.whatsappCode)));
+        const metaText = metaParts.join(' • ') || (isAr ? 'لا يوجد هاتف مسجل' : 'No phone recorded');
+
+        const activeStyles = isSelected
+          ? 'bg-blue-50 border border-blue-200 text-blue-950 font-semibold'
+          : 'bg-white hover:bg-slate-100/90 text-slate-800 border border-slate-100';
+
+        return `
+          <div onclick="selectLinkWhatsAppPatient('${escapeHtml(String(p.id))}')" role="button" tabindex="0" class="flex items-center justify-between gap-3 rounded-xl p-2.5 transition cursor-pointer select-none ${activeStyles}">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xs font-bold text-slate-700">
+                ${initials}
+              </div>
+              <div class="min-w-0">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="truncate text-sm font-bold text-slate-900">${name}</span>
+                  ${fileBadge}
+                </div>
+                <p class="truncate text-xs text-slate-500 mt-0.5" dir="ltr">${metaText}</p>
+              </div>
+            </div>
+            <div class="shrink-0">
+              ${isSelected ? `
+                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-white shadow-2xs">
+                  <i data-lucide="check" class="h-3.5 w-3.5"></i>
+                </span>
+              ` : `
+                <span class="flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-transparent">
+                  <i data-lucide="check" class="h-3.5 w-3.5"></i>
+                </span>
+              `}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    async function filterLinkWhatsAppPatients(query) {
+      const container = document.getElementById('link-wa-patients-results');
+      if (!container) return;
+      const isAr = currentUiLanguage === 'ar';
+      const q = String(query || '').trim().toLowerCase();
+      const patientList = (Array.isArray(patients) && patients.length > 0)
+        ? patients
+        : (Array.isArray(patientDirectoryRows) ? patientDirectoryRows : []);
+
+      let matches = [];
+      if (!q) {
+        matches = patientList.slice(0, 15);
+      } else {
+        const cleanQ = q.replace(/^#/, '');
+        matches = patientList.filter(p => {
+          if (!p) return false;
+          const name = String(p.name || '').toLowerCase();
+          const phone = String(p.phone || '').replace(/[^\d]/g, '');
+          const fileNum = String(p.patientNumber || p.file_number || p.id || '').toLowerCase();
+          const username = String(p.whatsappUsername || p.whatsapp_username || '').toLowerCase();
+          const code = String(p.whatsappCode || p.whatsapp_code || '').toLowerCase();
+
+          return name.includes(q) ||
+                 (cleanQ && fileNum.includes(cleanQ)) ||
+                 (cleanQ && phone.includes(cleanQ)) ||
+                 (cleanQ && username.includes(cleanQ)) ||
+                 (cleanQ && code.includes(cleanQ));
+        }).slice(0, 20);
+      }
+
+      renderLinkWaPatientItems(matches, container, isAr);
+
+      if (q.length >= 2) {
+        clearTimeout(linkWaSearchDebounceTimer);
+        linkWaSearchDebounceTimer = setTimeout(async () => {
+          try {
+            const cleanQ = q.replace(/^#/, '');
+            let sbQuery = db.from('patients').select(PATIENT_SELECT_FIELDS);
+            if (/^\d+$/.test(cleanQ)) {
+              sbQuery = sbQuery.or(`patient_number.eq.${cleanQ},phone.ilike.%${cleanQ}%`);
+            } else {
+              sbQuery = sbQuery.or(`name.ilike.%${cleanQ}%,whatsapp_username.ilike.%${cleanQ}%,whatsapp_code.ilike.%${cleanQ}%`);
+            }
+            const { data, error } = await sbQuery.limit(15);
+            if (!error && Array.isArray(data) && data.length > 0) {
+              const remoteNormalised = data.map(normalisePatientRecord);
+              const mergedMap = new Map();
+              matches.forEach(m => mergedMap.set(String(m.id), m));
+              remoteNormalised.forEach(r => {
+                if (!mergedMap.has(String(r.id))) {
+                  mergedMap.set(String(r.id), r);
+                  if (Array.isArray(patients) && !patients.some(p => p.id === r.id)) {
+                    patients.push(r);
+                  }
+                }
+              });
+              renderLinkWaPatientItems(Array.from(mergedMap.values()).slice(0, 20), container, isAr);
+            }
+          } catch (e) {
+            console.warn('Live remote patient search error:', e);
+          }
+        }, 250);
+      }
+    }
+
+    function selectLinkWhatsAppPatient(patientId) {
+      linkWaSelectedPatientId = patientId;
+      const patientList = (Array.isArray(patients) && patients.length > 0)
+        ? patients
+        : (Array.isArray(patientDirectoryRows) ? patientDirectoryRows : []);
+      const patient = patientList.find(p => String(p.id) === String(patientId));
+      if (!patient) return;
+
+      const isAr = currentUiLanguage === 'ar';
+      const banner = document.getElementById('link-wa-selected-banner');
+      const summary = document.getElementById('link-wa-selected-summary');
+      const desc = document.getElementById('link-wa-selected-desc');
+      const errorEl = document.getElementById('link-wa-modal-error');
+      if (errorEl) errorEl.classList.add('hidden');
+
+      if (banner) {
+        banner.classList.remove('hidden');
+        if (summary) {
+          summary.textContent = patient.name + (patient.patientNumber ? ` (#${patient.patientNumber})` : '');
+        }
+        if (desc && activeWhatsAppConversation) {
+          const rawContact = String(activeWhatsAppConversation.phone || '').trim();
+          const isBsuid = isWhatsAppBsuid(rawContact);
+          const isUsername = isWhatsAppUsername(rawContact);
+          const contactTag = isBsuid ? formatWhatsAppCode(rawContact) : isUsername ? `@${cleanWhatsAppUsername(rawContact)}` : rawContact;
+
+          desc.textContent = isAr
+            ? `سيتم ربط المحادثة (${contactTag}) بملف المريض ${patient.name}.`
+            : `Conversation (${contactTag}) will be linked to ${patient.name}'s medical profile.`;
+        }
+      }
+
+      const searchInput = document.getElementById('link-wa-search-input');
+      filterLinkWhatsAppPatients(searchInput ? searchInput.value : '');
+    }
+
+    function openLinkWhatsAppPatientModal() {
+      if (!activeWhatsAppConversation) return;
+
+      const modal = document.getElementById('modal-link-whatsapp-patient');
+      if (!modal) return;
+
+      const isAr = currentUiLanguage === 'ar';
       const rawContact = String(activeWhatsAppConversation.phone || '').trim();
       const isBsuid = isWhatsAppBsuid(rawContact);
-      const isUsername = rawContact.startsWith('@') || isWhatsAppUsername(rawContact);
-      const contactLabel = isBsuid
-        ? formatWhatsAppCode(rawContact)
-        : isUsername
-          ? `@${cleanWhatsAppUsername(rawContact)}`
-          : ('+' + rawContact.replace(/[^\d]/g, ''));
+      const isUsername = isWhatsAppUsername(rawContact);
 
-      const confirmed = confirm(
-        currentUiLanguage === 'ar'
-          ? `لم يتم ربط هذه المحادثة بملف مريض بعد.\nهل تريد إنشاء مريض جديد باسم "${activeWhatsAppConversation.patient_name || 'مريض جديد'}" ومعرّف "${contactLabel}"؟`
-          : `This conversation is not linked to a patient profile yet.\nWould you like to create a new patient named "${activeWhatsAppConversation.patient_name || 'New Patient'}" with identifier "${contactLabel}"?`
-      );
-      if (!confirmed) return;
+      // Contact Chip & Display
+      let chipText = '';
+      if (isBsuid) chipText = formatWhatsAppCode(rawContact);
+      else if (isUsername) chipText = `@${cleanWhatsAppUsername(rawContact)}`;
+      else chipText = formatWhatsAppContactDisplay(rawContact);
 
-      try {
-        const nameParts = (activeWhatsAppConversation.patient_name || 'Patient').trim().split(/\s+/);
-        const firstName = nameParts[0] || 'Patient';
-        const lastName = nameParts.slice(1).join(' ') || '';
+      const contactChip = document.getElementById('link-wa-contact-chip');
+      if (contactChip) contactChip.textContent = chipText;
 
-        const newPatientPayload = {
-          name: activeWhatsAppConversation.patient_name || 'Patient',
-          first_name: firstName,
-          last_name: lastName
-        };
+      const contactName = document.getElementById('link-wa-contact-name');
+      if (contactName) contactName.textContent = activeWhatsAppConversation.patient_name || (isAr ? 'جهة اتصال واتساب' : 'WhatsApp Contact');
 
-        if (isBsuid) {
-          newPatientPayload.whatsapp_code = formatWhatsAppCode(rawContact);
-          newPatientPayload.phone = null;
-        } else if (isUsername) {
-          newPatientPayload.whatsapp_username = cleanWhatsAppUsername(rawContact);
-          newPatientPayload.phone = null;
+      // Pre-fill Tab 2 (Create New)
+      const newNameInput = document.getElementById('link-new-patient-name');
+      if (newNameInput) newNameInput.value = activeWhatsAppConversation.patient_name || '';
+
+      const newPhoneInput = document.getElementById('link-new-patient-phone');
+      if (newPhoneInput) {
+        newPhoneInput.value = (!isBsuid && !isUsername) ? rawContact.replace(/[^\d]/g, '') : '';
+      }
+
+      const newUsernameInput = document.getElementById('link-new-patient-username');
+      if (newUsernameInput) {
+        newUsernameInput.value = isUsername ? cleanWhatsAppUsername(rawContact) : '';
+      }
+
+      const newCodeInput = document.getElementById('link-new-patient-code');
+      if (newCodeInput) {
+        newCodeInput.value = isBsuid ? formatWhatsAppCode(rawContact) : '';
+      }
+
+      // Bilingual labels
+      const modalTitle = document.getElementById('link-wa-modal-title');
+      if (modalTitle) modalTitle.textContent = isAr ? 'ربط واتساب بملف مريض' : 'Link WhatsApp to Patient';
+
+      const tabLabelExisting = document.getElementById('tab-label-link-wa-existing');
+      if (tabLabelExisting) tabLabelExisting.textContent = isAr ? 'مريض موجود' : 'Existing Patient';
+
+      const tabLabelNew = document.getElementById('tab-label-link-wa-new');
+      if (tabLabelNew) tabLabelNew.textContent = isAr ? 'إنشاء مريض جديد' : 'Create New Patient';
+
+      const labelSearch = document.getElementById('label-link-wa-search');
+      if (labelSearch) labelSearch.textContent = isAr ? 'البحث عن مريض بالاسم أو الهاتف أو رقم الملف' : 'Search patient by name, phone, or file #';
+
+      const searchInput = document.getElementById('link-wa-search-input');
+      if (searchInput) {
+        searchInput.placeholder = isAr ? 'مثال: سارة، 0101234، أو #1042' : 'e.g. Sarah, 0101234, or #1042';
+        searchInput.value = '';
+      }
+
+      const labelSelectPatient = document.getElementById('label-link-wa-select-patient');
+      if (labelSelectPatient) labelSelectPatient.textContent = isAr ? 'اختر مريضاً للربط' : 'Select patient to link';
+
+      const labelUpdateUsername = document.getElementById('label-link-wa-update-username');
+      if (labelUpdateUsername) {
+        if (isUsername) {
+          labelUpdateUsername.textContent = isAr ? `تحديث اسم مستخدم واتساب (@${cleanWhatsAppUsername(rawContact)}) في ملف المريض` : `Update WhatsApp username (@${cleanWhatsAppUsername(rawContact)}) on patient's profile`;
+        } else if (isBsuid) {
+          labelUpdateUsername.textContent = isAr ? `تحديث كود واتساب (${formatWhatsAppCode(rawContact)}) في ملف المريض` : `Update WhatsApp code (${formatWhatsAppCode(rawContact)}) on patient's profile`;
         } else {
-          newPatientPayload.phone = rawContact.replace(/[^\d]/g, '') || null;
+          labelUpdateUsername.textContent = isAr ? `تحديث رقم الواتساب (${chipText}) في ملف المريض` : `Update WhatsApp phone (${chipText}) on patient's profile`;
+        }
+      }
+
+      const labelNewName = document.getElementById('label-link-new-name');
+      if (labelNewName) labelNewName.innerHTML = isAr ? 'اسم المريض الكامل <span class="text-rose-500">*</span>' : 'Patient Full Name <span class="text-rose-500">*</span>';
+
+      const labelNewPhone = document.getElementById('label-link-new-phone');
+      if (labelNewPhone) labelNewPhone.innerHTML = isAr ? 'رقم الهاتف <span class="font-normal text-slate-400">(اختياري)</span>' : 'Phone Number <span class="font-normal text-slate-400">(optional)</span>';
+
+      const labelNewGender = document.getElementById('label-link-new-gender');
+      if (labelNewGender) labelNewGender.textContent = isAr ? 'الجنس' : 'Gender';
+
+      const labelNewUsername = document.getElementById('label-link-new-username');
+      if (labelNewUsername) labelNewUsername.textContent = isAr ? 'اسم مستخدم واتساب' : 'WhatsApp Username';
+
+      const labelNewCode = document.getElementById('label-link-new-code');
+      if (labelNewCode) labelNewCode.textContent = isAr ? 'كود واتساب (BSUID)' : 'WhatsApp Code (BSUID)';
+
+      // Check if conversation already has a linked patient or matched patient
+      const resolvedPatient = resolvePatientForWhatsApp(activeWhatsAppConversation);
+      if (resolvedPatient) {
+        linkWaSelectedPatientId = resolvedPatient.id;
+        selectLinkWhatsAppPatient(resolvedPatient.id);
+      } else {
+        linkWaSelectedPatientId = null;
+        const banner = document.getElementById('link-wa-selected-banner');
+        if (banner) banner.classList.add('hidden');
+        filterLinkWhatsAppPatients('');
+      }
+
+      const errorEl = document.getElementById('link-wa-modal-error');
+      if (errorEl) {
+        errorEl.classList.add('hidden');
+        errorEl.textContent = '';
+      }
+
+      const submitBtn = document.getElementById('btn-submit-link-wa');
+      if (submitBtn) submitBtn.disabled = false;
+
+      setLinkWhatsAppTab('existing');
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      if (window.lucide) lucide.createIcons();
+
+      setTimeout(() => {
+        const input = document.getElementById('link-wa-search-input');
+        input?.focus();
+      }, 100);
+    }
+
+    function closeLinkWhatsAppPatientModal() {
+      const modal = document.getElementById('modal-link-whatsapp-patient');
+      if (!modal) return;
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      linkWaSelectedPatientId = null;
+    }
+
+    async function submitLinkWhatsAppPatient() {
+      if (!activeWhatsAppConversation) return;
+
+      const isAr = currentUiLanguage === 'ar';
+      const submitBtn = document.getElementById('btn-submit-link-wa');
+      const errorEl = document.getElementById('link-wa-modal-error');
+      const showError = (msg) => {
+        if (errorEl) {
+          errorEl.textContent = msg;
+          errorEl.classList.remove('hidden');
+        } else {
+          alert(msg);
+        }
+      };
+
+      if (errorEl) {
+        errorEl.classList.add('hidden');
+        errorEl.textContent = '';
+      }
+
+      const rawContact = String(activeWhatsAppConversation.phone || '').trim();
+      const isBsuid = isWhatsAppBsuid(rawContact);
+      const isUsername = isWhatsAppUsername(rawContact);
+
+      if (linkWaActiveTab === 'existing') {
+        if (!linkWaSelectedPatientId) {
+          showError(isAr ? 'يرجى اختيار مريض من القائمة أولاً.' : 'Please select a patient from the list first.');
+          return;
         }
 
-        const { data: newPatient, error } = await db.from('patients').insert(newPatientPayload).select(PATIENT_SELECT_FIELDS).single();
-        if (error) throw error;
-
-        const normalised = normalisePatientRecord(newPatient);
-        if (Array.isArray(patients) && !patients.some(p => p.id === normalised.id)) {
-          patients.unshift(normalised);
+        const patientList = (Array.isArray(patients) && patients.length > 0)
+          ? patients
+          : (Array.isArray(patientDirectoryRows) ? patientDirectoryRows : []);
+        const patient = patientList.find(p => String(p.id) === String(linkWaSelectedPatientId));
+        if (!patient) {
+          showError(isAr ? 'تعذر العثور على المريض المحدد.' : 'Selected patient could not be found.');
+          return;
         }
 
-        activeWhatsAppConversation.patient_id = normalised.id;
-        await db.from('whatsapp_conversations').update({ patient_id: normalised.id }).eq('id', activeWhatsAppConversation.id);
+        if (submitBtn) submitBtn.disabled = true;
 
-        renderWhatsAppConversationsList();
-        activePatientId = normalised.id;
-        await switchView('patient-profile');
-      } catch (err) {
-        alert('Failed to create patient: ' + err.message);
+        try {
+          const updateCheck = document.getElementById('link-wa-update-username-check')?.checked;
+          const patientUpdates = {};
+
+          if (updateCheck) {
+            if (isUsername) {
+              const uName = cleanWhatsAppUsername(rawContact);
+              patientUpdates.whatsapp_username = uName;
+              patient.whatsappUsername = uName;
+              patient.whatsapp_username = uName;
+            } else if (isBsuid) {
+              const bsuidCode = formatWhatsAppCode(rawContact);
+              patientUpdates.whatsapp_code = bsuidCode;
+              patient.whatsappCode = bsuidCode;
+              patient.whatsapp_code = bsuidCode;
+            } else {
+              const cleanNum = rawContact.replace(/[^\d]/g, '');
+              if (cleanNum && !patient.phone) {
+                patientUpdates.phone = cleanNum;
+                patient.phone = cleanNum;
+              }
+            }
+          }
+
+          if (Object.keys(patientUpdates).length > 0) {
+            patientUpdates.updated_at = new Date().toISOString();
+            const { error: patientErr } = await db.from('patients').update(patientUpdates).eq('id', patient.id);
+            if (patientErr) console.warn('Could not update patient with whatsapp info:', patientErr);
+          }
+
+          // Link conversation to patient
+          const { error: convErr } = await db.from('whatsapp_conversations').update({
+            patient_id: patient.id
+          }).eq('id', activeWhatsAppConversation.id);
+          if (convErr) throw convErr;
+
+          activeWhatsAppConversation.patient_id = patient.id;
+
+          // Re-render conversation list and header
+          renderWhatsAppConversationsList();
+          await selectWhatsAppConversation(activeWhatsAppConversation.id);
+
+          closeLinkWhatsAppPatientModal();
+          showAppointmentNotificationToast(
+            isAr ? 'تم ربط ملف المريض' : 'Patient File Linked',
+            isAr ? `تم ربط المحادثة بملف ${patient.name} بنجاح.` : `Conversation successfully linked to ${patient.name}.`
+          );
+
+          // Redirect directly to patient profile page!
+          activePatientId = patient.id;
+          await switchView('patient-profile');
+        } catch (err) {
+          console.error('Failed to link WhatsApp patient:', err);
+          showError((isAr ? 'فشل ربط المريض: ' : 'Failed to link patient: ') + (err.message || 'Unknown error'));
+        } finally {
+          if (submitBtn) submitBtn.disabled = false;
+        }
+
+      } else {
+        // Tab: Create New Patient
+        const nameInput = document.getElementById('link-new-patient-name');
+        const phoneInput = document.getElementById('link-new-patient-phone');
+        const genderInput = document.getElementById('link-new-patient-gender');
+        const usernameInput = document.getElementById('link-new-patient-username');
+        const codeInput = document.getElementById('link-new-patient-code');
+
+        const fullName = String(nameInput?.value || '').trim();
+        if (!fullName) {
+          showError(isAr ? 'يرجى إدخال اسم المريض الكامل.' : 'Please enter the patient full name.');
+          nameInput?.focus();
+          return;
+        }
+
+        if (submitBtn) submitBtn.disabled = true;
+
+        try {
+          const nameParts = fullName.split(/\s+/);
+          const firstName = nameParts[0] || 'Patient';
+          const lastName = nameParts.slice(1).join(' ') || '';
+          const gender = genderInput?.value || 'female';
+
+          const newPatientPayload = {
+            name: fullName,
+            first_name: firstName,
+            last_name: lastName,
+            gender: gender
+          };
+
+          const rawPhone = String(phoneInput?.value || '').replace(/[^\d]/g, '');
+          if (rawPhone) {
+            newPatientPayload.phone = rawPhone;
+          }
+
+          const rawUname = String(usernameInput?.value || '').trim();
+          if (rawUname) {
+            newPatientPayload.whatsapp_username = cleanWhatsAppUsername(rawUname);
+          }
+
+          const rawCode = String(codeInput?.value || '').trim();
+          if (rawCode) {
+            newPatientPayload.whatsapp_code = formatWhatsAppCode(rawCode);
+          }
+
+          // If no contact field entered, fall back to conversation's contact
+          if (!newPatientPayload.phone && !newPatientPayload.whatsapp_username && !newPatientPayload.whatsapp_code) {
+            if (isBsuid) {
+              newPatientPayload.whatsapp_code = formatWhatsAppCode(rawContact);
+            } else if (isUsername) {
+              newPatientPayload.whatsapp_username = cleanWhatsAppUsername(rawContact);
+            } else {
+              newPatientPayload.phone = rawContact.replace(/[^\d]/g, '') || null;
+            }
+          }
+
+          const { data: newPatient, error: insertErr } = await db
+            .from('patients')
+            .insert(newPatientPayload)
+            .select(PATIENT_SELECT_FIELDS)
+            .single();
+          if (insertErr) throw insertErr;
+
+          const normalised = normalisePatientRecord(newPatient);
+          if (Array.isArray(patients) && !patients.some(p => p.id === normalised.id)) {
+            patients.unshift(normalised);
+          }
+
+          // Link conversation
+          const { error: convErr } = await db.from('whatsapp_conversations').update({
+            patient_id: normalised.id
+          }).eq('id', activeWhatsAppConversation.id);
+          if (convErr) throw convErr;
+
+          activeWhatsAppConversation.patient_id = normalised.id;
+
+          renderWhatsAppConversationsList();
+          await selectWhatsAppConversation(activeWhatsAppConversation.id);
+
+          closeLinkWhatsAppPatientModal();
+          showAppointmentNotificationToast(
+            isAr ? 'تم إنشاء وربط المريض' : 'Patient Created & Linked',
+            isAr ? `تم إنشاء ملف جديد لـ ${normalised.name} وربطه بالمحادثة.` : `New profile created for ${normalised.name} and linked to conversation.`
+          );
+
+          // Redirect directly to patient profile page!
+          activePatientId = normalised.id;
+          await switchView('patient-profile');
+        } catch (err) {
+          console.error('Failed to create and link patient:', err);
+          showError((isAr ? 'فشل إنشاء المريض: ' : 'Failed to create patient: ') + (err.message || 'Unknown error'));
+        } finally {
+          if (submitBtn) submitBtn.disabled = false;
+        }
       }
     }
 
