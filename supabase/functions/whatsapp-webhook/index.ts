@@ -91,7 +91,16 @@ function matchPatientNameScore(targetName: string, candidateName: string): numbe
   if (w1[0] && w2[0] && w1[0] === w2[0]) {
     if (w1.length > 1 && w2.length > 1 && w1[1] === w2[1]) return 90;
   }
-  if (n1.includes(n2) || n2.includes(n1)) return 80;
+  // Check if shorter name's words appear as consecutive whole words in the longer name (requires at least 2 words)
+  if (w1.length >= 2 && w2.length >= 2) {
+    const shorter = w1.length <= w2.length ? w1 : w2;
+    const longer = w1.length <= w2.length ? w2 : w1;
+    const shorterStr = shorter.join(" ");
+    const longerStr = longer.join(" ");
+    const escaped = shorterStr.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(`(^|\\s)${escaped}(\\s|$)`);
+    if (regex.test(longerStr)) return 80;
+  }
   if (w1[0] && w2[0] && w1[0] === w2[0] && (w1.length === 1 || w2.length === 1)) return 60;
   return 0;
 }
@@ -199,22 +208,26 @@ async function findPatientsByWhatsApp(
         }
       }
 
-      // Also check if username matches patient name in database (fuzzy name match)
+      // Also check if username matches patient name in database (fuzzy full name match)
+      // CRITICAL GUARD: Only attempt full name matching if username consists of AT LEAST 2 words (e.g. First + Last name)
+      // A single first name (e.g. "هدى", "Ahmed", "Sarah") must NEVER match arbitrary patients across the clinic!
       if (uniqueMap.size === 0) {
         const normUser = normalizeArabicName(cleanUser);
-        const firstWord = normUser.split(" ")[0];
-        if (firstWord && firstWord.length >= 3) {
+        const words = normUser.split(" ").filter(Boolean);
+        if (words.length >= 2 && words[0].length >= 2 && words[1].length >= 2) {
+          const firstWord = words[0];
+          const secondWord = words[1];
           const { data: nameCandidates } = await supabase
             .from("patients")
             .select(selectCols)
-            .ilike("name", `%${firstWord}%`)
+            .ilike("name", `${firstWord} ${secondWord}%`)
             .limit(10);
 
           if (Array.isArray(nameCandidates)) {
             for (const p of nameCandidates) {
               if (p?.id && !uniqueMap.has(p.id)) {
                 const score = matchPatientNameScore(cleanUser, p.name);
-                if (score >= 80) {
+                if (score >= 90) {
                   uniqueMap.set(p.id, p);
                 }
               }
@@ -1205,7 +1218,7 @@ function buildGeminiTools(doctorNames: string[] = [], visitTypeNames: string[] =
         },
         {
           name: "book_appointment",
-          description: "Book an appointment for a patient in the clinic calendar. Automatically re-uses and links the existing patient profile attached to this phone number. ONLY call this tool after verifying that the requested slot is present in available_slots and NOT in occupied_slots.",
+          description: "Book an appointment for a patient in the clinic calendar. Automatically re-uses and links the existing patient profile attached to this phone number. ONLY call this tool after verifying that the requested slot is present in available_slots and NOT in occupied_slots. For patients who already have an actual profile, DO NOT ask them for their phone number again; you may confirm with them the phone number associated with their profile if needed.",
           parameters: {
             type: "OBJECT",
             properties: {
@@ -1641,7 +1654,7 @@ async function handleGeminiToolCall(
         found: true,
         count: 1,
         patient: { id: p.id, name: p.name, phone: p.phone, patient_number: p.patient_number, whatsapp_username: waUser, whatsapp_code: waCode },
-        message: `تم جلب ملف المريض بنجاح: الاسم "${p.name}" (معرّف المريض: ${p.id}). تم ربط المحادثة وحفظ اسم مستخدم واتساب وكود واتساب بملف المريض. رحب بالمريض باسمه وأكد هويته واستخدم ملفه للحجز مباشرة عبر book_appointment دون استدعاء create_patient.`,
+        message: `تم جلب ملف المريض بنجاح: الاسم "${p.name}" (معرّف المريض: ${p.id}). تم ربط المحادثة وحفظ اسم مستخدم واتساب وكود واتساب بملف المريض. رقم الهاتف المرتبط بملفه هو: "${p.phone || rawPhone}". المريض لديه ملف فعلي مسجل الآن: لا تسأله عن رقم هاتفه مرة أخرى أبداً، ويمكنك فقط تأكيد رقم الهاتف المرتبط بملفه معه إذا دعت الحاجة. رحب بالمريض باسمه وأكد هويته واستخدم ملفه للحجز مباشرة عبر book_appointment دون استدعاء create_patient.`,
       };
     }
 
@@ -1712,7 +1725,8 @@ async function handleGeminiToolCall(
       success: true,
       patient_id: p.id,
       patient_name: finalName,
-      message: `تم تعيين وربط المحادثة بنجاح بالملف المسجل للمريض "${finalName}".`,
+      phone: p.phone,
+      message: `تم تعيين وربط المحادثة بنجاح بالملف المسجل للمريض "${finalName}" (رقم الهاتف المرتبط بملفه: "${p.phone || conversation.phone || "على الملف"}"). المريض لديه ملف فعلي مسجل الآن: لا تسأله عن رقم هاتفه مرة أخرى أبداً، ويمكنك فقط تأكيد رقم الهاتف المرتبط بملفه معه إذا دعت الحاجة.`,
     };
   }
 
@@ -1754,7 +1768,7 @@ async function handleGeminiToolCall(
         patient_id: existing.id,
         patient_name: existing.name,
         phone: existing.phone,
-        message: `تم استخدام الملف المسجل مسبقاً للمريض "${existing.name}" المربوط بهذا الرقم بنجاح دون إنشاء مريض مكرر.`,
+        message: `تم استخدام الملف المسجل مسبقاً للمريض "${existing.name}" المربوط بهذا الرقم بنجاح دون إنشاء مريض مكرر. المريض لديه ملف فعلي مسجل الآن: لا تسأله عن رقم هاتفه مرة أخرى أبداً، ويمكنك فقط تأكيد رقم هاتفه المسجل معه إذا دعت الحاجة.`,
       };
     }
 
@@ -1787,7 +1801,7 @@ async function handleGeminiToolCall(
           patient_id: best.p.id,
           patient_name: best.p.name,
           phone: best.p.phone,
-          message: `تم استخدام الملف المسجل مسبقاً للمريض "${best.p.name}" المربوط بهذا الرقم بنجاح دون إنشاء مريض مكرر.`,
+          message: `تم استخدام الملف المسجل مسبقاً للمريض "${best.p.name}" المربوط بهذا الرقم بنجاح دون إنشاء مريض مكرر. المريض لديه ملف فعلي مسجل الآن: لا تسأله عن رقم هاتفه مرة أخرى أبداً، ويمكنك فقط تأكيد رقم هاتفه المسجل معه إذا دعت الحاجة.`,
         };
       }
     }
@@ -1799,7 +1813,7 @@ async function handleGeminiToolCall(
       const { data: nameCandidates } = await supabase
         .from("patients")
         .select("id, name, phone")
-        .ilike("name", `%${firstWord}%`)
+        .ilike("name", `${firstWord}%`)
         .limit(10);
 
       if (Array.isArray(nameCandidates) && nameCandidates.length > 0) {
@@ -1836,7 +1850,7 @@ async function handleGeminiToolCall(
             patient_id: existing.id,
             patient_name: existing.name,
             phone: existing.phone || phoneToAssign,
-            message: `تم العثور على ملف مسجل مسبقاً للمريض "${existing.name}" واستخدامه بنجاح دون إنشاء مريض مكرر.`,
+            message: `تم العثور على ملف مسجل مسبقاً للمريض "${existing.name}" واستخدامه بنجاح دون إنشاء مريض مكرر. المريض لديه ملف فعلي مسجل الآن: لا تسأله عن رقم هاتفه مرة أخرى أبداً، ويمكنك فقط تأكيد رقم هاتفه المسجل معه إذا دعت الحاجة.`,
           };
         }
       }
@@ -1964,7 +1978,7 @@ async function handleGeminiToolCall(
         const { data: nameCandidates } = await supabase
           .from("patients")
           .select("id, name, phone")
-          .ilike("name", `%${firstWord}%`)
+          .ilike("name", `${firstWord}%`)
           .limit(10);
 
         if (Array.isArray(nameCandidates) && nameCandidates.length > 0) {
@@ -2191,6 +2205,7 @@ async function handleGeminiToolCall(
       success: true,
       appointment_id: apt.id,
       patient_name: patient_name || conversation.patient_name,
+      patient_phone: conversation.phone || null,
       date,
       time,
       duration_minutes: duration,
@@ -2198,6 +2213,7 @@ async function handleGeminiToolCall(
       doctor: confirmedDoctorName,
       visit_type: confirmedVisitType,
       status: "Confirmed",
+      message: "تم تثبيت الحجز بنجاح. إذا كان المريض لديه ملف فعلي مسجل، لا تسأله عن رقم هاتفه مرة أخرى، ويمكنك فقط تأكيد رقم الهاتف المرتبط بملفه معه إذا رغبت.",
     };
   }
 
@@ -2407,18 +2423,43 @@ async function runGeminiAgent(
   let patientContextSection = "";
   if (matchedPatients.length === 1) {
     const p = matchedPatients[0];
-    const registeredPhone = p.phone ? (p.phone.startsWith("+") ? p.phone : `+${p.phone}`) : "";
-    patientContextSection = `PATIENT CONTEXT - REGISTERED PATIENT FOUND FOR PHONE +${conversation?.phone}:
+    const isMaskedBsuid = isBsuid(conversation?.phone);
+    const rawProfilePhone = p.phone || (!isMaskedBsuid ? conversation?.phone : "");
+    if (!p.phone && rawProfilePhone) {
+      p.phone = rawProfilePhone;
+      await supabase.from("patients").update({ phone: rawProfilePhone }).eq("id", p.id);
+    }
+    const registeredPhone = rawProfilePhone ? (rawProfilePhone.startsWith("+") ? rawProfilePhone : `+${rawProfilePhone}`) : "";
+    patientContextSection = isMaskedBsuid
+      ? `PATIENT CONTEXT - REGISTERED PATIENT FOUND FOR WHATSAPP ACCOUNT ${formatWhatsAppCode(conversation?.phone)}:
+- Status: This chat is with an EXISTING PATIENT WHO HAS AN ACTUAL REGISTERED PROFILE.
 - Fetched Patient Name: "${p.name}"
 - Patient ID: ${p.id}
-- Phone on file: ${registeredPhone || "Not provided yet"}
+- Phone associated with profile: ${registeredPhone || "Not provided yet (masked WhatsApp account)"}
 - WhatsApp Username: "${p.whatsapp_username || conversation?.patient_name || "N/A"}"
-- WhatsApp Code: "${p.whatsapp_code || (isBsuid(conversation?.phone) ? formatWhatsAppCode(conversation.phone) : "N/A")}"
+- WhatsApp Code: "${p.whatsapp_code || formatWhatsAppCode(conversation.phone)}"
 
-RULES:
+MANDATORY RULES FOR PATIENT WITH AN ACTUAL PROFILE:
 1. Address the patient warmly by their fetched name (e.g. "أهلاً بكِ أستاذ/ة ${p.name}! نورتِ عيادة لومين.").
 2. By default, use this patient profile (ID: ${p.id}) for any appointments.
-3. ${registeredPhone ? `Their mobile number is already registered (${registeredPhone}), so do NOT ask for their mobile number again unless they wish to change it.` : `Their mobile number is not yet in their file. If they wish to book an appointment, politely ask for their mobile phone number to complete their file, and call lookup_patient with it.`}
+3. ${registeredPhone ? `Their mobile number is already on file (${registeredPhone}), so do NOT ask for their phone number again; you may confirm this phone number if needed.` : `Their mobile number is not yet in their file. If they wish to book an appointment, politely ask for their mobile phone number to complete their file.`}
+4. If the patient explicitly states they are contacting on behalf of someone else or a new family member:
+   Ask for that person's full name, and ONLY THEN call \`create_patient\` to register them.`
+      : `PATIENT CONTEXT - REGISTERED PATIENT FOUND FOR PHONE +${conversation?.phone}:
+- Status: This chat is with an EXISTING PATIENT WHO HAS AN ACTUAL REGISTERED PROFILE.
+- Fetched Patient Name: "${p.name}"
+- Patient ID: ${p.id}
+- Phone associated with profile: ${registeredPhone || "Known from active chat"}
+- WhatsApp Username: "${p.whatsapp_username || conversation?.patient_name || "N/A"}"
+- WhatsApp Code: "${p.whatsapp_code || "N/A"}"
+
+MANDATORY RULES FOR PATIENT WITH AN ACTUAL PROFILE:
+1. Address the patient warmly by their fetched name (e.g. "أهلاً بكِ أستاذ/ة ${p.name}! نورتِ عيادة لومين.").
+2. By default, use this patient profile (ID: ${p.id}) for any appointments.
+3. CRITICAL - DO NOT ASK FOR PHONE NUMBER AGAIN:
+   - FORBIDDEN TO ASK FOR PHONE NUMBER: Under NO circumstance should you ask this patient for their phone number again (never ask "ما هو رقم هاتفك؟", "يرجى تزويدنا برقم هاتفك", "ممكن رقم التليفون؟", "Can you provide your phone number?", "What is your contact number?", etc.).
+   - CONFIRMATION ALLOWED: You MAY confirm with him the phone number associated with his profile if helpful (e.g. "هل رقم التواصل المسجل لدينا هو ${registeredPhone || conversation?.phone}؟" or "الموعد مسجل لرقم هاتفك المسجل ${registeredPhone || conversation?.phone}" / "We have confirmed your booking under your registered contact number ${registeredPhone || conversation?.phone}"). But DO NOT ask him to give, type, or provide his phone number again.
+   - Schedule appointments and answer inquiries directly using their existing profile without requesting phone details.
 4. If the patient explicitly states they are contacting on behalf of someone else or a new family member:
    Ask for that person's full name, and ONLY THEN call \`create_patient\` to register them.`;
   } else if (matchedPatients.length > 1) {
@@ -2429,24 +2470,54 @@ RULES:
       ? `Currently assigned profile: "${conversation.patient_name}" (ID: ${conversation.patient_id})`
       : `Currently unassigned among duplicates`;
 
-    patientContextSection = `CRITICAL PATIENT CONTEXT - DUPLICATE PATIENTS FOUND FOR PHONE +${conversation?.phone}:
+    const isMaskedBsuid = isBsuid(conversation?.phone);
+    const channelTerm = isMaskedBsuid ? "حساب الواتساب هذا" : "هذا الرقم";
+
+    patientContextSection = isMaskedBsuid
+      ? `CRITICAL PATIENT CONTEXT - DUPLICATE PATIENTS FOUND FOR WHATSAPP ACCOUNT ${formatWhatsAppCode(conversation?.phone)}:
+- Status: There are MULTIPLE (${matchedPatients.length}) existing patient records linked to this WhatsApp account:
+${dupList}
+- ${assignedNote}
+
+MANDATORY RULES FOR DUPLICATE PATIENTS:
+1. WHATSAPP ACCOUNT (NOT A PHONE NUMBER): This user is messaging via a masked WhatsApp account (${formatWhatsAppCode(conversation?.phone)}). DO NOT refer to this WhatsApp code as a phone number!
+2. ALWAYS ASK THE PATIENT WHICH ONE TO ASSIGN:
+   ${!conversation?.patient_id ? `Because there are multiple patient profiles linked to this WhatsApp account, you MUST ask the patient which one of these duplicate profiles they are (or if they are contacting for someone new / a new patient).
+   Ask warmly in their language, for example:
+   "أهلاً بك في عيادة لومين لطب الأسنان! 🦷✨
+   يوجد لدينا أكثر من ملف مسجل بحساب الواتساب هذا:
+${matchedPatients.map((p: any, i: number) => `   ${i + 1}. ${p.name}`).join("\n")}
+   هل التواصل بخصوص أحد هذه الأسماء، أم لشخص جديد؟"` : `If the patient indicates they are contacting or booking for another name on the list or a new person, update or create accordingly.`}
+3. ASSIGNING AN EXISTING PROFILE:
+   When the patient indicates which duplicate profile they are (by name or number):
+   - Immediately call \`assign_patient\` with that patient's \`patient_id\` and \`patient_name\`.
+   - Greet or confirm to them warmly by name, and proceed with their requested service.
+   - Once assigned, they have an actual profile: if their file has a phone number, do not ask for it again; if not, ask for their mobile phone number.
+4. CREATING A NEW PATIENT:
+   - ONLY IF the patient explicitly clarifies that they are a NEW patient (i.e. not any of the duplicate profiles listed above):
+     Ask for their full name and mobile phone number.
+     ONLY THEN call \`create_patient\` to make a new patient record!
+   - NEVER create a new patient profile if they match or choose one of the existing duplicate profiles!`
+      : `CRITICAL PATIENT CONTEXT - DUPLICATE PATIENTS FOUND FOR PHONE +${conversation?.phone}:
 - Status: There are MULTIPLE (${matchedPatients.length}) existing patient records registered with this phone number:
 ${dupList}
 - ${assignedNote}
 
 MANDATORY RULES FOR DUPLICATE PATIENTS:
-1. ALWAYS ASK THE PATIENT WHICH ONE TO ASSIGN:
+1. PHONE NUMBER ALREADY REGISTERED: The phone number (+${conversation?.phone}) is already registered and known. Do NOT ask for the phone number again!
+2. ALWAYS ASK THE PATIENT WHICH ONE TO ASSIGN:
    ${!conversation?.patient_id ? `Because there are duplicate patient profiles registered under this mobile number, you MUST ask the patient which one of these duplicate profiles they are (or if they are contacting for someone new / a new patient).
    Ask warmly in their language, for example:
    "أهلاً بك في عيادة لومين لطب الأسنان! 🦷✨
    يوجد لدينا أكثر من ملف مسجل بهذا الرقم:
 ${matchedPatients.map((p: any, i: number) => `   ${i + 1}. ${p.name}`).join("\n")}
    هل التواصل بخصوص أحد هذه الأسماء، أم لشخص جديد؟"` : `If the patient indicates they are contacting or booking for another name on the list or a new person, update or create accordingly.`}
-2. ASSIGNING AN EXISTING PROFILE:
+3. ASSIGNING AN EXISTING PROFILE:
    When the patient indicates which duplicate profile they are (by name or number):
    - Immediately call \`assign_patient\` with that patient's \`patient_id\` and \`patient_name\`.
    - Greet or confirm to them warmly by name, and proceed with their requested service.
-3. CREATING A NEW PATIENT:
+   - Once assigned, they have an actual profile: DO NOT ask for their phone number again! You may only confirm the phone number associated with their profile (+${conversation?.phone}) if needed.
+4. CREATING A NEW PATIENT:
    - ONLY IF the patient explicitly clarifies that they are a NEW patient (i.e. not any of the duplicate profiles listed above):
      Ask for their full name (if not yet provided).
      ONLY THEN call \`create_patient\` to make a new patient record and assign this mobile number to them!
@@ -2530,9 +2601,14 @@ PATIENT IDENTITY & PROFILE RULES:
 ${patientContextSection}
 
 PHONE NUMBER LOOKUP & ASSIGNMENT RULES:
-1. When a patient provides a mobile number in the chat (or if the sender's phone is masked and they provide their phone number):
+1. PATIENTS WITH AN ACTUAL PROFILE:
+   - When communicating with a patient that currently has an actual profile (registered profile found or linked to the chat):
+     * DO NOT ASK HIM FOR A PHONE NUMBER AGAIN. Never ask the patient to supply, enter, or send their phone number under any circumstance.
+     * You MAY confirm with him the phone number associated with his profile (e.g. "هل رقم التواصل المسجل هو ...؟" / "الموعد مسجل لرقم هاتفك ..."), but NEVER ask him to provide or re-enter it from scratch.
+     * Book appointments and manage requests directly using his existing profile and associated phone number.
+2. When a patient provides a mobile number in the chat (or if the sender's phone is masked and they provide their phone number):
    - You MUST call \`lookup_patient(phone)\` with the provided mobile number.
-   - If 1 patient is found: fetch their name, greet them warmly by name, and call \`assign_patient\`.
+   - If 1 patient is found: fetch their name, greet them warmly by name, and call \`assign_patient\`. Since their profile is now identified, DO NOT ask for their phone number again; you may only confirm the number on file if needed.
    - If duplicate patients are found: you MUST ask the patient which one of the duplicate patients to assign (or if they are a new patient). When they clarify, call \`assign_patient\`.
    - ONLY IF they clarify that they are a new patient, ask for their full name, and ONLY THEN call \`create_patient\` to make a new patient and assign this number to him.
 ================================================================================
@@ -2561,6 +2637,7 @@ General Rules:
    - For a specific date, call \`check_available_slots\` with that YYYY-MM-DD date and \`duration_minutes\`.
    - Propose 3 to 5 convenient vacant slots (from available_slots) to the patient.
    - Ask for their full name if not already known.
+   - CRITICAL - NO PHONE NUMBER REQUEST FOR EXISTING PROFILES: If the patient currently has an actual profile, DO NOT ask him for a phone number again! You may confirm with him the phone number associated with his profile if needed (e.g. "الموعد مسجل لرقم هاتفك المسجل لدينا ..." / "Confirming under your registered number ..."), but NEVER ask him to provide a phone number.
    - When the patient agrees on a specific date and time, call \`book_appointment\` with \`duration_minutes\` to save it to the system with the appropriate doctor and visit type.
    - Once booked, provide a clear, warm confirmation message summarizing the date, time, duration (e.g. 1 hour / ساعة واحدة), doctor, and service.
 3. If the patient has severe medical emergencies, pain that requires immediate triage, or requests to speak to a person, call \`request_human_support\` and politely inform the patient that our clinic team will reply shortly.

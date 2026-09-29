@@ -176,7 +176,16 @@ test('normalizeArabicName and matchPatientNameScore are defined and handle Arabi
     if (w1[0] && w2[0] && w1[0] === w2[0]) {
       if (w1.length > 1 && w2.length > 1 && w1[1] === w2[1]) return 90;
     }
-    if (n1.includes(n2) || n2.includes(n1)) return 80;
+    // Check if shorter name's words appear as consecutive whole words in the longer name (requires at least 2 words)
+    if (w1.length >= 2 && w2.length >= 2) {
+      const shorter = w1.length <= w2.length ? w1 : w2;
+      const longer = w1.length <= w2.length ? w2 : w1;
+      const shorterStr = shorter.join(" ");
+      const longerStr = longer.join(" ");
+      const escaped = shorterStr.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp(`(^|\\s)${escaped}(\\s|$)`);
+      if (regex.test(longerStr)) return 80;
+    }
     if (w1[0] && w2[0] && w1[0] === w2[0] && (w1.length === 1 || w2.length === 1)) return 60;
     return 0;
   }
@@ -196,6 +205,12 @@ test('normalizeArabicName and matchPatientNameScore are defined and handle Arabi
   // Partial / First+Second name match
   assert.equal(matchPatientNameScore("أحمد علي", "أحمد علي حسين"), 90);
   assert.ok(matchPatientNameScore("علي", "علي حسن") >= 60);
+
+  // Single first name MUST NOT match words that merely contain it as a substring (e.g. "هدى" inside "مهدي" or "هديل")
+  assert.equal(matchPatientNameScore("هدى", "رباب مهدي"), 0);
+  assert.equal(matchPatientNameScore("هدى", "هديل عمرو"), 0);
+  assert.equal(matchPatientNameScore("هدى", "هدير محمد"), 0);
+  assert.equal(matchPatientNameScore("هدى", "مروة مهدي محرم"), 0);
 
   // Different names
   assert.equal(matchPatientNameScore("حيدر", "علي حسن"), 0);
@@ -296,4 +311,88 @@ test('lookup_patient preserves BSUID recipient phone and links patient file with
   assert.doesNotMatch(webhookContent, /if \(isBsuid\(conversation\.phone\) && rawPhone\) \{\s*updatePayload\.phone = cleanPhone\(rawPhone\);/);
   assert.match(webhookContent, /savePatientWhatsAppIdentity\(supabase, p\.id/);
 });
+
+test('Gemini AI agent strictly instructs never to ask for phone number again when patient has actual profile, allowing confirmation only', () => {
+  // 1. Registered patient context section rules
+  assert.match(webhookContent, /MANDATORY RULES FOR PATIENT WITH AN ACTUAL PROFILE:/);
+  assert.match(webhookContent, /FORBIDDEN TO ASK FOR PHONE NUMBER/);
+  assert.match(webhookContent, /CONFIRMATION ALLOWED:\s*You MAY confirm with him the phone number associated with his profile/);
+
+  // 2. PHONE NUMBER LOOKUP & ASSIGNMENT RULES section
+  assert.match(webhookContent, /PATIENTS WITH AN ACTUAL PROFILE:\s*\n\s*-\s*When communicating with a patient that currently has an actual profile/);
+  assert.match(webhookContent, /DO NOT ASK HIM FOR A PHONE NUMBER AGAIN/);
+  assert.match(webhookContent, /You MAY confirm with him the phone number associated with his profile/);
+
+  // 3. General Rules section
+  assert.match(webhookContent, /CRITICAL - NO PHONE NUMBER REQUEST FOR EXISTING PROFILES:/);
+  assert.match(webhookContent, /You may confirm with him the phone number associated with his profile if needed/);
+
+  // 4. book_appointment tool description
+  assert.match(webhookContent, /For patients who already have an actual profile, DO NOT ask them for their phone number again; you may confirm with them the phone number associated with their profile if needed\./);
+
+  // 5. Tool completion handlers guide the model
+  assert.match(webhookContent, /المريض لديه ملف فعلي مسجل الآن: لا تسأله عن رقم هاتفه مرة أخرى أبداً، ويمكنك فقط تأكيد رقم الهاتف المرتبط بملفه معه إذا دعت الحاجة/);
+  assert.match(webhookContent, /إذا كان المريض لديه ملف فعلي مسجل، لا تسأله عن رقم هاتفه مرة أخرى، ويمكنك فقط تأكيد رقم الهاتف المرتبط بملفه معه إذا رغبت/);
+});
+
+test('findPatientsByWhatsApp guards against single first-name matching and BSUID prompt does not mislabel code as phone number', async () => {
+  // 1. Webhook source code guards
+  assert.match(webhookContent, /words\.length >= 2/);
+  assert.match(webhookContent, /A single first name \(e\.g\. "هدى", "Ahmed", "Sarah"\) must NEVER match arbitrary patients/);
+  assert.match(webhookContent, /CRITICAL PATIENT CONTEXT - DUPLICATE PATIENTS FOUND FOR WHATSAPP ACCOUNT/);
+  assert.match(webhookContent, /WHATSAPP ACCOUNT \(NOT A PHONE NUMBER\): This user is messaging via a masked WhatsApp account/);
+  assert.match(webhookContent, /PATIENT CONTEXT - REGISTERED PATIENT FOUND FOR WHATSAPP ACCOUNT/);
+
+  // 2. Functional simulation of findPatientsByWhatsApp with single name "هدى" vs multiple candidates
+  async function simulateFindPatientsByWhatsApp(supabase, codeOrPhone, username) {
+    const isBsuid = (val) => val && /^\+?[A-Za-z]{2}\.\d+$/i.test(String(val).trim());
+    const normalizeArabicName = (name) => String(name || '')
+      .replace(/[إأآا]/g, 'ا')
+      .replace(/[ة]/g, 'ه')
+      .replace(/[ى]/g, 'ي')
+      .trim();
+
+    const uniqueMap = new Map();
+
+    // Check username fallback
+    if (username && typeof username === 'string') {
+      const cleanUser = username.trim();
+      const normUser = normalizeArabicName(cleanUser);
+      const words = normUser.split(' ').filter(Boolean);
+
+      // Guard: require >= 2 words for fallback matching
+      if (words.length >= 2 && words[0].length >= 2 && words[1].length >= 2) {
+        const { data } = await supabase.from('patients').select();
+        for (const p of data || []) {
+          uniqueMap.set(p.id, p);
+        }
+      }
+    }
+
+    return Array.from(uniqueMap.values());
+  }
+
+  const mockDbWithSimilarNames = {
+    from: () => ({
+      select: async () => ({
+        data: [
+          { id: '1', name: 'هديل عمرو' },
+          { id: '2', name: 'هدير ايهاب' },
+          { id: '3', name: 'رباب مهدي' },
+          { id: '4', name: 'مروة مهدي' },
+        ],
+      }),
+    }),
+  };
+
+  // User with single first name "هدى" must NOT match any of the above candidates
+  const singleNameMatches = await simulateFindPatientsByWhatsApp(mockDbWithSimilarNames, 'EG.1598566451815476', 'هدى');
+  assert.equal(singleNameMatches.length, 0, 'Single first name "هدى" must return 0 matches and not match arbitrary patients');
+
+  // User with full name "هدى محمود علي" allows matching
+  const fullNameMatches = await simulateFindPatientsByWhatsApp(mockDbWithSimilarNames, 'EG.1598566451815476', 'هدى محمود علي');
+  assert.ok(fullNameMatches.length > 0, 'Full name with >= 2 words is allowed to match');
+});
+
+
 
