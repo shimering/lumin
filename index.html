@@ -26708,6 +26708,35 @@
       document.getElementById('profile-patient-address').textContent = patient.address || 'Not provided';
       const whatsappUserEl = document.getElementById('profile-patient-whatsapp-username');
       const whatsappCodeEl = document.getElementById('profile-patient-whatsapp-code');
+
+      // Auto-resolve missing whatsappCode / whatsappUsername from linked WhatsApp conversations or active chat
+      if ((!patient.whatsappCode || !patient.whatsappUsername) && patient.id) {
+        const linkedConv = (typeof activeWhatsAppConversation !== 'undefined' && activeWhatsAppConversation && String(activeWhatsAppConversation.patient_id) === String(patient.id) ? activeWhatsAppConversation : null)
+          || (Array.isArray(whatsappConversations) ? whatsappConversations.find(c => String(c.patient_id) === String(patient.id)) : null);
+        if (linkedConv && linkedConv.phone) {
+          const rawPhone = String(linkedConv.phone).trim();
+          let shouldPersist = false;
+          const patch = {};
+
+          if (!patient.whatsappCode && isWhatsAppBsuid(rawPhone)) {
+            patient.whatsappCode = formatWhatsAppCode(rawPhone);
+            patient.whatsapp_code = patient.whatsappCode;
+            patch.whatsapp_code = patient.whatsappCode;
+            shouldPersist = true;
+          }
+          if (!patient.whatsappUsername && isWhatsAppUsername(rawPhone)) {
+            patient.whatsappUsername = `@${cleanWhatsAppUsername(rawPhone)}`;
+            patient.whatsapp_username = patient.whatsappUsername;
+            patch.whatsapp_username = patient.whatsappUsername;
+            shouldPersist = true;
+          }
+          if (shouldPersist && currentSession) {
+            patch.updated_at = new Date().toISOString();
+            void db.from('patients').update(patch).eq('id', patient.id);
+          }
+        }
+      }
+
       if (whatsappUserEl) {
         let displayUname = patient.whatsappUsername || '';
         if (displayUname) {
@@ -26723,14 +26752,16 @@
       const chatTitle = currentUiLanguage === 'ar' ? 'فتح محادثة واتساب' : 'Open WhatsApp chat';
       const waCodeActions = document.getElementById('profile-patient-whatsapp-code-actions');
       if (waCodeActions) {
+        const codeTarget = patient.whatsappCode || targetWa;
         waCodeActions.innerHTML = (patient.whatsappCode || targetWa) && hasPageAccess('whatsapp')
-          ? `<button type="button" onclick="openWhatsAppPatientConversation('${escapeHtml(targetWa)}', '${escapeHtml(patient.name || '')}', '', '${escapeHtml(patient.id)}')" class="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800 transition hover:bg-emerald-200" title="${chatTitle}"><i data-lucide="message-circle" class="h-3 w-3"></i> ${chatLabel}</button>`
+          ? `<button type="button" onclick="openWhatsAppPatientConversation('${escapeHtml(codeTarget)}', '${escapeHtml(patient.name || '')}', '', '${escapeHtml(patient.id)}')" class="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800 transition hover:bg-emerald-200" title="${chatTitle}"><i data-lucide="message-circle" class="h-3 w-3"></i> ${chatLabel}</button>`
           : '';
       }
       const waUserActions = document.getElementById('profile-patient-whatsapp-username-actions');
       if (waUserActions) {
+        const userTarget = patient.whatsappUsername || targetWa;
         waUserActions.innerHTML = (patient.whatsappUsername || targetWa) && hasPageAccess('whatsapp')
-          ? `<button type="button" onclick="openWhatsAppPatientConversation('${escapeHtml(targetWa)}', '${escapeHtml(patient.name || '')}', '', '${escapeHtml(patient.id)}')" class="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800 transition hover:bg-emerald-200" title="${chatTitle}"><i data-lucide="message-circle" class="h-3 w-3"></i> ${chatLabel}</button>`
+          ? `<button type="button" onclick="openWhatsAppPatientConversation('${escapeHtml(userTarget)}', '${escapeHtml(patient.name || '')}', '', '${escapeHtml(patient.id)}')" class="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800 transition hover:bg-emerald-200" title="${chatTitle}"><i data-lucide="message-circle" class="h-3 w-3"></i> ${chatLabel}</button>`
           : '';
       }
       document.getElementById('profile-patient-medical').textContent = patient.medicalHistory || 'None reported';
@@ -37844,6 +37875,18 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
 
         if (error) throw error;
         whatsappConversations = data || [];
+        if (Array.isArray(whatsappConversations)) {
+          whatsappConversations.forEach(c => {
+            if (c.patient_id && isWhatsAppBsuid(c.phone)) {
+              const code = formatWhatsAppCode(c.phone);
+              const p = typeof getKnownPatient === 'function' ? getKnownPatient(c.patient_id) : null;
+              if (p && !p.whatsappCode) {
+                p.whatsappCode = code;
+                p.whatsapp_code = code;
+              }
+            }
+          });
+        }
         if (activeWhatsAppConversationId) {
           activeWhatsAppConversation = whatsappConversations.find(conv => conv.id === activeWhatsAppConversationId) || null;
         }
@@ -39358,6 +39401,30 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       // 1. If already linked to a patient profile in local state
       if (activeWhatsAppConversation.patient_id) {
         const targetId = activeWhatsAppConversation.patient_id;
+        const patient = (typeof getKnownPatient === 'function' ? getKnownPatient(targetId) : null)
+          || (typeof ensureKnownPatient === 'function' ? await ensureKnownPatient(targetId) : null);
+        if (patient) {
+          const rawContact = String(activeWhatsAppConversation.phone || '').trim();
+          let needsSync = false;
+          const patientUpdates = {};
+
+          if (isWhatsAppBsuid(rawContact) && !patient.whatsappCode) {
+            patient.whatsappCode = formatWhatsAppCode(rawContact);
+            patient.whatsapp_code = patient.whatsappCode;
+            patientUpdates.whatsapp_code = patient.whatsappCode;
+            needsSync = true;
+          }
+          if (isWhatsAppUsername(rawContact) && !patient.whatsappUsername) {
+            patient.whatsappUsername = `@${cleanWhatsAppUsername(rawContact)}`;
+            patient.whatsapp_username = patient.whatsappUsername;
+            patientUpdates.whatsapp_username = patient.whatsappUsername;
+            needsSync = true;
+          }
+          if (needsSync && typeof currentSession !== 'undefined' && currentSession) {
+            patientUpdates.updated_at = new Date().toISOString();
+            void db.from('patients').update(patientUpdates).eq('id', patient.id);
+          }
+        }
         activeWorkspacePatientId = targetId;
         activePatientId = targetId;
         await openPatientWorkspace(targetId, 'profile', 'whatsapp');

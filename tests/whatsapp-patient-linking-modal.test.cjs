@@ -482,3 +482,87 @@ test('selectLinkWhatsAppPatient pre-fills existing username and code fields in c
   assert.match(summaryEl.textContent, /Karim Adel/);
 });
 
+test('renderPatientProfile auto-resolves missing whatsappCode from linked conversation', async () => {
+  let updatedDbPatch = null;
+  let updatedPatientId = null;
+
+  const patient = {
+    id: '66',
+    name: 'محمد لطفي',
+    phone: '01000000000',
+    whatsappCode: null,
+    whatsappUsername: null
+  };
+
+  const elements = {};
+  const getEl = (id) => {
+    if (!elements[id]) elements[id] = { textContent: '', innerHTML: '', classList: { add: () => {}, remove: () => {}, toggle: () => {} } };
+    return elements[id];
+  };
+
+  const mockContext = {
+    patientWorkspaceId: () => '66',
+    getKnownPatient: (id) => (id === '66' ? patient : null),
+    ensureKnownPatient: async (id) => (id === '66' ? patient : null),
+    switchView: () => {},
+    activeWorkspacePatientId: null,
+    updatePatientWorkspaceNavigation: () => {},
+    patientPhoneActionsMarkup: () => '',
+    patientAgeProfileLabel: () => '30y',
+    formatPatientNumber: () => '#66',
+    activeWhatsAppConversation: {
+      patient_id: '66',
+      phone: '+EG.1372864025001690'
+    },
+    whatsappConversations: [],
+    currentSession: { user: { id: 'test' } },
+    currentUiLanguage: 'ar',
+    isWhatsAppBsuid: (v) => String(v).includes('EG.'),
+    isWhatsAppUsername: () => false,
+    formatWhatsAppCode: (v) => (v.startsWith('+') ? v : `+${v}`),
+    cleanWhatsAppUsername: (v) => v.replace(/^@+/, ''),
+    hasPageAccess: () => true,
+    escapeHtml: (s) => s,
+    db: {
+      from: () => ({
+        update: (patch) => ({
+          eq: (col, val) => {
+            updatedDbPatch = patch;
+            updatedPatientId = val;
+            return Promise.resolve({ error: null });
+          }
+        })
+      })
+    },
+    document: {
+      getElementById: getEl
+    },
+    // stubs for elements/functions called by renderPatientProfile
+    getPatientNameInitials: () => 'ML',
+    renderPatientProfileTreatments: () => {},
+    renderPatientProfileInvoices: () => {},
+    renderPatientProfileAppointments: () => {},
+    renderPatientProfilePrescriptions: () => {},
+    renderPatientProfileAttachments: () => {},
+    renderPatientProfileToothChart: () => {},
+    renderPatientProfileClinicalNotes: () => {},
+    updatePatientMedicalHistoryBadges: () => {},
+    translateUiTree: () => {},
+    lucide: { createIcons: () => {} }
+  };
+
+  const fnStart = html.indexOf('async function renderPatientProfile()');
+  const fnEnd = html.indexOf('function firstAuthorizedClinicManagementTab', fnStart);
+  const snippet = html.slice(fnStart, fnEnd);
+
+  vm.runInNewContext(snippet, mockContext);
+
+  await mockContext.renderPatientProfile();
+
+  assert.equal(patient.whatsappCode, '+EG.1372864025001690');
+  assert.equal(elements['profile-patient-whatsapp-code'].textContent, '+EG.1372864025001690');
+  assert.ok(updatedDbPatch);
+  assert.equal(updatedDbPatch.whatsapp_code, '+EG.1372864025001690');
+  assert.equal(updatedPatientId, '66');
+});
+
