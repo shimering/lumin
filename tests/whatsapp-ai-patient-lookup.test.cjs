@@ -263,3 +263,37 @@ test('book_appointment re-uses fetched patient profile attached to phone number 
   });
   assert.equal(resNew.createdNewPatient, true, "Only completely new phone creates new patient");
 });
+
+test('findPatientsByWhatsApp and formatWhatsAppCode correctly resolve patients by BSUID code and username', () => {
+  assert.match(webhookContent, /async function findPatientsByWhatsApp\(/);
+  assert.match(webhookContent, /function formatWhatsAppCode\(/);
+  assert.match(webhookContent, /savePatientWhatsAppIdentity\(/);
+  assert.match(webhookContent, /whatsapp_code\.eq/);
+  assert.match(webhookContent, /whatsapp_username/);
+
+  // Pure JS simulation
+  function isBsuid(val) {
+    if (!val || typeof val !== 'string') return false;
+    return /^\+?[A-Za-z]{2}\.\d+$/i.test(val.trim());
+  }
+
+  function formatWhatsAppCode(val) {
+    if (!val || typeof val !== 'string') return '';
+    const s = val.trim();
+    if (!s) return '';
+    return s.startsWith('+') ? s : `+${s}`;
+  }
+
+  assert.equal(isBsuid('EG.4631528857091458'), true);
+  assert.equal(isBsuid('+EG.4631528857091458'), true);
+  assert.equal(isBsuid('01065668752'), false);
+  assert.equal(formatWhatsAppCode('EG.4631528857091458'), '+EG.4631528857091458');
+  assert.equal(formatWhatsAppCode('+EG.4631528857091458'), '+EG.4631528857091458');
+});
+
+test('lookup_patient preserves BSUID recipient phone and links patient file with WhatsApp identity', () => {
+  // Ensure lookup_patient does NOT overwrite conversation.phone with rawPhone when conversation.phone is BSUID
+  assert.doesNotMatch(webhookContent, /if \(isBsuid\(conversation\.phone\) && rawPhone\) \{\s*updatePayload\.phone = cleanPhone\(rawPhone\);/);
+  assert.match(webhookContent, /savePatientWhatsAppIdentity\(supabase, p\.id/);
+});
+

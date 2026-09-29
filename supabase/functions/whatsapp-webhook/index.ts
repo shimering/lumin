@@ -37,7 +37,19 @@ function compileWhatsAppAiInstructions(blocks: unknown, legacyInstructions: unkn
 function isBsuid(val: string): boolean {
   if (!val || typeof val !== "string") return false;
   const s = val.trim();
-  return /^[A-Za-z]{2}\.\d+$/i.test(s);
+  return /^\+?[A-Za-z]{2}\.\d+$/i.test(s);
+}
+
+function formatWhatsAppCode(val: string): string {
+  if (!val || typeof val !== "string") return "";
+  const s = val.trim();
+  if (!s) return "";
+  return s.startsWith("+") ? s : `+${s}`;
+}
+
+function cleanWhatsAppCode(val: string): string {
+  if (!val || typeof val !== "string") return "";
+  return val.trim().replace(/^\+/, "");
 }
 
 // Clean phone numbers to standard international format (digits only, e.g. 9647701234567)
@@ -113,7 +125,7 @@ async function findPatientsByPhone(supabase: any, rawPhone: string): Promise<any
 
   const { data, error } = await supabase
     .from("patients")
-    .select("id, name, first_name, last_name, phone, patient_number")
+    .select("id, name, first_name, last_name, phone, patient_number, whatsapp_username, whatsapp_code")
     .or(orParts.join(","))
     .order("created_at", { ascending: false });
 
@@ -139,6 +151,124 @@ async function findPatientsByPhone(supabase: any, rawPhone: string): Promise<any
   }
 
   return Array.from(uniqueMap.values());
+}
+
+// Find patients by WhatsApp BSUID code (+EG... / EG...) or WhatsApp username
+async function findPatientsByWhatsApp(
+  supabase: any,
+  codeOrPhone?: string | null,
+  username?: string | null
+): Promise<any[]> {
+  const uniqueMap = new Map();
+  const selectCols = "id, name, first_name, last_name, phone, patient_number, whatsapp_username, whatsapp_code";
+
+  // 1. Look up by WhatsApp code (BSUID) e.g. EG.4631528857091458 or +EG.4631528857091458
+  if (codeOrPhone && isBsuid(codeOrPhone)) {
+    const raw = codeOrPhone.trim();
+    const withoutPlus = raw.replace(/^\+/, "");
+    const withPlus = `+${withoutPlus}`;
+
+    const { data: codeMatches, error: codeErr } = await supabase
+      .from("patients")
+      .select(selectCols)
+      .or(`whatsapp_code.eq.${withPlus},whatsapp_code.eq.${withoutPlus}`);
+
+    if (codeErr) console.warn("findPatientsByWhatsApp code lookup error:", codeErr.message || codeErr);
+
+    if (Array.isArray(codeMatches)) {
+      for (const p of codeMatches) {
+        if (p?.id && !uniqueMap.has(p.id)) uniqueMap.set(p.id, p);
+      }
+    }
+  }
+
+  // 2. Look up by WhatsApp username (e.g. Roaa Alahl)
+  if (username && typeof username === "string") {
+    const cleanUser = username.trim();
+    if (cleanUser && cleanUser !== "WhatsApp User" && !cleanUser.startsWith("+")) {
+      const { data: userMatches, error: userErr } = await supabase
+        .from("patients")
+        .select(selectCols)
+        .ilike("whatsapp_username", cleanUser);
+
+      if (userErr) console.warn("findPatientsByWhatsApp username lookup error:", userErr.message || userErr);
+
+      if (Array.isArray(userMatches)) {
+        for (const p of userMatches) {
+          if (p?.id && !uniqueMap.has(p.id)) uniqueMap.set(p.id, p);
+        }
+      }
+
+      // Also check if username matches patient name in database (fuzzy name match)
+      if (uniqueMap.size === 0) {
+        const normUser = normalizeArabicName(cleanUser);
+        const firstWord = normUser.split(" ")[0];
+        if (firstWord && firstWord.length >= 3) {
+          const { data: nameCandidates } = await supabase
+            .from("patients")
+            .select(selectCols)
+            .ilike("name", `%${firstWord}%`)
+            .limit(10);
+
+          if (Array.isArray(nameCandidates)) {
+            for (const p of nameCandidates) {
+              if (p?.id && !uniqueMap.has(p.id)) {
+                const score = matchPatientNameScore(cleanUser, p.name);
+                if (score >= 80) {
+                  uniqueMap.set(p.id, p);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return Array.from(uniqueMap.values());
+}
+
+// Persist / link WhatsApp identity (username and code) to patient file
+async function savePatientWhatsAppIdentity(
+  supabase: any,
+  patientId: string,
+  data: {
+    whatsapp_username?: string | null;
+    whatsapp_code?: string | null;
+    phone?: string | null;
+  }
+) {
+  if (!patientId) return;
+  const updates: any = {};
+  if (data.whatsapp_username && typeof data.whatsapp_username === "string") {
+    const trimmed = data.whatsapp_username.trim();
+    if (trimmed && trimmed !== "WhatsApp User" && !trimmed.startsWith("+")) {
+      updates.whatsapp_username = trimmed;
+    }
+  }
+  if (data.whatsapp_code && isBsuid(data.whatsapp_code)) {
+    updates.whatsapp_code = formatWhatsAppCode(data.whatsapp_code);
+  }
+  if (data.phone && !isBsuid(data.phone)) {
+    const cleaned = cleanPhone(data.phone);
+    if (cleaned && cleaned.length >= 7) {
+      const { data: current } = await supabase
+        .from("patients")
+        .select("phone")
+        .eq("id", patientId)
+        .maybeSingle();
+      if (!current?.phone || current.phone === "0" || isBsuid(current.phone)) {
+        updates.phone = data.phone.startsWith("+") ? data.phone : `+${cleaned}`;
+      }
+    }
+  }
+  if (Object.keys(updates).length > 0) {
+    try {
+      await supabase.from("patients").update(updates).eq("id", patientId);
+    } catch (err: any) {
+      console.warn("savePatientWhatsAppIdentity error:", err?.message || err);
+    }
+  }
 }
 
 // Extract sender identifier from wamid (e.g. wamid.HBgTRUcu... -> EG.1016355928130143)
@@ -1484,23 +1614,34 @@ async function handleGeminiToolCall(
 
     if (matches.length === 1) {
       const p = matches[0];
+      const previousName = conversation.patient_name;
       conversation.patient_id = p.id;
       conversation.patient_name = p.name;
       const updatePayload: any = { patient_id: p.id, patient_name: p.name };
-      if (isBsuid(conversation.phone) && rawPhone) {
-        updatePayload.phone = cleanPhone(rawPhone);
-        conversation.phone = cleanPhone(rawPhone);
-      }
+      // CRITICAL: DO NOT overwrite conversation.phone if conversation.phone is a BSUID!
+      // In Meta WhatsApp Cloud API, conversation.phone is the recipient channel identifier used for message delivery and webhook routing.
+      // Changing it breaks inbound routing and creates duplicate conversations!
       await supabase
         .from("whatsapp_conversations")
         .update(updatePayload)
         .eq("id", conversation.id);
 
+      const waCode = isBsuid(conversation.phone) ? formatWhatsAppCode(conversation.phone) : (p.whatsapp_code || null);
+      const waUser = (previousName && previousName !== p.name && previousName !== "WhatsApp User" && !previousName.startsWith("+"))
+        ? previousName
+        : (p.whatsapp_username || null);
+
+      await savePatientWhatsAppIdentity(supabase, p.id, {
+        whatsapp_username: waUser,
+        whatsapp_code: waCode,
+        phone: rawPhone,
+      });
+
       return {
         found: true,
         count: 1,
-        patient: { id: p.id, name: p.name, phone: p.phone, patient_number: p.patient_number },
-        message: `تم جلب ملف المريض بنجاح: الاسم "${p.name}" (معرّف المريض: ${p.id}). رحب بالمريض باسمه وأكد هويته واستخدم ملفه للحجز مباشرة عبر book_appointment دون استدعاء create_patient.`,
+        patient: { id: p.id, name: p.name, phone: p.phone, patient_number: p.patient_number, whatsapp_username: waUser, whatsapp_code: waCode },
+        message: `تم جلب ملف المريض بنجاح: الاسم "${p.name}" (معرّف المريض: ${p.id}). تم ربط المحادثة وحفظ اسم مستخدم واتساب وكود واتساب بملف المريض. رحب بالمريض باسمه وأكد هويته واستخدم ملفه للحجز مباشرة عبر book_appointment دون استدعاء create_patient.`,
       };
     }
 
@@ -1544,6 +1685,7 @@ async function handleGeminiToolCall(
     }
 
     const finalName = p.name || targetPatientName || "Patient";
+    const previousName = conversation.patient_name;
 
     await supabase
       .from("whatsapp_conversations")
@@ -1555,6 +1697,16 @@ async function handleGeminiToolCall(
 
     conversation.patient_id = p.id;
     conversation.patient_name = finalName;
+
+    const waCode = isBsuid(conversation.phone) ? formatWhatsAppCode(conversation.phone) : (p.whatsapp_code || null);
+    const waUser = (previousName && previousName !== finalName && previousName !== "WhatsApp User" && !previousName.startsWith("+"))
+      ? previousName
+      : (p.whatsapp_username || null);
+
+    await savePatientWhatsAppIdentity(supabase, p.id, {
+      whatsapp_username: waUser,
+      whatsapp_code: waCode,
+    });
 
     return {
       success: true,
@@ -1590,6 +1742,12 @@ async function handleGeminiToolCall(
       conversation.patient_id = existing.id;
       conversation.patient_name = existing.name || patientName;
 
+      await savePatientWhatsAppIdentity(supabase, existing.id, {
+        whatsapp_username: conversation.patient_name !== existing.name ? conversation.patient_name : null,
+        whatsapp_code: isBsuid(conversation.phone) ? formatWhatsAppCode(conversation.phone) : null,
+        phone: phoneToAssign,
+      });
+
       return {
         success: true,
         already_existed: true,
@@ -1616,6 +1774,12 @@ async function handleGeminiToolCall(
 
         conversation.patient_id = best.p.id;
         conversation.patient_name = best.p.name;
+
+        await savePatientWhatsAppIdentity(supabase, best.p.id, {
+          whatsapp_username: conversation.patient_name !== best.p.name ? conversation.patient_name : null,
+          whatsapp_code: isBsuid(conversation.phone) ? formatWhatsAppCode(conversation.phone) : null,
+          phone: phoneToAssign,
+        });
 
         return {
           success: true,
@@ -1660,6 +1824,12 @@ async function handleGeminiToolCall(
           conversation.patient_id = existing.id;
           conversation.patient_name = existing.name;
 
+          await savePatientWhatsAppIdentity(supabase, existing.id, {
+            whatsapp_username: conversation.patient_name !== existing.name ? conversation.patient_name : null,
+            whatsapp_code: isBsuid(conversation.phone) ? formatWhatsAppCode(conversation.phone) : null,
+            phone: phoneToAssign,
+          });
+
           return {
             success: true,
             already_existed: true,
@@ -1676,6 +1846,11 @@ async function handleGeminiToolCall(
     const firstName = nameParts[0] || "Patient";
     const lastName = nameParts.slice(1).join(" ") || "";
 
+    const waCode = isBsuid(conversation.phone) ? formatWhatsAppCode(conversation.phone) : null;
+    const waUser = (conversation.patient_name && conversation.patient_name !== patientName && conversation.patient_name !== "WhatsApp User" && !conversation.patient_name.startsWith("+"))
+      ? conversation.patient_name
+      : null;
+
     const { data: newPatient, error: createErr } = await supabase
       .from("patients")
       .insert({
@@ -1683,9 +1858,11 @@ async function handleGeminiToolCall(
         first_name: firstName,
         last_name: lastName,
         phone: phoneToAssign,
+        whatsapp_username: waUser,
+        whatsapp_code: waCode,
         chart_state: {},
       })
-      .select("id, name, phone")
+      .select("id, name, phone, whatsapp_username, whatsapp_code")
       .single();
 
     if (createErr) {
@@ -1709,7 +1886,9 @@ async function handleGeminiToolCall(
       patient_id: newPatient.id,
       patient_name: newPatient.name,
       phone: newPatient.phone,
-      message: `تم إنشاء ملف جديد بنجاح للمريض "${newPatient.name}" برقم هاتف "${newPatient.phone || "بدون رقم"}"، وتم ربط المحادثة به.`,
+      whatsapp_username: newPatient.whatsapp_username,
+      whatsapp_code: newPatient.whatsapp_code,
+      message: `تم إنشاء ملف جديد بنجاح للمريض "${newPatient.name}" برقم هاتف "${newPatient.phone || "بدون رقم"}"، وحفظ بيانات واتساب وربط المحادثة به.`,
     };
   }
 
@@ -2195,10 +2374,19 @@ async function runGeminiAgent(
 
   const dynamicTools = buildGeminiTools(doctorNames, visitTypeNames);
 
-  // 2. Patient Identity Auto-Sync: Fetch registered patient(s) by mobile number
+  // 2. Patient Identity Auto-Sync: Fetch registered patient(s) by mobile number or WhatsApp identity
   let matchedPatients: any[] = [];
-  if (!isBsuid(conversation?.phone) && conversation?.phone) {
+  if (conversation?.patient_id) {
+    const { data: p } = await supabase
+      .from("patients")
+      .select("id, name, first_name, last_name, phone, patient_number, whatsapp_username, whatsapp_code")
+      .eq("id", conversation.patient_id)
+      .maybeSingle();
+    if (p) matchedPatients = [p];
+  } else if (!isBsuid(conversation?.phone) && conversation?.phone) {
     matchedPatients = await findPatientsByPhone(supabase, conversation.phone);
+  } else if (isBsuid(conversation?.phone)) {
+    matchedPatients = await findPatientsByWhatsApp(supabase, conversation.phone, conversation.patient_name);
   }
 
   // Auto-link conversation if exactly 1 patient is registered and conversation is unassigned
@@ -2209,15 +2397,30 @@ async function runGeminiAgent(
       .from("whatsapp_conversations")
       .update({ patient_id: matchedPatients[0].id, patient_name: conversation.patient_name })
       .eq("id", conversation.id);
+
+    await savePatientWhatsAppIdentity(supabase, matchedPatients[0].id, {
+      whatsapp_username: conversation.patient_name !== matchedPatients[0].name ? conversation.patient_name : null,
+      whatsapp_code: isBsuid(conversation.phone) ? formatWhatsAppCode(conversation.phone) : null,
+    });
   }
 
   let patientContextSection = "";
-  if (isBsuid(conversation?.phone)) {
-    patientContextSection = `PATIENT IDENTIFICATION STATUS (MASKED WHATSAPP USERNAME):
-- This patient is contacting via a masked WhatsApp username (phone number hidden).
-- Current contact name: "${conversation?.patient_name || "WhatsApp User"}"
-- If the patient provides a mobile number in the chat, IMMEDIATELY call the \`lookup_patient\` tool with that number.
-- When booking or registering, politely ask for their mobile phone number and full name.`;
+  if (matchedPatients.length === 1) {
+    const p = matchedPatients[0];
+    const registeredPhone = p.phone ? (p.phone.startsWith("+") ? p.phone : `+${p.phone}`) : "";
+    patientContextSection = `PATIENT CONTEXT - REGISTERED PATIENT FOUND FOR PHONE +${conversation?.phone}:
+- Fetched Patient Name: "${p.name}"
+- Patient ID: ${p.id}
+- Phone on file: ${registeredPhone || "Not provided yet"}
+- WhatsApp Username: "${p.whatsapp_username || conversation?.patient_name || "N/A"}"
+- WhatsApp Code: "${p.whatsapp_code || (isBsuid(conversation?.phone) ? formatWhatsAppCode(conversation.phone) : "N/A")}"
+
+RULES:
+1. Address the patient warmly by their fetched name (e.g. "أهلاً بكِ أستاذ/ة ${p.name}! نورتِ عيادة لومين.").
+2. By default, use this patient profile (ID: ${p.id}) for any appointments.
+3. ${registeredPhone ? `Their mobile number is already registered (${registeredPhone}), so do NOT ask for their mobile number again unless they wish to change it.` : `Their mobile number is not yet in their file. If they wish to book an appointment, politely ask for their mobile phone number to complete their file, and call lookup_patient with it.`}
+4. If the patient explicitly states they are contacting on behalf of someone else or a new family member:
+   Ask for that person's full name, and ONLY THEN call \`create_patient\` to register them.`;
   } else if (matchedPatients.length > 1) {
     const dupList = matchedPatients
       .map((p: any, idx: number) => `  ${idx + 1}. "${p.name}" (ID: ${p.id})`)
@@ -2248,18 +2451,13 @@ ${matchedPatients.map((p: any, i: number) => `   ${i + 1}. ${p.name}`).join("\n"
      Ask for their full name (if not yet provided).
      ONLY THEN call \`create_patient\` to make a new patient record and assign this mobile number to them!
    - NEVER create a new patient profile if they match or choose one of the existing duplicate profiles!`;
-  } else if (matchedPatients.length === 1) {
-    const p = matchedPatients[0];
-    patientContextSection = `PATIENT CONTEXT - REGISTERED PATIENT FOUND FOR PHONE +${conversation?.phone}:
-- Fetched Patient Name: "${p.name}"
-- Patient ID: ${p.id}
-- Phone: ${p.phone || conversation?.phone}
-
-RULES:
-1. Address the patient warmly by their fetched name (e.g. "أهلاً بك أستاذ/ة ${p.name}! 🦷✨").
-2. By default, use this patient profile (ID: ${p.id}) for any appointments.
-3. If the patient explicitly states they are contacting on behalf of someone else or a new family member:
-   Ask for that person's full name, and ONLY THEN call \`create_patient\` to register them.`;
+  } else if (isBsuid(conversation?.phone)) {
+    patientContextSection = `PATIENT IDENTIFICATION STATUS (MASKED WHATSAPP USERNAME):
+- This patient is contacting via a masked WhatsApp username (phone number hidden).
+- Current contact name: "${conversation?.patient_name || "WhatsApp User"}"
+- WhatsApp code: "${formatWhatsAppCode(conversation?.phone)}"
+- If the patient provides a mobile number in the chat, IMMEDIATELY call the \`lookup_patient\` tool with that number.
+- When booking or registering, politely ask for their mobile phone number and full name.`;
   } else {
     patientContextSection = `PATIENT CONTEXT - UNREGISTERED PHONE (+${conversation?.phone || "None"}):
 - Status: No existing patient record found with this phone number.
@@ -3047,7 +3245,17 @@ Deno.serve(async (req: Request) => {
                   let patientName = contactName;
                   let patientId = null;
 
-                  if (!isMaskedProfile && fromPhone) {
+                  if (isMaskedProfile) {
+                    const matchedPatients = await findPatientsByWhatsApp(supabase, fromPhone, contactName);
+                    if (matchedPatients.length === 1) {
+                      patientName = matchedPatients[0].name || contactName;
+                      patientId = matchedPatients[0].id;
+                      await savePatientWhatsAppIdentity(supabase, matchedPatients[0].id, {
+                        whatsapp_code: formatWhatsAppCode(fromPhone),
+                        whatsapp_username: contactName,
+                      });
+                    }
+                  } else if (fromPhone) {
                     const matchedPatients = await findPatientsByPhone(supabase, fromPhone);
                     if (matchedPatients.length === 1) {
                       patientName = matchedPatients[0].name || contactName;
@@ -3086,13 +3294,23 @@ Deno.serve(async (req: Request) => {
                     unread_count: (conv.unread_count || 0) + 1,
                   };
 
-                  if (!conv.patient_id && !isMaskedProfile && fromPhone) {
-                    const matchedPatients = await findPatientsByPhone(supabase, fromPhone);
+                  if (!conv.patient_id) {
+                    let matchedPatients: any[] = [];
+                    if (isMaskedProfile) {
+                      matchedPatients = await findPatientsByWhatsApp(supabase, fromPhone, contactName);
+                    } else if (fromPhone) {
+                      matchedPatients = await findPatientsByPhone(supabase, fromPhone);
+                    }
+
                     if (matchedPatients.length === 1) {
                       updatePayload.patient_id = matchedPatients[0].id;
                       if (matchedPatients[0].name) {
                         updatePayload.patient_name = matchedPatients[0].name;
                       }
+                      await savePatientWhatsAppIdentity(supabase, matchedPatients[0].id, {
+                        whatsapp_code: isMaskedProfile ? formatWhatsAppCode(fromPhone) : null,
+                        whatsapp_username: contactName,
+                      });
                     }
                   }
 
