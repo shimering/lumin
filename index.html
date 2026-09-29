@@ -19552,8 +19552,9 @@
 
       const isBsuid = isWhatsAppBsuid(rawContact);
       const cleanCode = isBsuid ? cleanWhatsAppCode(rawContact) : null;
-      const cleanUsername = cleanWhatsAppUsername(rawContact);
-      const cleanDigits = String(rawContact).replace(/[^\d]/g, '');
+      const isUsername = isWhatsAppUsername(rawContact);
+      const cleanUsername = isUsername ? cleanWhatsAppUsername(rawContact) : null;
+      const cleanDigits = (!isBsuid && !isUsername) ? String(rawContact).replace(/[^\d]/g, '') : '';
 
       const searchList = Array.isArray(patients) && patients.length > 0 
         ? patients 
@@ -25393,7 +25394,7 @@
 
     function patientWorkspaceOriginView(preferredView = null) {
       const candidate = preferredView || window.location.hash.slice(1);
-      return ['dashboard', 'appointments', 'patients', 'finances'].includes(candidate) && (candidate === 'patients' ? canOpenPatientsPage() : hasPageAccess(candidate))
+      return ['dashboard', 'appointments', 'patients', 'finances', 'whatsapp'].includes(candidate) && (candidate === 'patients' ? canOpenPatientsPage() : hasPageAccess(candidate))
         ? candidate
         : null;
     }
@@ -25574,9 +25575,13 @@
     async function openPatientWorkspace(patientId, tabName = 'profile', returnView = null) {
       if (!patientId) return;
       await ensurePatientsLoaded();
-      if (!patients.some(patient => patient.id === patientId)) return;
+      if (!patients.some(patient => patient.id === patientId)) {
+        const loadedPatient = await ensureKnownPatient(patientId);
+        if (!loadedPatient && !patients.some(patient => patient.id === patientId)) return;
+      }
       rememberPatientWorkspaceOrigin(returnView);
       activeWorkspacePatientId = patientId;
+      activePatientId = patientId;
       if (tabName === 'chart') {
         openPatientChart(patientId);
         return;
@@ -25621,7 +25626,8 @@
         dashboard: currentUiLanguage === 'ar' ? 'العودة إلى لوحة التحكم' : 'Back to dashboard',
         appointments: currentUiLanguage === 'ar' ? 'العودة إلى المواعيد' : 'Back to appointments',
         patients: currentUiLanguage === 'ar' ? 'العودة إلى المرضى' : 'Back to patients',
-        finances: currentUiLanguage === 'ar' ? 'العودة إلى المالية' : 'Back to finances'
+        finances: currentUiLanguage === 'ar' ? 'العودة إلى المالية' : 'Back to finances',
+        whatsapp: currentUiLanguage === 'ar' ? 'العودة إلى المحادثات' : 'Back to WhatsApp'
       };
       const returnLabel = returnLabels[patientWorkspaceReturnView] || returnLabels.patients;
       document.querySelectorAll('[data-patient-workspace-back]').forEach(button => {
@@ -39328,8 +39334,10 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
 
       // 1. If already linked to a patient profile in local state
       if (activeWhatsAppConversation.patient_id) {
-        activePatientId = activeWhatsAppConversation.patient_id;
-        await switchView('patient-profile');
+        const targetId = activeWhatsAppConversation.patient_id;
+        activeWorkspacePatientId = targetId;
+        activePatientId = targetId;
+        await openPatientWorkspace(targetId, 'profile', 'whatsapp');
         return;
       }
 
@@ -39337,8 +39345,9 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       const matchedPatient = await ensurePatientForWhatsApp(activeWhatsAppConversation);
       if (matchedPatient) {
         activeWhatsAppConversation.patient_id = matchedPatient.id;
+        activeWorkspacePatientId = matchedPatient.id;
         activePatientId = matchedPatient.id;
-        await switchView('patient-profile');
+        await openPatientWorkspace(matchedPatient.id, 'profile', 'whatsapp');
         return;
       }
 
@@ -39767,8 +39776,9 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
           );
 
           // Redirect directly to patient profile page!
+          activeWorkspacePatientId = patient.id;
           activePatientId = patient.id;
-          await switchView('patient-profile');
+          await openPatientWorkspace(patient.id, 'profile', 'whatsapp');
         } catch (err) {
           console.error('Failed to link WhatsApp patient:', err);
           showError((isAr ? 'فشل ربط المريض: ' : 'Failed to link patient: ') + (err.message || 'Unknown error'));
@@ -39862,8 +39872,9 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
           );
 
           // Redirect directly to patient profile page!
+          activeWorkspacePatientId = normalised.id;
           activePatientId = normalised.id;
-          await switchView('patient-profile');
+          await openPatientWorkspace(normalised.id, 'profile', 'whatsapp');
         } catch (err) {
           console.error('Failed to create and link patient:', err);
           showError((isAr ? 'فشل إنشاء المريض: ' : 'Failed to create patient: ') + (err.message || 'Unknown error'));

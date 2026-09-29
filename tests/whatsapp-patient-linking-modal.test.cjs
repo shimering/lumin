@@ -43,18 +43,18 @@ test('WhatsApp chat header contains patient file button beside name and modal ma
 });
 
 test('WhatsApp linking modal strictly obeys AGENTS.md rules (no border slash opacity)', () => {
-  // Extract modal section
   const modalStart = html.indexOf('id="modal-link-whatsapp-patient"');
   const modalEnd = html.indexOf('<!-- ================= MODAL: WHATSAPP LOCATION ================= -->', modalStart);
   const modalSection = html.slice(modalStart, modalEnd);
 
-  // Test for illegal border slash-opacity patterns like border-slate-200/80
   const slashBorderMatches = modalSection.match(/border-[a-z]+-[0-9]+\/[0-9]+/g);
   assert.equal(slashBorderMatches, null, `Found illegal slash-opacity border classes: ${slashBorderMatches}`);
 });
 
-test('openActiveChatPatientFile redirects directly to patient profile if patient file is found', async () => {
-  let switchedView = null;
+test('openActiveChatPatientFile sets activeWorkspacePatientId and calls openPatientWorkspace', async () => {
+  let openedWorkspacePatientId = null;
+  let openedWorkspaceTab = null;
+  let openedWorkspaceReturnView = null;
   let openedModal = false;
 
   const mockContext = {
@@ -63,9 +63,12 @@ test('openActiveChatPatientFile redirects directly to patient profile if patient
       phone: '201001234567',
       patient_id: 'patient-999'
     },
+    activeWorkspacePatientId: 'wrong-patient-roaa',
     activePatientId: null,
-    switchView: async (view) => {
-      switchedView = view;
+    openPatientWorkspace: async (patientId, tab, returnView) => {
+      openedWorkspacePatientId = patientId;
+      openedWorkspaceTab = tab;
+      openedWorkspaceReturnView = returnView;
     },
     ensurePatientForWhatsApp: async () => null,
     openLinkWhatsAppPatientModal: () => {
@@ -73,39 +76,25 @@ test('openActiveChatPatientFile redirects directly to patient profile if patient
     }
   };
 
-  const snippet = `
-    async function openActiveChatPatientFile() {
-      if (!activeWhatsAppConversation) return;
-
-      if (activeWhatsAppConversation.patient_id) {
-        activePatientId = activeWhatsAppConversation.patient_id;
-        await switchView('patient-profile');
-        return;
-      }
-
-      const matchedPatient = await ensurePatientForWhatsApp(activeWhatsAppConversation);
-      if (matchedPatient) {
-        activeWhatsAppConversation.patient_id = matchedPatient.id;
-        activePatientId = matchedPatient.id;
-        await switchView('patient-profile');
-        return;
-      }
-
-      openLinkWhatsAppPatientModal();
-    }
-  `;
+  const fnStart = html.indexOf('async function openActiveChatPatientFile()');
+  const fnEnd = html.indexOf('let linkWaActiveTab =', fnStart);
+  const snippet = html.slice(fnStart, fnEnd);
 
   vm.runInNewContext(snippet, mockContext);
 
   await mockContext.openActiveChatPatientFile();
 
+  // MUST set both activePatientId and activeWorkspacePatientId to the actual linked patient!
   assert.equal(mockContext.activePatientId, 'patient-999');
-  assert.equal(switchedView, 'patient-profile');
+  assert.equal(mockContext.activeWorkspacePatientId, 'patient-999');
+  assert.equal(openedWorkspacePatientId, 'patient-999');
+  assert.equal(openedWorkspaceTab, 'profile');
+  assert.equal(openedWorkspaceReturnView, 'whatsapp');
   assert.equal(openedModal, false);
 });
 
-test('openActiveChatPatientFile matches patient by phone/username and redirects to profile', async () => {
-  let switchedView = null;
+test('openActiveChatPatientFile matches patient by phone/username, sets workspace and redirects', async () => {
+  let openedWorkspacePatientId = null;
   let openedModal = false;
 
   const mockContext = {
@@ -114,9 +103,10 @@ test('openActiveChatPatientFile matches patient by phone/username and redirects 
       phone: '@dr_sarah',
       patient_id: null
     },
+    activeWorkspacePatientId: 'wrong-patient-roaa',
     activePatientId: null,
-    switchView: async (view) => {
-      switchedView = view;
+    openPatientWorkspace: async (patientId, tab, returnView) => {
+      openedWorkspacePatientId = patientId;
     },
     ensurePatientForWhatsApp: async (conv) => {
       if (conv.phone === '@dr_sarah') {
@@ -129,40 +119,23 @@ test('openActiveChatPatientFile matches patient by phone/username and redirects 
     }
   };
 
-  const snippet = `
-    async function openActiveChatPatientFile() {
-      if (!activeWhatsAppConversation) return;
-
-      if (activeWhatsAppConversation.patient_id) {
-        activePatientId = activeWhatsAppConversation.patient_id;
-        await switchView('patient-profile');
-        return;
-      }
-
-      const matchedPatient = await ensurePatientForWhatsApp(activeWhatsAppConversation);
-      if (matchedPatient) {
-        activeWhatsAppConversation.patient_id = matchedPatient.id;
-        activePatientId = matchedPatient.id;
-        await switchView('patient-profile');
-        return;
-      }
-
-      openLinkWhatsAppPatientModal();
-    }
-  `;
+  const fnStart = html.indexOf('async function openActiveChatPatientFile()');
+  const fnEnd = html.indexOf('let linkWaActiveTab =', fnStart);
+  const snippet = html.slice(fnStart, fnEnd);
 
   vm.runInNewContext(snippet, mockContext);
 
   await mockContext.openActiveChatPatientFile();
 
   assert.equal(mockContext.activePatientId, 'patient-sarah');
+  assert.equal(mockContext.activeWorkspacePatientId, 'patient-sarah');
   assert.equal(mockContext.activeWhatsAppConversation.patient_id, 'patient-sarah');
-  assert.equal(switchedView, 'patient-profile');
+  assert.equal(openedWorkspacePatientId, 'patient-sarah');
   assert.equal(openedModal, false);
 });
 
 test('openActiveChatPatientFile opens modal when patient file is not found', async () => {
-  let switchedView = null;
+  let openedWorkspacePatientId = null;
   let openedModal = false;
 
   const mockContext = {
@@ -171,9 +144,10 @@ test('openActiveChatPatientFile opens modal when patient file is not found', asy
       phone: '201999999999',
       patient_id: null
     },
+    activeWorkspacePatientId: 'prev-patient',
     activePatientId: null,
-    switchView: async (view) => {
-      switchedView = view;
+    openPatientWorkspace: async (patientId) => {
+      openedWorkspacePatientId = patientId;
     },
     ensurePatientForWhatsApp: async () => null,
     openLinkWhatsAppPatientModal: () => {
@@ -181,39 +155,21 @@ test('openActiveChatPatientFile opens modal when patient file is not found', asy
     }
   };
 
-  const snippet = `
-    async function openActiveChatPatientFile() {
-      if (!activeWhatsAppConversation) return;
-
-      if (activeWhatsAppConversation.patient_id) {
-        activePatientId = activeWhatsAppConversation.patient_id;
-        await switchView('patient-profile');
-        return;
-      }
-
-      const matchedPatient = await ensurePatientForWhatsApp(activeWhatsAppConversation);
-      if (matchedPatient) {
-        activeWhatsAppConversation.patient_id = matchedPatient.id;
-        activePatientId = matchedPatient.id;
-        await switchView('patient-profile');
-        return;
-      }
-
-      openLinkWhatsAppPatientModal();
-    }
-  `;
+  const fnStart = html.indexOf('async function openActiveChatPatientFile()');
+  const fnEnd = html.indexOf('let linkWaActiveTab =', fnStart);
+  const snippet = html.slice(fnStart, fnEnd);
 
   vm.runInNewContext(snippet, mockContext);
 
   await mockContext.openActiveChatPatientFile();
 
   assert.equal(mockContext.activePatientId, null);
-  assert.equal(switchedView, null);
+  assert.equal(openedWorkspacePatientId, null);
   assert.equal(openedModal, true);
 });
 
-test('Linking an existing patient updates patient record, links conversation, and redirects to patient-profile', async () => {
-  let switchedView = null;
+test('Linking an existing patient updates patient record, links conversation, sets activeWorkspacePatientId and redirects to patient-profile', async () => {
+  let openedWorkspacePatientId = null;
   let conversationUpdatePayload = null;
   let patientUpdatePayload = null;
 
@@ -236,6 +192,7 @@ test('Linking an existing patient updates patient record, links conversation, an
     linkWaActiveTab: 'existing',
     linkWaSelectedPatientId: 'pat-123',
     currentUiLanguage: 'en',
+    activeWorkspacePatientId: 'wrong-patient-roaa',
     activePatientId: null,
     db: {
       from: (table) => ({
@@ -264,13 +221,12 @@ test('Linking an existing patient updates patient record, links conversation, an
     selectWhatsAppConversation: async () => {},
     closeLinkWhatsAppPatientModal: () => {},
     showAppointmentNotificationToast: () => {},
-    switchView: async (view) => {
-      switchedView = view;
+    openPatientWorkspace: async (patientId, tab, returnView) => {
+      openedWorkspacePatientId = patientId;
     },
     console: { error: () => {}, warn: () => {} }
   };
 
-  // Run submitLinkWhatsAppPatient logic from index.html
   const fnStart = html.indexOf('async function submitLinkWhatsAppPatient()');
   const fnEnd = html.indexOf('function formatWhatsAppTime(', fnStart);
   const snippet = html.slice(fnStart, fnEnd);
@@ -287,13 +243,14 @@ test('Linking an existing patient updates patient record, links conversation, an
   assert.equal(patientUpdatePayload.whatsapp_username, 'ahmed_m');
   assert.equal(existingPatient.whatsappUsername, 'ahmed_m');
 
-  // Verify redirect
+  // Verify workspace patient ID is updated to the newly linked patient!
+  assert.equal(mockContext.activeWorkspacePatientId, 'pat-123');
   assert.equal(mockContext.activePatientId, 'pat-123');
-  assert.equal(switchedView, 'patient-profile');
+  assert.equal(openedWorkspacePatientId, 'pat-123');
 });
 
-test('Creating a new patient inserts record, links conversation, and redirects to patient-profile', async () => {
-  let switchedView = null;
+test('Creating a new patient inserts record, links conversation, sets activeWorkspacePatientId and redirects to patient-profile', async () => {
+  let openedWorkspacePatientId = null;
   let insertedPayload = null;
   let conversationUpdatePayload = null;
 
@@ -308,6 +265,7 @@ test('Creating a new patient inserts record, links conversation, and redirects t
     patientDirectoryRows: [],
     linkWaActiveTab: 'new',
     currentUiLanguage: 'en',
+    activeWorkspacePatientId: 'wrong-patient-roaa',
     activePatientId: null,
     PATIENT_SELECT_FIELDS: '*',
     db: {
@@ -352,8 +310,8 @@ test('Creating a new patient inserts record, links conversation, and redirects t
     selectWhatsAppConversation: async () => {},
     closeLinkWhatsAppPatientModal: () => {},
     showAppointmentNotificationToast: () => {},
-    switchView: async (view) => {
-      switchedView = view;
+    openPatientWorkspace: async (patientId, tab, returnView) => {
+      openedWorkspacePatientId = patientId;
     },
     console: { error: () => {}, warn: () => {} }
   };
@@ -366,7 +324,7 @@ test('Creating a new patient inserts record, links conversation, and redirects t
 
   await mockContext.submitLinkWhatsAppPatient();
 
-  // Verify new patient created with proper username and BSUID code
+  // Verify new patient created
   assert.equal(insertedPayload.name, 'Layla Fawzy');
   assert.equal(insertedPayload.whatsapp_username, 'layla_f');
   assert.equal(insertedPayload.whatsapp_code, '+EG.4631528857091458');
@@ -377,7 +335,8 @@ test('Creating a new patient inserts record, links conversation, and redirects t
   assert.equal(conversationUpdatePayload.patient_id, 'new-pat-888');
   assert.equal(mockContext.activeWhatsAppConversation.patient_id, 'new-pat-888');
 
-  // Verify redirect to patient profile
+  // Verify workspace patient ID is updated to the newly created patient!
+  assert.equal(mockContext.activeWorkspacePatientId, 'new-pat-888');
   assert.equal(mockContext.activePatientId, 'new-pat-888');
-  assert.equal(switchedView, 'patient-profile');
+  assert.equal(openedWorkspacePatientId, 'new-pat-888');
 });
