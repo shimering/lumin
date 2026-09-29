@@ -6104,7 +6104,7 @@
         <div class="grid gap-5 xl:grid-cols-3">
           <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs"><div class="flex items-center justify-between gap-3 border-b border-slate-100 p-4 sm:p-5"><div><h3 class="text-sm font-black text-slate-800">Extra shifts</h3><p class="mt-1 text-[11px] font-bold text-slate-400">Separate dates, rates, reasons, and calculated amounts.</p></div><span id="hr-staff-extra-total" class="rounded-full bg-amber-100 px-3 py-1.5 text-[10px] font-black text-amber-700"></span></div><div class="overflow-x-auto"><table class="w-full min-w-[560px] xl:min-w-0 text-left text-xs"><thead class="border-b border-slate-100 bg-slate-50/70 text-[9px] font-black uppercase tracking-wider text-slate-400"><tr><th class="px-4 py-3">Date</th><th class="px-4 py-3">Shifts</th><th class="px-4 py-3">Rate</th><th class="px-4 py-3">Amount</th><th class="px-4 py-3">Reason</th><th class="w-10 px-3 py-3 text-right"></th></tr></thead><tbody id="hr-staff-extra-table" class="divide-y divide-slate-100 font-semibold text-slate-600"></tbody></table></div></div>
           <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs"><div class="flex items-center justify-between gap-3 border-b border-slate-100 p-4 sm:p-5"><div><h3 class="text-sm font-black text-slate-800">Performance entries</h3><p class="mt-1 text-[11px] font-bold text-slate-400">Bonuses and deductions remain separate from attendance.</p></div><span id="hr-staff-performance-total" class="rounded-full bg-violet-100 px-3 py-1.5 text-[10px] font-black text-violet-700"></span></div><div class="overflow-x-auto"><table class="w-full min-w-[560px] xl:min-w-0 text-left text-xs"><thead class="border-b border-slate-100 bg-slate-50/70 text-[9px] font-black uppercase tracking-wider text-slate-400"><tr><th class="px-4 py-3">Date</th><th class="px-4 py-3">Type</th><th class="px-4 py-3">Amount</th><th class="px-4 py-3">Score</th><th class="px-4 py-3">Reason</th><th class="w-10 px-3 py-3 text-right"></th></tr></thead><tbody id="hr-staff-performance-table" class="divide-y divide-slate-100 font-semibold text-slate-600"></tbody></table></div></div>
-          <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs"><div class="flex items-center justify-between gap-3 border-b border-slate-100 p-4 sm:p-5"><div><h3 class="text-sm font-black text-slate-800">Salary advances</h3><p class="mt-1 text-[11px] font-bold text-slate-400">Borrowings deducted from total monthly salary.</p></div><span id="hr-staff-advance-total" class="rounded-full bg-sky-100 px-3 py-1.5 text-[10px] font-black text-sky-700"></span></div><div class="overflow-x-auto"><table class="w-full min-w-[340px] xl:min-w-0 text-left text-xs"><thead class="border-b border-slate-100 bg-slate-50/70 text-[9px] font-black uppercase tracking-wider text-slate-400"><tr><th class="px-4 py-3">Date</th><th class="px-4 py-3">Amount</th><th class="px-4 py-3">Reason</th><th class="w-10 px-3 py-3 text-right"></th></tr></thead><tbody id="hr-staff-advance-table" class="divide-y divide-slate-100 font-semibold text-slate-600"></tbody></table></div></div>
+          <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs"><div class="flex items-center justify-between gap-3 border-b border-slate-100 p-4 sm:p-5"><div><h3 class="text-sm font-black text-slate-800">Salary advances</h3><p class="mt-1 text-[11px] font-bold text-slate-400">Borrowings deducted from total monthly salary.</p></div><span id="hr-staff-advance-total" class="rounded-full bg-sky-100 px-3 py-1.5 text-[10px] font-black text-sky-700"></span></div><div class="overflow-x-auto"><table class="w-full min-w-[420px] xl:min-w-0 text-left text-xs"><thead class="border-b border-slate-100 bg-slate-50/70 text-[9px] font-black uppercase tracking-wider text-slate-400"><tr><th class="px-4 py-3">Date</th><th class="px-4 py-3">Amount</th><th class="px-4 py-3">Method</th><th class="px-4 py-3">Reason</th><th class="w-10 px-3 py-3 text-right"></th></tr></thead><tbody id="hr-staff-advance-table" class="divide-y divide-slate-100 font-semibold text-slate-600"></tbody></table></div></div>
         </div>
       </div>
 
@@ -9544,9 +9544,13 @@
               <span>Current salary balance</span>
               <span id="hr-advance-current-balance" class="font-black">EGP 0</span>
             </div>
-            <p class="mt-1 text-[11px] text-sky-600">Advances are deducted directly from the monthly salary total. If an advance exceeds current earnings, the salary will show a negative balance.</p>
+            <p class="mt-1 text-[11px] text-sky-600">Advances are deducted directly from the monthly salary total. Recorded as an expense and synced to the Baytna Finance app.</p>
           </div>
-          <label><span class="mb-1.5 block text-xs font-bold text-slate-600">Advance amount (EGP)</span><input id="hr-advance-amount" type="number" min="0.01" step="0.01" placeholder="0.00" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-black" /></label>
+          <div class="grid grid-cols-2 gap-3">
+            <label><span class="mb-1.5 block text-xs font-bold text-slate-600">Advance amount (EGP)</span><input id="hr-advance-amount" type="number" min="0.01" step="0.01" placeholder="0.00" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-black" /></label>
+            <label><span class="mb-1.5 block text-xs font-bold text-slate-600">Payment method</span><select id="hr-advance-payment-method" onchange="updateHrAdvanceRouteHint()" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold"><option value="">Choose method…</option></select></label>
+          </div>
+          <p id="hr-advance-baytna-hint" class="text-[11px] font-semibold text-slate-400">Paid from selected account and synced to Baytna Finance.</p>
         </div>
         <label><span class="mb-1.5 block text-xs font-bold text-slate-600">Note</span><textarea id="hr-adjustment-note" maxlength="500" rows="3" placeholder="Reason or details" class="w-full resize-y rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm"></textarea></label>
         <p id="hr-adjustment-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="status"></p>
@@ -10425,8 +10429,13 @@
       'No salary advances in this month.': 'لا توجد سلف مسجلة في هذا الشهر.',
       'Borrowings deducted from total monthly salary.': 'المبالغ المقترضة مخصومة من إجمالي الراتب الشهري.',
       'Advances are deducted directly from the monthly salary total. If an advance exceeds current earnings, the salary will show a negative balance.': 'تُخصم مبالغ السلف مباشرة من إجمالي الراتب الشهري. وفي حال تجاوزت السلفة المستحق حالياً، سيظهر الراتب برصيد سالب.',
+      'Advances are deducted directly from the monthly salary total. Recorded as an expense and synced to the Baytna Finance app.': 'تُخصم مبالغ السلف مباشرة من إجمالي الراتب الشهري، وتُسجّل كمصروف يُزامن مع تطبيق بيتنا المالي.',
       'Current salary balance': 'رصيد الراتب الحالي',
       'Advance amount (EGP)': 'مبلغ السلفة (جنيه)',
+      'Choose method…': 'اختر طريقة الدفع…',
+      'Please choose a payment method.': 'يرجى اختيار طريقة الدفع.',
+      'Paid from selected account and synced to Baytna Finance.': 'يُصرف من الحساب المحدد وتتم مزامنته مع تطبيق بيتنا المالي.',
+      'Salary advance recorded and synced as an expense.': 'تم تسجيل سلفة الراتب ومزامنتها كمصروف.',
       'Net loss': 'صافي الخسارة',
       'Income less paid expenses': 'الدخل ناقص المصروفات المدفوعة',
       'Net margin': 'هامش الربح الصافي',
@@ -20741,7 +20750,10 @@
       const advanceTotalEl = document.getElementById('hr-staff-advance-total');
       if (advanceTotalEl) advanceTotalEl.textContent = `${advanceRows.length} record${advanceRows.length === 1 ? '' : 's'} · −${formatInvoiceMoney(metrics.advanceAmount)}`;
       const advanceTableEl = document.getElementById('hr-staff-advance-table');
-      if (advanceTableEl) advanceTableEl.innerHTML = advanceRows.map(row => `<tr><td class="px-4 py-3 font-black text-slate-800">${escapeHtml(hrDateLabel(row.advance_date, { short: true }))}</td><td class="px-4 py-3 font-black text-sky-700">−${escapeHtml(formatInvoiceMoney(row.amount))}</td><td class="max-w-[220px] px-4 py-3">${escapeHtml(row.note || '—')}</td><td class="w-10 px-3 py-3 text-right">${canManageAdjustments ? `<button type="button" onclick="deleteHrSalaryAdvance('${row.id}')" title="Delete salary advance" class="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"><i data-lucide="trash-2" class="h-4 w-4"></i></button>` : ''}</td></tr>`).join('') || '<tr><td colspan="4" class="px-4 py-8 text-center text-xs font-bold text-slate-400">No salary advances in this month.</td></tr>';
+      if (advanceTableEl) advanceTableEl.innerHTML = advanceRows.map(row => {
+        const method = row.payment_methods ? hrSalaryPaymentMethodLabel(row.payment_methods) : '—';
+        return `<tr><td class="px-4 py-3 font-black text-slate-800">${escapeHtml(hrDateLabel(row.advance_date, { short: true }))}</td><td class="px-4 py-3 font-black text-sky-700">−${escapeHtml(formatInvoiceMoney(row.amount))}</td><td class="px-4 py-3"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">${escapeHtml(method)}</span></td><td class="max-w-[220px] px-4 py-3">${escapeHtml(row.note || '—')}</td><td class="w-10 px-3 py-3 text-right">${canManageAdjustments ? `<button type="button" onclick="deleteHrSalaryAdvance('${row.id}')" title="Delete salary advance" class="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"><i data-lucide="trash-2" class="h-4 w-4"></i></button>` : ''}</td></tr>`;
+      }).join('') || '<tr><td colspan="5" class="px-4 py-8 text-center text-xs font-bold text-slate-400">No salary advances in this month.</td></tr>';
       lucide.createIcons();
     }
 
@@ -20949,7 +20961,7 @@
           db.from('hr_payroll_periods').select('*').eq('pay_month', start).maybeSingle(),
           db.from('hr_salary_payments').select('*').eq('pay_month', start),
           db.rpc('get_hr_doctor_payroll', { p_pay_month: start }),
-          db.from('hr_salary_advances').select('id,user_id,advance_date,amount,note').gte('advance_date', start).lt('advance_date', end)
+          db.from('hr_salary_advances').select('id,user_id,advance_date,amount,note,payment_method_id,expense_id,payment_methods(id,name)').gte('advance_date', start).lt('advance_date', end)
         ]);
         for (const result of [usersResult, settingsResult, attendanceResult, extraResult, performanceResult, periodResult, paymentsResult, doctorPayrollResult, advancesResult]) if (result.error) throw result.error;
         hrDirectoryUsers = (usersResult.data || []).map(normaliseHrDirectoryUser);
@@ -21146,6 +21158,7 @@
       const perfAmountInput = document.getElementById('hr-performance-amount');
       const perfScoreInput = document.getElementById('hr-performance-score');
       const advanceAmountInput = document.getElementById('hr-advance-amount');
+      const advancePaymentMethodInput = document.getElementById('hr-advance-payment-method');
 
       if (extraCountInput) extraCountInput.disabled = !isExtra;
       if (extraRateInput) extraRateInput.disabled = !isExtra;
@@ -21153,6 +21166,7 @@
       if (perfAmountInput) perfAmountInput.disabled = !isPerf;
       if (perfScoreInput) perfScoreInput.disabled = !isPerf;
       if (advanceAmountInput) advanceAmountInput.disabled = !isAdvance;
+      if (advancePaymentMethodInput) advancePaymentMethodInput.disabled = !isAdvance;
 
       if (extraCountInput) extraCountInput.value = 1;
       if (extraRateInput) extraRateInput.value = hrUserSettings(userId).extraRate || 0;
@@ -21160,6 +21174,7 @@
       if (perfAmountInput) perfAmountInput.value = '';
       if (perfScoreInput) perfScoreInput.value = '';
       if (advanceAmountInput) advanceAmountInput.value = '';
+      if (advancePaymentMethodInput) advancePaymentMethodInput.value = '';
 
       if (isAdvance) {
         const metrics = hrUserMetrics(user);
@@ -21168,6 +21183,9 @@
           currentBalanceEl.textContent = metrics.salary < 0
             ? `−${formatInvoiceMoney(Math.abs(metrics.salary))}`
             : formatInvoiceMoney(metrics.salary);
+        }
+        if (typeof loadHrAdvancePaymentMethods === 'function') {
+          void loadHrAdvancePaymentMethods();
         }
       }
 
@@ -21221,11 +21239,16 @@
         if (!amount || isNaN(amount) || amount <= 0) {
           return setAdminMessage('hr-adjustment-message', 'Please enter an advance amount greater than zero.', 'error');
         }
+        const paymentMethodId = document.getElementById('hr-advance-payment-method')?.value || '';
+        if (!paymentMethodId) {
+          return setAdminMessage('hr-adjustment-message', typeof hrSalaryPaymentText === 'function' ? hrSalaryPaymentText('Please choose a payment method for the advance.', 'يرجى اختيار طريقة الدفع للسلفة.') : 'Please choose a payment method for the advance.', 'error');
+        }
         payload = {
           p_id: null,
           p_user_id: userId,
           p_advance_date: date,
           p_amount: amount,
+          p_payment_method_id: paymentMethodId,
           p_note: document.getElementById('hr-adjustment-note').value.trim()
         };
       } else {
@@ -21260,6 +21283,10 @@
         if (result.error) throw result.error;
         closeHrAdjustmentModal();
         hrDirectoryLoaded = false;
+        if (mode === 'advance') {
+          if (typeof financeExpensesLoaded !== 'undefined') financeExpensesLoaded = false;
+          if (typeof financeOverviewLoaded !== 'undefined') financeOverviewLoaded = false;
+        }
         await refreshHrDirectory({ refresh: true });
         showAppointmentNotificationToast(
           mode === 'extra' ? 'Extra shift saved' : mode === 'advance' ? 'Salary advance saved' : 'Adjustment saved',
@@ -21306,6 +21333,8 @@
       try {
         const { error } = await db.rpc('delete_hr_salary_advance', { p_id: id });
         if (error) throw error;
+        if (typeof financeExpensesLoaded !== 'undefined') financeExpensesLoaded = false;
+        if (typeof financeOverviewLoaded !== 'undefined') financeOverviewLoaded = false;
         showAppointmentNotificationToast('Salary advance deleted', 'The salary advance was removed.');
         hrDirectoryLoaded = false;
         await refreshHrDirectory({ refresh: true });
@@ -21319,8 +21348,82 @@
     }
 
     function hrSalaryPaymentMethodLabel(method) {
-      const arabic = { cash: 'نقداً', instapay: 'إنستاباي', card: 'بطاقة' }[String(method.name).toLowerCase().replaceAll(' ', '')];
-      return hrSalaryPaymentText(method.name, arabic || method.name);
+      if (!method) return '—';
+      const name = typeof method === 'string' ? method : method.name;
+      const arabic = { cash: 'نقداً', instapay: 'إنستاباي', card: 'بطاقة' }[String(name || '').toLowerCase().replaceAll(' ', '')];
+      return hrSalaryPaymentText(name, arabic || name);
+    }
+
+    let cachedHrAdvanceRoutes = null;
+
+    async function loadHrAdvancePaymentMethods() {
+      const select = document.getElementById('hr-advance-payment-method');
+      const hint = document.getElementById('hr-advance-baytna-hint');
+      if (!select) return;
+      select.disabled = true;
+      select.innerHTML = `<option value="">${hrSalaryPaymentText('Loading payment methods…', 'جارٍ تحميل طرق الدفع…')}</option>`;
+      if (hint) {
+        hint.textContent = hrSalaryPaymentText('Loading payment destination…', 'جارٍ تحميل وجهة الدفع…');
+        hint.className = 'text-[11px] font-semibold text-slate-400';
+      }
+      try {
+        const { data, error } = await db.rpc('get_hr_salary_payment_methods');
+        if (error) throw error;
+        cachedHrAdvanceRoutes = data;
+        const methods = data?.methods || [];
+        select.innerHTML = `<option value="">${hrSalaryPaymentText('Choose a payment method…', 'اختر طريقة الدفع…')}</option>` +
+          methods.map(method => `<option value="${escapeHtml(method.id)}">${escapeHtml(hrSalaryPaymentMethodLabel(method))}</option>`).join('');
+        select.disabled = !methods.length;
+        if (!methods.length) {
+          if (hint) {
+            hint.textContent = hrSalaryPaymentText('No active payment methods found. Add one in Admin → Payment methods.', 'لا توجد طرق دفع نشطة. أضف طريقة في الإدارة ← طرق الدفع.');
+            hint.className = 'text-[11px] font-semibold text-rose-600';
+          }
+        } else {
+          const cash = methods.find(m => String(m.name || '').toLowerCase().trim() === 'cash');
+          select.value = cash ? cash.id : methods[0].id;
+          updateHrAdvanceRouteHint(data);
+        }
+      } catch (error) {
+        select.innerHTML = `<option value="">${hrSalaryPaymentText('Failed to load payment methods', 'تعذر تحميل طرق الدفع')}</option>`;
+        if (hint) {
+          hint.textContent = hrSalaryPaymentText('Could not load payment methods. Please retry.', 'تعذر تحميل طرق الدفع. يرجى إعادة المحاولة.');
+          hint.className = 'text-[11px] font-semibold text-rose-600';
+        }
+      }
+    }
+
+    function updateHrAdvanceRouteHint(providedRoutes = null) {
+      const select = document.getElementById('hr-advance-payment-method');
+      const hint = document.getElementById('hr-advance-baytna-hint');
+      if (!select || !hint) return;
+      const routes = providedRoutes || cachedHrAdvanceRoutes;
+      const methodId = select.value;
+      const method = routes?.methods?.find(item => item.id === methodId);
+      const t = hrSalaryPaymentText;
+      if (!methodId || !method) {
+        hint.textContent = t('Choose a payment method to see the Baytna destination.', 'اختر طريقة الدفع لعرض الحساب المقابل في بيتنا.');
+        hint.className = 'text-[11px] font-semibold text-slate-400';
+        return;
+      }
+      if (!method.account_id) {
+        hint.textContent = t('This method is excluded from Baytna sync. It will stay in Lumin only.', 'هذه الطريقة مستبعدة من مزامنة بيتنا. ستبقى في لومين فقط.');
+        hint.className = 'text-[11px] font-semibold text-amber-600';
+      } else {
+        const name = (currentUiLanguage === 'ar' ? method.account_name_ar : method.account_name) || method.account_name || t('Mapped account', 'الحساب المرتبط');
+        let text = t('Baytna account: ', 'حساب بيتنا: ') + name + '. ';
+        if (!routes?.sync_expenses) {
+          text += t('Expense sync is disabled in settings; advance remains in Lumin.', 'مزامنة المصروفات معطلة في الإعدادات؛ ستبقى السلفة في لومين.');
+          hint.className = 'text-[11px] font-semibold text-amber-600';
+        } else if (!routes?.enabled) {
+          text += t('Sync is paused; advance will queue until resumed.', 'المزامنة متوقفة مؤقتاً؛ ستنتظر السلفة حتى استئنافها.');
+          hint.className = 'text-[11px] font-semibold text-amber-600';
+        } else {
+          text += t('Recorded as a salary expense and queued for Baytna sync.', 'يسجل كمصروف راتب ويُجدول للمزامنة مع بيتنا.');
+          hint.className = 'text-[11px] font-semibold text-emerald-600';
+        }
+        hint.textContent = text;
+      }
     }
 
     function openHrSalaryPaymentDialog(review) {

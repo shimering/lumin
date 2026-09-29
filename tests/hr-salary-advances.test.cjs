@@ -197,6 +197,16 @@ test('saveHrAdjustment: validates advance amount greater than zero', async () =>
   assert.ok(adminMessages.some(m => m.msg.includes('greater than zero')));
 });
 
+test('saveHrAdjustment: validates payment method for salary advance', async () => {
+  const { ctx, getNode, adminMessages } = setupContext();
+  ctx.openHrAdjustmentModal('advance', 'user-staff-1');
+
+  getNode('hr-advance-amount').value = '200';
+  getNode('hr-advance-payment-method').value = '';
+  await ctx.saveHrAdjustment({ preventDefault: () => {} });
+  assert.ok(adminMessages.some(m => m.msg.toLowerCase().includes('payment method')));
+});
+
 test('saveHrAdjustment: calls save_hr_salary_advance RPC with valid payload and displays toast', async () => {
   const rpcCalls = [];
   const { ctx, getNode, toasts } = setupContext({
@@ -210,6 +220,7 @@ test('saveHrAdjustment: calls save_hr_salary_advance RPC with valid payload and 
 
   ctx.openHrAdjustmentModal('advance', 'user-staff-1');
   getNode('hr-advance-amount').value = '350.50';
+  getNode('hr-advance-payment-method').value = 'pm-cash-1';
   getNode('hr-adjustment-date').value = '2026-09-18';
   getNode('hr-adjustment-note').value = 'Emergency family expense';
 
@@ -222,6 +233,7 @@ test('saveHrAdjustment: calls save_hr_salary_advance RPC with valid payload and 
     p_user_id: 'user-staff-1',
     p_advance_date: '2026-09-18',
     p_amount: 350.5,
+    p_payment_method_id: 'pm-cash-1',
     p_note: 'Emergency family expense'
   });
 
