@@ -240,13 +240,99 @@ test('Linking an existing patient updates patient record, links conversation, se
   assert.equal(mockContext.activeWhatsAppConversation.patient_id, 'pat-123');
 
   // Verify patient updated with whatsapp_username
-  assert.equal(patientUpdatePayload.whatsapp_username, 'ahmed_m');
-  assert.equal(existingPatient.whatsappUsername, 'ahmed_m');
+  assert.equal(patientUpdatePayload.whatsapp_username, '@ahmed_m');
+  assert.equal(existingPatient.whatsappUsername, '@ahmed_m');
 
   // Verify workspace patient ID is updated to the newly linked patient!
   assert.equal(mockContext.activeWorkspacePatientId, 'pat-123');
   assert.equal(mockContext.activePatientId, 'pat-123');
   assert.equal(openedWorkspacePatientId, 'pat-123');
+});
+
+test('Linking an existing patient with entered username saves username with @ even when conversation phone is BSUID', async () => {
+  let openedWorkspacePatientId = null;
+  let conversationUpdatePayload = null;
+  let patientUpdatePayload = null;
+
+  const existingPatient = {
+    id: 'pat-999',
+    patientNumber: '1088',
+    name: 'Sara Connor',
+    phone: '201011111111',
+    whatsappUsername: null,
+    whatsappCode: null
+  };
+
+  const mockContext = {
+    activeWhatsAppConversation: {
+      id: 'conv-bsuid-1',
+      phone: '+EG.4631528857091458',
+      patient_id: null
+    },
+    patients: [existingPatient],
+    patientDirectoryRows: [],
+    linkWaActiveTab: 'existing',
+    linkWaSelectedPatientId: 'pat-999',
+    currentUiLanguage: 'en',
+    activeWorkspacePatientId: 'wrong-patient-roaa',
+    activePatientId: null,
+    db: {
+      from: (table) => ({
+        update: (payload) => ({
+          eq: (field, val) => {
+            if (table === 'whatsapp_conversations') conversationUpdatePayload = payload;
+            if (table === 'patients') patientUpdatePayload = payload;
+            return Promise.resolve({ error: null });
+          }
+        })
+      })
+    },
+    document: {
+      getElementById: (id) => {
+        if (id === 'link-wa-update-username-check') return { checked: true };
+        if (id === 'link-existing-patient-username') return { value: 'sara_c' };
+        if (id === 'link-existing-patient-code') return { value: '+EG.4631528857091458' };
+        if (id === 'btn-submit-link-wa') return { disabled: false };
+        if (id === 'link-wa-modal-error') return { classList: { add: () => {}, remove: () => {} }, textContent: '' };
+        return null;
+      }
+    },
+    isWhatsAppBsuid: (v) => v.includes('EG.'),
+    isWhatsAppUsername: () => false,
+    cleanWhatsAppUsername: (v) => v.replace(/^@+/, '').toLowerCase(),
+    formatWhatsAppCode: (v) => v.startsWith('+') ? v : `+${v}`,
+    renderWhatsAppConversationsList: () => {},
+    selectWhatsAppConversation: async () => {},
+    closeLinkWhatsAppPatientModal: () => {},
+    showAppointmentNotificationToast: () => {},
+    openPatientWorkspace: async (patientId, tab, returnView) => {
+      openedWorkspacePatientId = patientId;
+    },
+    console: { error: () => {}, warn: () => {} }
+  };
+
+  const fnStart = html.indexOf('async function submitLinkWhatsAppPatient()');
+  const fnEnd = html.indexOf('function formatWhatsAppTime(', fnStart);
+  const snippet = html.slice(fnStart, fnEnd);
+
+  vm.runInNewContext(snippet, mockContext);
+
+  await mockContext.submitLinkWhatsAppPatient();
+
+  // Verify conversation updated
+  assert.equal(conversationUpdatePayload.patient_id, 'pat-999');
+  assert.equal(mockContext.activeWhatsAppConversation.patient_id, 'pat-999');
+
+  // Verify patient updated with both entered username (with @) and whatsapp_code
+  assert.equal(patientUpdatePayload.whatsapp_username, '@sara_c');
+  assert.equal(patientUpdatePayload.whatsapp_code, '+EG.4631528857091458');
+  assert.equal(existingPatient.whatsappUsername, '@sara_c');
+  assert.equal(existingPatient.whatsappCode, '+EG.4631528857091458');
+
+  // Verify workspace redirect
+  assert.equal(mockContext.activeWorkspacePatientId, 'pat-999');
+  assert.equal(mockContext.activePatientId, 'pat-999');
+  assert.equal(openedWorkspacePatientId, 'pat-999');
 });
 
 test('Creating a new patient inserts record, links conversation, sets activeWorkspacePatientId and redirects to patient-profile', async () => {
@@ -326,7 +412,7 @@ test('Creating a new patient inserts record, links conversation, sets activeWork
 
   // Verify new patient created
   assert.equal(insertedPayload.name, 'Layla Fawzy');
-  assert.equal(insertedPayload.whatsapp_username, 'layla_f');
+  assert.equal(insertedPayload.whatsapp_username, '@layla_f');
   assert.equal(insertedPayload.whatsapp_code, '+EG.4631528857091458');
   assert.equal(mockContext.patients.length, 1);
   assert.equal(mockContext.patients[0].id, 'new-pat-888');
@@ -340,3 +426,59 @@ test('Creating a new patient inserts record, links conversation, sets activeWork
   assert.equal(mockContext.activePatientId, 'new-pat-888');
   assert.equal(openedWorkspacePatientId, 'new-pat-888');
 });
+
+test('selectLinkWhatsAppPatient pre-fills existing username and code fields in confirmation banner', () => {
+  const existingPatient = {
+    id: 'pat-101',
+    patientNumber: '1090',
+    name: 'Karim Adel',
+    whatsappUsername: '@karim_adel',
+    whatsappCode: '+EG.4631528857091458'
+  };
+
+  const usernameField = { value: '' };
+  const codeField = { value: '' };
+  const bannerEl = { classList: { remove: () => {}, add: () => {} } };
+  const summaryEl = { textContent: '' };
+  const descEl = { textContent: '' };
+
+  const mockContext = {
+    linkWaSelectedPatientId: null,
+    patients: [existingPatient],
+    patientDirectoryRows: [],
+    activeWhatsAppConversation: {
+      phone: '+EG.4631528857091458'
+    },
+    currentUiLanguage: 'en',
+    document: {
+      getElementById: (id) => {
+        if (id === 'link-wa-selected-banner') return bannerEl;
+        if (id === 'link-wa-selected-summary') return summaryEl;
+        if (id === 'link-wa-selected-desc') return descEl;
+        if (id === 'link-existing-patient-username') return usernameField;
+        if (id === 'link-existing-patient-code') return codeField;
+        if (id === 'link-wa-search-input') return { value: '' };
+        return null;
+      }
+    },
+    isWhatsAppBsuid: (v) => v.includes('EG.'),
+    isWhatsAppUsername: () => false,
+    cleanWhatsAppUsername: (v) => v.replace(/^@+/, '').toLowerCase(),
+    formatWhatsAppCode: (v) => v.startsWith('+') ? v : `+${v}`,
+    filterLinkWhatsAppPatients: () => {}
+  };
+
+  const fnStart = html.indexOf('function selectLinkWhatsAppPatient(patientId)');
+  const fnEnd = html.indexOf('function openLinkWhatsAppPatientModal()', fnStart);
+  const snippet = html.slice(fnStart, fnEnd);
+
+  vm.runInNewContext(snippet, mockContext);
+
+  mockContext.selectLinkWhatsAppPatient('pat-101');
+
+  assert.equal(mockContext.linkWaSelectedPatientId, 'pat-101');
+  assert.equal(usernameField.value, 'karim_adel');
+  assert.equal(codeField.value, '+EG.4631528857091458');
+  assert.match(summaryEl.textContent, /Karim Adel/);
+});
+
