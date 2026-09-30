@@ -13,8 +13,10 @@ const root = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 // Exercise the real markup, CSS, and layout helpers without connecting to clinic data.
 const fixture = source.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
-const viewportHelpers = source.slice(source.indexOf('    function mobileViewContentBottom('), source.indexOf('    function refreshAppointmentCurrentTimeLine('));
+const viewportHelpers = source.slice(source.indexOf('    function updateAppViewportDimensions('), source.indexOf('    function refreshAppointmentCurrentTimeLine('));
 const themeHelper = source.slice(source.indexOf('    function applyUiTheme('), source.indexOf('    function resetUiTheme('));
+const directoryHelpers = source.slice(source.indexOf('    function renderPatientQueryPagination('), source.indexOf('    async function deletePatient('));
+const phoneHelper = source.slice(source.indexOf('    function patientPhoneActionsMarkup('), source.indexOf('    function openPatientProfileWhatsApp('));
 
 test('mobile screens fill the available height at every app scale', { skip: !chromium && 'Playwright is not available' }, async t => {
   const server = http.createServer((req, res) => {
@@ -28,27 +30,44 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
     if (!target.startsWith(root + path.sep) || !fs.existsSync(target) || !fs.statSync(target).isFile()) {
       res.statusCode = 404; res.end(); return;
     }
-    res.setHeader('Content-Type', target.endsWith('.css') ? 'text/css' : 'application/octet-stream');
+    res.setHeader('Content-Type', target.endsWith('.css') ? 'text/css' : target.endsWith('.js') ? 'text/javascript' : 'application/octet-stream');
     res.end(fs.readFileSync(target));
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  t.after(() => new Promise(resolve => server.close(resolve)));
+  t.after(() => new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }));
   const browser = await chromium.launch({ headless: true, channel: process.env.LUMIN_TEST_BROWSER_CHANNEL || undefined });
   t.after(() => browser.close());
   const page = await browser.newPage({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
+  await page.addScriptTag({ url: `http://127.0.0.1:${server.address().port}/vendor/lucide.min.js` });
   await page.addScriptTag({ content: `
     let appointmentCalendarResizeFrame = null, patientQueryResizeFrame = null, dashboardResizeFrame = null;
     let currentUiTheme = 'flat', currentUiTint = 'blue', currentUiScale = 100;
     const UI_SCALE_DEFAULT = 100;
+    let currentUiLanguage = 'en';
+    const PATIENT_QUERY_PAGE_SIZE = 10;
+    let patientQueryPage = 1, patientQuerySignature = '';
+    const patientsLoaded = true, patientDirectoryLoaded = true, patientDirectoryTotal = 20;
+    const patients = Array.from({ length: 20 }, (_, i) => ({ id: 'test-' + i, patientNumber: 2500 + i,
+      name: 'Test patient with a long name — مريض تجريبي باسم طويل '.repeat(3), phone: '01000000000', secondaryPhone: '01100000000' }));
+    const patientDirectoryRows = patients;
+    function hasPageAccess() { return true; }
+    function escapeHtml(value) { return String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;'); }
+    function formatPatientNumber(patient) { return '#' + patient.patientNumber; }
+    function patientProfilePhoneContext(id) { return { rawPhone: patients.find(patient => patient.id === id).phone }; }
+    function normaliseCallPhone(value) { return value; }
+    function normaliseWhatsAppPhone(value) { return value; }
     function normaliseUiTint(value) { return value; }
     function normaliseUiScale(value) { return Number(value); }
     function syncUiThemeToggle() {}
     function updateAppointmentMonthCardVisibility() {}
     ${viewportHelpers}
     ${themeHelper}
+    ${directoryHelpers}
+    ${phoneHelper}
+    setupAppViewportDimensions();
     setupAppointmentCalendarViewport();
     setupPatientQueryViewport();
     setupDashboardViewport();
@@ -63,6 +82,7 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
     await page.evaluate(({ view, scale, theme, dir }) => {
       const root = document.documentElement;
       root.dir = dir;
+      currentUiLanguage = dir === 'rtl' ? 'ar' : 'en';
       for (const name of ['patient-query-active', 'appointments-calendar-active', 'whatsapp-view-active', 'dashboard-active', 'whatsapp-mobile-chat-open', 'whatsapp-keyboard-open']) {
         root.classList.remove(name); document.body.classList.remove(name);
       }
@@ -74,7 +94,7 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
       const active = { patients: 'patient-query-active', appointments: 'appointments-calendar-active', whatsapp: 'whatsapp-view-active' }[view];
       if (active) { root.classList.add(active); document.body.classList.add(active); }
       applyUiTheme(theme, 'violet', scale);
-      if (view === 'patients') schedulePatientQueryViewportUpdate();
+      if (view === 'patients') { runPatientQuery(); schedulePatientQueryViewportUpdate(); }
       if (view === 'appointments') scheduleAppointmentCalendarViewportUpdate();
       if (view === 'whatsapp') scheduleWhatsAppMobileViewportUpdate();
     }, { view, scale, theme, dir });
@@ -83,9 +103,10 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
 
   async function bounds(view) {
     return page.evaluate(view => {
-      const rect = el => { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: r.height }; };
+      const rect = el => { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width, height: r.height }; };
       return {
-        viewport: innerHeight,
+        viewport: window.visualViewport?.height || innerHeight,
+        viewportWidth: window.visualViewport?.width || innerWidth,
         page: rect(document.getElementById('view-' + view)),
         nav: rect(document.getElementById('app-primary-nav')),
         ancestors: ['app-main', 'app-shell'].map(id => rect(document.getElementById(id))).concat(rect(document.body), rect(document.documentElement))
@@ -105,7 +126,7 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
   await t.test('phone and tablet layouts fit in English and Arabic, in both themes', async () => {
     for (const size of [{ width: 360, height: 640 }, { width: 390, height: 844 }, { width: 412, height: 915 }, { width: 412, height: 780 }, { width: 844, height: 390 }, { width: 820, height: 1180 }]) {
       await page.setViewportSize(size);
-      for (const dir of ['ltr', 'rtl']) for (const theme of ['flat', 'raised']) for (const scale of [80, 100, 125]) for (const view of ['patients', 'appointments', 'whatsapp']) {
+      for (const dir of ['ltr', 'rtl']) for (const theme of ['flat', 'raised']) for (const scale of [80, 85, 100, 125]) for (const view of ['patients', 'appointments', 'whatsapp']) {
         await showView(view, scale, theme, dir);
         assertFits(await bounds(view), `${view} ${size.width}×${size.height} ${scale}% ${theme} ${dir}`);
       }
@@ -130,8 +151,58 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
     assertFits(await bounds('whatsapp'), 'WhatsApp after changing scale');
   });
 
+  await t.test('85% standalone layout keeps the dock inside a smaller visible viewport', async () => {
+    await page.setViewportSize({ width: 412, height: 915 });
+    await showView('patients', 85);
+    await page.evaluate(() => {
+      window.originalVisualViewport = window.visualViewport;
+      Object.defineProperty(window, 'visualViewport', { configurable: true, value: { width: 384, height: 844, offsetTop: 0, offsetLeft: 0 } });
+      updateAppViewportDimensions();
+      updatePatientQueryViewportHeight();
+    });
+    try {
+      const result = await bounds('patients');
+      assert.ok(result.nav.bottom <= result.viewport, 'dock stays above the visible screen bottom');
+      assert.ok(result.nav.left >= 0 && result.nav.right <= result.viewportWidth, 'dock stays inside the visible screen width');
+      assertFits(result, '85% with smaller visible viewport');
+    } finally {
+      await page.evaluate(() => Object.defineProperty(window, 'visualViewport', { configurable: true, value: window.originalVisualViewport }));
+      await page.evaluate(() => updateAppViewportDimensions());
+    }
+  });
+
+  await t.test('85% patient results scroll inside their panel without moving the outer page or dock', async () => {
+    await page.setViewportSize({ width: 412, height: 915 });
+    for (const dir of ['ltr', 'rtl']) {
+      await showView('patients', 85, 'raised', dir);
+      await page.evaluate(() => {
+        const scroll = document.getElementById('patient-query-results-scroll');
+        const nav = document.getElementById('app-primary-nav');
+        const navBottom = nav.getBoundingClientRect().bottom;
+        const horizontalEnd = document.documentElement.dir === 'rtl' ? -100000 : 100000;
+        window.scrollTo(horizontalEnd, 100000);
+        scroll.scrollTop = 100000;
+        scroll.scrollLeft = horizontalEnd;
+        window.testNavBottom = navBottom;
+      });
+      await settle();
+      const result = await page.evaluate(() => {
+        const scroll = document.getElementById('patient-query-results-scroll');
+        return { x: window.scrollX, y: window.scrollY, resultsX: scroll.scrollLeft, resultsY: scroll.scrollTop,
+          navBottom: window.testNavBottom, afterNavBottom: document.getElementById('app-primary-nav').getBoundingClientRect().bottom,
+          pageRight: document.getElementById('view-patients').getBoundingClientRect().right,
+          viewportWidth: window.visualViewport.width };
+      });
+      assert.equal(result.x, 0, dir + ': outer page does not scroll sideways');
+      assert.equal(result.y, 0, dir + ': outer page does not scroll below the viewport');
+      assert.ok(result.resultsY > 0 && Math.abs(result.resultsX) > 0, dir + ': table still scrolls in both directions');
+      assert.equal(result.navBottom, result.afterNavBottom, dir + ': navigation stays anchored');
+      assert.ok(result.pageRight <= result.viewportWidth, dir + ': long names do not widen the page');
+    }
+  });
+
   await t.test('chat fits the visible keyboard viewport at reduced and enlarged scales', async () => {
-    for (const scale of [80, 100, 125]) {
+    for (const scale of [80, 85, 100, 125]) {
       await showView('whatsapp', scale);
       await page.evaluate(() => {
         window.originalVisualViewport = window.visualViewport;
