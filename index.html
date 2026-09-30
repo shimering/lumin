@@ -2890,6 +2890,8 @@
       :root { --mobile-nav-height: max(5.5rem, calc(4.75rem + env(safe-area-inset-bottom))); }
       #app-shell { padding-bottom: var(--mobile-nav-height); }
 
+      /* Full-height containers use the dynamic viewport divided by the user's app scale.
+         Bare 100dvh would clip content above the dock when the whole app is zoomed out. */
       /* Reclaim top space: All pages expand to fill the top space on mobile */
       #app-main {
         padding-top: max(0.5rem, env(safe-area-inset-top)) !important;
@@ -2901,16 +2903,16 @@
       html.patient-query-active,
       body.patient-query-active {
         height: 100% !important;
-        height: 100dvh !important;
-        max-height: 100dvh !important;
+        height: var(--lumin-app-viewport-height, 100dvh) !important;
+        max-height: var(--lumin-app-viewport-height, 100dvh) !important;
         overflow: hidden !important;
         overscroll-behavior: none !important;
         overscroll-behavior-y: none !important;
       }
       body.patient-query-active #app-shell {
         height: 100% !important;
-        height: 100dvh !important;
-        max-height: 100dvh !important;
+        height: var(--lumin-app-viewport-height, 100dvh) !important;
+        max-height: var(--lumin-app-viewport-height, 100dvh) !important;
         overflow: hidden !important;
         overscroll-behavior: none !important;
         overscroll-behavior-y: none !important;
@@ -2918,8 +2920,8 @@
       }
       body.patient-query-active #app-main {
         height: 100% !important;
-        height: 100dvh !important;
-        max-height: 100dvh !important;
+        height: var(--lumin-app-viewport-height, 100dvh) !important;
+        max-height: var(--lumin-app-viewport-height, 100dvh) !important;
         overflow: hidden !important;
         overscroll-behavior: none !important;
         overscroll-behavior-y: none !important;
@@ -2988,16 +2990,16 @@
       html.appointments-calendar-active,
       body.appointments-calendar-active {
         height: 100% !important;
-        height: 100dvh !important;
-        max-height: 100dvh !important;
+        height: var(--lumin-app-viewport-height, 100dvh) !important;
+        max-height: var(--lumin-app-viewport-height, 100dvh) !important;
         overflow: hidden !important;
         overscroll-behavior: none !important;
         overscroll-behavior-y: none !important;
       }
       body.appointments-calendar-active #app-shell {
         height: 100% !important;
-        height: 100dvh !important;
-        max-height: 100dvh !important;
+        height: var(--lumin-app-viewport-height, 100dvh) !important;
+        max-height: var(--lumin-app-viewport-height, 100dvh) !important;
         overflow: hidden !important;
         overscroll-behavior: none !important;
         overscroll-behavior-y: none !important;
@@ -3005,8 +3007,8 @@
       }
       body.appointments-calendar-active #app-main {
         height: 100% !important;
-        height: 100dvh !important;
-        max-height: 100dvh !important;
+        height: var(--lumin-app-viewport-height, 100dvh) !important;
+        max-height: var(--lumin-app-viewport-height, 100dvh) !important;
         overflow: hidden !important;
         overscroll-behavior: none !important;
         overscroll-behavior-y: none !important;
@@ -3078,16 +3080,16 @@
       html.whatsapp-view-active,
       body.whatsapp-view-active {
         height: 100% !important;
-        height: 100dvh !important;
-        max-height: 100dvh !important;
+        height: var(--lumin-app-viewport-height, 100dvh) !important;
+        max-height: var(--lumin-app-viewport-height, 100dvh) !important;
         overflow: hidden !important;
         overscroll-behavior: none !important;
         overscroll-behavior-y: none !important;
       }
       body.whatsapp-view-active #app-shell {
         height: 100% !important;
-        height: 100dvh !important;
-        max-height: 100dvh !important;
+        height: var(--lumin-app-viewport-height, 100dvh) !important;
+        max-height: var(--lumin-app-viewport-height, 100dvh) !important;
         overflow: hidden !important;
         overscroll-behavior: none !important;
         overscroll-behavior-y: none !important;
@@ -3095,8 +3097,8 @@
       }
       body.whatsapp-view-active #app-main {
         height: 100% !important;
-        height: 100dvh !important;
-        max-height: 100dvh !important;
+        height: var(--lumin-app-viewport-height, 100dvh) !important;
+        max-height: var(--lumin-app-viewport-height, 100dvh) !important;
         overflow: hidden !important;
         overscroll-behavior: none !important;
         overscroll-behavior-y: none !important;
@@ -12978,6 +12980,7 @@
         scheduleDashboardViewportUpdate();
         schedulePatientQueryViewportUpdate();
         scheduleAppointmentCalendarViewportUpdate();
+        scheduleWhatsAppMobileViewportUpdate();
       }
     }
 
@@ -32620,8 +32623,11 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
         && Number.isFinite(navRect.top);
       if (navIsVisible) return Math.min(viewportBottom, navRect.top) - 8;
 
+      // No dock space is needed when the keyboard hides navigation.
+      if (document.body.classList.contains('whatsapp-keyboard-open')) return viewportBottom;
+      const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
       const mobileNavigationHeight = Number.parseFloat(getComputedStyle(appShell).paddingBottom) || 0;
-      return viewportBottom - mobileNavigationHeight - 8;
+      return viewportBottom - mobileNavigationHeight * zoom - 8;
     }
 
     function resetAppointmentsCalendarWindowScroll() {
@@ -32867,7 +32873,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
 
       if (isKeyboardOpen && isChatOpen && vv) {
-        const targetHeight = Math.floor(vv.height);
+        const targetHeight = Math.floor(vv.height / zoom);
         document.documentElement.style.setProperty('--whatsapp-mobile-viewport-height', `${targetHeight}px`);
         whatsAppView.style.setProperty('--whatsapp-mobile-viewport-height', `${targetHeight}px`);
         resetWhatsAppWindowScroll();
