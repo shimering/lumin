@@ -76,6 +76,7 @@
   <script src="lumin-finance-sync.js?v=2"></script>
   <script src="lumin-patient-swipe.js?v=1"></script>
   <script src="lumin-patients.js?v=4"></script>
+  <script src="lumin-chart-sync.js?v=1"></script>
   <script src="lumin-mobile-nav.js?v=1"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   
@@ -9923,6 +9924,8 @@
     const TOOTH_DENTITION_LONG_PRESS_MOVE_TOLERANCE = 12;
     let chartInvoiceStatePatientId = null;
     let chartInvoiceStateLoading = false;
+    let chartInvoiceStateLoaded = false;
+    let chartInvoiceStateRenderToken = 0;
     let openChartFindingNoteTrigger = null;
     let chartFindingNotePreviewCloseTimer = null;
     let editingChartFindingNoteIds = [];
@@ -19928,7 +19931,8 @@
     async function fetchPatientsFromDB() {
       const userId = currentSession?.user?.id;
       try {
-        const { data, error } = await coalesceRefreshRead(contentRefreshContext('patients'), async () => {
+        const { data, error, chartReadRevision } = await coalesceRefreshRead(contentRefreshContext('patients'), async () => {
+          const chartReadRevision = patientChartWriteRevision;
           const data = [];
           const pageSize = 1000;
           let error = null;
@@ -19946,7 +19950,7 @@
             data.push(...(result.data || []));
             if ((result.data || []).length < pageSize) break;
           }
-          return { data, error };
+          return { data, error, chartReadRevision };
         });
         if (currentSession?.user?.id !== userId) return false;
 
@@ -19966,7 +19970,11 @@
         const previousActivePatientId = previouslyActivePatient?.id || null;
         const previousActiveChartSignature = patientChartRenderSignature(previouslyActivePatient);
 
-        patients = data.map(normalisePatientRecord);
+        patients = data.map(record => {
+          const patient = normalisePatientRecord(record);
+          if (patientChartSaveStates.has(patientChartSaveKey(patient.id))) rememberPatientChartSnapshot(patient, chartReadRevision);
+          return patient;
+        });
         const patientsChanged = previousPatientsSignature !== stableJsonStringify(patients);
         patientsLoaded = true;
         patientDirectoryRows = patients.slice(0, PATIENT_QUERY_PAGE_SIZE);
@@ -22183,22 +22191,10 @@
       }
     }
 
-    async function saveActivePatientChart() {
-      const patient = getActivePatient();
+    async function saveActivePatientChart(patient = getActivePatient(), options = {}) {
       if (!patient) return false;
       rebuildChartProcedureStepPayrollFindings(patient);
-
-      const { error } = await db
-        .from('patients')
-        .update({ chart_state: patient.chartState })
-        .eq('id', patient.id);
-
-      if (error) {
-        console.error('Failed to sync chart with Supabase:', error);
-        return false;
-      }
-      hrDirectoryLoaded = false;
-      return true;
+      return enqueuePatientChartSave(patient, options);
     }
 
     // ================= IMPLANT PROGRESS TRACKING =================
@@ -22787,10 +22783,8 @@
             if (chartUpdated) {
               if (patientObj.id === getActivePatient()?.id) {
                 renderFindingsList();
-                void saveActivePatientChart();
-              } else {
-                void db.from('patients').update({ chart_state: patientObj.chartState }).eq('id', patientObj.id);
               }
+              void saveActivePatientChart(patientObj);
             }
           }
         }
@@ -28187,6 +28181,7 @@
       activeWorkspacePatientId = patient.id;
       updatePatientWorkspaceNavigation(patient, 'chart');
 
+      rememberPatientChartSnapshot(patient);
       ensureChartMeta(patient);
       const chartMetadataChanged = ensureChartFindingMetadata(patient);
       const visibleChartTeeth = new Set([...getVisibleChartTeeth().upper, ...getVisibleChartTeeth().lower].map(entry => String(entry.toothId || '')));
@@ -29473,9 +29468,8 @@
         }
         renderChartFindingTeeth([...currentToothIds, ...selectedToothIds]);
         renderFindingsList();
-        const saved = await saveActivePatientChart();
+        const saved = await saveActivePatientChart(patient, { previousChartState });
         if (!saved) {
-          patient.chartState = previousChartState;
           selectedFindingIds = previousSelectedFindingIds;
           renderChartFindingTeeth([...currentToothIds, ...selectedToothIds]);
           renderFindingsList();
@@ -29603,16 +29597,21 @@
       renderFindingsList();
 
       try {
-        if (!(await saveActivePatientChart())) throw new Error('The chart update could not be saved.');
         const refreshedGroup = chartFindingGroupFromControl(control);
         const payrollFindingIds = (refreshedGroup?.memberFindings || [refreshedGroup]).filter(Boolean)
           .flatMap(finding => normaliseChartFindingSteps(finding.steps).filter(step => step.id === stepId).map(step => step.payrollFindingId))
           .filter(Boolean);
-        const { error } = await db.rpc('sync_chart_finding_doctor', {
-          p_patient_id: patient.id,
-          p_finding_ids: [...new Set([...findingIds, ...payrollFindingIds])]
+        const saved = await saveActivePatientChart(patient, {
+          previousChartState,
+          afterSave: async () => {
+            const { error } = await db.rpc('sync_chart_finding_doctor', {
+              p_patient_id: patient.id,
+              p_finding_ids: [...new Set([...findingIds, ...payrollFindingIds])]
+            });
+            if (error) throw error;
+          }
         });
-        if (error) throw error;
+        if (!saved) throw new Error('The chart update could not be saved.');
         hrDirectoryLoaded = false;
         financeInvoicesLoaded = false;
         dashboardInvoiceCache.clear();
@@ -29629,8 +29628,6 @@
             : `${step?.name || 'The step'} is now ${operationStatusDefinition(step?.status || 'P').label.toLowerCase()}.`
         );
       } catch (error) {
-        patient.chartState = previousChartState;
-        await saveActivePatientChart();
         renderChartFindingTeeth(chartFindingToothIdsFromControl(control));
         renderFindingsList();
         alert('Could not update the procedure step: ' + (error?.message || 'Unknown error'));
@@ -29668,12 +29665,17 @@
       renderFindingsList();
 
       try {
-        if (!(await saveActivePatientChart())) throw new Error('The chart update could not be saved.');
-        const { error } = await db.rpc('sync_chart_finding_doctor', {
-          p_patient_id: patient.id,
-          p_finding_ids: findingIds
+        const saved = await saveActivePatientChart(patient, {
+          previousChartState,
+          afterSave: async () => {
+            const { error } = await db.rpc('sync_chart_finding_doctor', {
+              p_patient_id: patient.id,
+              p_finding_ids: findingIds
+            });
+            if (error) throw error;
+          }
         });
-        if (error) throw error;
+        if (!saved) throw new Error('The chart update could not be saved.');
         hrDirectoryLoaded = false;
         financeInvoicesLoaded = false;
         dashboardInvoiceCache.clear();
@@ -29687,8 +29689,6 @@
               : (currentUiLanguage === 'ar' ? 'لم يعد هناك طبيب معين لهذا الإجراء.' : 'This procedure has no assigned doctor.')
         );
       } catch (error) {
-        patient.chartState = previousChartState;
-        await saveActivePatientChart();
         renderChartFindingTeeth(chartFindingToothIdsFromControl(control));
         renderFindingsList();
         alert('Could not update the assigned doctor: ' + (error?.message || 'Unknown error'));
@@ -30114,19 +30114,19 @@
       })) return;
       renderChartFindingTeeth(chartFindingToothIdsFromControl(control));
       renderFindingsList();
-      if (!(await saveActivePatientChart())) {
-        patient.chartState = previousChartState;
+      if (!(await saveActivePatientChart(patient, { previousChartState }))) {
         renderChartFindingTeeth(chartFindingToothIdsFromControl(control));
         renderFindingsList();
         alert(currentUiLanguage === 'ar' ? 'تعذر تحديث حالة الإجراء. احذف مصروف راتب الطبيب المرتبط أولاً إذا كان الراتب مدفوعاً.' : 'Could not update the procedure status. Delete its linked doctor salary expense first if salary was paid.');
         return;
       }
       await refreshChartFindingInvoiceState(patient.id);
+      const savedPatient = getKnownPatient(patient.id) || patient;
       findingIds.forEach(fid => {
-        Object.entries(patient.chartState || {}).forEach(([toothId, toothData]) => {
+        Object.entries(savedPatient.chartState || {}).forEach(([toothId, toothData]) => {
           if (toothId === CHART_META_KEY || !toothData || typeof toothData !== 'object') return;
           const match = ensureWholeOperations(toothData).find(f => f.id === fid);
-          if (match) void syncImplantProgressFromChartOperation(patient, toothId, match, null);
+          if (match) void syncImplantProgressFromChartOperation(savedPatient, toothId, match, null);
         });
       });
     }
@@ -30264,21 +30264,39 @@
         ? `Add ${count} selected operation${count === 1 ? '' : 's'} to invoice`
         : 'Add invoice');
       button.title = count ? `${count} selected · ${formatInvoiceMoney(total)}` : 'Add invoice';
-      button.innerHTML = '<i data-lucide="receipt-text" class="h-4 w-4"></i><span>' + (currentUiLanguage === 'ar' ? 'إضافة إلى الفاتورة' : 'Add invoice') + '</span>';
-      lucide.createIcons();
+      if (setStableHtml(button, '<i data-lucide="receipt-text" class="h-4 w-4"></i><span>' + (currentUiLanguage === 'ar' ? 'إضافة إلى الفاتورة' : 'Add invoice') + '</span>')) renderChartFindingIcons(button);
     }
 
     async function refreshChartFindingInvoiceState(patientId) {
-      if (!patientId || !hasPageAccess('chart')) return;
+      if (!patientId || !hasPageAccess('chart') || activePatientId !== patientId) return;
+      const userId = currentSession?.user?.id;
+      const request = ++chartInvoiceStateRenderToken;
+      const initialLoad = chartInvoiceStatePatientId !== patientId || !chartInvoiceStateLoaded;
       chartInvoiceStatePatientId = patientId;
-      chartInvoiceStateLoading = true;
-      renderFindingInvoiceToolbar(collectDocumentedFindings(getActivePatient()));
+      if (initialLoad) {
+        chartInvoiceStateLoaded = false;
+        chartInvoiceStateLoading = true;
+        renderFindingInvoiceToolbar(collectDocumentedFindings(getActivePatient()));
+      }
+      const isCurrent = () => request === chartInvoiceStateRenderToken && chartInvoiceStatePatientId === patientId
+        && activePatientId === patientId && currentSession?.user?.id === userId && hasPageAccess('chart');
       try {
-        const [invoices, salaryTransfers] = await Promise.all([
-          fetchInvoiceRecords({ patientId }),
-          fetchPatientDoctorSalaryTransfers(patientId)
-        ]);
-        if (chartInvoiceStatePatientId !== patientId || activePatientId !== patientId) return;
+        const result = await coalesceRefreshRead(contentRefreshContext('chart-invoice-state', patientId), async () => {
+          while (currentSession?.user?.id === userId && hasPageAccess('chart')) {
+            await waitForPatientChartSaves(patientId);
+            if (currentSession?.user?.id !== userId) return null;
+            const revision = patientChartSaveStates.get(patientChartSaveKey(patientId))?.revision || 0;
+            const [invoices, salaryTransfers] = await Promise.all([
+              fetchInvoiceRecords({ patientId }),
+              fetchPatientDoctorSalaryTransfers(patientId)
+            ]);
+            const state = patientChartSaveStates.get(patientChartSaveKey(patientId));
+            if (!state?.jobs.length && revision === (state?.revision || 0)) return { invoices, salaryTransfers };
+          }
+          return null;
+        });
+        if (!isCurrent() || !result) return;
+        const { invoices, salaryTransfers } = result;
         invoicedFindingIds = new Set(invoices.flatMap(invoice => invoice.items.map(item => item.findingId).filter(Boolean)));
         chartInvoiceItemsByFindingId = new Map(invoices.flatMap(invoice => invoice.items
           .filter(item => item.findingId)
@@ -30287,10 +30305,11 @@
           .filter(item => item.findingId && salaryTransfers.has(Number(item.id)))
           .map(item => [item.findingId, { ...salaryTransfers.get(Number(item.id)), invoiceItemId: item.id }])));
         selectedFindingIds = new Set([...selectedFindingIds].filter(id => !invoicedFindingIds.has(id)));
+        chartInvoiceStateLoaded = true;
       } catch (error) {
         console.error('Could not load chart invoice state:', error);
       } finally {
-        if (chartInvoiceStatePatientId === patientId && activePatientId === patientId) {
+        if (isCurrent()) {
           chartInvoiceStateLoading = false;
           renderFindingsList();
         }
@@ -30693,7 +30712,6 @@
     }
 
     function renderFindingsList() {
-      if (openChartFindingNoteTrigger) closeChartFindingNotePreview();
       const container = document.getElementById('findings-container');
       const patient = getActivePatient();
       const findings = collectDocumentedFindings(patient);
@@ -30717,11 +30735,12 @@
           : documentedFindingsTab === 'existed'
             ? 'No existed operations are documented for this patient.'
             : 'No planned, in-progress, or completed operations are documented for this patient.';
-        container.innerHTML = `<div class="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center text-sm font-medium text-slate-400">${emptyLabel}</div>`;
+        setStableHtml(container, `<div class="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center text-sm font-medium text-slate-400">${emptyLabel}</div>`);
+        if (openChartFindingNoteTrigger && !openChartFindingNoteTrigger.isConnected) closeChartFindingNotePreview();
         return;
       }
 
-      container.innerHTML = visibleFindings.map(finding => {
+      const changed = setStableHtml(container, visibleFindings.map(finding => {
         const status = operationStatusDefinition(finding.status);
         const displayColor = finding.status === 'E' ? '#475569' : status.color;
         const statusSoft = appointmentColorRgba(displayColor, 0.085);
@@ -30763,7 +30782,7 @@
           <div class="space-y-2">${procedureSteps.map((step, index) => {
             const stepStatus = operationStatusDefinition(step.status);
             const stepValue = Math.round(totalPrice * step.percentage) / 100;
-            return `<div class="procedure-step-clinical-row grid items-center gap-2 rounded-xl border border-cyan-100 bg-white p-2.5">
+            return `<div data-chart-step="${escapeHtml(step.id)}" class="procedure-step-clinical-row grid items-center gap-2 rounded-xl border border-cyan-100 bg-white p-2.5">
               <span class="flex h-7 w-7 items-center justify-center rounded-lg ${step.status === 'C' ? 'bg-emerald-100 text-emerald-700' : step.status === 'In' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'} text-[10px] font-black">${step.status === 'C' ? '<i data-lucide="check" class="h-3.5 w-3.5"></i>' : index + 1}</span>
               <div class="min-w-0"><p class="truncate text-xs font-black text-slate-800">${escapeHtml(step.name)}</p><p class="mt-0.5 text-[9px] font-bold text-slate-400">${step.percentage}% · ${escapeHtml(formatInvoiceMoney(stepValue))} of this procedure</p></div>
               <label class="finding-step-doctor-control inline-flex min-h-11 min-w-0 items-center overflow-hidden rounded-lg border ${stepAssignmentEnabled ? 'border-cyan-200 bg-white focus-within:ring-2 focus-within:ring-cyan-500/20' : 'border-slate-200 bg-slate-100 opacity-60'}" title="${stepAssignmentEnabled ? '' : (currentUiLanguage === 'ar' ? 'اختر «بدون طبيب — تعيين الخطوات» في قائمة طبيب الإجراء أولاً' : 'Choose “Unassigned — assign steps” for the whole procedure first')}"><span class="border-r ${stepAssignmentEnabled ? 'border-cyan-100 bg-cyan-50 text-cyan-700' : 'border-slate-200 bg-slate-100 text-slate-500'} px-2 py-1.5 text-[9px] font-black">${currentUiLanguage === 'ar' ? 'الطبيب' : 'Doctor'}</span><select data-procedure-step-id="${escapeHtml(step.id)}" onchange="updateFindingProcedureStepFromControl(this,'doctor')" ${stepAssignmentEnabled ? '' : 'disabled'} class="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-[10px] font-bold text-slate-700 outline-none disabled:text-slate-400" aria-label="${currentUiLanguage === 'ar' ? 'الطبيب المكلف بخطوة' : 'Doctor assigned to'} ${escapeHtml(step.name)}">${chartDoctorSelectOptions(step)}</select></label>
@@ -30988,7 +31007,7 @@
         const dataAttributes = `data-finding-ids="${escapeHtml(findingIds.join(','))}" data-tooth-ids="${escapeHtml(toothIds.join(','))}" onchange="updateFindingGroupStatusFromControl(this)"`;
         const findingIdentityAttributes = `data-finding-id="${escapeHtml(findingIds[0] || '')}" data-finding-ids="${escapeHtml(findingIds.join(','))}" data-finding-kind="${escapeHtml(finding.kind)}" data-batch-id="${escapeHtml(finding.batchId || '')}" data-tooth-id="${escapeHtml(finding.toothId)}" data-tooth-ids="${escapeHtml(toothIds.join(','))}" data-operation-code="${escapeHtml(finding.code)}" data-operation-status="${finding.status}" data-surfaces="${escapeHtml(finding.surfaces.join(','))}"`;
         return `
-          <article ${findingIdentityAttributes} onclick="toggleFindingCardSelection(event, this)" aria-selected="${isSelected}" class="finding-row ${procedureSteps.length ? 'has-procedure-steps' : ''} ${isOrthoPackage ? 'has-ortho-visits' : ''} ${isSelected ? 'is-selected' : ''} ${isInvoiced ? 'is-invoiced' : ''} ${isBatch ? 'is-batch-finding' : ''} flex flex-row ${(procedureSteps.length || isOrthoPackage) ? 'flex-wrap' : 'flex-nowrap'} items-center gap-2.5 overflow-hidden rounded-xl border border-slate-200 border-l-4 px-3 py-2.5 shadow-sm transition hover:shadow-md" style="--finding-display-color:${displayColor};--finding-status-soft:${statusSoft};--finding-status-border:${statusBorder};border-left-color:${displayColor}">
+          <article data-refresh-key="${escapeHtml(String(findingIds[0] || finding.batchId || finding.id))}" ${findingIdentityAttributes} onclick="toggleFindingCardSelection(event, this)" aria-selected="${isSelected}" class="finding-row ${procedureSteps.length ? 'has-procedure-steps' : ''} ${isOrthoPackage ? 'has-ortho-visits' : ''} ${isSelected ? 'is-selected' : ''} ${isInvoiced ? 'is-invoiced' : ''} ${isBatch ? 'is-batch-finding' : ''} flex flex-row ${(procedureSteps.length || isOrthoPackage) ? 'flex-wrap' : 'flex-nowrap'} items-center gap-2.5 overflow-hidden rounded-xl border border-slate-200 border-l-4 px-3 py-2.5 shadow-sm transition hover:shadow-md" style="--finding-display-color:${displayColor};--finding-status-soft:${statusSoft};--finding-status-border:${statusBorder};border-left-color:${displayColor}">
             ${isOrthoPackage ? '<div class="finding-row-main flex flex-row flex-nowrap items-center gap-2.5 w-full">' : ''}
             <div class="finding-row-summary flex min-w-0 flex-1 items-center gap-3">
               ${isOrthoPackage ? `
@@ -31105,8 +31124,9 @@
             ${procedureStepsMarkup}
             ${orthoVisitsMarkup}
           </article>`;
-      }).join('');
-      if (window.lucide) lucide.createIcons();
+      }).join(''), { updateNode: reconcileChartFindingNode });
+      if (openChartFindingNoteTrigger && !openChartFindingNoteTrigger.isConnected) closeChartFindingNotePreview();
+      if (changed) renderChartFindingIcons(container);
     }
 
     // ================= CHAIRSIDE VOICE CONTROL AI AGENT =================
@@ -33677,7 +33697,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     }
 
     // Keep existing nodes (and native open selects) when a background read is unchanged.
-    function setStableHtml(element, markup) {
+    function setStableHtml(element, markup, { updateNode } = {}) {
       if (element.luminRenderedHtml === markup && element.luminRenderedFirstChild === element.firstElementChild) return false;
       // Keep unaffected cards/rows and their focused controls when one record changes.
       if (markup.includes('data-refresh-key=')) {
@@ -33693,7 +33713,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
           incoming.forEach((node, index) => {
             const raw = node.outerHTML;
             const previous = existing.get(keys[index]);
-            const next = previous?.luminRenderedHtml === raw ? previous : node;
+            const next = previous?.luminRenderedHtml === raw ? previous : (previous && updateNode ? updateNode(previous, node) : node);
             next.luminRenderedHtml = raw;
             retained.add(next);
             if (element.children[index] !== next) element.insertBefore(next, element.children[index] || null);
