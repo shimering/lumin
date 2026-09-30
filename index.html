@@ -3947,6 +3947,65 @@
     #dashboard-invoices-list::-webkit-scrollbar-track { background: #f8fafc; }
     #dashboard-appointments-list::-webkit-scrollbar-thumb,
     #dashboard-invoices-list::-webkit-scrollbar-thumb { border-radius: 999px; background: #cbd5e1; }
+    #dashboard-mobile-date-host,
+    #dashboard-mobile-tabs { display: none; }
+    #dashboard-mobile-date-host[hidden],
+    #dashboard-mobile-tabs[hidden],
+    #dashboard-tab-invoices[hidden],
+    #dashboard-schedule-card[hidden],
+    #dashboard-invoices-card[hidden] { display: none !important; }
+    html.lumin-phone-nav #dashboard-mobile-date-host {
+      display: block;
+      padding: 16px;
+      border: 1px solid #e2e8f0;
+      border-radius: 20px;
+      background: var(--lumin-face, #fff);
+    }
+    html.lumin-phone-nav body.lumin-raised #dashboard-mobile-date-host { border-color: #ffffff; box-shadow: var(--lumin-small-raised); }
+    html.lumin-phone-nav #dashboard-mobile-date-host button,
+    html.lumin-phone-nav #dashboard-mobile-tabs button {
+      min-width: calc(44px / var(--lumin-app-scale, 1));
+      min-height: calc(44px / var(--lumin-app-scale, 1));
+    }
+    html.lumin-phone-nav #dashboard-mobile-tabs {
+      display: flex;
+      position: sticky;
+      top: max(8px, env(safe-area-inset-top));
+      z-index: 5;
+      gap: 4px;
+      padding: 4px;
+      border-radius: 16px;
+      background: var(--lumin-face, #f1f5f9);
+    }
+    .dashboard-mobile-tab {
+      display: inline-flex;
+      flex: 1 1 0;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-width: 0;
+      min-height: calc(44px / var(--lumin-app-scale, 1));
+      padding: 10px 12px;
+      border: 0;
+      border-radius: 12px;
+      background: transparent;
+      color: #64748b;
+      font-size: 14px;
+      font-weight: 600;
+      touch-action: manipulation;
+      transition: background-color 150ms ease-out, color 150ms ease-out, transform 150ms ease-out;
+    }
+    .dashboard-mobile-tab svg { width: 18px; height: 18px; flex: none; }
+    .dashboard-mobile-tab:hover { background: #e2e8f0; color: #334155; }
+    .dashboard-mobile-tab[aria-selected="true"] { background: #eff6ff; color: #1d4ed8; box-shadow: 0 2px 6px rgba(15, 23, 42, .06); }
+    body.lumin-raised .dashboard-mobile-tab[aria-selected="true"] { background: hsl(var(--lumin-hue) calc(80% * var(--lumin-chroma)) 95%); color: hsl(var(--lumin-hue) calc(70% * var(--lumin-chroma)) 35%); }
+    .dashboard-mobile-tab:active { transform: scale(.98); }
+    .dashboard-mobile-tab:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+    .dashboard-mobile-tab:disabled { opacity: .5; pointer-events: none; }
+    html.lumin-phone-nav #dashboard-schedule-date-slot { display: none; }
+    html.lumin-phone-nav.dashboard-active #view-dashboard:not(.hidden) { height: auto; }
+    html.lumin-phone-nav #dashboard-scroll-panels { grid-template-columns: minmax(0, 1fr); }
+    @media (prefers-reduced-motion: reduce) { .dashboard-mobile-tab { transition: none; } }
     /* Mobile dashboard returns to normal page scrolling and content-sized panels. */
     @media (max-width: 1023px) {
       html.dashboard-active,
@@ -5606,10 +5665,15 @@
         <p id="dashboard-attendance-message" class="hidden border-t border-rose-100 px-4 py-3 text-xs font-bold" role="status"></p>
       </div>
 
+      <div id="dashboard-mobile-date-host" hidden></div>
+      <div id="dashboard-mobile-tabs" role="tablist" aria-label="Dashboard sections" onkeydown="handleDashboardMobileTabKeydown(event)" hidden>
+        <button id="dashboard-tab-schedule" class="dashboard-mobile-tab" type="button" role="tab" aria-selected="true" aria-controls="dashboard-schedule-card" onclick="setDashboardMobileTab('schedule')"><i data-lucide="calendar-days" aria-hidden="true"></i><span>Schedule</span></button>
+        <button id="dashboard-tab-invoices" class="dashboard-mobile-tab" type="button" role="tab" aria-selected="false" aria-controls="dashboard-invoices-card" tabindex="-1" onclick="setDashboardMobileTab('invoices')"><i data-lucide="receipt-text" aria-hidden="true"></i><span>Invoices</span></button>
+      </div>
       <div id="dashboard-scroll-panels" class="grid gap-5 xl:grid-cols-2">
-        <div class="dashboard-scroll-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-          <div class="border-b border-slate-100 p-4 sm:p-5">
-          <div class="flex items-center justify-between gap-3" dir="ltr">
+        <div id="dashboard-schedule-card" class="dashboard-scroll-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+          <div id="dashboard-schedule-date-slot" class="border-b border-slate-100 p-4 sm:p-5">
+          <div id="dashboard-date-toolbar" class="flex items-center justify-between gap-3" dir="ltr">
             <button type="button" onclick="changeDashboardDay(-1)" class="dashboard-day-button flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-xs transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700" aria-label="Previous day" title="Previous day">
               <i data-lucide="arrow-left" class="h-4 w-4"></i>
             </button>
@@ -9942,6 +10006,7 @@
     let appointmentVisibleMonth = new Date(appointmentToday.getFullYear(), appointmentToday.getMonth(), 1);
     let appointmentSelectedDate = new Date(appointmentToday);
     let dashboardSelectedDate = new Date(appointmentToday);
+    let activeDashboardMobileTab = 'schedule';
     let dashboardDoctorFilter = 'all';
     let dashboardDoctorFilterExplicitlySet = false;
 
@@ -10249,6 +10314,8 @@
       'Prices': 'الأسعار',
       'Patient Directory': 'دليل المرضى',
       'Dashboard': 'لوحة التحكم',
+      'Schedule': 'الجدول',
+      'Dashboard sections': 'أقسام لوحة التحكم',
       'My daily schedule': 'جدولي اليومي',
       'Patients assigned specifically to your login are shown here.': 'يظهر هنا المرضى المسندون إلى حسابك تحديدًا.',
       'Patients scheduled for every doctor are shown here.': 'يظهر هنا المرضى المجدولون لجميع الأطباء.',
@@ -12650,6 +12717,7 @@
         doctorWorkingSchedules.clear();
         doctorWorkingSchedulesLoaded = false;
         dashboardSelectedDate = new Date(appointmentToday);
+        activeDashboardMobileTab = 'schedule';
         dashboardDoctorFilterExplicitlySet = false;
         dashboardDoctorFilter = 'all';
         expandedDashboardAppointmentId = null;
@@ -32890,7 +32958,69 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       }
     }
 
+    function syncDashboardMobileTabs() {
+      const tabs = document.getElementById('dashboard-mobile-tabs');
+      const dateHost = document.getElementById('dashboard-mobile-date-host');
+      const dateSlot = document.getElementById('dashboard-schedule-date-slot');
+      const dateToolbar = document.getElementById('dashboard-date-toolbar');
+      if (!tabs || !dateHost || !dateSlot || !dateToolbar) return;
+      const phone = Boolean(window.LuminMobileNav?.isPhone());
+      const invoicesAllowed = canViewDashboardInvoices();
+      if (!invoicesAllowed) activeDashboardMobileTab = 'schedule';
+      const ar = currentUiLanguage === 'ar';
+      tabs.hidden = !phone || !invoicesAllowed;
+      tabs.setAttribute('aria-label', ar ? 'أقسام لوحة التحكم' : 'Dashboard sections');
+      dateHost.hidden = !phone;
+      const dateParent = phone ? dateHost : dateSlot;
+      if (dateToolbar.parentElement !== dateParent) dateParent.appendChild(dateToolbar);
+      for (const tab of ['schedule', 'invoices']) {
+        const button = document.getElementById('dashboard-tab-' + tab);
+        const panel = document.getElementById(tab === 'schedule' ? 'dashboard-schedule-card' : 'dashboard-invoices-card');
+        const allowed = tab === 'schedule' || invoicesAllowed;
+        const selected = activeDashboardMobileTab === tab;
+        const label = tab === 'schedule' ? (ar ? 'الجدول' : 'Schedule') : (ar ? 'الفواتير' : 'Invoices');
+        if (button.lastElementChild.textContent !== label) button.lastElementChild.textContent = label;
+        button.hidden = !allowed;
+        button.setAttribute('aria-selected', String(selected));
+        button.tabIndex = selected ? 0 : -1;
+        panel.hidden = !allowed || (phone && !selected);
+        panel.classList.toggle('hidden', panel.hidden);
+        if (phone) {
+          panel.setAttribute('role', 'tabpanel');
+          panel.setAttribute('aria-labelledby', button.id);
+          panel.tabIndex = 0;
+        } else {
+          panel.removeAttribute('role');
+          panel.removeAttribute('aria-labelledby');
+          panel.removeAttribute('tabindex');
+        }
+      }
+    }
+
+    function setDashboardMobileTab(tab) {
+      if (!window.LuminMobileNav?.isPhone() || !['schedule', 'invoices'].includes(tab)) return;
+      if (tab === 'invoices' && !canViewDashboardInvoices()) return;
+      activeDashboardMobileTab = tab;
+      syncDashboardMobileTabs();
+      document.getElementById('app-shell').scrollTop = 0;
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      scheduleDashboardViewportUpdate();
+    }
+
+    function handleDashboardMobileTabKeydown(event) {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || !canViewDashboardInvoices()) return;
+      event.preventDefault();
+      const direction = document.documentElement.dir === 'rtl' ? -1 : 1;
+      const tabs = ['schedule', 'invoices'];
+      const current = tabs.indexOf(activeDashboardMobileTab);
+      const offset = event.key === 'ArrowRight' ? direction : -direction;
+      const next = event.key === 'Home' ? 'schedule' : event.key === 'End' ? 'invoices' : tabs[(current + offset + 2) % 2];
+      setDashboardMobileTab(next);
+      document.getElementById('dashboard-tab-' + next)?.focus({ preventScroll: true });
+    }
+
     function updateDashboardViewportHeight() {
+      syncDashboardMobileTabs();
       const dashboardView = document.getElementById('view-dashboard');
       const main = document.querySelector('main');
       const appShell = document.getElementById('app-shell');
@@ -32924,6 +33054,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     }
 
     function setupDashboardViewport() {
+      syncDashboardMobileTabs();
       window.addEventListener('resize', scheduleDashboardViewportUpdate, { passive: true });
       window.visualViewport?.addEventListener('resize', scheduleDashboardViewportUpdate, { passive: true });
     }
@@ -34245,6 +34376,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       scrollPanels?.classList.toggle('xl:grid-cols-2', showDashboardInvoices);
       scrollPanels?.classList.toggle('xl:grid-cols-1', !showDashboardInvoices);
       if (!showDashboardInvoices) dashboardInvoiceRenderToken += 1;
+      syncDashboardMobileTabs();
 
       const selectedDoctor = renderDashboardDoctorFilter();
       const entries = dashboardAppointmentsForDate(dashboardSelectedDate);

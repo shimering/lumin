@@ -22,6 +22,9 @@ const closeHeaderHelper = source.slice(source.indexOf('    function closeMobileH
 const routingHelper = source.slice(source.indexOf('    async function switchView('), source.indexOf('    async function openPatientChart('));
 const patientsSource = fs.readFileSync(path.join(root, 'lumin-patients.js'), 'utf8');
 const patientsTabHelpers = patientsSource.slice(patientsSource.indexOf('function canOpenPatientsPage('), patientsSource.indexOf('function handlePatientsTabKeydown('));
+const dashboardPermission = source.slice(source.indexOf('    function canViewDashboardInvoices('), source.indexOf('    function canViewFinanceDepts('));
+const dashboardRenderer = source.slice(source.indexOf('    function renderDashboard('), source.indexOf('    function legacyDashboardInvoiceCardMarkup('));
+const dashboardDateHelpers = source.slice(source.indexOf('    function changeDashboardDay('), source.indexOf('    function escapeAppointmentText('));
 const appScales = Array.from({ length: 10 }, (_, i) => 80 + i * 5);
 
 test('mobile screens fill the available height at every app scale', { skip: !chromium && 'Playwright is not available' }, async t => {
@@ -57,6 +60,19 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
     const patientWorkspaceSwipe = null;
     const UI_SCALE_DEFAULT = 100;
     let currentUiLanguage = 'en';
+    let activeDashboardMobileTab = 'schedule', expandedDashboardAppointmentId = null, dashboardInvoiceRenderToken = 0;
+    const appointmentToday = new Date(2026, 8, 30);
+    let dashboardSelectedDate = new Date(appointmentToday);
+    const appointmentDayFormatter = new Intl.DateTimeFormat('en-GB', { dateStyle: 'long' });
+    let currentUserAccess = { isAdmin: false, isDoctor: false, permissions: new Set(['dashboard_invoices']) };
+    function refreshMyAttendanceState() {}
+    function renderDashboardDoctorFilter() { return null; }
+    function dashboardAppointmentsForDate() { return []; }
+    function sameAppointmentDate(a, b) { return a.toDateString() === b.toDateString(); }
+    function setStableHtml(element, markup) { element.innerHTML = markup; }
+    function refreshWhatsAppTemplatePickerAnchor() {}
+    function ensureAppointmentWaitIndicatorTimer() {}
+    async function renderDashboardInvoices() { document.getElementById('dashboard-invoice-date').textContent = appointmentDayFormatter.format(dashboardSelectedDate); }
     const PATIENT_QUERY_PAGE_SIZE = 10;
     let patientQueryPage = 1, patientQuerySignature = '';
     const patientsLoaded = true, patientDirectoryLoaded = true, patientDirectoryTotal = 20;
@@ -100,6 +116,9 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
     ${closeHeaderHelper}
     ${patientsTabHelpers}
     ${routingHelper}
+    ${dashboardPermission}
+    ${dashboardRenderer}
+    ${dashboardDateHelpers}
     setupMobileNavigation();
     setupAppViewportDimensions();
     setupAppointmentCalendarViewport();
@@ -129,9 +148,10 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
         if (button.id === 'nav-btn-' + view) button.setAttribute('aria-current', 'page');
         else button.removeAttribute('aria-current');
       });
-      const active = { patients: 'patient-query-active', appointments: 'appointments-calendar-active', whatsapp: 'whatsapp-view-active' }[view];
+      const active = { dashboard: 'dashboard-active', patients: 'patient-query-active', appointments: 'appointments-calendar-active', whatsapp: 'whatsapp-view-active' }[view];
       if (active) { root.classList.add(active); document.body.classList.add(active); }
       applyUiTheme(theme, 'violet', scale);
+      if (view === 'dashboard') { renderDashboard(); scheduleDashboardViewportUpdate(); }
       if (view === 'patients') { runPatientQuery(); schedulePatientQueryViewportUpdate(); }
       if (view === 'appointments') scheduleAppointmentCalendarViewportUpdate();
       if (view === 'whatsapp') scheduleWhatsAppMobileViewportUpdate();
@@ -173,6 +193,127 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
       assert.ok(Math.abs(rect.height - result.viewport) <= 1, description + ': container fills the actual screen height');
     }
   }
+
+  await t.test('phone dashboard shows one tab panel at a time at every scale in both languages and themes', async () => {
+    for (const size of [{ width: 320, height: 568 }, { width: 384, height: 781 }]) {
+      await page.setViewportSize(size);
+      for (const dir of ['ltr', 'rtl']) for (const theme of ['flat', 'raised']) for (const scale of appScales) {
+        await showView('dashboard', scale, theme, dir);
+        await page.evaluate(() => setDashboardMobileTab('schedule'));
+        assert.equal(await page.locator('#dashboard-schedule-card').isVisible(), true);
+        assert.equal(await page.locator('#dashboard-invoices-card').isVisible(), false);
+        assert.equal(await page.locator('#dashboard-tab-schedule').textContent(), dir === 'rtl' ? 'الجدول' : 'Schedule');
+        await page.locator('#dashboard-tab-invoices').click();
+        assert.equal(await page.locator('#dashboard-schedule-card').isVisible(), false);
+        assert.equal(await page.locator('#dashboard-invoices-card').isVisible(), true);
+        assert.equal(await page.locator('#dashboard-tab-invoices').getAttribute('aria-selected'), 'true');
+        assert.equal(await page.locator('#dashboard-invoices-card').getAttribute('role'), 'tabpanel');
+        assert.equal(await page.locator('#dashboard-date-toolbar').evaluate(el => el.parentElement.id), 'dashboard-mobile-date-host');
+        for (const tab of ['schedule', 'invoices']) {
+          const button = await page.locator('#dashboard-tab-' + tab).boundingBox();
+          assert.ok(button.width >= 43.9 && button.height >= 43.9 && button.x >= 0 && button.x + button.width <= size.width + 1, tab + ' is touch safe at ' + scale + '% ' + dir + ': ' + JSON.stringify(button));
+        }
+        const nav = await bounds('dashboard');
+        assert.ok(nav.nav.bottom <= nav.viewport + 1 && nav.navButtons.every(button => button.hit), 'floating dock remains tappable');
+      }
+    }
+    await page.evaluate(() => setDashboardMobileTab('schedule'));
+  });
+
+  await t.test('dashboard tabs retain shared day controls, keyboard navigation, permissions, and tablet/desktop layouts', async () => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await showView('dashboard', 100);
+    await page.locator('#dashboard-tab-invoices').click();
+    const expectedDate = await page.evaluate(() => { const date = new Date(dashboardSelectedDate); date.setDate(date.getDate() + 1); return date.getTime(); });
+    await page.locator('#dashboard-date-toolbar button[title="Next day"]').click();
+    assert.equal(await page.evaluate(() => dashboardSelectedDate.getTime()), expectedDate);
+    assert.equal(await page.locator('#dashboard-tab-invoices').getAttribute('aria-selected'), 'true', 'data refresh preserves the selected tab');
+    assert.equal(await page.locator('#dashboard-invoice-date').textContent(), await page.locator('#dashboard-date-heading').textContent());
+    assert.equal(await page.locator('#dashboard-date-toolbar').count(), 1, 'day controls are reused without duplicates');
+    await page.locator('#dashboard-tab-invoices').focus();
+    await page.keyboard.press('Home');
+    assert.equal(await page.locator('#dashboard-tab-schedule').getAttribute('aria-selected'), 'true');
+    await page.keyboard.press('End');
+    assert.equal(await page.locator('#dashboard-tab-invoices').getAttribute('aria-selected'), 'true');
+    await page.keyboard.press('ArrowRight');
+    assert.equal(await page.locator('#dashboard-tab-schedule').getAttribute('aria-selected'), 'true');
+    await page.evaluate(() => { currentUserAccess.permissions.delete('dashboard_invoices'); renderDashboard(); setDashboardMobileTab('invoices'); });
+    assert.equal(await page.locator('#dashboard-mobile-tabs').isVisible(), false, 'restricted users keep their existing Schedule view');
+    assert.equal(await page.locator('#dashboard-invoices-card').isVisible(), false);
+    assert.equal(await page.locator('#dashboard-schedule-card').isVisible(), true);
+    await page.evaluate(() => { currentUserAccess.permissions.add('dashboard_invoices'); renderDashboard(); });
+    for (const size of [{ width: 820, height: 1180 }, { width: 1440, height: 900 }]) {
+      await page.setViewportSize(size);
+      await settle();
+      assert.equal(await page.locator('#dashboard-mobile-tabs').isVisible(), false);
+      assert.equal(await page.locator('#dashboard-schedule-card').isVisible(), true);
+      assert.equal(await page.locator('#dashboard-invoices-card').isVisible(), true);
+      assert.equal(await page.locator('#dashboard-date-toolbar').evaluate(el => el.parentElement.id), 'dashboard-schedule-date-slot');
+      assert.equal(await page.locator('#dashboard-schedule-card').getAttribute('role'), null);
+    }
+    const schedule = await page.locator('#dashboard-schedule-card').boundingBox();
+    const invoices = await page.locator('#dashboard-invoices-card').boundingBox();
+    assert.ok(schedule.x + schedule.width <= invoices.x, 'desktop panels stay side by side');
+    await page.setViewportSize({ width: 744, height: 1133 });
+    await page.evaluate(() => {
+      window.originalUserAgent = navigator.userAgent;
+      Object.defineProperty(navigator, 'userAgent', { configurable: true, value: 'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)' });
+    });
+    await showView('dashboard', 100);
+    assert.equal(await page.locator('#dashboard-mobile-tabs').isVisible(), false, 'iPad mini retains the existing layout');
+    await page.evaluate(() => Object.defineProperty(navigator, 'userAgent', { configurable: true, value: 'Mozilla/5.0 (Linux; Android 16) SamsungBrowser Mobile' }));
+    await page.setViewportSize({ width: 844, height: 390 });
+    await showView('dashboard', 85);
+    assert.equal(await page.locator('#dashboard-mobile-tabs').isVisible(), true, 'phone landscape keeps tabs');
+    await page.evaluate(() => Object.defineProperty(navigator, 'userAgent', { configurable: true, value: window.originalUserAgent }));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await showView('dashboard', 100);
+    await page.evaluate(() => showDashboardToday());
+  });
+
+  await t.test('mobile dashboard tabs retain content scrolling, attendance, and the floating dock', async dashboardTest => {
+    const touch = await page.context().newCDPSession(page);
+    dashboardTest.after(async () => {
+      const attendance = page.locator('#dashboard-attendance-card');
+      await attendance.evaluate(el => { el.hidden = true; el.classList.add('hidden'); });
+      await page.evaluate(() => setDashboardMobileTab('schedule'));
+      await touch.detach();
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await showView('dashboard', 85);
+    await page.locator('#dashboard-attendance-card').evaluate(el => { el.hidden = false; el.classList.remove('hidden'); });
+    for (const tab of ['schedule', 'invoices']) {
+      await page.evaluate(tab => {
+        setDashboardMobileTab(tab);
+        const list = document.getElementById(tab === 'schedule' ? 'dashboard-appointments-list' : 'dashboard-invoices-list');
+        list.innerHTML = Array.from({ length: 20 }, (_, i) => '<article style="min-height:120px;padding:20px">Test ' + tab + ' ' + i + '</article>').join('');
+      }, tab);
+      await settle();
+      assert.equal(await page.locator('#dashboard-attendance-card').isVisible(), true, 'attendance remains shared');
+      const navBefore = (await bounds('dashboard')).nav;
+      const point = await page.evaluate(tab => {
+        const list = document.getElementById(tab === 'schedule' ? 'dashboard-appointments-list' : 'dashboard-invoices-list');
+        const rect = list.getBoundingClientRect();
+        return { x: rect.left + rect.width / 2, y: Math.min(rect.top + 140, document.getElementById('lumin-mobile-nav').getBoundingClientRect().top - 40) };
+      }, tab);
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: point.x, y: point.y }] });
+      for (let step = 1; step <= 8; step++) await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: point.x, y: point.y - step * 20 }] });
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await settle();
+      const scroll = await page.evaluate(() => ({ y: scrollY, shellY: document.getElementById('app-shell').scrollTop, mainY: document.getElementById('app-main').scrollTop, documentHeight: document.documentElement.scrollHeight, bodyHeight: document.body.scrollHeight, shellHeight: document.getElementById('app-shell').scrollHeight, shellClientHeight: document.getElementById('app-shell').clientHeight }));
+      assert.ok(scroll.y > 20 || scroll.shellY > 20, tab + ' content scrolls with a finger: ' + JSON.stringify(scroll));
+      assert.equal((await bounds('dashboard')).nav.top, navBefore.top, 'dock stays anchored during scrolling');
+      await page.evaluate(() => {
+        const shell = document.getElementById('app-shell');
+        shell.scrollTo({ top: shell.scrollHeight, behavior: 'instant' });
+        window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' });
+      });
+      await settle();
+      const lastBottom = await page.locator(tab === 'schedule' ? '#dashboard-appointments-list > :last-child' : '#dashboard-invoices-list > :last-child').evaluate(el => el.getBoundingClientRect().bottom);
+      const navTop = (await bounds('dashboard')).nav.top;
+      assert.ok(lastBottom <= navTop, 'last item remains above the dock: ' + JSON.stringify({ tab, lastBottom, navTop }));
+    }
+  });
 
   await t.test('Implant Progress and Procedure Search accept touch scrolling while Browse keeps its outer page locked', async scrollTest => {
     const touch = await page.context().newCDPSession(page);
@@ -545,6 +686,20 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
     await page.setViewportSize({ width: 390, height: 844 });
     await showView('patients', 100);
     await page.screenshot({ path: process.env.LUMIN_NAV_SCREENSHOT });
+  }
+  if (process.env.LUMIN_DASHBOARD_SCREENSHOT) {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await showView('dashboard', 100);
+    await page.evaluate(() => {
+      document.getElementById('dashboard-invoices-list').replaceChildren();
+      setDashboardMobileTab('schedule');
+      if (window.lucide) lucide.createIcons();
+    });
+    await settle();
+    await page.screenshot({ path: process.env.LUMIN_DASHBOARD_SCREENSHOT + '-schedule.png' });
+    await page.locator('#dashboard-tab-invoices').click();
+    await settle();
+    await page.screenshot({ path: process.env.LUMIN_DASHBOARD_SCREENSHOT + '-invoices.png' });
   }
   assert.deepEqual(errors, [], 'layout helpers do not throw in the browser');
 });
