@@ -75,7 +75,7 @@
   <script src="lumin-loyalty.js?v=5"></script>
   <script src="lumin-finance-sync.js?v=2"></script>
   <script src="lumin-patient-swipe.js?v=1"></script>
-  <script src="lumin-patients.js?v=3"></script>
+  <script src="lumin-patients.js?v=4"></script>
   <script src="lumin-mobile-nav.js?v=1"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   
@@ -9793,6 +9793,7 @@
     let realtimeChannel = null;
     let realtimeRefreshTimer = null;
     let realtimeRefreshDueAt = 0;
+    let realtimeRefreshBatchStartedAt = null;
     let realtimeRefreshInFlight = false;
     let realtimeRefreshQueued = false;
     let realtimeRefreshRetryCount = 0;
@@ -9800,6 +9801,7 @@
     let realtimeHasSubscribed = false;
     let realtimeLastCatchUpAt = 0;
     const realtimePendingTables = new Set();
+    const coalescedRefreshReads = new Map();
     let patientInvoiceRenderToken = 0;
     let patientPaymentsRenderToken = 0;
     let patientPrescriptionsRequest = 0;
@@ -9849,6 +9851,7 @@
     let financeExpenses = [];
     let financeExpensesLoaded = false;
     let financeExpenseLoadPromise = null;
+    let financeExpenseRenderToken = 0;
     let incomeStatementReport = null;
     let incomeStatementLoadedRange = '';
     let incomeStatementRenderToken = 0;
@@ -16495,26 +16498,26 @@
       if (!patient) { resetPatientPrescriptionsState(); await switchView('patients'); return; }
       const content = document.getElementById('patient-prescriptions-content');
       const userId = currentSession?.user?.id;
+      const context = contentRefreshContext('patient-prescriptions', patientId);
       const request = ++patientPrescriptionsRequest;
       const isCurrent = () => request === patientPrescriptionsRequest && patientWorkspaceId() === patientId && currentSession?.user?.id === userId && canViewPatientPrescriptions();
       updatePatientWorkspaceNavigation(patient, 'prescriptions');
       if (patientPrescriptionsPatientId !== patientId) {
         patientPrescriptionRecords = [];
         patientPrescriptionsPatientId = patientId;
-        content.innerHTML = '<p class="p-6 text-center text-sm text-slate-500">Loading prescriptions...</p>';
       }
-      content.setAttribute('aria-busy', 'true');
+      beginContentRefresh(content, context, '<p class="p-6 text-center text-sm text-slate-500">Loading prescriptions...</p>');
       try {
         void ensurePrescriptionConfigurationLoaded().catch(() => {});
-        const records = await fetchPatientPrescriptions(patientId);
+        const records = await coalesceRefreshRead(context, () => fetchPatientPrescriptions(patientId));
         if (!isCurrent()) return;
         patientPrescriptionRecords = records;
-        content.innerHTML = records.length ? records.map(prescriptionHistoryCardMarkup).join('') : '<div class="rounded-2xl border border-slate-200 bg-white px-6 py-14 text-center"><span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600"><i data-lucide="notebook-tabs" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-700">No prescriptions for this patient yet.</p><p class="mt-1 text-xs text-slate-400">Create the first prescription to save it in the patient record.</p></div>';
+        finishContentRefresh(content, context, records.length ? records.map(prescriptionHistoryCardMarkup).join('') : '<div class="rounded-2xl border border-slate-200 bg-white px-6 py-14 text-center"><span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600"><i data-lucide="notebook-tabs" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-700">No prescriptions for this patient yet.</p><p class="mt-1 text-xs text-slate-400">Create the first prescription to save it in the patient record.</p></div>');
         translateUiTree(content, currentUiLanguage);
         lucide.createIcons();
       } catch (error) {
         if (!isCurrent()) return;
-        content.innerHTML = `<div class="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700"><p>Could not load prescriptions.</p><button type="button" onclick="renderPatientPrescriptions()" class="mt-3 min-h-11 rounded-lg border border-red-200 bg-white px-4 py-2 font-bold">Try again</button></div>`;
+        failContentRefresh(content, context, `<div class="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700"><p>Could not load prescriptions.</p><button type="button" onclick="renderPatientPrescriptions()" class="mt-3 min-h-11 rounded-lg border border-red-200 bg-white px-4 py-2 font-bold">Try again</button></div>`);
         if (throwOnError) throw error;
       } finally { if (isCurrent()) content.setAttribute('aria-busy', 'false'); }
     }
@@ -17280,11 +17283,11 @@
     function renderAdminHrStaffSettings() {
       const container = document.getElementById('admin-hr-staff-settings-list');
       if (!container) return;
-      container.innerHTML = adminUsers.map(user => {
+      setStableHtml(container, adminUsers.map(user => {
         const settings = hrSettingsForUser(user.user_id);
         const role = adminRoles.find(item => item.id === user.role_id);
-        return `<article class="rounded-2xl border ${settings.attendance_enabled ? 'border-rose-200 bg-rose-50/35' : 'border-slate-200 bg-white'} p-4"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><h4 class="truncate text-sm font-black text-slate-800">${escapeHtml(user.full_name)}</h4><p class="mt-1 text-[10px] font-black uppercase tracking-wider text-slate-400">${escapeHtml(role?.name || 'Unassigned')} · ${user.is_doctor ? 'Doctor' : 'Staff'}</p></div><span class="rounded-full px-2.5 py-1 text-[10px] font-black ${settings.attendance_enabled ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}">${settings.attendance_enabled ? 'Attendance on' : 'Attendance off'}</span></div><div class="mt-3 rounded-xl bg-white/80 p-3 text-[11px] font-bold text-slate-500"><p>${escapeHtml(hrScheduleLabel(settings.weekly_schedule))}</p><p class="mt-1">Regular ${escapeHtml(formatInvoiceMoney(settings.regular_shift_rate || 0))}${user.is_doctor ? '' : ` · Extra ${escapeHtml(formatInvoiceMoney(settings.extra_shift_rate || 0))}`}</p></div><button type="button" onclick="openHrStaffSettingsModal('${user.user_id}')" class="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-[11px] font-black text-rose-700 hover:bg-rose-50"><i data-lucide="settings-2" class="h-4 w-4"></i> Configure</button></article>`;
-      }).join('') || '<div class="col-span-full p-8 text-center text-sm font-bold text-slate-400">No login users found.</div>';
+        return `<article data-refresh-key="${escapeHtml(String(user.user_id))}" class="rounded-2xl border ${settings.attendance_enabled ? 'border-rose-200 bg-rose-50/35' : 'border-slate-200 bg-white'} p-4"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><h4 class="truncate text-sm font-black text-slate-800">${escapeHtml(user.full_name)}</h4><p class="mt-1 text-[10px] font-black uppercase tracking-wider text-slate-400">${escapeHtml(role?.name || 'Unassigned')} · ${user.is_doctor ? 'Doctor' : 'Staff'}</p></div><span class="rounded-full px-2.5 py-1 text-[10px] font-black ${settings.attendance_enabled ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}">${settings.attendance_enabled ? 'Attendance on' : 'Attendance off'}</span></div><div class="mt-3 rounded-xl bg-white/80 p-3 text-[11px] font-bold text-slate-500"><p>${escapeHtml(hrScheduleLabel(settings.weekly_schedule))}</p><p class="mt-1">Regular ${escapeHtml(formatInvoiceMoney(settings.regular_shift_rate || 0))}${user.is_doctor ? '' : ` · Extra ${escapeHtml(formatInvoiceMoney(settings.extra_shift_rate || 0))}`}</p></div><button type="button" onclick="openHrStaffSettingsModal('${user.user_id}')" class="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-[11px] font-black text-rose-700 hover:bg-rose-50"><i data-lucide="settings-2" class="h-4 w-4"></i> Configure</button></article>`;
+      }).join('') || '<div class="col-span-full p-8 text-center text-sm font-bold text-slate-400">No login users found.</div>');
       lucide.createIcons();
     }
 
@@ -17606,8 +17609,8 @@
 
     function renderAdminRoles() {
       const container = document.getElementById('admin-roles-list');
-      container.innerHTML = adminRoles.map(role => `
-        <article class="rounded-2xl border ${role.is_admin ? 'border-blue-200 bg-blue-50/40' : 'border-slate-200 bg-white'} p-4">
+      setStableHtml(container, adminRoles.map(role => `
+        <article data-refresh-key="${escapeHtml(String(role.id))}" class="rounded-2xl border ${role.is_admin ? 'border-blue-200 bg-blue-50/40' : 'border-slate-200 bg-white'} p-4">
           <div class="flex items-start justify-between gap-3">
             <div>
               <h4 class="text-sm font-black text-slate-800">${escapeHtml(role.name)}</h4>
@@ -17678,17 +17681,17 @@
             </div>
           `}
         </article>
-      `).join('');
+      `).join(''));
       lucide.createIcons();
     }
 
     function renderAdminUsers() {
       const tbody = document.getElementById('admin-users-table-body');
-      tbody.innerHTML = adminUsers.map(user => {
+      setStableHtml(tbody, adminUsers.map(user => {
         const isCurrentUser = user.user_id === currentSession?.user.id;
         const roleOptions = adminRoles.map(role => `<option value="${role.id}" ${role.id === user.role_id ? 'selected' : ''}>${escapeHtml(role.name)}</option>`).join('');
         return `
-          <tr>
+          <tr data-refresh-key="${escapeHtml(String(user.user_id))}">
             <td data-label="User" class="px-5 py-4"><span class="font-bold text-slate-800">${escapeHtml(user.full_name)}</span>${isCurrentUser ? '<span class="ml-2 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-600">You</span>' : ''}</td>
             <td data-label="Login name" class="px-5 py-4 font-mono text-xs font-bold text-blue-600">${escapeHtml(user.login_name)}</td>
             <td data-label="Email" class="px-5 py-4 text-slate-500">${escapeHtml(user.email)}</td>
@@ -17707,7 +17710,7 @@
             <td data-label="Actions" class="px-5 py-4 text-right"><div class="flex flex-wrap items-center justify-end gap-2">${isCurrentUser ? '<span class="text-[10px] font-bold text-slate-400">Account protected</span>' : ''}<button type="button" onclick="openManagedUserEditor('${user.user_id}')" class="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[11px] font-black text-violet-700 transition hover:bg-violet-100">Edit login</button><button type="button" data-save-managed-user="${user.user_id}" onclick="updateManagedUser('${user.user_id}')" class="rounded-lg border border-blue-200 px-3 py-2 text-[11px] font-black text-blue-600 transition hover:bg-blue-50">Save access</button>${isCurrentUser ? '' : `<button type="button" data-delete-managed-user="${user.user_id}" onclick="deleteManagedUser('${user.user_id}')" class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-black text-red-600 transition hover:border-red-300 hover:bg-red-100">Delete</button>`}</div></td>
           </tr>
         `;
-      }).join('') || '<tr><td colspan="7" class="px-5 py-8 text-center text-sm text-slate-400">No login users found.</td></tr>';
+      }).join('') || '<tr><td colspan="7" class="px-5 py-8 text-center text-sm text-slate-400">No login users found.</td></tr>');
     }
 
     function openManagedUserEditor(userId) {
@@ -18649,6 +18652,71 @@
       updateDentitionToolbar();
     }
 
+    // Related save handlers and realtime events share reads, including one trailing
+    // read when another change arrives in flight. Never discard another user's change.
+    function coalesceRefreshRead(key, load) {
+      const existing = coalescedRefreshReads.get(key);
+      if (existing) {
+        existing.next = load;
+        return existing.promise;
+      }
+      const state = { next: load, promise: null };
+      state.promise = Promise.resolve().then(async () => {
+        let result;
+        while (state.next) {
+          const next = state.next;
+          state.next = null;
+          try { result = await next(); }
+          catch (error) { if (!state.next) throw error; }
+        }
+        return result;
+      }).finally(() => {
+        if (coalescedRefreshReads.get(key) === state) coalescedRefreshReads.delete(key);
+      });
+      coalescedRefreshReads.set(key, state);
+      return state.promise;
+    }
+
+    function contentRefreshContext(...parts) {
+      return stableJsonStringify([currentSession?.user?.id || null, currentUiLanguage, ...parts]);
+    }
+
+    function beginContentRefresh(element, context, loadingMarkup) {
+      element.luminRefreshError?.remove();
+      element.luminRefreshError = null;
+      element.luminRefreshPendingContext = context;
+      element.setAttribute('aria-busy', 'true');
+      if (element.luminRefreshContext !== context) setStableHtml(element, loadingMarkup);
+    }
+
+    function finishContentRefresh(element, context, markup) {
+      if (element.luminRefreshPendingContext !== context) return;
+      element.luminRefreshError?.remove();
+      element.luminRefreshError = null;
+      setStableHtml(element, markup);
+      element.luminRefreshContext = context;
+      element.setAttribute('aria-busy', 'false');
+    }
+
+    function failContentRefresh(element, context, errorMarkup) {
+      if (element.luminRefreshPendingContext !== context) return;
+      element.setAttribute('aria-busy', 'false');
+      if (element.luminRefreshContext !== context) {
+        setStableHtml(element, errorMarkup);
+        return;
+      }
+      element.luminRefreshError?.remove();
+      const message = document.createElement('p');
+      message.className = 'rounded-xl bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800';
+      message.setAttribute('role', 'status');
+      message.textContent = currentUiLanguage === 'ar'
+        ? 'تعذر تحديث البيانات. يتم عرض آخر بيانات تم تحميلها.'
+        : 'Could not refresh. Showing the last loaded information.';
+      if (element.tagName === 'TBODY') element.closest('table').insertAdjacentElement('afterend', message);
+      else element.appendChild(message);
+      element.luminRefreshError = message;
+    }
+
     // ================= SUPABASE REALTIME SYNC =================
     const REALTIME_ACCESS_TABLES = new Set(['user_profiles', 'access_roles', 'role_permissions']);
     const REALTIME_DENTAL_CUSTOMIZATION_TABLES = new Set(['dental_specialties', 'dental_operations']);
@@ -18683,7 +18751,9 @@
       realtimeRefreshTimer = null;
       realtimeReconnectTimer = null;
       realtimeRefreshDueAt = 0;
+      realtimeRefreshBatchStartedAt = null;
       realtimePendingTables.clear();
+      coalescedRefreshReads.clear();
       recentLocalAppointmentChanges.clear();
       realtimeRefreshQueued = false;
       realtimeRefreshRetryCount = 0;
@@ -18696,15 +18766,21 @@
       }
     }
 
-    function scheduleRealtimeRefresh(delay = 80) {
-      const dueAt = Date.now() + Math.max(0, delay);
-      if (realtimeRefreshTimer && realtimeRefreshDueAt <= dueAt) return;
+    function scheduleRealtimeRefresh(delay = 150) {
+      if (realtimeRefreshInFlight) { realtimeRefreshQueued = true; return; }
+      const now = Date.now();
+      if (realtimeRefreshBatchStartedAt === null) realtimeRefreshBatchStartedAt = now;
+      const dueAt = delay > 0 && delay < 1000
+        ? Math.min(now + delay, realtimeRefreshBatchStartedAt + 500)
+        : now + Math.max(0, delay);
+      // Immediate catch-up and retry backoff keep their existing timing.
+      if (realtimeRefreshTimer && (realtimeRefreshDueAt <= now || (delay >= 1000 && realtimeRefreshDueAt <= dueAt))) return;
       if (realtimeRefreshTimer) clearTimeout(realtimeRefreshTimer);
       realtimeRefreshDueAt = dueAt;
-      realtimeRefreshTimer = setTimeout(flushRealtimeRefresh, Math.max(0, delay));
+      realtimeRefreshTimer = setTimeout(flushRealtimeRefresh, Math.max(0, dueAt - now));
     }
 
-    function queueRealtimeRefresh(tableName, delay = 80) {
+    function queueRealtimeRefresh(tableName, delay = 150) {
       if (!currentSession || !currentUserAccess || !REALTIME_APP_TABLES.has(tableName)) return;
       realtimePendingTables.add(tableName);
       scheduleRealtimeRefresh(delay);
@@ -18816,6 +18892,7 @@
     async function flushRealtimeRefresh() {
       realtimeRefreshTimer = null;
       realtimeRefreshDueAt = 0;
+      realtimeRefreshBatchStartedAt = null;
       if (realtimeRefreshInFlight) {
         realtimeRefreshQueued = true;
         return;
@@ -18825,8 +18902,10 @@
       const changedTables = new Set(realtimePendingTables);
       realtimePendingTables.clear();
       realtimeRefreshInFlight = true;
-      let nextRefreshDelay = 80;
+      let nextRefreshDelay = 150;
       try {
+        const invoicesChanged = [...changedTables].some(table => REALTIME_INVOICE_TABLES.has(table));
+        if (invoicesChanged) dashboardInvoiceCache.clear();
         const accessChanged = [...changedTables].some(table => REALTIME_ACCESS_TABLES.has(table));
         if (accessChanged && !(await refreshCurrentAccessFromRealtime())) return;
         const adminVisible = hasPageAccess('admin') && realtimeViewIsVisible('admin');
@@ -18902,10 +18981,9 @@
         if (accessChanged && chartDoctorsLoaded && hasPageAccess('chart')) {
           await fetchChartDoctors();
         }
-        const invoicesChanged = [...changedTables].some(table => REALTIME_INVOICE_TABLES.has(table));
         if (accessChanged || changedTables.has('patients') || invoicesChanged || dentalCustomizationChanged) {
           patientProcedureState.loaded = false;
-          if (hasPageAccess('patients') && realtimeViewIsVisible('patients') && activePatientsTab === 'procedures') await searchPatientProcedures({ force: true });
+          if (hasPageAccess('patients') && realtimeViewIsVisible('patients') && activePatientsTab === 'procedures') await searchPatientProcedures({ force: true, background: true });
         }
         if (invoicesChanged) {
           financeInvoicesLoaded = false;
@@ -18914,7 +18992,6 @@
           financeOverviewLoaded = false;
         }
         if (invoicesChanged && !document.getElementById('view-dashboard').classList.contains('hidden')) {
-          dashboardInvoiceCache.clear();
           await renderDashboardInvoices(dashboardAppointmentsForDate(dashboardSelectedDate));
         }
         if (invoicesChanged && !document.getElementById('view-invoices').classList.contains('hidden')) {
@@ -19002,7 +19079,7 @@
           { event: 'INSERT', schema: 'public', table: 'app_change_events' },
           payload => {
             const tableName = payload.new?.table_name;
-            queueRealtimeRefresh(tableName, tableName === 'appointments' ? 20 : 80);
+            queueRealtimeRefresh(tableName, tableName === 'appointments' ? 20 : 150);
           }
         );
 
@@ -19849,24 +19926,29 @@
     }
 
     async function fetchPatientsFromDB() {
+      const userId = currentSession?.user?.id;
       try {
-        const data = [];
-        const pageSize = 1000;
-        let error = null;
-        for (let page = 0; page < 20; page += 1) {
-          const from = page * pageSize;
-          const result = await db
-            .from('patients')
-            .select(PATIENT_SELECT_FIELDS)
-            .order('created_at', { ascending: false })
-            .range(from, from + pageSize - 1);
-          if (result.error) {
-            error = result.error;
-            break;
+        const { data, error } = await coalesceRefreshRead(contentRefreshContext('patients'), async () => {
+          const data = [];
+          const pageSize = 1000;
+          let error = null;
+          for (let page = 0; page < 20; page += 1) {
+            const from = page * pageSize;
+            const result = await db
+              .from('patients')
+              .select(PATIENT_SELECT_FIELDS)
+              .order('created_at', { ascending: false })
+              .range(from, from + pageSize - 1);
+            if (result.error) {
+              error = result.error;
+              break;
+            }
+            data.push(...(result.data || []));
+            if ((result.data || []).length < pageSize) break;
           }
-          data.push(...(result.data || []));
-          if ((result.data || []).length < pageSize) break;
-        }
+          return { data, error };
+        });
+        if (currentSession?.user?.id !== userId) return false;
 
         if (error) {
           console.error('Supabase Error:', error);
@@ -19879,18 +19961,20 @@
           return false;
         }
 
+        const previousPatientsSignature = patientsLoaded ? stableJsonStringify(patients) : null;
         const previouslyActivePatient = patients.find(patient => patient.id === activePatientId) || null;
         const previousActivePatientId = previouslyActivePatient?.id || null;
         const previousActiveChartSignature = patientChartRenderSignature(previouslyActivePatient);
 
         patients = data.map(normalisePatientRecord);
+        const patientsChanged = previousPatientsSignature !== stableJsonStringify(patients);
         patientsLoaded = true;
         patientDirectoryRows = patients.slice(0, PATIENT_QUERY_PAGE_SIZE);
         patientDirectoryTotal = patients.length;
         patientDirectoryLoaded = true;
 
         const appShellVisible = !document.getElementById('app-shell').classList.contains('hidden');
-        if (appShellVisible) {
+        if (patientsChanged && appShellVisible) {
           runPatientQuery();
           renderAppointmentPatientOptions();
           if (hasPageAccess('dashboard')) renderDashboard();
@@ -19966,17 +20050,19 @@
 
     async function fetchAppointmentsFromDB(options = {}) {
       const { refreshStaff = true, throwOnError = false } = options;
+      const userId = currentSession?.user?.id;
       try {
-        const appointmentsWereLoaded = appointmentsLoaded;
-        const previousAppointmentsSignature = stableJsonStringify(appointments);
         if (refreshStaff) await fetchAppointmentStaff();
-        const { data, error } = await db
+        const { data, error } = await coalesceRefreshRead(contentRefreshContext('appointments'), () => db
           .from('appointments')
           .select(APPOINTMENT_SELECT_FIELDS)
-          .order('appointment_at', { ascending: true });
+          .order('appointment_at', { ascending: true }));
+        if (currentSession?.user?.id !== userId) return false;
 
         if (error) throw error;
 
+        const appointmentsWereLoaded = appointmentsLoaded;
+        const previousAppointmentsSignature = stableJsonStringify(appointments);
         const fetchedAppointments = (data || []).map(normaliseAppointmentRecord);
         const fetchedAppointmentIds = new Set();
         appointments = fetchedAppointments.map(appointment => {
@@ -21006,9 +21092,9 @@
       const table = document.getElementById('hr-team-table');
       const tableHead = document.getElementById('hr-team-table-head');
       if (table) table.className = `w-full ${doctorDirectory ? 'min-w-[800px]' : 'min-w-[1120px]'} text-left text-xs`;
-      if (tableHead) tableHead.innerHTML = doctorDirectory
+      if (tableHead) setStableHtml(tableHead, doctorDirectory
         ? '<tr><th class="px-5 py-3.5">Team member</th><th class="px-5 py-3.5">Schedule</th><th class="px-5 py-3.5">Salary calculation</th><th class="px-5 py-3.5">Payment</th><th class="px-5 py-3.5 text-right">Actions</th></tr>'
-        : '<tr><th class="px-5 py-3.5">Team member</th><th class="px-5 py-3.5">Schedule</th><th class="px-5 py-3.5">Attendance</th><th class="px-5 py-3.5">Performance</th><th class="px-5 py-3.5">Salary calculation</th><th class="px-5 py-3.5">Payment</th><th class="px-5 py-3.5 text-right">Actions</th></tr>';
+        : '<tr><th class="px-5 py-3.5">Team member</th><th class="px-5 py-3.5">Schedule</th><th class="px-5 py-3.5">Attendance</th><th class="px-5 py-3.5">Performance</th><th class="px-5 py-3.5">Salary calculation</th><th class="px-5 py-3.5">Payment</th><th class="px-5 py-3.5 text-right">Actions</th></tr>');
       const query = String(document.getElementById('hr-team-search')?.value || '').trim().toLowerCase();
       const baseUsers = hrDirectoryUsers.filter(user => user.active && (activeHrTeamTab === 'doctors' ? user.isDoctor : !user.isDoctor));
       renderHrRoleFilters(baseUsers);
@@ -21023,7 +21109,7 @@
       document.getElementById('hr-salary-total').textContent = formatInvoiceMoney(metrics.reduce((sum, item) => sum + item.salary, 0));
       renderHrPeriodControls();
       const periodLocked = ['locked', 'paid'].includes(hrPayrollPeriod?.status);
-      tbody.innerHTML = metrics.map(item => {
+      setStableHtml(tbody, metrics.map(item => {
         const { user, settings } = item;
         const initials = user.fullName.split(/\s+/).filter(Boolean).map(part => part[0]).join('').substring(0, 2).toUpperCase() || '—';
         const attendanceClass = item.attended >= item.expected ? 'text-emerald-700' : 'text-amber-700';
@@ -21049,8 +21135,8 @@
           ? `<p class="font-black text-blue-700">${escapeHtml(formatInvoiceMoney(item.grossAmount))}</p><p class="mt-1 text-[10px] font-bold text-slate-400">Completed procedure value</p>`
           : `<p class="font-black ${item.performanceAmount >= 0 ? 'text-emerald-700' : 'text-red-600'}">${item.performanceAmount >= 0 ? '+' : '−'}${escapeHtml(formatInvoiceMoney(Math.abs(item.performanceAmount)))}</p><p class="mt-1 text-[10px] font-bold text-slate-400">${item.performanceScore == null ? 'No score' : `${item.performanceScore.toFixed(1)}% score`} · ${item.performanceRows.length} entries</p>`;
         const staffMetricColumns = user.isDoctor ? '' : `<td data-label="Attendance" class="px-5 py-4">${activityMarkup}</td><td data-label="Performance" class="px-5 py-4">${performanceMarkup}</td>`;
-        return `<tr${cardAttributes}><td data-label="Team member" class="px-5 py-4"><div class="flex min-w-0 items-center gap-3"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${user.isDoctor ? 'bg-cyan-50 text-cyan-700' : 'bg-rose-50 text-rose-700'} text-[11px] font-black">${escapeHtml(initials)}</span><div class="min-w-0"><p class="truncate font-black text-slate-800">${escapeHtml(user.fullName)}</p><p class="mt-1 text-[10px] font-bold text-slate-400">${escapeHtml(user.roleName)} · Open details</p></div></div></td><td data-label="Schedule" class="px-5 py-4"><p class="text-[11px] font-bold text-slate-600">${escapeHtml(hrScheduleLabel(settings.schedule))}</p><p class="mt-1 text-[10px] font-bold ${settings.attendanceEnabled ? 'text-rose-600' : 'text-slate-400'}">${settings.attendanceEnabled ? 'Mobile attendance enabled' : 'Attendance not configured'}</p></td>${staffMetricColumns}<td data-label="Salary calculation" class="px-5 py-4"><p class="font-black ${item.salary < 0 ? 'text-rose-600' : 'text-slate-900'}">${escapeHtml(item.salary < 0 ? `−${formatInvoiceMoney(Math.abs(item.salary))}` : formatInvoiceMoney(item.salary))}</p><p class="mt-1 text-[10px] font-bold text-slate-400">${user.isDoctor ? escapeHtml(hrDoctorCompensationSummary(user.userId)) : `${formatInvoiceMoney(item.regularAmount)} regular · ${formatInvoiceMoney(item.extraAmount)} extra${item.advanceAmount ? ` · −${formatInvoiceMoney(item.advanceAmount)} advance` : ''}`}</p></td><td data-label="Payment" class="px-5 py-4">${paymentMarkup}</td><td data-label="Actions" class="px-5 py-4 text-right">${actionMarkup}</td></tr>`;
-      }).join('') || `<tr><td colspan="${doctorDirectory ? 5 : 7}" class="px-5 py-12 text-center text-sm font-bold text-slate-400">No team members match this view.</td></tr>`;
+        return `<tr data-refresh-key="${escapeHtml(String(user.userId))}"${cardAttributes}><td data-label="Team member" class="px-5 py-4"><div class="flex min-w-0 items-center gap-3"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${user.isDoctor ? 'bg-cyan-50 text-cyan-700' : 'bg-rose-50 text-rose-700'} text-[11px] font-black">${escapeHtml(initials)}</span><div class="min-w-0"><p class="truncate font-black text-slate-800">${escapeHtml(user.fullName)}</p><p class="mt-1 text-[10px] font-bold text-slate-400">${escapeHtml(user.roleName)} · Open details</p></div></div></td><td data-label="Schedule" class="px-5 py-4"><p class="text-[11px] font-bold text-slate-600">${escapeHtml(hrScheduleLabel(settings.schedule))}</p><p class="mt-1 text-[10px] font-bold ${settings.attendanceEnabled ? 'text-rose-600' : 'text-slate-400'}">${settings.attendanceEnabled ? 'Mobile attendance enabled' : 'Attendance not configured'}</p></td>${staffMetricColumns}<td data-label="Salary calculation" class="px-5 py-4"><p class="font-black ${item.salary < 0 ? 'text-rose-600' : 'text-slate-900'}">${escapeHtml(item.salary < 0 ? `−${formatInvoiceMoney(Math.abs(item.salary))}` : formatInvoiceMoney(item.salary))}</p><p class="mt-1 text-[10px] font-bold text-slate-400">${user.isDoctor ? escapeHtml(hrDoctorCompensationSummary(user.userId)) : `${formatInvoiceMoney(item.regularAmount)} regular · ${formatInvoiceMoney(item.extraAmount)} extra${item.advanceAmount ? ` · −${formatInvoiceMoney(item.advanceAmount)} advance` : ''}`}</p></td><td data-label="Payment" class="px-5 py-4">${paymentMarkup}</td><td data-label="Actions" class="px-5 py-4 text-right">${actionMarkup}</td></tr>`;
+      }).join('') || `<tr><td colspan="${doctorDirectory ? 5 : 7}" class="px-5 py-12 text-center text-sm font-bold text-slate-400">No team members match this view.</td></tr>`);
       if (activeHrStaffDetailsId) renderHrStaffDetails();
       if (activeHrDoctorDetailsId) renderHrDoctorDetails();
       lucide.createIcons();
@@ -22390,7 +22476,7 @@
         return;
       }
 
-      tbody.innerHTML = paginatedRecords.map(record => {
+      setStableHtml(tbody, paginatedRecords.map(record => {
         const patient = record.patients || patients.find(p => p.id === record.patient_id);
         const patientName = patient?.name || 'Unknown patient';
         const patientPhone = patient?.phone || '';
@@ -22432,7 +22518,7 @@
         }
 
         return `
-          <tr class="${rowClass} transition border-b border-slate-100/80">
+          <tr data-refresh-key="${escapeHtml(String(record.id))}" class="${rowClass} transition border-b border-slate-100">
             <td class="px-4 py-3 whitespace-nowrap text-xs font-bold text-slate-700">
               ${escapeHtml(displayProcDate)}
             </td>
@@ -22488,7 +22574,7 @@
             </td>
           </tr>
         `;
-      }).join('');
+      }).join(''));
 
       translateUiTree(tbody, currentUiLanguage);
       lucide.createIcons();
@@ -23080,10 +23166,10 @@
       const visiblePatients = patientsLoaded ? filtered.slice(pageStart, pageStart + PATIENT_QUERY_PAGE_SIZE) : filtered;
       renderPatientQueryPagination(totalMatches);
 
-      tbody.innerHTML = visiblePatients.map(p => {
+      setStableHtml(tbody, visiblePatients.map(p => {
         const chartAllowed = hasPageAccess('chart');
         return `
-          <tr tabindex="0" class="cursor-pointer hover:bg-slate-50 transition" onclick="openPatientWorkspace('${p.id}', 'profile')" onkeydown="if ((event.key === 'Enter' || event.key === ' ') && event.target === this) { event.preventDefault(); openPatientWorkspace('${p.id}', 'profile'); }">
+          <tr data-refresh-key="${escapeHtml(String(p.id))}" tabindex="0" class="cursor-pointer hover:bg-slate-50 transition" onclick="openPatientWorkspace('${p.id}', 'profile')" onkeydown="if ((event.key === 'Enter' || event.key === ' ') && event.target === this) { event.preventDefault(); openPatientWorkspace('${p.id}', 'profile'); }">
             <td data-label="${currentUiLanguage === 'ar' ? 'رقم المريض' : 'Patient number'}" class="px-6 py-4">
               <span class="patient-record-number text-sm font-black text-blue-600">${escapeHtml(formatPatientNumber(p))}${p.legacyPatientId && p.legacyPatientId !== p.patientNumber ? ` · ${currentUiLanguage === 'ar' ? 'قديم' : 'Old'} #${escapeHtml(String(p.legacyPatientId))}` : ''}</span>
             </td>
@@ -23121,7 +23207,7 @@
             </td>
           </tr>
         `;
-      }).join('');
+      }).join(''));
 
       lucide.createIcons();
     }
@@ -23432,17 +23518,19 @@
     }
 
     async function fetchInvoiceRecords(filters = {}) {
-      let query = db
-        .from('patient_invoices')
-        .select(INVOICE_SELECT_FIELDS)
-        .order('invoice_date', { ascending: false })
-        .order('created_at', { ascending: false });
-      if (filters.patientId) query = query.eq('patient_id', filters.patientId);
-      if (filters.patientIds?.length) query = query.in('patient_id', filters.patientIds);
-      if (filters.invoiceDate) query = query.eq('invoice_date', filters.invoiceDate);
-      const { data, error } = await query;
-      if (error) throw error;
-      return (data || []).map(normaliseInvoiceRecord);
+      return coalesceRefreshRead(contentRefreshContext('invoices', filters), async () => {
+        let query = db
+          .from('patient_invoices')
+          .select(INVOICE_SELECT_FIELDS)
+          .order('invoice_date', { ascending: false })
+          .order('created_at', { ascending: false });
+        if (filters.patientId) query = query.eq('patient_id', filters.patientId);
+        if (filters.patientIds?.length) query = query.in('patient_id', filters.patientIds);
+        if (filters.invoiceDate) query = query.eq('invoice_date', filters.invoiceDate);
+        const { data, error } = await query;
+        if (error) throw error;
+        return (data || []).map(normaliseInvoiceRecord);
+      });
     }
 
     function financeInvoiceDateInputValue(date) {
@@ -23504,19 +23592,23 @@
       const netTotal = document.getElementById('finance-summary-net-total');
       const netCard = document.getElementById('finance-summary-net-card');
       if (!paymentTotal || !releaseTotal || !expenseTotal || !netTotal || !netCard) return;
+      const context = contentRefreshContext('finance-overview', financeUniversalQueryFilters());
+      const keepTotals = netCard.luminRefreshContext === context;
       if (options.refresh) financeOverviewLoaded = false;
       if (financeOverviewLoaded) return;
-      paymentTotal.textContent = '—';
-      releaseTotal.textContent = '—';
-      expenseTotal.textContent = '—';
-      netTotal.textContent = '—';
-      delete netCard.dataset.loss;
+      if (!keepTotals) {
+        paymentTotal.textContent = '—';
+        releaseTotal.textContent = '—';
+        expenseTotal.textContent = '—';
+        netTotal.textContent = '—';
+        delete netCard.dataset.loss;
+      }
       const requestToken = ++financeOverviewRenderToken;
-      const loadPromise = fetchFinanceOverviewSummary();
+      const loadPromise = coalesceRefreshRead(context, () => fetchFinanceOverviewSummary());
       financeOverviewLoadPromise = loadPromise;
       try {
         const summary = await loadPromise;
-        if (requestToken !== financeOverviewRenderToken) return;
+        if (requestToken !== financeOverviewRenderToken || context !== contentRefreshContext('finance-overview', financeUniversalQueryFilters())) return;
         paymentTotal.textContent = formatInvoiceMoney(summary.paymentTotal);
         releaseTotal.textContent = formatInvoiceMoney(summary.releaseTotal);
         expenseTotal.textContent = formatInvoiceMoney(summary.expenseTotal);
@@ -23527,14 +23619,17 @@
         releaseTotal.removeAttribute('title');
         expenseTotal.removeAttribute('title');
         netTotal.removeAttribute('title');
+        netCard.luminRefreshContext = context;
         financeOverviewLoaded = true;
       } catch (error) {
-        if (requestToken !== financeOverviewRenderToken) return;
+        if (requestToken !== financeOverviewRenderToken || context !== contentRefreshContext('finance-overview', financeUniversalQueryFilters())) return;
         financeOverviewLoaded = false;
-        paymentTotal.textContent = '—';
-        releaseTotal.textContent = '—';
-        expenseTotal.textContent = '—';
-        netTotal.textContent = '—';
+        if (!keepTotals) {
+          paymentTotal.textContent = '—';
+          releaseTotal.textContent = '—';
+          expenseTotal.textContent = '—';
+          netTotal.textContent = '—';
+        }
         const message = error?.message || 'Could not calculate finance totals.';
         paymentTotal.title = message;
         releaseTotal.title = message;
@@ -23698,7 +23793,7 @@
         ? `<button type="button" data-patient-id="${escapeHtml(invoice.patientId)}" onclick="openPatientInvoices(this.dataset.patientId)" class="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[11px] font-black text-violet-700 transition hover:bg-violet-100" aria-label="Open patient invoices"><i data-lucide="arrow-up-right" class="h-3.5 w-3.5"></i> View</button>`
         : '<span class="text-slate-300">—</span>';
       return `
-        <tr class="transition hover:bg-emerald-50/25">
+        <tr data-refresh-key="${escapeHtml(String(invoice.id))}" class="transition hover:bg-emerald-50/25">
           <td data-label="Invoice" class="px-5 py-4"><span class="rounded-lg bg-slate-100 px-2.5 py-1 font-mono text-[11px] font-black text-slate-700">${escapeHtml(invoiceNumber(invoice.id))}</span></td>
           <td data-label="Patient" class="px-5 py-4"><span class="block font-black text-slate-800">${escapeHtml(patientName)}</span><span class="mt-1 block text-[10px] font-bold text-slate-400">${escapeHtml(patientMeta)}</span></td>
           <td data-label="Date" class="px-5 py-4 font-bold text-slate-600">${escapeHtml(formatInvoiceDate(invoice.invoiceDate))}</td>
@@ -23737,9 +23832,9 @@
       nextButton.setAttribute('aria-label', isArabic ? 'صفحة الفواتير التالية' : 'Next invoice page');
       previousButton.innerHTML = `<i data-lucide="${isArabic ? 'chevron-right' : 'chevron-left'}" class="h-4 w-4"></i>`;
       nextButton.innerHTML = `<i data-lucide="${isArabic ? 'chevron-left' : 'chevron-right'}" class="h-4 w-4"></i>`;
-      body.innerHTML = financeInvoices.length
+      setStableHtml(body, financeInvoices.length
         ? financeInvoices.map(financeInvoiceRowMarkup).join('')
-        : '<tr><td colspan="9" class="px-5 py-14 text-center"><span class="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"><i data-lucide="search-x" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-600">No invoices match these filters.</p></td></tr>';
+        : '<tr><td colspan="9" class="px-5 py-14 text-center"><span class="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"><i data-lucide="search-x" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-600">No invoices match these filters.</p></td></tr>');
       translateUiTree(document.getElementById('view-finances'), currentUiLanguage);
       lucide.createIcons();
     }
@@ -23765,27 +23860,28 @@
       const body = document.getElementById('finance-invoices-table-body');
       const summary = document.getElementById('finance-invoice-results-summary');
       if (!body || !summary) return;
+      const context = contentRefreshContext('finance-invoices', financeInvoicePage, financeInvoicePageSize, financeInvoiceQueryFilters());
       if (options.refresh) financeInvoicesLoaded = false;
       if (!financeInvoicesLoaded) {
         const previousButton = document.getElementById('finance-invoice-previous');
         const nextButton = document.getElementById('finance-invoice-next');
         if (previousButton) previousButton.disabled = true;
         if (nextButton) nextButton.disabled = true;
-        body.innerHTML = '<tr><td colspan="9" class="px-5 py-12 text-center text-sm font-bold text-slate-400"><span class="inline-flex items-center gap-2"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Loading invoices...</span></td></tr>';
-        summary.textContent = 'Loading invoices...';
+        beginContentRefresh(body, context, '<tr><td colspan="9" class="px-5 py-12 text-center text-sm font-bold text-slate-400"><span class="inline-flex items-center gap-2"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Loading invoices...</span></td></tr>');
+        if (body.luminRefreshContext !== context) summary.textContent = 'Loading invoices...';
         lucide.createIcons();
         const requestToken = ++financeInvoiceRenderToken;
         const requestedPage = financeInvoicePage;
         const requestedPageSize = financeInvoicePageSize;
-        const loadPromise = fetchFinanceInvoiceRecords({
+        const loadPromise = coalesceRefreshRead(context, () => fetchFinanceInvoiceRecords({
           page: requestedPage,
           pageSize: requestedPageSize,
           filters: financeInvoiceQueryFilters()
-        });
+        }));
         financeInvoiceLoadPromise = loadPromise;
         try {
           const result = await loadPromise;
-          if (requestToken !== financeInvoiceRenderToken) return;
+          if (requestToken !== financeInvoiceRenderToken || context !== contentRefreshContext('finance-invoices', financeInvoicePage, financeInvoicePageSize, financeInvoiceQueryFilters())) return;
           const totalPages = Math.max(1, Math.ceil(result.totalCount / requestedPageSize));
           if (requestedPage > totalPages) {
             financeInvoicePage = totalPages;
@@ -23796,16 +23892,17 @@
           financeInvoiceTotalCount = result.totalCount;
           financeInvoicesLoaded = true;
         } catch (error) {
-          if (requestToken !== financeInvoiceRenderToken) return;
+          if (requestToken !== financeInvoiceRenderToken || context !== contentRefreshContext('finance-invoices', financeInvoicePage, financeInvoicePageSize, financeInvoiceQueryFilters())) return;
           financeInvoicesLoaded = false;
-          body.innerHTML = '<tr><td colspan="9" class="px-5 py-12 text-center text-sm font-bold text-red-600">Could not load invoices: ' + escapeHtml(error.message || 'Unknown error') + '</td></tr>';
-          summary.textContent = 'Could not load invoices.';
+          failContentRefresh(body, context, '<tr><td colspan="9" class="px-5 py-12 text-center text-sm font-bold text-red-600">Could not load invoices: ' + escapeHtml(error.message || 'Unknown error') + '</td></tr>');
+          if (body.luminRefreshContext !== context) summary.textContent = 'Could not load invoices.';
           return;
         } finally {
           if (financeInvoiceLoadPromise === loadPromise) financeInvoiceLoadPromise = null;
         }
       }
       renderFinanceInvoiceRows();
+      finishContentRefresh(body, context, body.luminRenderedHtml);
     }
 
     async function fetchFinanceDeptInvoiceRecords(filters = financeUniversalQueryFilters()) {
@@ -24068,32 +24165,34 @@
       const list = document.getElementById('finance-depts-list');
       const summary = document.getElementById('finance-depts-results-summary');
       if (!list || !summary) return;
+      const context = contentRefreshContext('finance-depts', financeUniversalQueryFilters());
       if (options.refresh) financeDeptsLoaded = false;
       if (!financeDeptsLoaded) {
-        if (!list.luminRenderedHtml) list.innerHTML = '<div class="px-5 py-12 text-center text-sm font-bold text-slate-400"><span class="inline-flex items-center gap-2"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Loading patient depts...</span></div>';
-        summary.textContent = 'Loading patient depts...';
+        beginContentRefresh(list, context, '<div class="px-5 py-12 text-center text-sm font-bold text-slate-400"><span class="inline-flex items-center gap-2"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Loading patient depts...</span></div>');
+        if (list.luminRefreshContext !== context) summary.textContent = 'Loading patient depts...';
         lucide.createIcons();
         const requestToken = ++financeDeptsRenderToken;
-        const loadPromise = fetchFinanceDeptInvoiceRecords(financeUniversalQueryFilters());
+        const filters = financeUniversalQueryFilters();
+        const loadPromise = coalesceRefreshRead(context, () => fetchFinanceDeptInvoiceRecords(filters));
         financeDeptsLoadPromise = loadPromise;
         try {
           const invoices = await loadPromise;
-          if (requestToken !== financeDeptsRenderToken) return;
+          if (requestToken !== financeDeptsRenderToken || context !== contentRefreshContext('finance-depts', financeUniversalQueryFilters())) return;
           financeDeptInvoices = invoices;
           financeDeptsLoaded = true;
         } catch (error) {
-          if (requestToken !== financeDeptsRenderToken) return;
+          if (requestToken !== financeDeptsRenderToken || context !== contentRefreshContext('finance-depts', financeUniversalQueryFilters())) return;
           financeDeptsLoaded = false;
-          delete list.luminRenderedHtml;
-          list.innerHTML = '<div class="px-5 py-12 text-center text-sm font-bold text-red-600">Could not load patient depts: ' + escapeHtml(error.message || 'Unknown error') + '</div>';
+          failContentRefresh(list, context, '<div class="px-5 py-12 text-center text-sm font-bold text-red-600">Could not load patient depts: ' + escapeHtml(error.message || 'Unknown error') + '</div>');
           refreshWhatsAppTemplatePickerAnchor();
-          summary.textContent = 'Could not load patient depts.';
+          if (list.luminRefreshContext !== context) summary.textContent = 'Could not load patient depts.';
           return;
         } finally {
           if (financeDeptsLoadPromise === loadPromise) financeDeptsLoadPromise = null;
         }
       }
       renderFinanceDeptRows();
+      finishContentRefresh(list, context, list.luminRenderedHtml);
     }
 
     function normaliseFinancePaymentRecord(record) {
@@ -24186,7 +24285,7 @@
         ? `<button type="button" data-patient-id="${escapeHtml(payment.patientId)}" onclick="openPatientInvoices(this.dataset.patientId)" class="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[11px] font-black text-violet-700 transition hover:bg-violet-100" aria-label="Open patient invoices"><i data-lucide="arrow-up-right" class="h-3.5 w-3.5"></i> View</button>`
         : '<span class="text-slate-300">—</span>';
       return `
-        <tr class="transition hover:bg-emerald-50/25">
+        <tr data-refresh-key="${escapeHtml(String(payment.id))}" class="transition hover:bg-emerald-50/25">
           <td data-label="Payment" class="px-5 py-4"><span class="rounded-lg bg-emerald-50 px-2.5 py-1 font-mono text-[11px] font-black text-emerald-700">${escapeHtml(financePaymentNumber(payment.id))}</span></td>
           <td data-label="Invoice" class="px-5 py-4"><span class="rounded-lg bg-slate-100 px-2.5 py-1 font-mono text-[11px] font-black text-slate-700">${escapeHtml(invoiceNumber(payment.invoiceId))}</span></td>
           <td data-label="Patient" class="px-5 py-4"><span class="block font-black text-slate-800">${escapeHtml(patientName)}</span><span class="mt-1 block text-[10px] font-bold text-slate-400">${escapeHtml(patientMeta)}</span></td>
@@ -24224,9 +24323,9 @@
       nextButton.setAttribute('aria-label', isArabic ? 'صفحة المدفوعات التالية' : 'Next payment page');
       previousButton.innerHTML = `<i data-lucide="${isArabic ? 'chevron-right' : 'chevron-left'}" class="h-4 w-4"></i>`;
       nextButton.innerHTML = `<i data-lucide="${isArabic ? 'chevron-left' : 'chevron-right'}" class="h-4 w-4"></i>`;
-      body.innerHTML = financePayments.length
+      setStableHtml(body, financePayments.length
         ? financePayments.map(financePaymentRowMarkup).join('')
-        : '<tr><td colspan="7" class="px-5 py-14 text-center"><span class="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"><i data-lucide="search-x" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-600">No payments match these filters.</p></td></tr>';
+        : '<tr><td colspan="7" class="px-5 py-14 text-center"><span class="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"><i data-lucide="search-x" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-600">No payments match these filters.</p></td></tr>');
       translateUiTree(document.getElementById('view-finances'), currentUiLanguage);
       lucide.createIcons();
     }
@@ -24256,27 +24355,28 @@
       const body = document.getElementById('finance-payments-table-body');
       const summary = document.getElementById('finance-payment-results-summary');
       if (!body || !summary) return;
+      const context = contentRefreshContext('finance-payments', financePaymentPage, financePaymentPageSize, financePaymentQueryFilters());
       if (options.refresh) financePaymentsLoaded = false;
       if (!financePaymentsLoaded) {
         const previousButton = document.getElementById('finance-payment-previous');
         const nextButton = document.getElementById('finance-payment-next');
         if (previousButton) previousButton.disabled = true;
         if (nextButton) nextButton.disabled = true;
-        body.innerHTML = '<tr><td colspan="7" class="px-5 py-12 text-center text-sm font-bold text-slate-400"><span class="inline-flex items-center gap-2"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Loading payments...</span></td></tr>';
-        summary.textContent = 'Loading payments...';
+        beginContentRefresh(body, context, '<tr><td colspan="7" class="px-5 py-12 text-center text-sm font-bold text-slate-400"><span class="inline-flex items-center gap-2"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Loading payments...</span></td></tr>');
+        if (body.luminRefreshContext !== context) summary.textContent = 'Loading payments...';
         lucide.createIcons();
         const requestToken = ++financePaymentRenderToken;
         const requestedPage = financePaymentPage;
         const requestedPageSize = financePaymentPageSize;
-        const loadPromise = fetchFinancePaymentRecords({
+        const loadPromise = coalesceRefreshRead(context, () => fetchFinancePaymentRecords({
           page: requestedPage,
           pageSize: requestedPageSize,
           filters: financePaymentQueryFilters()
-        });
+        }));
         financePaymentLoadPromise = loadPromise;
         try {
           const result = await loadPromise;
-          if (requestToken !== financePaymentRenderToken) return;
+          if (requestToken !== financePaymentRenderToken || context !== contentRefreshContext('finance-payments', financePaymentPage, financePaymentPageSize, financePaymentQueryFilters())) return;
           const totalPages = Math.max(1, Math.ceil(result.totalCount / requestedPageSize));
           if (requestedPage > totalPages) {
             financePaymentPage = totalPages;
@@ -24287,16 +24387,17 @@
           financePaymentTotalCount = result.totalCount;
           financePaymentsLoaded = true;
         } catch (error) {
-          if (requestToken !== financePaymentRenderToken) return;
+          if (requestToken !== financePaymentRenderToken || context !== contentRefreshContext('finance-payments', financePaymentPage, financePaymentPageSize, financePaymentQueryFilters())) return;
           financePaymentsLoaded = false;
-          body.innerHTML = '<tr><td colspan="7" class="px-5 py-12 text-center text-sm font-bold text-red-600">Could not load payments: ' + escapeHtml(error.message || 'Unknown error') + '</td></tr>';
-          summary.textContent = 'Could not load payments.';
+          failContentRefresh(body, context, '<tr><td colspan="7" class="px-5 py-12 text-center text-sm font-bold text-red-600">Could not load payments: ' + escapeHtml(error.message || 'Unknown error') + '</td></tr>');
+          if (body.luminRefreshContext !== context) summary.textContent = 'Could not load payments.';
           return;
         } finally {
           if (financePaymentLoadPromise === loadPromise) financePaymentLoadPromise = null;
         }
       }
       renderFinancePaymentRows();
+      finishContentRefresh(body, context, body.luminRenderedHtml);
     }
 
     function normaliseExpenseRecord(record) {
@@ -24403,7 +24504,7 @@
       const deleteLabel = `${isArabic ? 'حذف المصروف' : 'Delete expense'}: ${expense.name}`;
       const actionButtons = `<span class="finance-expense-actions"><button type="button" onclick="openExpenseModal('${escapeHtml(expense.id)}')" class="finance-expense-action finance-expense-edit" aria-label="${escapeHtml(editLabel)}" title="${escapeHtml(editLabel)}"><i data-lucide="pencil"></i></button><button type="button" onclick="deleteFinanceExpense('${escapeHtml(expense.id)}', this)" class="finance-expense-action finance-expense-delete" aria-label="${escapeHtml(deleteLabel)}" title="${escapeHtml(deleteLabel)}" ${expense.linkedSalary && !canModifyHr() ? 'disabled' : ''}><i data-lucide="trash-2"></i></button></span>`;
       return `
-        <tr class="transition hover:bg-emerald-50/25">
+        <tr data-refresh-key="${escapeHtml(String(expense.id))}" class="transition hover:bg-emerald-50/25">
           <td data-label="${isArabic ? 'المصروف' : 'Expense'}" class="px-5 py-4"><span class="block font-black text-slate-800">${escapeHtml(expense.name)}</span><span class="mt-1 block font-mono text-[9px] font-bold uppercase tracking-wider text-slate-400">${escapeHtml(String(expense.id).slice(0, 8))} · ${isArabic ? 'الكمية' : 'Qty'} ${escapeHtml(quantityLabel)}</span></td>
           <td data-label="${isArabic ? 'النوع' : 'Type'}" class="px-5 py-4"><span class="inline-flex rounded-lg px-2.5 py-1 text-[10px] font-black" style="background-color:${typeColor}12;color:${typeColor}">${escapeHtml(typeName)}</span></td>
           <td data-label="${isArabic ? 'التاريخ' : 'Date'}" class="px-5 py-4 font-bold text-slate-600">${escapeHtml(formatInvoiceDate(expense.expenseDate))}</td>
@@ -24477,7 +24578,7 @@
       summary.textContent = currentUiLanguage === 'ar'
         ? `عرض ${filtered.length} من ${financeExpenses.length} مصروف · المصروف المدفوع ${formatInvoiceMoney(paidTotal)} · المتبقي ${formatInvoiceMoney(remainingTotal)}`
         : `Showing ${filtered.length} of ${financeExpenses.length} expenses · Paid expenses ${formatInvoiceMoney(paidTotal)} · Outstanding ${formatInvoiceMoney(remainingTotal)}`;
-      body.innerHTML = filtered.length ? filtered.map(financeExpenseRowMarkup).join('') : '<tr><td colspan="8" class="px-5 py-14 text-center"><span class="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"><i data-lucide="search-x" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-600">No expenses match these filters.</p></td></tr>';
+      setStableHtml(body, filtered.length ? filtered.map(financeExpenseRowMarkup).join('') : '<tr><td colspan="8" class="px-5 py-14 text-center"><span class="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"><i data-lucide="search-x" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-600">No expenses match these filters.</p></td></tr>');
       translateUiTree(document.getElementById('view-finances'), currentUiLanguage);
       lucide.createIcons();
     }
@@ -24487,27 +24588,33 @@
       const body = document.getElementById('finance-expenses-table-body');
       const summary = document.getElementById('finance-expense-results-summary');
       if (!body || !summary) return;
+      const context = contentRefreshContext('finance-expenses', canModifyHr());
+      const requestToken = ++financeExpenseRenderToken;
       if (options.refresh) financeExpensesLoaded = false;
       await ensureExpenseTypesLoaded();
       if (!financeExpensesLoaded) {
-        body.innerHTML = '<tr><td colspan="8" class="px-5 py-12 text-center text-sm font-bold text-slate-400"><span class="inline-flex items-center gap-2"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Loading expenses...</span></td></tr>';
-        summary.textContent = 'Loading expenses...';
+        beginContentRefresh(body, context, '<tr><td colspan="8" class="px-5 py-12 text-center text-sm font-bold text-slate-400"><span class="inline-flex items-center gap-2"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Loading expenses...</span></td></tr>');
+        if (body.luminRefreshContext !== context) summary.textContent = 'Loading expenses...';
         lucide.createIcons();
-        const loadPromise = financeExpenseLoadPromise || fetchFinanceExpenseRecords();
+        const loadPromise = coalesceRefreshRead(context, () => fetchFinanceExpenseRecords());
         financeExpenseLoadPromise = loadPromise;
         try {
-          financeExpenses = await loadPromise;
+          const result = await loadPromise;
+          if (requestToken !== financeExpenseRenderToken || context !== contentRefreshContext('finance-expenses', canModifyHr())) return;
+          financeExpenses = result;
           financeExpensesLoaded = true;
         } catch (error) {
+          if (requestToken !== financeExpenseRenderToken || context !== contentRefreshContext('finance-expenses', canModifyHr())) return;
           financeExpensesLoaded = false;
-          body.innerHTML = '<tr><td colspan="8" class="px-5 py-12 text-center text-sm font-bold text-red-600">Could not load expenses: ' + escapeHtml(error.message || 'Unknown error') + '</td></tr>';
-          summary.textContent = 'Could not load expenses.';
+          failContentRefresh(body, context, '<tr><td colspan="8" class="px-5 py-12 text-center text-sm font-bold text-red-600">Could not load expenses: ' + escapeHtml(error.message || 'Unknown error') + '</td></tr>');
+          if (body.luminRefreshContext !== context) summary.textContent = 'Could not load expenses.';
           return;
         } finally {
           if (financeExpenseLoadPromise === loadPromise) financeExpenseLoadPromise = null;
         }
       }
       renderFinanceExpenseRows();
+      finishContentRefresh(body, context, body.luminRenderedHtml);
     }
 
     async function switchFinanceTab(tabName) {
@@ -25702,7 +25809,7 @@
       const deleteInvoiceButton = canDeleteInvoice
         ? '<button type="button" onclick="deletePatientInvoice(' + invoice.id + ')" title="Delete invoice" aria-label="Delete invoice" class="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-rose-50 px-3 text-xs font-black text-rose-700 transition-all duration-150 ease-out hover:bg-rose-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20"><i data-lucide="trash-2" class="h-4 w-4"></i> Delete</button>'
         : '';
-      return '<article class="overflow-hidden rounded-2xl border transition ' + (complete ? 'border-emerald-200 bg-emerald-50/40 shadow-sm shadow-emerald-900/5' : 'border-slate-200 bg-white hover:border-violet-200') + '">'
+      return '<article data-refresh-key="' + escapeHtml(String(invoice.id)) + '" class="overflow-hidden rounded-2xl border transition ' + (complete ? 'border-emerald-200 bg-emerald-50/40 shadow-sm shadow-emerald-900/5' : 'border-slate-200 bg-white hover:border-violet-200') + '">'
         + '<div class="flex flex-col gap-3 border-b border-slate-100 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><div class="flex flex-wrap items-center gap-2"><span class="font-mono text-[11px] font-black text-slate-700">' + escapeHtml(invoiceNumber(invoice.id)) + '</span><span class="text-[10px] font-bold text-slate-400">' + escapeHtml(formatInvoiceDate(invoice.invoiceDate)) + '</span><span class="rounded-lg border px-2.5 py-1 text-[10px] font-black ' + status.className + '">' + escapeHtml(status.label) + '</span>' + (invoice.releasedAmount > 0 ? '<span class="text-[10px] font-black text-rose-600">' + escapeHtml(formatInvoiceMoney(invoice.releasedAmount)) + ' released</span>' : '') + '</div><div class="flex flex-wrap gap-2">' + discountButton + payButton + releaseButton + undoReleaseButton + deleteInvoiceButton + '</div></div>'
         + '<div class="flex flex-wrap items-center justify-between gap-2 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-700"><span>' + (currentUiLanguage === 'ar' ? 'إجمالي المريض' : 'Patient total') + ': <strong class="text-slate-900">' + escapeHtml(formatInvoiceMoney(total)) + '</strong></span><span>' + (currentUiLanguage === 'ar' ? 'المتبقي' : 'Remaining') + ': <strong class="text-amber-700">' + escapeHtml(formatInvoiceMoney(remaining)) + '</strong></span></div>'
         + ((invoice.loyaltyDiscount > 0 || invoice.manualDiscount > 0) ? '<div class="flex flex-wrap gap-2 px-4 py-2">' + invoiceLoyaltyBadge(invoice) + invoiceManualDiscountBadge(invoice) + '</div>' : '')
@@ -25711,6 +25818,7 @@
 
     async function renderPatientInvoices() {
       const renderToken = ++patientInvoiceRenderToken;
+      const userId = currentSession?.user?.id;
       let patient = getKnownPatient(activeInvoicePatientId);
       if (!patient && activeInvoicePatientId) {
         patient = await ensureKnownPatient(activeInvoicePatientId);
@@ -25724,15 +25832,16 @@
 
       activeWorkspacePatientId = patient.id;
       updatePatientWorkspaceNavigation(patient, 'invoices');
-      list.innerHTML = '<div class="p-10 text-center text-sm font-bold text-slate-400"><span class="inline-flex items-center gap-2"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Loading invoices...</span></div>';
+      const context = contentRefreshContext('patient-invoices', patient.id);
+      beginContentRefresh(list, context, '<div class="p-10 text-center text-sm font-bold text-slate-400"><span class="inline-flex items-center gap-2"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Loading invoices...</span></div>');
       lucide.createIcons();
 
       try {
         const [invoices, salaryTransfers] = await Promise.all([
           fetchInvoiceRecords({ patientId: patient.id }),
-          fetchPatientDoctorSalaryTransfers(patient.id)
+          coalesceRefreshRead(contentRefreshContext('salary-transfers', patient.id), () => fetchPatientDoctorSalaryTransfers(patient.id))
         ]);
-        if (renderToken !== patientInvoiceRenderToken || activeInvoicePatientId !== patient.id) return;
+        if (renderToken !== patientInvoiceRenderToken || activeInvoicePatientId !== patient.id || currentSession?.user?.id !== userId) return;
         invoices.forEach(invoice => invoice.items.forEach(item => {
           item.salaryTransfer = salaryTransfers.get(Number(item.id)) || null;
           item.doctorName = item.salaryTransfer?.doctor_name || item.doctorName;
@@ -25746,14 +25855,14 @@
         document.getElementById('patient-invoice-released').textContent = formatInvoiceMoney(released);
         document.getElementById('patient-invoice-remaining').textContent = formatInvoiceMoney(Math.max(0, total - paid - released));
         document.getElementById('patient-invoice-count').textContent = String(invoicedProcedureCount);
-        list.innerHTML = invoices.length
+        finishContentRefresh(list, context, invoices.length
           ? invoices.map(invoice => invoiceCardMarkup(invoice)).join('')
-          : '<div class="px-6 py-14 text-center"><span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-400"><i data-lucide="receipt-text" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-700">No invoices for this patient yet.</p><p class="mt-1 text-xs text-slate-400">A doctor can add a priced operation from the dental chart.</p></div>';
+          : '<div class="px-6 py-14 text-center"><span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-400"><i data-lucide="receipt-text" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-700">No invoices for this patient yet.</p><p class="mt-1 text-xs text-slate-400">A doctor can add a priced operation from the dental chart.</p></div>');
         translateUiTree(document.getElementById('view-invoices'), currentUiLanguage);
         lucide.createIcons();
       } catch (error) {
-        if (renderToken !== patientInvoiceRenderToken) return;
-        list.innerHTML = '<div class="p-10 text-center text-sm font-bold text-red-600">Could not load invoices: ' + escapeHtml(error.message || 'Unknown error') + '</div>';
+        if (renderToken !== patientInvoiceRenderToken || currentSession?.user?.id !== userId) return;
+        failContentRefresh(list, context, '<div class="p-10 text-center text-sm font-bold text-red-600">Could not load invoices: ' + escapeHtml(error.message || 'Unknown error') + '</div>');
       }
     }
 
@@ -25812,28 +25921,30 @@
     }
 
     async function fetchPatientPayments(patientId) {
-      const { data, error } = await db
-        .from('invoice_payments')
-        .select('id, invoice_id, patient_id, payment_method_id, payment_method_name, amount, payment_date, created_by, created_at, invoice_payment_allocations(invoice_item_id, amount)')
-        .eq('patient_id', patientId)
-        .order('payment_date', { ascending: false })
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return (data || []).map(payment => ({
-        id: payment.id,
-        invoiceId: payment.invoice_id,
-        patientId: payment.patient_id,
-        paymentMethodId: payment.payment_method_id,
-        paymentMethodName: payment.payment_method_name || 'Payment',
-        amount: Math.max(0, Number(payment.amount) || 0),
-        paymentDate: payment.payment_date,
-        createdBy: payment.created_by,
-        createdAt: payment.created_at,
-        allocations: (payment.invoice_payment_allocations || []).map(allocation => ({
-          invoiceItemId: Number(allocation.invoice_item_id),
-          amount: Math.max(0, Number(allocation.amount) || 0)
-        }))
-      }));
+      return coalesceRefreshRead(contentRefreshContext('patient-payments', patientId), async () => {
+        const { data, error } = await db
+          .from('invoice_payments')
+          .select('id, invoice_id, patient_id, payment_method_id, payment_method_name, amount, payment_date, created_by, created_at, invoice_payment_allocations(invoice_item_id, amount)')
+          .eq('patient_id', patientId)
+          .order('payment_date', { ascending: false })
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map(payment => ({
+          id: payment.id,
+          invoiceId: payment.invoice_id,
+          patientId: payment.patient_id,
+          paymentMethodId: payment.payment_method_id,
+          paymentMethodName: payment.payment_method_name || 'Payment',
+          amount: Math.max(0, Number(payment.amount) || 0),
+          paymentDate: payment.payment_date,
+          createdBy: payment.created_by,
+          createdAt: payment.created_at,
+          allocations: (payment.invoice_payment_allocations || []).map(allocation => ({
+            invoiceItemId: Number(allocation.invoice_item_id),
+            amount: Math.max(0, Number(allocation.amount) || 0)
+          }))
+        }));
+      });
     }
 
     function paymentHistoryCardMarkup(payment, focus = null) {
@@ -25845,13 +25956,14 @@
           ? `${formatInvoiceMoney(appliedAmount)} من هذه الدفعة يغطي الإجراء. حذف الدفعة يلغي قيمتها الكاملة ${formatInvoiceMoney(payment.amount)}.`
           : `${formatInvoiceMoney(appliedAmount)} of this payment covers the procedure. Deleting it reverses the full ${formatInvoiceMoney(payment.amount)} payment.`) + '</p>'
         : '';
-      return '<article class="flex flex-col gap-4 p-4 transition hover:bg-emerald-50/30 sm:flex-row sm:items-center sm:justify-between sm:p-5">'
+      return '<article data-refresh-key="' + escapeHtml(String(payment.id)) + '" class="flex flex-col gap-4 p-4 transition hover:bg-emerald-50/30 sm:flex-row sm:items-center sm:justify-between sm:p-5">'
         + '<div class="flex min-w-0 items-center gap-3"><span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700"><i data-lucide="badge-dollar-sign" class="h-5 w-5"></i></span><div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><h4 class="text-base font-black text-emerald-700">' + escapeHtml(formatInvoiceMoney(payment.amount)) + '</h4><span class="rounded-lg bg-amber-100 px-2.5 py-1 text-[10px] font-black text-amber-800">' + escapeHtml(payment.paymentMethodName) + '</span></div><p class="mt-1 text-xs font-bold text-slate-500">' + escapeHtml(formatInvoiceDate(payment.paymentDate)) + ' · ' + escapeHtml(invoiceNumber(payment.invoiceId)) + '</p>' + linkedDetail + '</div></div>'
         + '<div class="flex shrink-0 flex-wrap items-center gap-2"><button type="button" onclick="openPatientInvoices(\'' + payment.patientId + '\')" class="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-violet-50 px-3 text-xs font-semibold text-violet-700 transition-all duration-150 ease-out hover:bg-violet-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20"><i data-lucide="receipt-text" class="h-4 w-4"></i> View invoice</button><button type="button" onclick="deleteInvoicePayment(' + payment.id + ', ' + payment.invoiceId + ', ' + Number(payment.amount) + ')" class="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-rose-50 px-3 text-xs font-semibold text-rose-700 transition-all duration-150 ease-out hover:bg-rose-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20"><i data-lucide="trash-2" class="h-4 w-4"></i> Delete payment</button></div></article>';
     }
 
     async function renderPatientPayments() {
       const renderToken = ++patientPaymentsRenderToken;
+      const userId = currentSession?.user?.id;
       const patientId = patientWorkspaceId();
       let patient = getKnownPatient(patientId);
       if (!patient && patientId) {
@@ -25866,11 +25978,12 @@
       activeWorkspacePatientId = patient.id;
       activeInvoicePatientId = patient.id;
       updatePatientWorkspaceNavigation(patient, 'payments');
-      list.innerHTML = '<div class="p-10 text-center text-sm font-bold text-slate-400"><span class="inline-flex items-center gap-2"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Loading payments...</span></div>';
+      const context = contentRefreshContext('patient-payments', patient.id, patientPaymentFocus);
+      beginContentRefresh(list, context, '<div class="p-10 text-center text-sm font-bold text-slate-400"><span class="inline-flex items-center gap-2"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Loading payments...</span></div>');
       lucide.createIcons();
       try {
         const payments = await fetchPatientPayments(patient.id);
-        if (renderToken !== patientPaymentsRenderToken || activeWorkspacePatientId !== patient.id) return;
+        if (renderToken !== patientPaymentsRenderToken || activeWorkspacePatientId !== patient.id || currentSession?.user?.id !== userId) return;
         const focus = patientPaymentFocus?.patientId === patient.id ? patientPaymentFocus : null;
         const visiblePayments = focus ? payments.filter(payment => Number(payment.invoiceId) === focus.invoiceId
           && payment.allocations.some(allocation => allocation.invoiceItemId === focus.itemId && allocation.amount > 0)) : payments;
@@ -25883,14 +25996,14 @@
         document.getElementById('patient-payment-total').textContent = formatInvoiceMoney(payments.reduce((sum, payment) => sum + payment.amount, 0));
         document.getElementById('patient-payment-count').textContent = String(payments.length);
         document.getElementById('patient-payment-latest').textContent = payments.length ? formatInvoiceDate(payments[0].paymentDate) : '—';
-        list.innerHTML = focusBanner + (visiblePayments.length
+        finishContentRefresh(list, context, focusBanner + (visiblePayments.length
           ? visiblePayments.map(payment => paymentHistoryCardMarkup(payment, focus)).join('')
-          : '<div class="px-6 py-14 text-center"><span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-500"><i data-lucide="wallet-cards" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-700">' + escapeHtml(emptyMessage) + '</p></div>');
+          : '<div class="px-6 py-14 text-center"><span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-500"><i data-lucide="wallet-cards" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-700">' + escapeHtml(emptyMessage) + '</p></div>'));
         translateUiTree(document.getElementById('view-payments'), currentUiLanguage);
         lucide.createIcons();
       } catch (error) {
-        if (renderToken !== patientPaymentsRenderToken) return;
-        list.innerHTML = '<div class="p-10 text-center text-sm font-bold text-red-600">Could not load payments: ' + escapeHtml(error.message || 'Unknown error') + '</div>';
+        if (renderToken !== patientPaymentsRenderToken || currentSession?.user?.id !== userId) return;
+        failContentRefresh(list, context, '<div class="p-10 text-center text-sm font-bold text-red-600">Could not load payments: ' + escapeHtml(error.message || 'Unknown error') + '</div>');
       }
     }
 
@@ -33565,9 +33678,33 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
 
     // Keep existing nodes (and native open selects) when a background read is unchanged.
     function setStableHtml(element, markup) {
-      if (element.luminRenderedHtml === markup) return false;
-      element.innerHTML = markup;
+      if (element.luminRenderedHtml === markup && element.luminRenderedFirstChild === element.firstElementChild) return false;
+      // Keep unaffected cards/rows and their focused controls when one record changes.
+      if (markup.includes('data-refresh-key=')) {
+        const template = document.createElement('template');
+        template.innerHTML = markup;
+        const incoming = Array.from(template.content.children);
+        const keys = incoming.map(node => node.getAttribute('data-refresh-key'));
+        if (keys.every(Boolean) && new Set(keys).size === keys.length) {
+          const active = document.activeElement;
+          const scrollTop = element.scrollTop;
+          const existing = new Map(Array.from(element.children).map(node => [node.getAttribute('data-refresh-key'), node]));
+          const retained = new Set();
+          incoming.forEach((node, index) => {
+            const raw = node.outerHTML;
+            const previous = existing.get(keys[index]);
+            const next = previous?.luminRenderedHtml === raw ? previous : node;
+            next.luminRenderedHtml = raw;
+            retained.add(next);
+            if (element.children[index] !== next) element.insertBefore(next, element.children[index] || null);
+          });
+          Array.from(element.children).forEach(node => { if (!retained.has(node)) node.remove(); });
+          element.scrollTop = scrollTop;
+          if (active?.isConnected && document.activeElement !== active) active.focus({ preventScroll: true });
+        } else element.innerHTML = markup;
+      } else element.innerHTML = markup;
       element.luminRenderedHtml = markup;
+      element.luminRenderedFirstChild = element.firstElementChild;
       return true;
     }
 
@@ -34536,7 +34673,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       const percent = invoicePaymentPercent(invoice);
       const status = invoiceDisplayStatus(invoice);
       const procedureNames = [...new Set(invoice.items.map(item => item.operationName))];
-      return '<article class="p-4 transition hover:bg-slate-50/70 sm:p-5">'
+      return '<article data-refresh-key="' + escapeHtml(String(invoice.id)) + '" class="p-4 transition hover:bg-slate-50/70 sm:p-5">'
         + '<div class="flex items-start justify-between gap-3"><div class="min-w-0"><button type="button" onclick="openPatientInvoices(\'' + invoice.patientId + '\')" class="truncate text-left text-sm font-black text-blue-700 transition hover:text-blue-900">' + escapeHtml(patientName) + '</button><p class="mt-1 text-[10px] font-bold text-slate-400">' + escapeHtml(invoiceNumber(invoice.id)) + ' · ' + invoice.items.length + ' item' + (invoice.items.length === 1 ? '' : 's') + '</p></div>'
         + '<div class="flex flex-wrap items-center justify-end gap-2">' + invoicePaymentIndicatorMarkup(invoice) + '<span class="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-700">' + percent + '% paid</span>' + (invoice.releasedAmount > 0 ? '<span class="rounded-lg border px-2.5 py-1 text-[10px] font-black ' + status.className + '">' + escapeHtml(status.label) + '</span>' : '') + '</div></div>'
         + invoiceLoyaltyBadge(invoice)
@@ -34558,11 +34695,13 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       const promise = fetchInvoiceRecords({ patientIds })
         .then(invoices => invoices.filter(invoice => invoice.status !== 'cancelled' && invoiceRemaining(invoice) > 0))
         .then(invoices => {
-          dashboardInvoiceCache.set(cacheKey, { data: invoices, expiresAt: Date.now() + DASHBOARD_INVOICE_CACHE_TTL, promise: null });
+          if (dashboardInvoiceCache.get(cacheKey)?.promise === promise) {
+            dashboardInvoiceCache.set(cacheKey, { data: invoices, expiresAt: Date.now() + DASHBOARD_INVOICE_CACHE_TTL, promise: null });
+          }
           return invoices;
         })
         .catch(error => {
-          dashboardInvoiceCache.delete(cacheKey);
+          if (dashboardInvoiceCache.get(cacheKey)?.promise === promise) dashboardInvoiceCache.delete(cacheKey);
           throw error;
         });
       dashboardInvoiceCache.set(cacheKey, { data: null, expiresAt: 0, promise });
@@ -34572,6 +34711,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     async function renderDashboardInvoices(entries) {
       if (!canViewDashboardInvoices()) return;
       const renderToken = ++dashboardInvoiceRenderToken;
+      const userId = currentSession?.user?.id;
       const list = document.getElementById('dashboard-invoices-list');
       const invoiceDate = document.getElementById('dashboard-invoice-date');
       const invoiceCount = document.getElementById('dashboard-invoice-count');
@@ -34581,27 +34721,28 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       invoiceDate.textContent = appointmentDayFormatter.format(dashboardSelectedDate);
       const patientIds = [...new Set(entries.map(entry => entry.patientId).filter(Boolean))];
       const scheduledPatientNames = new Map(entries.map(entry => [entry.patientId, entry.patient]));
-      invoiceCount.textContent = '0 invoices';
+      const context = contentRefreshContext('dashboard-invoices', dateKey, patientIds.slice().sort());
+      if (list.luminRefreshContext !== context) invoiceCount.textContent = '0 invoices';
+      beginContentRefresh(list, context, '<div class="p-10 text-center text-sm font-bold text-slate-400"><span class="inline-flex items-center gap-2"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Loading invoices...</span></div>');
       if (!patientIds.length) {
-        list.innerHTML = '<div class="px-6 py-14 text-center"><span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"><i data-lucide="receipt-text" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-700">No scheduled-patient invoices.</p><p class="mt-1 text-xs text-slate-400">Invoices for patients in this day’s schedule will appear here.</p></div>';
+        finishContentRefresh(list, context, '<div class="px-6 py-14 text-center"><span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"><i data-lucide="receipt-text" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-700">No scheduled-patient invoices.</p><p class="mt-1 text-xs text-slate-400">Invoices for patients in this day’s schedule will appear here.</p></div>');
         lucide.createIcons();
         return;
       }
 
-      list.innerHTML = '<div class="p-10 text-center text-sm font-bold text-slate-400"><span class="inline-flex items-center gap-2"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Loading invoices...</span></div>';
       lucide.createIcons();
       try {
         const invoices = await loadDashboardInvoiceRecords(dateKey, patientIds);
-        if (renderToken !== dashboardInvoiceRenderToken || dateKey !== appointmentDateKey(dashboardSelectedDate)) return;
+        if (renderToken !== dashboardInvoiceRenderToken || dateKey !== appointmentDateKey(dashboardSelectedDate) || currentSession?.user?.id !== userId || !canViewDashboardInvoices()) return;
         invoiceCount.textContent = invoices.length + ' invoice' + (invoices.length === 1 ? '' : 's');
-        list.innerHTML = invoices.length
+        finishContentRefresh(list, context, invoices.length
           ? invoices.map(invoice => dashboardInvoiceCardMarkup(invoice, scheduledPatientNames)).join('')
-          : '<div class="px-6 py-14 text-center"><span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-400"><i data-lucide="receipt-text" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-700">No invoices for scheduled patients.</p><p class="mt-1 text-xs text-slate-400">Priced chart operations added by a doctor will appear here instantly.</p></div>';
+          : '<div class="px-6 py-14 text-center"><span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-400"><i data-lucide="receipt-text" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-700">No invoices for scheduled patients.</p><p class="mt-1 text-xs text-slate-400">Priced chart operations added by a doctor will appear here instantly.</p></div>');
         translateUiTree(document.getElementById('view-dashboard'), currentUiLanguage);
         lucide.createIcons();
       } catch (error) {
-        if (renderToken !== dashboardInvoiceRenderToken) return;
-        list.innerHTML = '<div class="p-10 text-center text-sm font-bold text-red-600">Could not load invoices: ' + escapeHtml(error.message || 'Unknown error') + '</div>';
+        if (renderToken !== dashboardInvoiceRenderToken || currentSession?.user?.id !== userId || !canViewDashboardInvoices()) return;
+        failContentRefresh(list, context, '<div class="p-10 text-center text-sm font-bold text-red-600">Could not load invoices: ' + escapeHtml(error.message || 'Unknown error') + '</div>');
       }
     }
 

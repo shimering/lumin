@@ -13,8 +13,8 @@ function functionSource(name) {
 const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const expense = {id:'fixture',name:'Water <&> bill',total:120,paidAmount:120,quantity:1,expenseDate:'2026-09-26',type:{name:'Utilities',color:'#2563eb'},confirmed:true,description:'Private supplier details'};
 function context(extra = {}) {
-  const ctx = vm.createContext({currentUiLanguage:'en',hasPageAccess:()=>true,canModifyHr:()=>true,expenseTypes:[],escapeHtml,formatInvoiceMoney:n=>`EGP ${n}`,formatInvoiceDate:d=>d,...extra});
-  for (const name of ['expenseRemaining','expensePaymentPercent','expensePaymentIndicatorMarkup','financeExpenseRowMarkup','renderFinanceOverview','deleteFinanceExpense']) vm.runInContext(functionSource(name),ctx);
+  const ctx = vm.createContext({currentSession:{user:{id:'fixture'}},currentUiLanguage:'en',coalescedRefreshReads:new Map(),stableJsonStringify:JSON.stringify,financeUniversalQueryFilters:()=>({}),hasPageAccess:()=>true,canModifyHr:()=>true,expenseTypes:[],escapeHtml,formatInvoiceMoney:n=>`EGP ${n}`,formatInvoiceDate:d=>d,...extra});
+  for (const name of ['contentRefreshContext','coalesceRefreshRead','expenseRemaining','expensePaymentPercent','expensePaymentIndicatorMarkup','financeExpenseRowMarkup','renderFinanceOverview','deleteFinanceExpense']) vm.runInContext(functionSource(name),ctx);
   return ctx;
 }
 test('Every expense has accessible icon-only edit and delete actions in eight columns', () => {
@@ -42,9 +42,9 @@ test('Net profit uses filtered payments minus paid expenses, ignoring releases a
   assert.equal(nodes['finance-summary-net-card'].dataset.loss,'true');
   ctx.fetchFinanceOverviewSummary = async()=>{throw Error('Offline');};
   await ctx.renderFinanceOverview({refresh:true});
-  assert.equal(nodes['finance-summary-net-total'].textContent,'—');
+  assert.equal(nodes['finance-summary-net-total'].textContent,'EGP -75.25');
   assert.equal(nodes['finance-summary-net-total'].title,'Offline');
-  assert.equal(nodes['finance-summary-net-card'].dataset.loss,undefined);
+  assert.equal(nodes['finance-summary-net-card'].dataset.loss,'true');
 });
 test('Expense deletion requires confirmation, refreshes totals, and recovers from errors', async () => {
   const calls=[],errors=[];

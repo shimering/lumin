@@ -260,20 +260,20 @@ function filterPatientProcedureRecords(records, filters) {
 }
 
 async function loadPatientProcedureRecords(state) {
-  if (!state.loadPromise) {
-    state.loadPromise = (async () => {
-      const [patientRows, invoiceRows] = await Promise.all([
-        fetchPatientProcedurePages('patients', 'id, patient_number, legacy_patient_id, name, phone, secondary_phone, whatsapp_username, whatsapp_code, chart_state'),
-        fetchPatientProcedurePages('patient_invoice_items', 'id, finding_id, operation_id, operation_code, operation_name, operation_status, tooth_id, created_at, patient_invoices!inner(patient_id, invoice_date)'),
-        ensureDentalCustomizationLoaded()
-      ]);
-      const normalisedPatients = patientRows.map(normalisePatientRecord);
-      state.patientsById = new Map(normalisedPatients.map(patient => [patient.id, patient]));
-      state.records = collectPatientProcedureRecords(normalisedPatients, invoiceRows);
-      state.loaded = true;
-    })().finally(() => { state.loadPromise = null; });
-  }
-  await state.loadPromise;
+  const loadPromise = coalesceRefreshRead(contentRefreshContext('patient-procedures'), async () => {
+    const [patientRows, invoiceRows] = await Promise.all([
+      fetchPatientProcedurePages('patients', 'id, patient_number, legacy_patient_id, name, phone, secondary_phone, whatsapp_username, whatsapp_code, chart_state'),
+      fetchPatientProcedurePages('patient_invoice_items', 'id, finding_id, operation_id, operation_code, operation_name, operation_status, tooth_id, created_at, patient_invoices!inner(patient_id, invoice_date)'),
+      ensureDentalCustomizationLoaded()
+    ]);
+    const normalisedPatients = patientRows.map(normalisePatientRecord);
+    state.patientsById = new Map(normalisedPatients.map(patient => [patient.id, patient]));
+    state.records = collectPatientProcedureRecords(normalisedPatients, invoiceRows);
+    state.loaded = true;
+  });
+  state.loadPromise = loadPromise;
+  try { await loadPromise; }
+  finally { if (state.loadPromise === loadPromise) state.loadPromise = null; }
 }
 
 function patientProcedureName(record) {
@@ -356,7 +356,7 @@ function populatePatientProcedureOptions() {
   select.value = groups.some(group => group.procedures.some(operation => operation.code === selected)) ? selected : 'all';
 }
 
-async function searchPatientProcedures({ force = false } = {}) {
+async function searchPatientProcedures({ force = false, background = false } = {}) {
   if (!hasPageAccess('patients') || !currentSession) return;
   updatePatientProcedureRange();
   const filters = readPatientProcedureFilters();
@@ -372,20 +372,27 @@ async function searchPatientProcedures({ force = false } = {}) {
   }
   const state = patientProcedureState;
   const request = ++state.request;
+  const keepResults = background && state.results !== null && state.filtersSignature === JSON.stringify(filters);
   state.error = false;
   if (force) state.loaded = false;
-  if (!state.loaded) setPatientProcedureLoading(true);
+  if (!state.loaded) setPatientProcedureLoading(true, { preserveResults: keepResults });
   message.textContent = '';
   try {
     if (!state.loaded) await loadPatientProcedureRecords(state);
     if (patientProcedureState !== state || request !== state.request || !hasPageAccess('patients')) return;
     populatePatientProcedureOptions();
     state.results = filterPatientProcedureRecords(state.records, filters);
-    state.page = 1;
+    state.filtersSignature = JSON.stringify(filters);
+    if (!keepResults) state.page = 1;
     renderPatientProcedureResults();
   } catch (error) {
     if (patientProcedureState !== state || request !== state.request) return;
     console.error('Could not load patient procedures:', error);
+    if (keepResults) {
+      state.loaded = false;
+      message.textContent = currentUiLanguage === 'ar' ? 'تعذر تحديث النتائج. يتم عرض آخر نتائج تم تحميلها.' : 'Could not refresh. Showing the last loaded results.';
+      return;
+    }
     state.error = true;
     state.results = null;
     renderPatientProcedureResults();
@@ -394,11 +401,11 @@ async function searchPatientProcedures({ force = false } = {}) {
   }
 }
 
-function setPatientProcedureLoading(loading) {
+function setPatientProcedureLoading(loading, { preserveResults = false } = {}) {
   ['submit', 'refresh'].forEach(id => { document.getElementById(`patient-procedure-${id}`).disabled = loading; });
   const results = document.getElementById('patient-procedure-results');
   results.setAttribute('aria-busy', String(loading));
-  if (loading) {
+  if (loading && !preserveResults) {
     document.getElementById('patient-procedure-count').textContent = patientsText('Loading procedure records…');
     document.getElementById('patient-procedure-pagination').classList.add('hidden');
     results.innerHTML = `<div class="patients-loading" role="status"><span>${patientsText('Loading procedure records…')}</span>${Array.from({ length: 3 }, () => '<div class="patients-skeleton animate-pulse"><div></div><div></div><div></div></div>').join('')}</div>`;
@@ -426,12 +433,12 @@ function renderPatientProcedureResults() {
     const procedures = state.results.reduce((sum, group) => sum + group.procedures.length, 0);
     count.textContent = currentUiLanguage === 'ar' ? `${total} مريض · ${procedures} إجراء` : `${total} patients · ${procedures} procedures`;
     state.page = Math.max(1, Math.min(state.page, Math.ceil(total / 10) || 1));
-    if (!total) results.innerHTML = patientProcedureEmptyMarkup('No patients match these filters', 'Try a wider date range or include all procedure statuses.', 'Reset filters', 'resetPatientProcedureFilters()');
-    else results.innerHTML = state.results.slice((state.page - 1) * 10, state.page * 10).map(group => {
+    if (!total) setStableHtml(results, patientProcedureEmptyMarkup('No patients match these filters', 'Try a wider date range or include all procedure statuses.', 'Reset filters', 'resetPatientProcedureFilters()'));
+    else setStableHtml(results, state.results.slice((state.page - 1) * 10, state.page * 10).map(group => {
       const patient = group.patient;
       const statusClasses = { P: 'bg-amber-100 text-amber-800', In: 'bg-blue-50 text-blue-700', C: 'bg-emerald-50 text-emerald-700', E: 'bg-slate-100 text-slate-600' };
-      return `<article class="patients-match-card"><div class="patients-match-header"><div class="patients-match-identity"><span class="patients-avatar">${escapeHtml(String(patient.name || '?').trim().slice(0, 1))}</span><div><h4>${escapeHtml(patient.name)}</h4><p><bdi>${escapeHtml(formatPatientNumber(patient))}</bdi>${patient.phone ? ` · <bdi>${escapeHtml(patient.phone)}</bdi>` : (patient.whatsappCode ? ` · <bdi>${escapeHtml(typeof formatWhatsAppCode === 'function' ? formatWhatsAppCode(patient.whatsappCode) : patient.whatsappCode)}</bdi>` : (patient.whatsappUsername ? ` · <bdi>@${escapeHtml(patient.whatsappUsername)}</bdi>` : ''))}</p></div></div><div class="patients-match-contact-actions">${patientPhoneActionsMarkup(patient, 'primary')}</div><div class="patients-match-actions"><button type="button" class="patients-action" data-patient-id="${escapeHtml(patient.id)}" onclick="openPatientWorkspace(this.dataset.patientId, 'profile', 'patients')"><i data-lucide="user-round" class="w-4 h-4"></i><span>${patientsText('Open patient')}</span></button>${hasPageAccess('chart') ? `<button type="button" class="patients-action" data-patient-id="${escapeHtml(patient.id)}" onclick="openPatientWorkspace(this.dataset.patientId, 'chart', 'patients')"><i data-lucide="clipboard-list" class="w-4 h-4"></i><span>${patientsText('Open chart')}</span></button>` : ''}</div></div><div class="patients-match-procedures">${group.procedures.map(record => `<div class="patients-match-procedure"><div class="patients-match-procedure-name"><strong>${escapeHtml(patientProcedureName(record))}</strong>${record.tooth ? `<span>${currentUiLanguage === 'ar' ? 'السن' : 'Tooth'} <bdi>${escapeHtml(String(record.tooth))}</bdi></span>` : ''}${record.visitNumber ? `<span>${currentUiLanguage === 'ar' ? 'زيارة' : 'Visit'} ${Number(record.visitNumber)}</span>` : ''}</div><time datetime="${record.date}">${formatPatientProcedureDay(record.date)}</time><span class="patients-badge ${statusClasses[record.status] || statusClasses.E}">${escapeHtml(patientsText(OPERATION_STATUSES[record.status]?.label || 'Existed'))}</span><span class="patients-badge ${record.invoiced ? 'bg-violet-100 text-violet-800' : 'bg-slate-100 text-slate-600'}">${patientsText(record.invoiced ? 'Invoiced' : 'Uninvoiced')}</span></div>`).join('')}</div></article>`;
-    }).join('');
+      return `<article data-refresh-key="${escapeHtml(String(patient.id))}" class="patients-match-card"><div class="patients-match-header"><div class="patients-match-identity"><span class="patients-avatar">${escapeHtml(String(patient.name || '?').trim().slice(0, 1))}</span><div><h4>${escapeHtml(patient.name)}</h4><p><bdi>${escapeHtml(formatPatientNumber(patient))}</bdi>${patient.phone ? ` · <bdi>${escapeHtml(patient.phone)}</bdi>` : (patient.whatsappCode ? ` · <bdi>${escapeHtml(typeof formatWhatsAppCode === 'function' ? formatWhatsAppCode(patient.whatsappCode) : patient.whatsappCode)}</bdi>` : (patient.whatsappUsername ? ` · <bdi>@${escapeHtml(patient.whatsappUsername)}</bdi>` : ''))}</p></div></div><div class="patients-match-contact-actions">${patientPhoneActionsMarkup(patient, 'primary')}</div><div class="patients-match-actions"><button type="button" class="patients-action" data-patient-id="${escapeHtml(patient.id)}" onclick="openPatientWorkspace(this.dataset.patientId, 'profile', 'patients')"><i data-lucide="user-round" class="w-4 h-4"></i><span>${patientsText('Open patient')}</span></button>${hasPageAccess('chart') ? `<button type="button" class="patients-action" data-patient-id="${escapeHtml(patient.id)}" onclick="openPatientWorkspace(this.dataset.patientId, 'chart', 'patients')"><i data-lucide="clipboard-list" class="w-4 h-4"></i><span>${patientsText('Open chart')}</span></button>` : ''}</div></div><div class="patients-match-procedures">${group.procedures.map(record => `<div class="patients-match-procedure"><div class="patients-match-procedure-name"><strong>${escapeHtml(patientProcedureName(record))}</strong>${record.tooth ? `<span>${currentUiLanguage === 'ar' ? 'السن' : 'Tooth'} <bdi>${escapeHtml(String(record.tooth))}</bdi></span>` : ''}${record.visitNumber ? `<span>${currentUiLanguage === 'ar' ? 'زيارة' : 'Visit'} ${Number(record.visitNumber)}</span>` : ''}</div><time datetime="${record.date}">${formatPatientProcedureDay(record.date)}</time><span class="patients-badge ${statusClasses[record.status] || statusClasses.E}">${escapeHtml(patientsText(OPERATION_STATUSES[record.status]?.label || 'Existed'))}</span><span class="patients-badge ${record.invoiced ? 'bg-violet-100 text-violet-800' : 'bg-slate-100 text-slate-600'}">${patientsText(record.invoiced ? 'Invoiced' : 'Uninvoiced')}</span></div>`).join('')}</div></article>`;
+    }).join(''));
     if (total > 10) {
       pagination.classList.remove('hidden');
       const first = (state.page - 1) * 10 + 1;
