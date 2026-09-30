@@ -462,6 +462,9 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
     const glass = await page.locator('.lumin-mobile-nav-bar').evaluate(el => ({ background: getComputedStyle(el).backgroundColor, blur: getComputedStyle(el).backdropFilter }));
     assert.match(glass.background, /rgba\(15, 23, 42,/);
     assert.match(glass.blur, /blur\(24px\)/);
+    await page.waitForFunction(() => getComputedStyle(document.getElementById('mobile-nav-patients')).color === 'rgb(147, 197, 253)', null, { timeout: 2000 });
+    const activeColor = await page.locator('#mobile-nav-patients').evaluate(el => ({ color: getComputedStyle(el).color, current: el.getAttribute('aria-current'), root: document.documentElement.className, focus: document.activeElement.id }));
+    assert.equal(activeColor.color, 'rgb(147, 197, 253)', 'active dock text remains readable in raised dark mode: ' + JSON.stringify(activeColor));
     await page.evaluate(() => {
       document.getElementById('patient-query-input').focus();
       window.originalInnerHeightDescriptor = Object.getOwnPropertyDescriptor(window, 'innerHeight');
