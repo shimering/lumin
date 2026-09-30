@@ -76,6 +76,7 @@
   <script src="lumin-finance-sync.js?v=2"></script>
   <script src="lumin-patient-swipe.js?v=1"></script>
   <script src="lumin-patients.js?v=3"></script>
+  <script src="lumin-mobile-nav.js?v=1"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   
   <style>
@@ -5254,6 +5255,7 @@
   <link rel="stylesheet" href="lumin-theme.css?v=19" />
   <link rel="stylesheet" href="lumin-patients.css?v=3" />
   <link rel="stylesheet" href="lumin-finance-sync.css?v=2" />
+  <link rel="stylesheet" href="lumin-mobile-nav.css?v=1" />
   <style id="finance-ledger-styles">
     #finance-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     #finance-summary-cards > div { min-width: 0; }
@@ -11558,6 +11560,25 @@
       return null;
     }
 
+    let mobileNavigation = null;
+
+    function setupMobileNavigation() {
+      if (mobileNavigation || !window.LuminMobileNav) return;
+      mobileNavigation = window.LuminMobileNav.create({
+        source: document.getElementById('app-primary-nav'),
+        shell: document.getElementById('app-shell'),
+        getLanguage: () => currentUiLanguage,
+        onQuickCreate: trigger => toggleQuickCreateMenu(trigger),
+        closeQuickCreate: () => closeQuickCreateMenu(),
+        onLayout: () => {
+          scheduleDashboardViewportUpdate();
+          schedulePatientQueryViewportUpdate();
+          scheduleAppointmentCalendarViewportUpdate();
+          scheduleWhatsAppMobileViewportUpdate();
+        }
+      });
+    }
+
     function syncNavMountLocation() {
       const nav = document.getElementById('app-primary-nav');
       const header = document.getElementById('app-header');
@@ -11583,6 +11604,7 @@
       if (!isMobile && mobileHeaderOverlayOpen) {
         closeMobileHeaderOverlay();
       }
+      mobileNavigation?.refresh();
     }
     window.addEventListener('resize', syncNavMountLocation, { passive: true });
     window.addEventListener('orientationchange', syncNavMountLocation, { passive: true });
@@ -32670,7 +32692,9 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     }
 
     function mobileViewContentBottom(appShell, viewportBottom) {
-      const mobileNav = document.getElementById('app-primary-nav');
+      const mobileNav = window.LuminMobileNav?.isPhone()
+        ? document.getElementById('lumin-mobile-nav')
+        : document.getElementById('app-primary-nav');
       const navRect = mobileNav?.getBoundingClientRect();
       const navIsVisible = mobileNav
         && getComputedStyle(mobileNav).display !== 'none'
@@ -32680,7 +32704,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       if (navIsVisible) return Math.min(viewportBottom, navRect.top) - 8;
 
       // No dock space is needed when the keyboard hides navigation.
-      if (document.body.classList.contains('whatsapp-keyboard-open')) return viewportBottom;
+      if (document.body.classList.contains('whatsapp-keyboard-open') || document.body.classList.contains('lumin-mobile-keyboard-open')) return viewportBottom;
       const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
       const mobileNavigationHeight = Number.parseFloat(getComputedStyle(appShell).paddingBottom) || 0;
       return viewportBottom - mobileNavigationHeight * zoom - 8;
@@ -32788,14 +32812,20 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       const appShell = document.getElementById('app-shell');
       if (!patientView || patientView.classList.contains('hidden') || !main || !appShell) return;
 
+      const isMobile = window.matchMedia('(max-width: 1023px)').matches;
+      if (isMobile) {
+        // Page entry changes the locked frame without necessarily emitting a resize event.
+        // Refresh the shared frame and navigation before measuring the results area.
+        resetPatientQueryWindowScroll();
+        updateAppViewportDimensions();
+        syncNavMountLocation();
+      }
       const visualViewport = window.visualViewport;
       const viewportBottom = visualViewport
         ? visualViewport.offsetTop + visualViewport.height
         : window.innerHeight;
       const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
-      const isMobile = window.matchMedia('(max-width: 1023px)').matches;
       if (isMobile) {
-        resetPatientQueryWindowScroll();
         const contentBottom = mobileViewContentBottom(appShell, viewportBottom);
         const patientTop = patientView.getBoundingClientRect().top;
         const availableHeight = Math.floor((contentBottom - patientTop) / zoom);
@@ -32816,8 +32846,12 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     function schedulePatientQueryViewportUpdate() {
       window.cancelAnimationFrame(patientQueryResizeFrame);
       patientQueryResizeFrame = window.requestAnimationFrame(() => {
-        patientQueryResizeFrame = null;
         updatePatientQueryViewportHeight();
+        // Recheck once after the entry frame paints; mobile viewport readings can settle late.
+        patientQueryResizeFrame = window.requestAnimationFrame(() => {
+          patientQueryResizeFrame = null;
+          updatePatientQueryViewportHeight();
+        });
       });
     }
 
@@ -41047,6 +41081,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     // Startup Initialization
     window.addEventListener('DOMContentLoaded', async () => {
       syncNavMountLocation();
+      setupMobileNavigation();
       setupPatientWorkspaceSwipeBack();
       postToLuminHost({ type: 'lumin:request-host-state' });
       startUiTranslationObserver();
