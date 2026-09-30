@@ -2923,6 +2923,7 @@
         overscroll-behavior-y: none !important;
       }
       body.patient-query-active #app-shell {
+        position: relative;
         height: 100% !important;
         height: var(--lumin-app-viewport-height, 100dvh) !important;
         max-height: var(--lumin-app-viewport-height, 100dvh) !important;
@@ -2940,6 +2941,13 @@
         overscroll-behavior-y: none !important;
         padding-bottom: 0 !important;
         margin-bottom: 0 !important;
+      }
+      /* Anchor the dock to the same visible frame as the patient list,
+         even when the browser reports a different fixed-position viewport. */
+      body.patient-query-active #app-primary-nav {
+        position: absolute;
+        bottom: max(0.85rem, env(safe-area-inset-bottom));
+        left: 50%;
       }
       body.patient-query-active #view-patients:not(.hidden) {
         display: flex !important;

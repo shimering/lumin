@@ -17,6 +17,7 @@ const viewportHelpers = source.slice(source.indexOf('    function updateAppViewp
 const themeHelper = source.slice(source.indexOf('    function applyUiTheme('), source.indexOf('    function resetUiTheme('));
 const directoryHelpers = source.slice(source.indexOf('    function renderPatientQueryPagination('), source.indexOf('    async function deletePatient('));
 const phoneHelper = source.slice(source.indexOf('    function patientPhoneActionsMarkup('), source.indexOf('    function openPatientProfileWhatsApp('));
+const navHelper = source.slice(source.indexOf('    function syncNavMountLocation('), source.indexOf("    window.addEventListener('resize', syncNavMountLocation"));
 
 test('mobile screens fill the available height at every app scale', { skip: !chromium && 'Playwright is not available' }, async t => {
   const server = http.createServer((req, res) => {
@@ -45,6 +46,7 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
   await page.addScriptTag({ content: `
     let appointmentCalendarResizeFrame = null, patientQueryResizeFrame = null, dashboardResizeFrame = null;
     let currentUiTheme = 'flat', currentUiTint = 'blue', currentUiScale = 100;
+    let mobileHeaderOverlayOpen = false;
     const UI_SCALE_DEFAULT = 100;
     let currentUiLanguage = 'en';
     const PATIENT_QUERY_PAGE_SIZE = 10;
@@ -67,6 +69,7 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
     ${themeHelper}
     ${directoryHelpers}
     ${phoneHelper}
+    ${navHelper}
     setupAppViewportDimensions();
     setupAppointmentCalendarViewport();
     setupPatientQueryViewport();
@@ -88,7 +91,7 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
       }
       document.getElementById('auth-gate').classList.add('hidden');
       const shell = document.getElementById('app-shell'); shell.classList.remove('hidden');
-      shell.appendChild(document.getElementById('app-primary-nav'));
+      syncNavMountLocation();
       document.querySelectorAll('#app-main > section, #app-main > div').forEach(el => el.classList.add('hidden'));
       document.getElementById('view-' + view).classList.remove('hidden');
       const active = { patients: 'patient-query-active', appointments: 'appointments-calendar-active', whatsapp: 'whatsapp-view-active' }[view];
@@ -109,6 +112,10 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
         viewportWidth: window.visualViewport?.width || innerWidth,
         page: rect(document.getElementById('view-' + view)),
         nav: rect(document.getElementById('app-primary-nav')),
+        navButtons: Array.from(document.querySelectorAll('#app-primary-nav > button')).filter(button => getComputedStyle(button).display !== 'none').map(button => {
+          const r = button.getBoundingClientRect();
+          return { id: button.id, hit: button.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)) };
+        }),
         ancestors: ['app-main', 'app-shell'].map(id => rect(document.getElementById(id))).concat(rect(document.body), rect(document.documentElement))
       };
     }, view);
@@ -116,6 +123,7 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
 
   function assertFits(result, description) {
     assert.ok(result.page.height > 0, description + ': page is visible');
+    for (const button of result.navButtons) assert.ok(button.hit, description + ': ' + button.id + ' is visible and tappable');
     assert.ok(result.nav.top - result.page.bottom >= 7 && result.nav.top - result.page.bottom <= 10, description + ': content reaches the navigation dock');
     for (const rect of result.ancestors) {
       assert.ok(rect.bottom >= result.page.bottom - 1, description + ': no ancestor clips the content');
@@ -198,6 +206,32 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
       assert.ok(result.resultsY > 0 && Math.abs(result.resultsX) > 0, dir + ': table still scrolls in both directions');
       assert.equal(result.navBottom, result.afterNavBottom, dir + ': navigation stays anchored');
       assert.ok(result.pageRight <= result.viewportWidth, dir + ': long names do not widen the page');
+    }
+  });
+
+  await t.test('85% patient dock remains tappable when innerHeight reports the visible viewport', async () => {
+    await page.setViewportSize({ width: 412, height: 915 });
+    await showView('patients', 85);
+    await page.evaluate(() => {
+      window.originalVisualViewport = window.visualViewport;
+      window.originalInnerHeightDescriptor = Object.getOwnPropertyDescriptor(window, 'innerHeight');
+      // Keep the CSS layout viewport tall while both JS height APIs report the smaller visible area.
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 });
+      Object.defineProperty(window, 'visualViewport', { configurable: true, value: { width: 412, height: 844, offsetTop: 0, offsetLeft: 0 } });
+      updateAppViewportDimensions();
+      updatePatientQueryViewportHeight();
+    });
+    try {
+      const result = await bounds('patients');
+      assert.ok(result.nav.top > 0 && result.nav.bottom <= result.viewport, 'Patients navigation stays inside the visible screen');
+      assertFits(result, '85% with different CSS and JS viewport heights');
+    } finally {
+      await page.evaluate(() => {
+        Object.defineProperty(window, 'innerHeight', window.originalInnerHeightDescriptor);
+        Object.defineProperty(window, 'visualViewport', { configurable: true, value: window.originalVisualViewport });
+        updateAppViewportDimensions();
+      });
+      await showView('patients', 85);
     }
   });
 
