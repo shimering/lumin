@@ -69,6 +69,15 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
     function toggleQuickCreateMenu() { window.quickCreateClicks = (window.quickCreateClicks || 0) + 1; document.getElementById('nav-btn-quick-create').setAttribute('aria-expanded', 'true'); }
     function openAppointmentsView() { window.appointmentsClicks = (window.appointmentsClicks || 0) + 1; }
     async function ensurePatientDirectoryPageLoaded() {}
+    const patientProcedureState = { loaded: true };
+    async function refreshImplantProgress() {
+      document.getElementById('implant-progress-table-body').innerHTML = Array.from({ length: 24 }, (_, i) => '<tr><td colspan="9" style="height:90px;padding:16px">Test implant ' + i + '</td></tr>').join('');
+    }
+    function updatePatientProcedureRange() {}
+    function populatePatientProcedureOptions() {}
+    function renderPatientProcedureResults() {
+      document.getElementById('patient-procedure-results').innerHTML = Array.from({ length: 24 }, (_, i) => '<article class="patients-match-card" style="min-height:90px;padding:16px">Test procedure ' + i + '</article>').join('');
+    }
     function resetPatientAppointmentsState() {}
     function resetPatientPrescriptionsState() {}
     function refreshUiThemePreference() {}
@@ -164,6 +173,52 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
       assert.ok(Math.abs(rect.height - result.viewport) <= 1, description + ': container fills the actual screen height');
     }
   }
+
+  await t.test('Implant Progress and Procedure Search accept touch scrolling while Browse keeps its outer page locked', async scrollTest => {
+    const touch = await page.context().newCDPSession(page);
+    scrollTest.after(async () => {
+      await page.evaluate(() => switchPatientsTab('browse'));
+      await touch.detach();
+    });
+    await page.setViewportSize({ width: 384, height: 781 });
+    for (const dir of ['ltr', 'rtl']) for (const scale of [85, 100, 125]) {
+      await showView('patients', scale, 'raised', dir);
+      for (const tab of ['implants', 'procedures']) {
+        await page.evaluate(tab => switchPatientsTab(tab), tab);
+        await settle();
+        const panelId = tab === 'implants' ? 'view-implants' : 'patients-panel-procedures';
+        const point = await page.evaluate(id => {
+          const panel = document.getElementById(id);
+          panel.scrollTop = 0;
+          const r = panel.getBoundingClientRect();
+          return { x: r.left + Math.min(80, r.width / 2), y: r.top + Math.min(220, r.height - 30), travel: Math.min(160, r.height - 60) };
+        }, panelId);
+        const navBefore = (await bounds('patients')).nav;
+        await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: point.x, y: point.y }] });
+        for (let step = 1; step <= 8; step++) {
+          await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: point.x, y: point.y - point.travel * step / 8 }] });
+        }
+        await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await settle();
+        const result = await page.evaluate(id => ({ scroll: document.getElementById(id).scrollTop, x: scrollX, y: scrollY }), panelId);
+        assert.ok(result.scroll > 30, tab + ' scrolls with a finger at ' + scale + '% ' + dir);
+        assert.equal(result.x, 0, 'outer page stays fixed horizontally');
+        assert.equal(result.y, 0, 'outer page stays fixed vertically');
+        const after = await bounds('patients');
+        assert.equal(after.nav.top, navBefore.top, 'navbar stays in place');
+        assertFits(after, tab + ' after touch scrolling');
+      }
+      await page.evaluate(() => switchPatientsTab('browse'));
+      await settle();
+      const browse = await page.evaluate(() => {
+        const move = new Event('touchmove', { bubbles: true, cancelable: true });
+        document.getElementById('patient-query-input').dispatchEvent(move);
+        return { blocked: move.defaultPrevented, scroll: document.getElementById('patients-panel-browse').scrollTop };
+      });
+      assert.equal(browse.blocked, true, 'Browse does not enable scrolling outside its results table');
+      assert.equal(browse.scroll, 0);
+    }
+  });
 
   await t.test('phone and tablet layouts fit in English and Arabic, in both themes', async () => {
     for (const size of [{ width: 320, height: 568 }, { width: 360, height: 640 }, { width: 390, height: 844 }, { width: 412, height: 915 }, { width: 412, height: 780 }, { width: 844, height: 390 }, { width: 820, height: 1180 }]) {

@@ -32864,12 +32864,12 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
       }, { passive: true });
       window.addEventListener('scroll', resetPatientQueryWindowScroll, { passive: true });
 
-      // Prevent scrolling outside the patient results box on mobile/tablet viewports
+      // Keep the outer page fixed, while each tab and the tab strip scroll natively.
       document.addEventListener('touchmove', (e) => {
         if (!document.body.classList.contains('patient-query-active')) return;
         if (window.innerWidth >= 1024) return;
-        // If touch gesture is inside view-patients but outside the results scroll box, prevent scrolling
-        if (e.target.closest('#view-patients') && !e.target.closest('#patient-query-results-scroll')) {
+        const scrollable = e.target.closest('#patient-query-results-scroll, #view-implants, #patients-panel-procedures, #patients-tabs');
+        if (e.target.closest('#view-patients') && !scrollable) {
           if (e.cancelable) e.preventDefault();
         }
       }, { passive: false });
