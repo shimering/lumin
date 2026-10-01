@@ -651,7 +651,7 @@ body.lumin-raised #app-header button:active:not(:disabled) { box-shadow: var(--l
     /* Laptop / Desktop only: Enlarged appointment status, patient name, and info on dashboard */
     @media screen and (min-width: 1024px) {
       html.is-laptop-device body.lumin-raised #dashboard-appointments-list {
-        --dashboard-card-font-reduction: 0pt;
+        --dashboard-card-font-reduction: 2px;
       }
       html.is-laptop-device body.lumin-raised #view-dashboard [data-dashboard-appointment-heading-row] h4,
       html.is-laptop-device body.lumin-raised #view-dashboard .dashboard-patient-name,

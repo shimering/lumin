@@ -4379,7 +4379,12 @@
     /* Laptop / Desktop only: Enlarged appointment status, patient name, and info on dashboard */
     @media screen and (min-width: 1024px) {
       html.is-laptop-device #dashboard-appointments-list {
-        --dashboard-card-font-reduction: 0pt;
+        --dashboard-card-font-reduction: 2px;
+      }
+      html.is-laptop-device #dashboard-appointments-list > article {
+        --lumin-type-micro: calc(0.6875rem - var(--dashboard-card-font-reduction));
+        --lumin-type-caption: calc(0.75rem - var(--dashboard-card-font-reduction));
+        --lumin-type-body: calc(0.875rem - var(--dashboard-card-font-reduction));
       }
       html.is-laptop-device #view-dashboard .dashboard-patient-name,
       html.is-laptop-device #view-dashboard .dashboard-patient-link,
@@ -5312,7 +5317,7 @@
       .wa-settings-primary-button { flex: 1 1 0; }
     }
   </style>
-  <link rel="stylesheet" href="lumin-theme.css?v=19" />
+  <link rel="stylesheet" href="lumin-theme.css?v=20" />
   <link rel="stylesheet" href="lumin-patients.css?v=3" />
   <link rel="stylesheet" href="lumin-finance-sync.css?v=2" />
   <link rel="stylesheet" href="lumin-mobile-nav.css?v=2" />
