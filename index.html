@@ -4343,6 +4343,35 @@
     }
     .storage-connection-badge[data-state="connected"] { background: #ecfdf5; color: #047857; }
     .storage-connection-badge svg { width: 0.875rem; height: 0.875rem; flex: none; }
+    #admin-panel-storage .storage-server-control {
+      min-height: 44px;
+      border-radius: 12px;
+      transition: background-color 150ms ease-out, color 150ms ease-out, transform 150ms ease-out;
+    }
+    #admin-panel-storage .storage-server-control:hover:not(:disabled) { background-color: #f1f5f9; }
+    #admin-panel-storage button.storage-server-control:active:not(:disabled) { transform: scale(0.98); }
+    #admin-panel-storage .storage-server-control:focus-visible { outline: 2px solid #3b82f6; outline-offset: 3px; }
+    #admin-panel-storage .storage-server-control:disabled { opacity: 0.5; pointer-events: none; }
+    #admin-panel-storage .storage-server-icon-button { width: 44px; min-width: 44px; }
+    .storage-server-card { min-width: 0; display: flex; flex-direction: column; gap: 16px; padding: 16px; border: 1px solid #e2e8f0; border-radius: 16px; background: #fff; }
+    .storage-server-card[data-active="true"] { background: #f8fbff; border-color: #cbd5e1; }
+    .storage-server-card-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; }
+    #modal-storage-server { position: fixed; inset: 0; z-index: 120; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px); }
+    #modal-storage-server.hidden { display: none; }
+    .storage-server-dialog-card { display: flex; flex-direction: column; width: 100%; max-width: 480px; max-height: 90dvh; overflow: hidden; border: 1px solid #e2e8f0; border-radius: 24px; background: #fff; box-shadow: 0 24px 64px #0f172a33; }
+    .storage-server-dialog-card form { display: flex; min-height: 0; flex-direction: column; }
+    .storage-server-dialog-body { display: grid; gap: 16px; overflow-y: auto; padding: 24px; }
+    .storage-server-dialog-footer { display: flex; flex: none; justify-content: flex-end; gap: 8px; padding: 16px 24px max(16px, env(safe-area-inset-bottom)); background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    #modal-storage-server :is(button, input) { min-height: 44px; border-radius: 12px; transition: background-color 150ms ease-out, transform 150ms ease-out; }
+    #modal-storage-server input { width: 100%; padding: 12px; border: 1px solid #e2e8f0; background: #f8fafc; color: #334155; font-size: 16px; }
+    #modal-storage-server button:hover { filter: brightness(0.97); }
+    #modal-storage-server button:active { transform: scale(0.98); }
+    #modal-storage-server :is(button, input):focus-visible { outline: 2px solid #3b82f6; outline-offset: 3px; }
+    #modal-storage-server button:disabled { opacity: 0.5; pointer-events: none; }
+    @media (max-width: 639px) {
+      #modal-storage-server { align-items: flex-end; padding: env(safe-area-inset-top) 0 0; }
+      .storage-server-dialog-card { max-width: none; border-radius: 24px 24px 0 0; }
+    }
     .app-page-icon {
       display: flex;
       width: 2.25rem;
@@ -6938,7 +6967,7 @@
         </button>
         <button id="admin-tab-loyalty" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-loyalty" onclick="switchAdminTab('loyalty')" class="inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"><i data-lucide="badge-check" class="h-4 w-4"></i> Loyalty</button>
         <button id="admin-tab-storage" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-storage" onclick="switchAdminTab('storage')" class="inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black text-slate-500 transition hover:bg-slate-100 hover:text-slate-800">
-          <i data-lucide="hard-drive" class="h-4 w-4"></i> Storage &amp; X-Rays
+          <i data-lucide="hard-drive" class="h-4 w-4"></i> <span id="admin-storage-tab-label">Storage Server</span>
         </button>
       </div>
 
@@ -6951,7 +6980,7 @@
             <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600"><i data-lucide="hard-drive" class="h-5 w-5"></i></span>
             <div class="min-w-0 flex-1">
               <div class="flex flex-wrap items-center gap-2.5">
-                <h3 class="text-base font-black text-slate-800">Storage & X-Ray Server</h3>
+                <h3 id="admin-storage-heading" class="text-base font-semibold tracking-tight text-slate-800">Storage Server</h3>
                 <span id="settings-storage-status-badge" class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-black text-slate-500">Not Tested</span>
               </div>
               <p class="mt-0.5 text-xs text-slate-400">Manage your clinic's local file storage server. Once saved here, connection settings automatically sync to all doctors and clinic devices.</p>
@@ -6964,10 +6993,38 @@
               <span>When you save, this connection syncs across the entire clinic instantly. Doctors and staff on other devices connect automatically without typing any URLs.</span>
             </div>
 
+            <!-- Saved Storage Server Presets Quick Switcher -->
+            <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="min-w-0">
+                  <h4 id="storage-presets-title" class="text-sm font-semibold text-slate-800">Saved servers</h4>
+                  <p id="storage-presets-description" class="mt-1 text-xs leading-relaxed text-slate-500">Choose a saved server to switch storage for the clinic.</p>
+                </div>
+                <button type="button" onclick="promptAddStoragePreset()" class="storage-server-control inline-flex shrink-0 items-center gap-1.5 border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-xs">
+                  <i data-lucide="plus" class="h-3.5 w-3.5 text-indigo-600"></i> <span id="storage-add-server-label">Add Server</span>
+                </button>
+              </div>
+              <div class="space-y-2">
+                <label id="storage-preset-picker-label" for="settings-storage-preset" class="block text-xs font-semibold text-slate-700">Quick switch</label>
+                <select id="settings-storage-preset" onchange="switchToStoragePreset(this.value)" aria-describedby="storage-preset-picker-hint" class="storage-server-control w-full min-w-0 border border-slate-200 bg-white px-3 text-sm text-slate-700">
+                  <option value="">Choose a saved server</option>
+                </select>
+                <p id="storage-preset-picker-hint" class="text-xs leading-relaxed text-slate-500">Switches immediately using the saved URL and key. No extra save step.</p>
+              </div>
+              <div id="storage-server-presets-container" class="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                <!-- Dynamically rendered -->
+              </div>
+            </div>
+
             <div>
-              <label for="settings-storage-url" class="block text-xs font-bold text-slate-700 mb-1.5">Server URL (Local or Cloudflare Tunnel)</label>
-              <input id="settings-storage-url" type="url" placeholder="e.g. http://localhost:5000 or https://xxxx.trycloudflare.com" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-              <p class="mt-1.5 text-[11px] text-slate-400">Use <code class="font-mono text-indigo-600 bg-slate-100 px-1.5 py-0.5 rounded">http://localhost:5000</code> when running on the main clinic PC, or paste your Cloudflare Tunnel HTTPS address for universal access.</p>
+              <div class="flex items-center justify-between mb-1.5">
+                <label for="settings-storage-url" class="block text-xs font-bold text-slate-700">Active Server URL (Tailscale, Tunnel, or LAN)</label>
+                <button type="button" onclick="saveCurrentUrlAsPreset()" class="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition">
+                  <i data-lucide="bookmark-plus" class="h-3.5 w-3.5"></i> <span>Save URL as preset</span>
+                </button>
+              </div>
+              <input id="settings-storage-url" type="url" placeholder="e.g. https://desktop-mlncjfe.tailf46d13.ts.net or http://localhost:5000" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <p class="mt-1.5 text-[11px] text-slate-400">Paste your Tailscale Funnel address, dedicated PC link, or local IP.</p>
             </div>
 
             <div>
@@ -8759,6 +8816,31 @@
         <p id="managed-user-self-note" class="hidden rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs font-bold leading-5 text-amber-800">Your own user type and active status are protected. Another administrator can change them.</p>
         <p id="managed-user-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="alert"></p>
         <div class="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onclick="closeManagedUserEditor()" class="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 transition hover:bg-slate-50">Cancel</button><button id="managed-user-save" type="submit" class="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"><i data-lucide="save" class="h-4 w-4"></i> Save login</button></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: SAVED STORAGE SERVER ================= -->
+  <div id="modal-storage-server" data-storage-server-dialog class="hidden" onclick="if (event.target === this) closeStoragePresetDialog()" onkeydown="handleStoragePresetDialogKeydown(event)">
+    <div class="storage-server-dialog-card" role="dialog" aria-modal="true" aria-labelledby="storage-preset-dialog-title" aria-describedby="storage-preset-dialog-description">
+      <div class="flex items-start justify-between gap-4 border-b border-slate-100 p-6">
+        <div class="min-w-0">
+          <h3 id="storage-preset-dialog-title" class="text-lg font-semibold tracking-tight text-slate-900">Add server</h3>
+          <p id="storage-preset-dialog-description" class="mt-1 text-sm leading-relaxed text-slate-500">Save this server, then choose it from Quick switch.</p>
+        </div>
+        <button id="storage-preset-dialog-close" type="button" onclick="closeStoragePresetDialog()" aria-label="Close" class="flex w-11 shrink-0 items-center justify-center bg-slate-100 text-slate-600"><i data-lucide="x" class="h-5 w-5"></i></button>
+      </div>
+      <form id="storage-preset-form" onsubmit="event.preventDefault(); saveStoragePresetFromDialog()">
+        <div class="storage-server-dialog-body">
+          <label><span id="storage-preset-name-label" class="mb-2 block text-xs font-semibold text-slate-700">Server name</span><input id="storage-preset-name" required maxlength="100" autocomplete="off" placeholder="Clinic PC" /></label>
+          <label><span id="storage-preset-url-label" class="mb-2 block text-xs font-semibold text-slate-700">Server URL</span><input id="storage-preset-url" type="url" required inputmode="url" autocomplete="off" dir="ltr" placeholder="https://storage.example.com" /></label>
+          <label><span id="storage-preset-key-label" class="mb-2 block text-xs font-semibold text-slate-700">Clinic secret key</span><input id="storage-preset-key" type="password" autocomplete="new-password" dir="ltr" /></label>
+          <p id="storage-preset-dialog-message" role="alert" class="hidden rounded-xl bg-rose-50 p-3 text-sm text-rose-700"></p>
+        </div>
+        <div class="storage-server-dialog-footer">
+          <button id="storage-preset-dialog-cancel" type="button" onclick="closeStoragePresetDialog()" class="border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700">Cancel</button>
+          <button type="submit" class="inline-flex items-center gap-2 bg-blue-50 px-4 text-sm font-semibold text-blue-700"><i data-lucide="check" class="h-4 w-4"></i><span id="storage-preset-dialog-save-label">Save server</span></button>
+        </div>
       </form>
     </div>
   </div>
@@ -10669,9 +10751,15 @@
       'Storage & X-Ray Server': 'خادم تخزين الأشعة والملفات',
       'Storage & X-Rays': 'تخزين الأشعة والملفات',
       'Storage &amp; X-Rays': 'تخزين الأشعة والملفات',
+      'Storage Server': 'خادم التخزين',
       'Test Connection': 'اختبار الاتصال',
       'Save Settings': 'حفظ الإعدادات',
       'Server URL (Local or Cloudflare Tunnel)': 'رابط الخادم (محلي أو نفق Cloudflare)',
+      'Saved Server Presets': 'خوادم التخزين المحفوظة',
+      'Switch between your clinic PC and backup/laptop server with 1 click.': 'التبديل بين كمبيوتر العيادة والخادم الاحتياطي بنقرة واحدة.',
+      'Active Server URL (Tailscale, Tunnel, or LAN)': 'رابط الخادم النشط (Tailscale أو النفق أو الشبكة المحلية)',
+      'Add Server': 'إضافة خادم',
+      'Save URL as preset': 'حفظ الرابط كخادم مفضل',
       'Clinic Secret Key': 'المفتاح السري للعيادة',
       'Not Tested': 'لم يتم الاختبار',
       'Connected': 'متصل',
@@ -11098,7 +11186,7 @@
 
     function isUiTranslationExcluded(node) {
       const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
-      return Boolean(element?.closest('#view-chart, #view-admin, #view-prices, .patient-workspace-name, [data-storage-connection-badge]'));
+      return Boolean(element?.closest('#view-chart, #view-admin, #view-prices, .patient-workspace-name, [data-storage-connection-badge], [data-storage-server-dialog]'));
     }
 
     function arabicUiPhrase(source) {
@@ -11270,6 +11358,7 @@
       }));
       translateUiTree(document.body, currentUiLanguage);
       renderStorageConnectionStatus();
+      if (typeof renderStorageServerPresets === 'function') renderStorageServerPresets();
       if (financeSyncSnapshot && hasPageAccess('admin')) renderFinanceSyncSnapshot();
       if (typeof syncVoiceFabBadge === 'function') syncVoiceFabBadge();
       if (typeof syncVoiceEngineSettingsUI === 'function') syncVoiceEngineSettingsUI();
@@ -11504,6 +11593,7 @@
 
     function prepareAuthSurface() {
       stopStorageConnectionMonitor();
+      closeStoragePresetDialog();
       resetUiTheme();
       document.documentElement.classList.remove('appointments-calendar-active');
       document.body.classList.remove('appointments-calendar-active');
@@ -26201,7 +26291,7 @@
       const dbUrl = (clinicStorageServerUrl || '').trim();
       const dbKey = (clinicStorageSecretKey || '').trim();
       const savedUrl = dbUrl || localStorage.getItem('lumin_storage_server_url') || 'http://localhost:5000';
-      const savedKey = dbKey || localStorage.getItem('lumin_storage_secret_key') || 'LuminClinicKey_2026';
+      const savedKey = dbKey || (localStorage.getItem('lumin_storage_secret_key') ?? 'LuminClinicKey_2026');
       return {
         url: savedUrl.trim().replace(/\/+$/, ''),
         key: savedKey.trim()
@@ -26228,6 +26318,7 @@
         settingsBadge.className = `rounded-full px-2 py-0.5 text-[10px] font-black ${storageConnectionConnected ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`;
         settingsBadge.textContent = label;
       }
+      if (typeof renderStoragePresetConnectionStatus === 'function') renderStoragePresetConnectionStatus();
     }
 
     function cancelStorageConnectionCheck() {
@@ -26345,9 +26436,277 @@
           clinicStorageServerUrl = localStorage.getItem('lumin_storage_server_url') || '';
           clinicStorageSecretKey = localStorage.getItem('lumin_storage_secret_key') || '';
           refreshStorageConnectionConfig();
+          if (typeof renderStorageServerPresets === 'function') renderStorageServerPresets();
+        } else if (event.key === 'lumin_storage_server_presets') {
+          if (typeof renderStorageServerPresets === 'function') renderStorageServerPresets();
         }
       });
     }
+
+    // ================= STORAGE SERVER PRESETS & SWITCHER =================
+    const DEFAULT_STORAGE_PRESETS = [
+      {
+        id: 'preset-laptop',
+        name: 'Laptop (Test Server)',
+        url: 'https://desktop-mlncjfe.tailf46d13.ts.net',
+        key: 'LuminClinicKey_2026',
+        icon: 'laptop'
+      },
+      {
+        id: 'preset-dedicated',
+        name: 'Dedicated Clinic PC (Main)',
+        url: '',
+        key: 'LuminClinicKey_2026',
+        icon: 'server'
+      },
+      {
+        id: 'preset-local',
+        name: 'Localhost (LAN / Direct)',
+        url: 'http://localhost:5000',
+        key: 'LuminClinicKey_2026',
+        icon: 'hard-drive'
+      }
+    ];
+
+    let storageSettingsSaving = false;
+    let storagePresetSwitchingId = null;
+    let editingStoragePresetId = null;
+    let storagePresetReturnFocus = null;
+    let storageSettingsMessageTimer = null;
+
+    function getStorageServerPresets() {
+      try {
+        const raw = localStorage.getItem('lumin_storage_server_presets');
+        if (raw !== null) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list)) return list.filter(preset => preset && typeof preset.id === 'string' && typeof preset.name === 'string' && typeof preset.url === 'string').map(preset => ({ ...preset }));
+        }
+      } catch (err) {
+        console.warn('Could not read storage presets:', err);
+      }
+      return DEFAULT_STORAGE_PRESETS.map(preset => ({ ...preset }));
+    }
+
+    function saveStorageServerPresets(presets) {
+      localStorage.setItem('lumin_storage_server_presets', JSON.stringify(presets));
+    }
+
+    function normaliseStoragePresetUrl(value) {
+      const url = new URL(String(value || '').trim());
+      if (!['http:', 'https:'].includes(url.protocol) || url.search || url.hash || url.username || url.password) throw new Error('Invalid storage server URL.');
+      return url.href.replace(/\/+$/, '');
+    }
+
+    function storageServerUrlsMatch(first, second) {
+      try { return normaliseStoragePresetUrl(first) === normaliseStoragePresetUrl(second); }
+      catch (_) { return false; }
+    }
+
+    function renderStoragePresetConnectionStatus() {
+      document.querySelectorAll('[data-active-storage-connection]').forEach(label => {
+        label.className = `text-xs font-medium ${storageConnectionConnected ? 'text-emerald-700' : 'text-rose-700'}`;
+        const text = currentUiLanguage === 'ar'
+          ? (storageConnectionConnected ? 'متصل' : 'غير متصل')
+          : (storageConnectionConnected ? 'Connected' : 'Not connected');
+        if (label.textContent !== text) label.textContent = text;
+      });
+    }
+
+    function renderStorageServerPresets() {
+      const isArabic = currentUiLanguage === 'ar';
+      const t = (english, arabic) => isArabic ? arabic : english;
+      const labels = {
+        'admin-storage-tab-label': t('Storage Server', 'خادم التخزين'),
+        'admin-storage-heading': t('Storage Server', 'خادم التخزين'),
+        'storage-presets-title': t('Saved servers', 'الخوادم المحفوظة'),
+        'storage-add-server-label': t('Add server', 'إضافة خادم'),
+        'storage-presets-description': t('Choose a saved server to switch storage for the clinic.', 'اختر خادماً محفوظاً لتبديل التخزين للعيادة.'),
+        'storage-preset-picker-label': t('Quick switch', 'التبديل السريع'),
+        'storage-preset-picker-hint': storageSettingsSaving
+          ? t('Saving the server selection…', 'جارٍ حفظ اختيار الخادم…')
+          : t('Switches immediately using the saved URL and key. No extra save step.', 'يتم التبديل مباشرة باستخدام الرابط والمفتاح المحفوظين، دون خطوة حفظ إضافية.')
+      };
+      Object.entries(labels).forEach(([id, text]) => {
+        const element = document.getElementById(id);
+        if (element) { element.textContent = text; element.dir = isArabic ? 'rtl' : 'ltr'; }
+      });
+      const container = document.getElementById('storage-server-presets-container');
+      if (!container) return;
+      const presets = getStorageServerPresets();
+      const currentConfig = getStorageServerConfig();
+      const activePreset = presets.find(preset => storageServerUrlsMatch(preset.url, currentConfig.url) && String(preset.key ?? currentConfig.key).trim() === currentConfig.key);
+      const picker = document.getElementById('settings-storage-preset');
+      if (picker) {
+        const prefix = activePreset ? t('Choose a saved server', 'اختر خادماً محفوظاً') : t('Current server (not in saved list)', 'الخادم الحالي (غير موجود في القائمة)');
+        picker.innerHTML = `<option value="">${prefix}</option>` + presets.map(preset => `<option value="${escapeHtml(preset.id)}" ${!preset.url.trim() ? 'disabled' : ''}>${escapeHtml(preset.name)}${!preset.url.trim() ? t(' — URL not set', ' — الرابط غير مُدخل') : ''}</option>`).join('');
+        picker.value = storagePresetSwitchingId || activePreset?.id || '';
+        picker.disabled = storageSettingsSaving || !presets.some(preset => preset.url.trim());
+        picker.dir = isArabic ? 'rtl' : 'ltr';
+      }
+      const saveButton = document.getElementById('btn-save-storage');
+      if (saveButton) saveButton.disabled = storageSettingsSaving;
+      container.setAttribute('aria-busy', String(storageSettingsSaving));
+      if (!presets.length) {
+        container.innerHTML = `<div class="rounded-xl bg-white p-5 text-center"><span class="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-700"><i data-lucide="server" class="h-5 w-5"></i></span><h4 class="mt-3 text-sm font-semibold text-slate-800">${t('No saved servers', 'لا توجد خوادم محفوظة')}</h4><p class="mt-1 text-xs leading-relaxed text-slate-500">${t('Add a server to switch to it whenever you need.', 'أضف خادماً للتبديل إليه متى احتجت.')}</p><button type="button" onclick="promptAddStoragePreset()" class="storage-server-control mt-3 bg-blue-50 px-4 text-xs font-semibold text-blue-700">${t('Add server', 'إضافة خادم')}</button></div>`;
+      } else {
+        container.innerHTML = presets.map(preset => {
+          const isActive = activePreset?.id === preset.id;
+          const switching = storagePresetSwitchingId === preset.id;
+          const configured = !!preset.url.trim();
+          const idArgument = escapeHtml(JSON.stringify(preset.id));
+          const icon = ['server', 'laptop', 'hard-drive'].includes(preset.icon) ? preset.icon : 'server';
+          const badge = isActive ? t('Active server', 'الخادم النشط') : configured ? t('Saved', 'محفوظ') : t('URL not set', 'الرابط غير مُدخل');
+          const action = switching ? t('Switching…', 'جارٍ التبديل…') : isActive ? t('Selected', 'مُختار') : configured ? t('Use this server', 'استخدام هذا الخادم') : t('Set up server', 'إعداد الخادم');
+          return `<article class="storage-server-card" data-active="${isActive}" data-storage-preset-id="${escapeHtml(preset.id)}">
+            <div class="flex flex-wrap items-start justify-between gap-2">
+              <div class="flex min-w-0 items-center gap-2"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700"><i data-lucide="${icon}" class="h-4 w-4"></i></span><h4 class="min-w-0 break-words text-sm font-semibold text-slate-800">${escapeHtml(preset.name)}</h4></div>
+              <span class="rounded-full px-2 py-1 text-xs font-medium ${isActive ? 'bg-blue-50 text-blue-700' : configured ? 'bg-slate-100 text-slate-600' : 'bg-amber-100 text-amber-800'}">${badge}</span>
+            </div>
+            <p class="min-w-0 truncate font-mono text-xs text-slate-500" dir="ltr" title="${escapeHtml(preset.url)}">${escapeHtml(preset.url || t('Enter a server URL to enable switching.', 'أدخل رابط الخادم لتفعيل التبديل.'))}</p>
+            ${isActive ? '<span data-active-storage-connection role="status"></span>' : ''}
+            <div class="storage-server-card-actions">
+              <button type="button" onclick="${configured ? 'switchToStoragePreset' : 'configureStoragePreset'}(${idArgument})" aria-pressed="${isActive}" data-storage-preset-switch="${escapeHtml(preset.id)}" ${storageSettingsSaving || isActive ? 'disabled' : ''} class="storage-server-control inline-flex items-center gap-2 bg-blue-50 px-3 text-xs font-semibold text-blue-700"><i data-lucide="${switching ? 'loader-circle' : isActive ? 'check' : 'arrow-right-left'}" class="h-4 w-4 ${switching ? 'animate-spin' : ''}"></i>${action}</button>
+              <div class="flex items-center gap-1">
+                <button type="button" onclick="configureStoragePreset(${idArgument})" aria-label="${escapeHtml(t('Edit server', 'تعديل الخادم') + ': ' + preset.name)}" class="storage-server-control storage-server-icon-button flex items-center justify-center text-slate-500"><i data-lucide="pencil" class="h-4 w-4"></i></button>
+                <button type="button" onclick="deleteStoragePreset(${idArgument})" aria-label="${escapeHtml(t('Remove server', 'حذف الخادم') + ': ' + preset.name)}" class="storage-server-control storage-server-icon-button flex items-center justify-center text-rose-700"><i data-lucide="trash-2" class="h-4 w-4"></i></button>
+              </div>
+            </div>
+          </article>`;
+        }).join('');
+      }
+      renderStoragePresetConnectionStatus();
+      syncStoragePresetDialogLabels();
+      if (window.lucide) lucide.createIcons();
+    }
+
+    async function switchToStoragePreset(presetId) {
+      if (!currentUserAccess?.isAdmin || storageSettingsSaving) return false;
+      const preset = getStorageServerPresets().find(preset => preset.id === presetId);
+      if (!preset?.url) return false;
+      const previous = getStorageServerConfig();
+      if (storageServerUrlsMatch(preset.url, previous.url) && String(preset.key || '').trim() === previous.key) return true;
+      const urlInput = document.getElementById('settings-storage-url');
+      const keyInput = document.getElementById('settings-storage-key');
+      if (!urlInput || !keyInput) return false;
+      urlInput.value = preset.url;
+      keyInput.value = preset.key ?? previous.key;
+      storagePresetSwitchingId = preset.id;
+      try {
+        const saved = await saveStorageServerSettings();
+        if (!saved) { urlInput.value = previous.url; keyInput.value = previous.key; }
+        return saved;
+      } finally {
+        storagePresetSwitchingId = null;
+        renderStorageServerPresets();
+      }
+    }
+
+    function syncStoragePresetDialogLabels() {
+      const modal = document.getElementById('modal-storage-server');
+      if (!modal) return;
+      const t = (english, arabic) => currentUiLanguage === 'ar' ? arabic : english;
+      modal.dir = currentUiLanguage === 'ar' ? 'rtl' : 'ltr';
+      const labels = {
+        'storage-preset-dialog-title': editingStoragePresetId ? t('Edit server', 'تعديل الخادم') : t('Add server', 'إضافة خادم'),
+        'storage-preset-dialog-description': t('Save this server, then choose it from Quick switch.', 'احفظ هذا الخادم، ثم اختره من التبديل السريع.'),
+        'storage-preset-name-label': t('Server name', 'اسم الخادم'),
+        'storage-preset-url-label': t('Server URL', 'رابط الخادم'),
+        'storage-preset-key-label': t('Clinic secret key', 'المفتاح السري للعيادة'),
+        'storage-preset-dialog-cancel': t('Cancel', 'إلغاء'),
+        'storage-preset-dialog-save-label': t('Save server', 'حفظ الخادم')
+      };
+      Object.entries(labels).forEach(([id, text]) => { document.getElementById(id).textContent = text; });
+      document.getElementById('storage-preset-dialog-close').setAttribute('aria-label', t('Close', 'إغلاق'));
+    }
+
+    function openStoragePresetDialog(presetId = null, useCurrentInputs = false) {
+      if (!currentUserAccess?.isAdmin) return;
+      const preset = presetId ? getStorageServerPresets().find(preset => preset.id === presetId) : null;
+      if (presetId && !preset) return;
+      editingStoragePresetId = preset?.id || null;
+      storagePresetReturnFocus = document.activeElement;
+      const current = getStorageServerConfig();
+      document.getElementById('storage-preset-name').value = preset?.name || '';
+      document.getElementById('storage-preset-url').value = preset?.url || (useCurrentInputs ? document.getElementById('settings-storage-url').value : '');
+      document.getElementById('storage-preset-key').value = preset?.key ?? (useCurrentInputs ? document.getElementById('settings-storage-key').value : current.key);
+      document.getElementById('storage-preset-dialog-message').classList.add('hidden');
+      syncStoragePresetDialogLabels();
+      document.getElementById('modal-storage-server').classList.remove('hidden');
+      if (window.lucide) lucide.createIcons();
+      requestAnimationFrame(() => document.getElementById('storage-preset-name').focus());
+    }
+
+    function closeStoragePresetDialog() {
+      document.getElementById('modal-storage-server')?.classList.add('hidden');
+      editingStoragePresetId = null;
+      if (storagePresetReturnFocus?.isConnected) storagePresetReturnFocus.focus();
+      else document.getElementById('settings-storage-preset')?.focus();
+      storagePresetReturnFocus = null;
+    }
+
+    function handleStoragePresetDialogKeydown(event) {
+      if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeStoragePresetDialog(); return; }
+      if (event.key !== 'Tab') return;
+      const controls = [...event.currentTarget.querySelectorAll('button, input')].filter(control => !control.disabled);
+      const first = controls[0], last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+
+    function saveStoragePresetFromDialog() {
+      if (!currentUserAccess?.isAdmin) return false;
+      const t = (english, arabic) => currentUiLanguage === 'ar' ? arabic : english;
+      const message = document.getElementById('storage-preset-dialog-message');
+      try {
+        const name = document.getElementById('storage-preset-name').value.trim();
+        if (!name) throw new Error(t('Enter a server name.', 'أدخل اسم الخادم.'));
+        let url;
+        try { url = normaliseStoragePresetUrl(document.getElementById('storage-preset-url').value); }
+        catch (_) { throw new Error(t('Enter a valid HTTP or HTTPS server URL.', 'أدخل رابط خادم صحيحاً يبدأ بـ HTTP أو HTTPS.')); }
+        const presets = getStorageServerPresets();
+        if (presets.some(preset => preset.id !== editingStoragePresetId && storageServerUrlsMatch(preset.url, url))) throw new Error(t('This server URL is already in your saved list.', 'رابط هذا الخادم موجود بالفعل في القائمة.'));
+        const existing = presets.find(preset => preset.id === editingStoragePresetId);
+        const uniqueId = typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
+        const entry = { id: existing?.id || 'preset-' + uniqueId, name, url, key: document.getElementById('storage-preset-key').value.trim(), icon: existing?.icon || 'server' };
+        if (existing) Object.assign(existing, entry);
+        else presets.push(entry);
+        saveStorageServerPresets(presets);
+        renderStorageServerPresets();
+        closeStoragePresetDialog();
+        return true;
+      } catch (error) {
+        message.textContent = error.message;
+        message.classList.remove('hidden');
+        return false;
+      }
+    }
+
+    function configureStoragePreset(presetId) {
+      openStoragePresetDialog(presetId);
+    }
+
+    function promptAddStoragePreset() {
+      openStoragePresetDialog();
+    }
+
+    function saveCurrentUrlAsPreset() {
+      openStoragePresetDialog(null, true);
+    }
+
+    function deleteStoragePreset(presetId) {
+      if (!currentUserAccess?.isAdmin) return;
+      const presets = getStorageServerPresets();
+      const preset = presets.find(preset => preset.id === presetId);
+      if (!preset) return;
+      if (!confirm(currentUiLanguage === 'ar' ? `حذف "${preset.name}" من الخوادم المحفوظة؟ سيظل اتصال الخادم الحالي كما هو.` : `Remove "${preset.name}" from saved servers? The current connection will stay as it is.`)) return;
+      try {
+        saveStorageServerPresets(presets.filter(preset => preset.id !== presetId));
+        renderStorageServerPresets();
+      } catch (_) {
+        showStorageSettingsMessage(currentUiLanguage === 'ar' ? 'تعذر حفظ القائمة. يرجى المحاولة مرة أخرى.' : 'Could not save the server list. Please try again.', false);
+      }
+    }
+
 
     function populateStorageServerSettingsInputs() {
       const config = getStorageServerConfig();
@@ -26355,6 +26714,7 @@
       const keyInput = document.getElementById('settings-storage-key');
       if (urlInput && document.activeElement !== urlInput) urlInput.value = config.url;
       if (keyInput && document.activeElement !== keyInput) keyInput.value = config.key;
+      renderStorageServerPresets();
     }
 
     async function openStorageSettings() {
@@ -26362,52 +26722,63 @@
       switchAdminTab('storage');
     }
 
+    function showStorageSettingsMessage(message, success) {
+      const element = document.getElementById('settings-storage-message');
+      if (!element) return;
+      if (storageSettingsMessageTimer) clearTimeout(storageSettingsMessageTimer);
+      element.className = `min-w-0 flex-1 rounded-xl px-3 py-2 text-xs font-medium ${success ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`;
+      element.textContent = message;
+      if (success) storageSettingsMessageTimer = setTimeout(() => element.classList.add('hidden'), 6000);
+    }
+
     async function saveStorageServerSettings() {
+      if (!currentUserAccess?.isAdmin || storageSettingsSaving) return false;
       const urlInput = document.getElementById('settings-storage-url');
       const keyInput = document.getElementById('settings-storage-key');
-      const msg = document.getElementById('settings-storage-message');
-      const saveBtn = document.getElementById('btn-save-storage');
-      if (!urlInput || !keyInput) return;
-
-      const cleanUrl = urlInput.value.trim().replace(/\/+$/, '');
+      if (!urlInput || !keyInput) return false;
+      let cleanUrl;
+      try { cleanUrl = normaliseStoragePresetUrl(urlInput.value); }
+      catch (_) {
+        showStorageSettingsMessage(currentUiLanguage === 'ar' ? 'أدخل رابط خادم صحيحاً يبدأ بـ HTTP أو HTTPS.' : 'Enter a valid HTTP or HTTPS server URL.', false);
+        return false;
+      }
       const cleanKey = keyInput.value.trim();
-
-      clinicStorageServerUrl = cleanUrl;
-      clinicStorageSecretKey = cleanKey;
-
-      localStorage.setItem('lumin_storage_server_url', cleanUrl);
-      localStorage.setItem('lumin_storage_secret_key', cleanKey);
-      refreshStorageConnectionConfig();
-
-      if (saveBtn) saveBtn.disabled = true;
-
+      storageSettingsSaving = true;
+      urlInput.disabled = true;
+      keyInput.disabled = true;
+      renderStorageServerPresets();
       try {
-        if (db) {
-          const { error } = await db
-            .from('clinic_settings')
-            .update({
-              storage_server_url: cleanUrl,
-              storage_secret_key: cleanKey,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', 1);
-          if (error) {
-            console.warn('Could not sync storage settings to database:', error.message);
-          }
-        }
-      } catch (dbErr) {
-        console.warn('Error saving storage settings to database:', dbErr);
+        if (!db) throw new Error('Clinic connection is unavailable.');
+        const { data, error } = await db.from('clinic_settings').update({
+          storage_server_url: cleanUrl,
+          storage_secret_key: cleanKey,
+          updated_at: new Date().toISOString()
+        }).eq('id', 1).select('id').maybeSingle();
+        if (error) throw error;
+        if (!data) throw new Error('The clinic storage settings could not be updated.');
+        clinicStorageServerUrl = cleanUrl;
+        clinicStorageSecretKey = cleanKey;
+        try {
+          localStorage.setItem('lumin_storage_server_url', cleanUrl);
+          localStorage.setItem('lumin_storage_secret_key', cleanKey);
+        } catch (_) { console.warn('Storage settings synced, but could not be cached on this device.'); }
+        urlInput.value = cleanUrl;
+        refreshStorageConnectionConfig();
+        showStorageSettingsMessage(currentUiLanguage === 'ar' ? 'تم حفظ اختيار خادم التخزين ومزامنته للعيادة.' : 'Storage server selection saved and synced to the clinic.', true);
+        void checkStorageServerConnection();
+        return true;
+      } catch (error) {
+        console.warn('Could not save storage server selection:', error.message);
+        showStorageSettingsMessage(currentUiLanguage === 'ar'
+          ? 'تعذر حفظ اختيار الخادم. ظل الخادم السابق نشطاً. يرجى المحاولة مرة أخرى.'
+          : 'Could not save the server selection. The previous server is still active. Please try again.', false);
+        return false;
       } finally {
-        if (saveBtn) saveBtn.disabled = false;
+        storageSettingsSaving = false;
+        urlInput.disabled = false;
+        keyInput.disabled = false;
+        renderStorageServerPresets();
       }
-
-      if (msg) {
-        msg.className = 'min-w-0 flex-1 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700';
-        msg.textContent = currentUiLanguage === 'ar' ? 'تم حفظ ومزامنة إعدادات التخزين لجميع المستخدمين بنجاح.' : 'Storage settings saved and synced to all clinic users!';
-        msg.classList.remove('hidden');
-        setTimeout(() => msg.classList.add('hidden'), 4000);
-      }
-      testStorageServerConnection();
     }
 
     async function testStorageServerConnection() {
