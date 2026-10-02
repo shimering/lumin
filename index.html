@@ -74,7 +74,7 @@
   <script src="vendor/supabase.js"></script>
   <script src="lumin-loyalty.js?v=5"></script>
   <script src="lumin-finance-sync.js?v=2"></script>
-  <script src="lumin-storage-sync.js?v=1"></script>
+  <script src="lumin-storage-sync.js?v=2"></script>
   <link rel="stylesheet" href="lumin-storage-sync.css?v=1" />
   <script src="lumin-patient-swipe.js?v=1"></script>
   <script src="lumin-patients.js?v=4"></script>
@@ -4344,6 +4344,7 @@
       white-space: nowrap;
     }
     .storage-connection-badge[data-state="connected"] { background: #ecfdf5; color: #047857; }
+    .storage-connection-badge[data-state="reconnecting"] { background: #fffbeb; color: #92400e; }
     .storage-connection-badge svg { width: 0.875rem; height: 0.875rem; flex: none; }
     #admin-panel-storage .storage-server-control {
       min-height: 44px;
@@ -26288,11 +26289,14 @@
     let clinicStorageServerUrl = '';
     let clinicStorageSecretKey = '';
     const STORAGE_CONNECTION_POLL_MS = 5000;
-    const STORAGE_CONNECTION_TIMEOUT_MS = 4000;
+    const STORAGE_CONNECTION_TIMEOUT_MS = 12000;
+    const STORAGE_CONNECTION_FAILURE_LIMIT = 3;
     let storageConnectionTimer = null;
     let storageConnectionCheck = null;
     let storageConnectionConfig = null;
     let storageConnectionConnected = false;
+    let storageConnectionState = 'disconnected';
+    let storageConnectionFailures = 0;
 
     function getStorageServerConfig() {
       const dbUrl = (clinicStorageServerUrl || '').trim();
@@ -26307,12 +26311,14 @@
 
     function renderStorageConnectionStatus() {
       const isArabic = currentUiLanguage === 'ar';
+      const reconnecting = storageConnectionState === 'reconnecting';
       const label = storageConnectionConnected
         ? (isArabic ? 'متصل' : 'Connected')
+        : reconnecting ? (isArabic ? 'جارٍ إعادة الاتصال…' : 'Reconnecting…')
         : (isArabic ? 'غير متصل' : 'Not connected');
       const description = isArabic ? `خادم التخزين: ${label}` : `Storage server: ${label}`;
       document.querySelectorAll('[data-storage-connection-badge]').forEach(badge => {
-        badge.dataset.state = storageConnectionConnected ? 'connected' : 'disconnected';
+        badge.dataset.state = storageConnectionState;
         badge.setAttribute('title', description);
         badge.setAttribute('aria-label', description);
         badge.setAttribute('lang', currentUiLanguage);
@@ -26322,7 +26328,7 @@
       });
       const settingsBadge = document.getElementById('settings-storage-status-badge');
       if (settingsBadge) {
-        settingsBadge.className = `rounded-full px-2 py-0.5 text-[10px] font-black ${storageConnectionConnected ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`;
+        settingsBadge.className = `rounded-full px-2 py-0.5 text-[10px] font-black ${storageConnectionConnected ? 'bg-emerald-100 text-emerald-700' : reconnecting ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-700'}`;
         settingsBadge.textContent = label;
       }
       if (typeof renderStoragePresetConnectionStatus === 'function') renderStoragePresetConnectionStatus();
@@ -26343,13 +26349,17 @@
       storageConnectionConfig = config;
       cancelStorageConnectionCheck();
       storageConnectionConnected = false;
+      storageConnectionState = 'disconnected';
+      storageConnectionFailures = 0;
       renderStorageConnectionStatus();
       if (storageConnectionTimer !== null) void checkStorageServerConnection();
     }
 
-    function checkStorageServerConnection({ force = false } = {}) {
+    function checkStorageServerConnection() {
       const config = getStorageServerConfig();
-      if (!force && storageConnectionCheck?.config.url === config.url && storageConnectionCheck?.config.key === config.key) {
+      // Focus/pageshow events can arrive together. Reuse the check instead of
+      // repeatedly aborting a slow tunnel request before it can finish.
+      if (storageConnectionCheck?.config.url === config.url && storageConnectionCheck?.config.key === config.key) {
         return storageConnectionCheck.promise;
       }
       cancelStorageConnectionCheck();
@@ -26360,6 +26370,7 @@
       check.promise = (async () => {
         let data = null;
         let error = null;
+        let transientFailure = true;
         try {
           if (!config.url || navigator.onLine === false) throw new Error('Storage server is unreachable.');
           const response = await fetch(`${config.url}/api/health`, {
@@ -26368,13 +26379,18 @@
             cache: 'no-store',
             signal: check.controller.signal
           });
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          if (!response.ok) {
+            transientFailure = response.status >= 500 || [408, 429].includes(response.status);
+            throw new Error(`HTTP ${response.status}`);
+          }
+          transientFailure = false;
           data = await response.json();
           if (data?.status !== 'online' || data?.service !== 'Lumin Local Storage Server') {
             throw new Error('Invalid storage server health response.');
           }
         } catch (err) {
           error = err.name === 'AbortError' ? new Error('Storage server connection timed out.') : err;
+          if (check.controller.signal.aborted) transientFailure = true;
         } finally {
           clearTimeout(check.timeout);
         }
@@ -26384,6 +26400,15 @@
         if (storageConnectionCheck === check) storageConnectionCheck = null;
         if (current) {
           storageConnectionConnected = !error;
+          if (!error) {
+            storageConnectionFailures = 0;
+            storageConnectionState = 'connected';
+          } else {
+            storageConnectionFailures += 1;
+            storageConnectionState = transientFailure
+              && storageConnectionFailures < STORAGE_CONNECTION_FAILURE_LIMIT
+              && storageConnectionState !== 'disconnected' ? 'reconnecting' : 'disconnected';
+          }
           renderStorageConnectionStatus();
         }
         return { connected: !error, data, error, current };
@@ -26405,6 +26430,8 @@
       storageConnectionTimer = null;
       cancelStorageConnectionCheck();
       storageConnectionConnected = false;
+      storageConnectionState = 'disconnected';
+      storageConnectionFailures = 0;
       renderStorageConnectionStatus();
     }
 
@@ -26424,7 +26451,7 @@
       renderStorageConnectionStatus();
       if (window.lucide) lucide.createIcons();
       const recheck = () => {
-        if (storageConnectionTimer !== null && document.visibilityState === 'visible') void checkStorageServerConnection({ force: true });
+        if (storageConnectionTimer !== null && document.visibilityState === 'visible') void checkStorageServerConnection();
       };
       window.addEventListener('online', recheck);
       window.addEventListener('focus', recheck);
@@ -26432,6 +26459,8 @@
       window.addEventListener('offline', () => {
         cancelStorageConnectionCheck();
         storageConnectionConnected = false;
+        storageConnectionState = 'disconnected';
+        storageConnectionFailures = 0;
         renderStorageConnectionStatus();
       });
       document.addEventListener('visibilitychange', () => {
@@ -26510,11 +26539,12 @@
     }
 
     function renderStoragePresetConnectionStatus() {
+      const reconnecting = storageConnectionState === 'reconnecting';
       document.querySelectorAll('[data-active-storage-connection]').forEach(label => {
-        label.className = `text-xs font-medium ${storageConnectionConnected ? 'text-emerald-700' : 'text-rose-700'}`;
+        label.className = `text-xs font-medium ${storageConnectionConnected ? 'text-emerald-700' : reconnecting ? 'text-amber-800' : 'text-rose-700'}`;
         const text = currentUiLanguage === 'ar'
-          ? (storageConnectionConnected ? 'متصل' : 'غير متصل')
-          : (storageConnectionConnected ? 'Connected' : 'Not connected');
+          ? (storageConnectionConnected ? 'متصل' : reconnecting ? 'جارٍ إعادة الاتصال…' : 'غير متصل')
+          : (storageConnectionConnected ? 'Connected' : reconnecting ? 'Reconnecting…' : 'Not connected');
         if (label.textContent !== text) label.textContent = text;
       });
     }

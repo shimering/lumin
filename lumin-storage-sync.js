@@ -54,10 +54,12 @@
   }
 
   function errorText(error) {
+    if (error.status === 404) return t(
+      'Update and restart the storage server on both computers, then try pairing again.',
+      'حدّث خادم التخزين وأعد تشغيله على الجهازين، ثم حاول الاقتران مجدداً.');
     if (t('en', 'ar') === 'en') return error.message;
     if (error.status === 401) return 'سجّل الدخول مجدداً بحساب مسؤول للمزامنة.';
     if (error.status === 403) return 'تحتاج هذه العملية إلى صلاحيات مسؤول نشط.';
-    if (error.status === 404) return 'حدّث خادم التخزين على الجهازين لدعم المزامنة.';
     if (error.status === 409) return 'تحقق من اختيار جهازين مختلفين وإعداد الاقتران، ثم أعد المحاولة. قد تكون الملفات تغيرت أثناء المزامنة.';
     return 'تعذر إكمال العملية. تأكد من تشغيل الجهازين وصحة الروابط وتوفر الاتصال والمساحة، ثم أعد المحاولة.';
   }

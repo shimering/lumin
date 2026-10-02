@@ -38,7 +38,7 @@ function harness() {
   const query = { update(value) { writes.push(value); return this; }, eq() { return this; }, select() { return this; }, maybeSingle: () => Promise.resolve(saveResult) };
   const ctx = vm.createContext({
     URL, crypto: { randomUUID }, currentUiLanguage: 'en', currentUserAccess: { isAdmin: true },
-    storageConnectionConnected: false, clinicStorageServerUrl: '', clinicStorageSecretKey: '',
+    storageConnectionConnected: false, storageConnectionState: 'disconnected', clinicStorageServerUrl: '', clinicStorageSecretKey: '',
     document: { getElementById: element, querySelectorAll: () => [], activeElement: element('return-focus') },
     localStorage: { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) },
     window: {}, console: { warn() {} }, requestAnimationFrame: fn => fn(),
@@ -160,7 +160,7 @@ test('real Storage Server subtab supports adding and one-step switching with acc
   await page.goto(origin);
   await page.addScriptTag({ url: origin + '/vendor/lucide.min.js' });
   await page.addScriptTag({ content: `
-    let currentUiLanguage='en', currentUserAccess={isAdmin:true}, clinicStorageServerUrl='', clinicStorageSecretKey='', storageConnectionConnected=false;
+    let currentUiLanguage='en', currentUserAccess={isAdmin:true}, clinicStorageServerUrl='', clinicStorageSecretKey='', storageConnectionConnected=false, storageConnectionState='disconnected';
     let writeCount=0;
     const db={from:()=>({update(){writeCount++;return this},eq(){return this},select(){return this},async maybeSingle(){return {data:{id:1},error:null}}})};
     function escapeHtml(value){return String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;')}

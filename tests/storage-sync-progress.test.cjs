@@ -21,6 +21,15 @@ test('progress is indeterminate during scans, byte-based for transfers, operatio
   assert.equal(p({status:'completed_with_conflicts',totalBytes:100,transferredBytes:100}).percent,100);
 });
 
+test('missing sync endpoints explain that both server processes need updating and restarting in English and Arabic', () => {
+  const ctx = vm.createContext({window:{addEventListener(){}}, document:{addEventListener(){}}, currentUiLanguage:'en'});
+  vm.runInContext(syncSource.replace('window.LuminStorageSync =', 'window.syncErrorText = errorText; window.LuminStorageSync ='), ctx);
+  const error = Object.assign(new Error('Storage request failed (HTTP 404).'), {status:404});
+  assert.equal(ctx.window.syncErrorText(error), 'Update and restart the storage server on both computers, then try pairing again.');
+  ctx.currentUiLanguage = 'ar';
+  assert.equal(ctx.window.syncErrorText(error), 'حدّث خادم التخزين وأعد تشغيله على الجهازين، ثم حاول الاقتران مجدداً.');
+});
+
 let chromium;
 try { ({chromium}=require('playwright')); } catch (_) {}
 test('Storage Server panel pairs once, syncs in one click, restores progress, retries, and supports responsive Arabic/English controls', {skip:!chromium && 'Playwright unavailable'}, async t => {

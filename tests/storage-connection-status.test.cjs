@@ -56,7 +56,8 @@ test('checks the actual storage service without cached responses and recovers af
   assert.equal(h.requests[0].options.headers['x-lumin-key'], 'test-key');
   h.ctx.fetch = async () => { throw Error('Network failure'); };
   assert.equal((await h.ctx.checkStorageServerConnection()).connected, false);
-  assert.equal(h.text.textContent, 'Not connected');
+  assert.equal(h.text.textContent, 'Reconnecting…');
+  assert.equal(h.badge.dataset.state, 'reconnecting');
   h.ctx.fetch = async () => response();
   await h.ctx.checkStorageServerConnection();
   assert.equal(h.text.textContent, 'Connected');
@@ -85,7 +86,7 @@ test('a hung health check times out and releases the request for recovery', asyn
   });
   const pending = h.ctx.checkStorageServerConnection();
   const timeout = [...h.timeouts.values()][0];
-  assert.equal(timeout.delay, 4000);
+  assert.equal(timeout.delay, 12000);
   timeout.fn();
   const result = await pending;
   assert.match(result.error.message, /timed out/);
@@ -93,6 +94,53 @@ test('a hung health check times out and releases the request for recovery', asyn
   h.ctx.fetch = async () => response();
   assert.equal((await h.ctx.checkStorageServerConnection()).connected, true);
   assert.equal(h.timeouts.size, 0);
+});
+
+test('transient failures retry visibly, a sustained outage disconnects, and recovery resets the failure count', async () => {
+  const h = harness();
+  await h.ctx.checkStorageServerConnection();
+  h.ctx.fetch = async () => response({}, 503);
+  for (const expected of ['reconnecting', 'reconnecting', 'disconnected', 'disconnected']) {
+    assert.equal((await h.ctx.checkStorageServerConnection()).connected, false);
+    assert.equal(h.badge.dataset.state, expected);
+  }
+  h.ctx.fetch = async () => response();
+  await h.ctx.checkStorageServerConnection();
+  assert.equal(h.badge.dataset.state, 'connected');
+  h.ctx.fetch = async () => { throw Error('Network failure'); };
+  await h.ctx.checkStorageServerConnection();
+  assert.equal(h.badge.dataset.state, 'reconnecting', 'recovery begins a fresh retry cycle');
+  h.ctx.currentUiLanguage = 'ar';
+  h.ctx.renderStorageConnectionStatus();
+  assert.equal(h.text.textContent, 'جارٍ إعادة الاتصال…');
+  assert.equal(h.badge.attributes['aria-label'], 'خادم التخزين: جارٍ إعادة الاتصال…');
+  assert.equal(h.badge.attributes.dir, 'rtl');
+});
+
+test('invalid credentials disconnect immediately instead of being treated as a tunnel interruption', async () => {
+  const h = harness();
+  await h.ctx.checkStorageServerConnection();
+  h.ctx.fetch = async () => response({}, 401);
+  assert.equal((await h.ctx.checkStorageServerConnection()).connected, false);
+  assert.equal(h.badge.dataset.state, 'disconnected');
+});
+
+test('focus, pageshow, and overlapping polls do not abort a slow health request', async () => {
+  const h = harness();
+  h.ctx.startStorageConnectionMonitor();
+  await settle();
+  let release, pendingSignal, count = 0;
+  h.ctx.fetch = (_url, { signal }) => new Promise(resolve => { count++; pendingSignal = signal; release = resolve; });
+  const pending = h.ctx.checkStorageServerConnection();
+  h.windowListeners.get('focus')();
+  h.windowListeners.get('pageshow')();
+  [...h.intervals.values()][0].fn();
+  assert.equal(count, 1);
+  assert.equal(pendingSignal.aborted, false);
+  assert.equal(h.ctx.checkStorageServerConnection({ force: true }), pending);
+  release(response());
+  assert.equal((await pending).connected, true);
+  assert.equal(h.badge.dataset.state, 'connected');
 });
 
 test('polls every five seconds only while active and visible, and coalesces overlapping checks', async () => {
@@ -220,6 +268,21 @@ test('title badges remain borderless, readable, and inside page bars on desktop,
     document.getElementById('auth-gate').classList.add('hidden');
     void checkStorageServerConnection();` });
   await page.waitForFunction(() => document.querySelector('[data-storage-connection-badge]').dataset.state === 'connected');
+  // A real tunnel response taking more than the old four-second deadline
+  // must finish even if focus/pageshow events arrive while it is pending.
+  await page.route('**/api/health', async route => {
+    await new Promise(resolve => setTimeout(resolve, 4500));
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify(healthy) });
+  });
+  await page.evaluate(async () => {
+    startStorageConnectionMonitor();
+    const pending = checkStorageServerConnection();
+    window.dispatchEvent(new Event('focus'));
+    window.dispatchEvent(new Event('pageshow'));
+    if (!(await pending).connected) throw Error('Slow tunnel response was rejected');
+  });
+  await page.unroute('**/api/health');
+  await page.evaluate(() => { clearInterval(storageConnectionTimer); storageConnectionTimer = null; });
   for (const width of [320, 390, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     for (const language of ['en', 'ar']) {
@@ -251,6 +314,30 @@ test('title badges remain borderless, readable, and inside page bars on desktop,
           assert.equal(result.icon, true);
         }
       }
+    }
+  }
+  // The retry state is distinct from a healthy connection and fits in RTL
+  // mobile page headings without clipping or introducing a hard border.
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const language of ['en', 'ar']) {
+      await page.evaluate(({ language }) => {
+        currentUiLanguage = language;
+        document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+        document.querySelectorAll('#app-main [id^="view-"]').forEach(element => element.classList.toggle('hidden', element.id !== 'view-dashboard'));
+        document.getElementById('patient-workspace-sheet').classList.add('hidden');
+        storageConnectionConnected = false;
+        storageConnectionState = 'reconnecting';
+        renderStorageConnectionStatus();
+      }, { language });
+      const result = await page.locator('[data-storage-connection-badge]:visible').evaluate(badge => {
+        const rect = badge.getBoundingClientRect(), bar = badge.closest('.app-page-bar').getBoundingClientRect();
+        return { inside: rect.left >= bar.left && rect.right <= bar.right + 1, color: getComputedStyle(badge).color, border: getComputedStyle(badge).borderTopWidth, label: badge.textContent };
+      });
+      assert.equal(result.inside, true, `${width}px, ${language}: retry badge fits`);
+      assert.equal(result.color, 'rgb(146, 64, 14)');
+      assert.equal(result.border, '0px');
+      assert.equal(result.label, language === 'ar' ? 'جارٍ إعادة الاتصال…' : 'Reconnecting…');
     }
   }
   // The longer disconnected label must fit too, including the raised theme.
