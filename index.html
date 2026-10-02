@@ -4325,6 +4325,24 @@
       box-shadow: none;
     }
     .app-page-heading { display: flex; min-width: 0; align-items: center; gap: 0.625rem; }
+    .app-page-heading-with-storage { max-width: 100%; flex-wrap: wrap; row-gap: 0.375rem; }
+    .storage-connection-badge {
+      display: inline-flex;
+      flex: 0 0 auto;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.375rem 0.625rem;
+      border: 0;
+      border-radius: 999px;
+      background: #fff1f2;
+      color: #be123c;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      line-height: 1;
+      white-space: nowrap;
+    }
+    .storage-connection-badge[data-state="connected"] { background: #ecfdf5; color: #047857; }
+    .storage-connection-badge svg { width: 0.875rem; height: 0.875rem; flex: none; }
     .app-page-icon {
       display: flex;
       width: 2.25rem;
@@ -11080,7 +11098,7 @@
 
     function isUiTranslationExcluded(node) {
       const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
-      return Boolean(element?.closest('#view-chart, #view-admin, #view-prices, .patient-workspace-name'));
+      return Boolean(element?.closest('#view-chart, #view-admin, #view-prices, .patient-workspace-name, [data-storage-connection-badge]'));
     }
 
     function arabicUiPhrase(source) {
@@ -11251,6 +11269,7 @@
         time: appointmentTimeFormatter.format(new Date(entry.startAt))
       }));
       translateUiTree(document.body, currentUiLanguage);
+      renderStorageConnectionStatus();
       if (financeSyncSnapshot && hasPageAccess('admin')) renderFinanceSyncSnapshot();
       if (typeof syncVoiceFabBadge === 'function') syncVoiceFabBadge();
       if (typeof syncVoiceEngineSettingsUI === 'function') syncVoiceEngineSettingsUI();
@@ -11484,6 +11503,7 @@
     }
 
     function prepareAuthSurface() {
+      stopStorageConnectionMonitor();
       resetUiTheme();
       document.documentElement.classList.remove('appointments-calendar-active');
       document.body.classList.remove('appointments-calendar-active');
@@ -12448,6 +12468,7 @@
       if (typeof populateStorageServerSettingsInputs === 'function') {
         populateStorageServerSettingsInputs();
       }
+      refreshStorageConnectionConfig();
       clinicWhatsAppDispatchMode = String(data?.whatsapp_dispatch_mode || 'cloud_api').trim() === 'external' ? 'external' : 'cloud_api';
       applyClinicWhatsAppAiEnabled(data?.whatsapp_enabled !== false);
       const timeFormatChanged = useTwelveHourTime !== Boolean(data?.use_12_hour_time);
@@ -12888,6 +12909,7 @@
         void sendOneSignalIdentity();
         postToLuminHost({ type: 'lumin:request-host-state' });
         startRealtimeSync();
+        startStorageConnectionMonitor();
         lucide.createIcons();
       } catch (error) {
         stopRealtimeSync();
@@ -13003,6 +13025,7 @@
       authLogoutInProgress = true;
       resetAuthRecoveryState();
       stopRealtimeSync();
+      stopStorageConnectionMonitor();
       postToLuminHost({ type: 'lumin:logout' });
       if (window.OneSignal && oneSignalInitialized) {
         try { void OneSignal.logout(); } catch (_) {}
@@ -26167,6 +26190,12 @@
     let lightboxInverted = false;
     let clinicStorageServerUrl = '';
     let clinicStorageSecretKey = '';
+    const STORAGE_CONNECTION_POLL_MS = 5000;
+    const STORAGE_CONNECTION_TIMEOUT_MS = 4000;
+    let storageConnectionTimer = null;
+    let storageConnectionCheck = null;
+    let storageConnectionConfig = null;
+    let storageConnectionConnected = false;
 
     function getStorageServerConfig() {
       const dbUrl = (clinicStorageServerUrl || '').trim();
@@ -26177,6 +26206,147 @@
         url: savedUrl.trim().replace(/\/+$/, ''),
         key: savedKey.trim()
       };
+    }
+
+    function renderStorageConnectionStatus() {
+      const isArabic = currentUiLanguage === 'ar';
+      const label = storageConnectionConnected
+        ? (isArabic ? 'متصل' : 'Connected')
+        : (isArabic ? 'غير متصل' : 'Not connected');
+      const description = isArabic ? `خادم التخزين: ${label}` : `Storage server: ${label}`;
+      document.querySelectorAll('[data-storage-connection-badge]').forEach(badge => {
+        badge.dataset.state = storageConnectionConnected ? 'connected' : 'disconnected';
+        badge.setAttribute('title', description);
+        badge.setAttribute('aria-label', description);
+        badge.setAttribute('lang', currentUiLanguage);
+        badge.setAttribute('dir', isArabic ? 'rtl' : 'ltr');
+        const text = badge.querySelector('[data-storage-connection-label]');
+        if (text && text.textContent !== label) text.textContent = label;
+      });
+      const settingsBadge = document.getElementById('settings-storage-status-badge');
+      if (settingsBadge) {
+        settingsBadge.className = `rounded-full px-2 py-0.5 text-[10px] font-black ${storageConnectionConnected ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`;
+        settingsBadge.textContent = label;
+      }
+    }
+
+    function cancelStorageConnectionCheck() {
+      const check = storageConnectionCheck;
+      storageConnectionCheck = null;
+      if (check) {
+        clearTimeout(check.timeout);
+        check.controller.abort();
+      }
+    }
+
+    function refreshStorageConnectionConfig() {
+      const config = getStorageServerConfig();
+      if (storageConnectionConfig?.url === config.url && storageConnectionConfig?.key === config.key) return;
+      storageConnectionConfig = config;
+      cancelStorageConnectionCheck();
+      storageConnectionConnected = false;
+      renderStorageConnectionStatus();
+      if (storageConnectionTimer !== null) void checkStorageServerConnection();
+    }
+
+    function checkStorageServerConnection({ force = false } = {}) {
+      const config = getStorageServerConfig();
+      if (!force && storageConnectionCheck?.config.url === config.url && storageConnectionCheck?.config.key === config.key) {
+        return storageConnectionCheck.promise;
+      }
+      cancelStorageConnectionCheck();
+      const check = { config, controller: new AbortController(), timeout: null, promise: null };
+      storageConnectionCheck = check;
+      storageConnectionConfig = config;
+      check.timeout = setTimeout(() => check.controller.abort(), STORAGE_CONNECTION_TIMEOUT_MS);
+      check.promise = (async () => {
+        let data = null;
+        let error = null;
+        try {
+          if (!config.url || navigator.onLine === false) throw new Error('Storage server is unreachable.');
+          const response = await fetch(`${config.url}/api/health`, {
+            method: 'GET',
+            headers: { 'x-lumin-key': config.key },
+            cache: 'no-store',
+            signal: check.controller.signal
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          data = await response.json();
+          if (data?.status !== 'online' || data?.service !== 'Lumin Local Storage Server') {
+            throw new Error('Invalid storage server health response.');
+          }
+        } catch (err) {
+          error = err.name === 'AbortError' ? new Error('Storage server connection timed out.') : err;
+        } finally {
+          clearTimeout(check.timeout);
+        }
+        const currentConfig = getStorageServerConfig();
+        const current = storageConnectionCheck === check
+          && currentConfig.url === config.url && currentConfig.key === config.key;
+        if (storageConnectionCheck === check) storageConnectionCheck = null;
+        if (current) {
+          storageConnectionConnected = !error;
+          renderStorageConnectionStatus();
+        }
+        return { connected: !error, data, error, current };
+      })();
+      return check.promise;
+    }
+
+    function startStorageConnectionMonitor() {
+      if (storageConnectionTimer !== null) return;
+      storageConnectionTimer = setInterval(() => {
+        if (document.visibilityState === 'visible' && navigator.onLine !== false) void checkStorageServerConnection();
+      }, STORAGE_CONNECTION_POLL_MS);
+      renderStorageConnectionStatus();
+      void checkStorageServerConnection();
+    }
+
+    function stopStorageConnectionMonitor() {
+      if (storageConnectionTimer !== null) clearInterval(storageConnectionTimer);
+      storageConnectionTimer = null;
+      cancelStorageConnectionCheck();
+      storageConnectionConnected = false;
+      renderStorageConnectionStatus();
+    }
+
+    function setupStorageConnectionMonitor() {
+      document.querySelectorAll('#dashboard-intro .app-page-heading, #view-chart .app-page-bar .app-page-heading').forEach(heading => {
+        if (heading.querySelector('[data-storage-connection-badge]')) return;
+        const badge = document.createElement('span');
+        badge.className = 'storage-connection-badge';
+        badge.setAttribute('data-storage-connection-badge', '');
+        badge.setAttribute('role', 'status');
+        badge.setAttribute('aria-live', 'polite');
+        badge.setAttribute('aria-atomic', 'true');
+        badge.innerHTML = '<i data-lucide="hard-drive" aria-hidden="true"></i><span data-storage-connection-label></span>';
+        heading.classList.add('app-page-heading-with-storage');
+        heading.appendChild(badge);
+      });
+      renderStorageConnectionStatus();
+      if (window.lucide) lucide.createIcons();
+      const recheck = () => {
+        if (storageConnectionTimer !== null && document.visibilityState === 'visible') void checkStorageServerConnection({ force: true });
+      };
+      window.addEventListener('online', recheck);
+      window.addEventListener('focus', recheck);
+      window.addEventListener('pageshow', recheck);
+      window.addEventListener('offline', () => {
+        cancelStorageConnectionCheck();
+        storageConnectionConnected = false;
+        renderStorageConnectionStatus();
+      });
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') recheck();
+        else cancelStorageConnectionCheck();
+      });
+      window.addEventListener('storage', event => {
+        if (event.key === 'lumin_storage_server_url' || event.key === 'lumin_storage_secret_key' || event.key === null) {
+          clinicStorageServerUrl = localStorage.getItem('lumin_storage_server_url') || '';
+          clinicStorageSecretKey = localStorage.getItem('lumin_storage_secret_key') || '';
+          refreshStorageConnectionConfig();
+        }
+      });
     }
 
     function populateStorageServerSettingsInputs() {
@@ -26207,6 +26377,7 @@
 
       localStorage.setItem('lumin_storage_server_url', cleanUrl);
       localStorage.setItem('lumin_storage_secret_key', cleanKey);
+      refreshStorageConnectionConfig();
 
       if (saveBtn) saveBtn.disabled = true;
 
@@ -26258,12 +26429,10 @@
       }
 
       try {
-        const resp = await fetch(`${config.url}/api/health`, {
-          method: 'GET',
-          headers: { 'x-lumin-key': config.key }
-        });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data = await resp.json();
+        const result = await checkStorageServerConnection();
+        if (!result.current) return false;
+        if (!result.connected) throw result.error;
+        const data = result.data;
         if (badge) {
           badge.className = 'rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700';
           badge.textContent = currentUiLanguage === 'ar' ? 'متصل بالخادم' : 'Connected';
@@ -41379,6 +41548,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     // Startup Initialization
     window.addEventListener('DOMContentLoaded', async () => {
       syncNavMountLocation();
+      setupStorageConnectionMonitor();
       setupMobileNavigation();
       setupPatientWorkspaceSwipeBack();
       postToLuminHost({ type: 'lumin:request-host-state' });
