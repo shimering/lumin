@@ -5,6 +5,7 @@ node_modules/
 .idea/
 *.log
 .venv/
+storage-server/.lumin-sync/
 **/__pycache__/
 *.exe
 storage-server/Storage

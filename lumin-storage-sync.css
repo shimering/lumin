@@ -1,0 +1,37 @@
+.storage-sync-panel { min-width:0; padding:24px; border:1px solid #e2e8f0; border-radius:16px; background:var(--lumin-face,#fff); }
+.storage-sync-heading { display:flex; align-items:flex-start; gap:12px; }
+.storage-sync-icon { display:flex; flex:none; align-items:center; justify-content:center; width:44px; height:44px; border-radius:50%; background:#eff6ff; color:#2563eb; }
+.storage-sync-panel svg { width:18px; height:18px; flex:none; }
+.storage-sync-panel h4 { margin:0; font-size:16px; font-weight:600; letter-spacing:-.02em; color:#0f172a; }
+.storage-sync-heading p { margin:4px 0 0; font-size:13px; line-height:1.6; color:#64748b; }
+.storage-sync-selectors { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-top:20px; }
+.storage-sync-selectors label { min-width:0; }
+.storage-sync-selectors label>span { display:block; margin-bottom:8px; font-size:12px; font-weight:600; color:#475569; }
+.storage-sync-panel select,.storage-sync-panel button { min-width:44px; min-height:44px; border-radius:12px; transition:background-color 150ms ease-out,transform 150ms ease-out; }
+.storage-sync-panel select { width:100%; padding:10px 12px; border:1px solid #e2e8f0; background:#f8fafc; color:#334155; font-size:14px; }
+.storage-sync-panel button { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:10px 16px; border:0; background:#f1f5f9; color:#334155; font-size:13px; font-weight:600; }
+.storage-sync-panel #storage-sync-start { background:#eff6ff; color:#1d4ed8; }
+.storage-sync-panel :is(button,select):hover:not(:disabled) { background:#e2e8f0; }
+.storage-sync-panel button:active:not(:disabled) { transform:scale(.98); }
+.storage-sync-panel :is(button,select):focus-visible { outline:2px solid #3b82f6; outline-offset:3px; }
+.storage-sync-panel :is(button,select):disabled { opacity:.5; pointer-events:none; }
+.storage-sync-actions { display:flex; flex-wrap:wrap; gap:12px; margin-top:16px; }
+.storage-sync-note { margin:12px 0 0; font-size:12px; line-height:1.7; color:#64748b; overflow-wrap:anywhere; }
+.storage-sync-progress { margin-top:24px; padding:16px; border-radius:12px; background:#f8fafc; }
+.storage-sync-progress-heading { display:flex; justify-content:space-between; gap:12px; font-size:13px; font-weight:600; color:#334155; }
+.storage-sync-track { position:relative; margin-top:12px; height:8px; overflow:hidden; border-radius:999px; background:#e2e8f0; }
+.storage-sync-track>span { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,#2563eb,#06b6d4); transition:width 250ms ease-out; }
+.storage-sync-track[data-status="failed"]>span { background:#e11d48; }
+.storage-sync-track[data-status="completed_with_conflicts"]>span { background:#d97706; }
+.storage-sync-track[data-status="completed"]>span { background:#059669; }
+.storage-sync-indeterminate>span { animation:storage-sync-scan 1.6s ease-in-out infinite alternate; }
+[dir="rtl"] .storage-sync-indeterminate>span { animation-name:storage-sync-scan-rtl; }
+.storage-sync-message { margin:16px 0 0; color:#64748b; font-size:12px; line-height:1.7; overflow-wrap:anywhere; }
+.storage-sync-message[data-error="true"] { padding:12px; border-radius:12px; background:#fff1f2; color:#be123c; }
+.storage-sync-conflicts { display:grid; gap:8px; margin:16px 0 0; padding:0; list-style:none; }
+.storage-sync-conflicts li { display:flex; flex-direction:column; gap:4px; padding:12px; border-radius:12px; background:#fffbeb; color:#92400e; font-size:12px; overflow-wrap:anywhere; }
+.storage-sync-panel .hidden { display:none; }
+@keyframes storage-sync-scan { from { transform:translateX(0); } to { transform:translateX(185%); } }
+@keyframes storage-sync-scan-rtl { from { transform:translateX(0); } to { transform:translateX(-185%); } }
+@media(max-width:639px) { .storage-sync-panel { padding:20px; } .storage-sync-selectors { grid-template-columns:minmax(0,1fr); } .storage-sync-panel select { font-size:16px; } .storage-sync-actions>button { flex:1; } }
+@media(prefers-reduced-motion:reduce) { .storage-sync-indeterminate>span { animation:none; width:100%!important; opacity:.6; } .storage-sync-track>span { transition:none; } }

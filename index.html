@@ -74,6 +74,8 @@
   <script src="vendor/supabase.js"></script>
   <script src="lumin-loyalty.js?v=5"></script>
   <script src="lumin-finance-sync.js?v=2"></script>
+  <script src="lumin-storage-sync.js?v=1"></script>
+  <link rel="stylesheet" href="lumin-storage-sync.css?v=1" />
   <script src="lumin-patient-swipe.js?v=1"></script>
   <script src="lumin-patients.js?v=4"></script>
   <script src="lumin-chart-sync.js?v=1"></script>
@@ -7015,6 +7017,8 @@
                 <!-- Dynamically rendered -->
               </div>
             </div>
+
+            <section id="storage-sync-panel" class="storage-sync-panel" aria-labelledby="storage-sync-title" translate="no"></section>
 
             <div>
               <div class="flex items-center justify-between mb-1.5">
@@ -16747,6 +16751,9 @@
       }
       if (showStorage) {
         populateStorageServerSettingsInputs();
+        window.LuminStorageSync?.open();
+      } else {
+        window.LuminStorageSync?.close();
       }
 
       accessTab.className = adminActiveTab === 'access' ? activeClass : inactiveClass;
@@ -26455,7 +26462,7 @@
       {
         id: 'preset-dedicated',
         name: 'Dedicated Clinic PC (Main)',
-        url: '',
+        url: 'https://desktop-qqh9t0j.tailf46d13.ts.net',
         key: 'LuminClinicKey_2026',
         icon: 'server'
       },
@@ -26576,6 +26583,7 @@
       }
       renderStoragePresetConnectionStatus();
       syncStoragePresetDialogLabels();
+      window.LuminStorageSync?.render();
       if (window.lucide) lucide.createIcons();
     }
 

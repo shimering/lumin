@@ -13,6 +13,9 @@ from datetime import datetime
 from pathlib import Path
 import shutil
 import urllib.request
+import urllib.parse
+import threading
+from file_sync import SyncEngine, SyncError, install_sync_routes, safe_path, json_request
 from PIL import Image, ImageOps
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -72,7 +75,7 @@ logging.basicConfig(
 logger = logging.getLogger("LuminStorage")
 
 # Load configuration
-CONFIG_FILE = Path(__file__).parent / "config.json"
+CONFIG_FILE = Path(os.environ.get("LUMIN_STORAGE_CONFIG", str(Path(__file__).parent / "config.json")))
 DEFAULT_CONFIG = {
     "port": 5000,
     "storage_path": "D:\\LuminStorage\\Patients",
@@ -146,6 +149,49 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 app.config['MAX_CONTENT_LENGTH'] = config["max_file_size_mb"] * 1024 * 1024
 
+_sync_engine = None
+_sync_engine_lock = threading.Lock()
+
+
+def get_sync_engine():
+    global _sync_engine
+    with _sync_engine_lock:
+        if _sync_engine is None:
+            _sync_engine = SyncEngine(
+                STORAGE_ROOT,
+                config.get('sync_state_path') or Path(__file__).parent / '.lumin-sync',
+                config['allowed_extensions'], generate_thumbnail)
+    return _sync_engine
+
+
+def require_sync_admin(authorization):
+    """Validate the JWT with Auth, then read the current role through caller-scoped RLS."""
+    if not authorization.startswith('Bearer ') or not authorization[7:].strip():
+        raise SyncError('Sign in as an administrator to synchronize storage.', 401)
+    headers = {'apikey': SUPABASE_ANON_KEY, 'Authorization': authorization}
+    try:
+        user = json_request(SUPABASE_URL + '/auth/v1/user', headers=headers)
+        user_id = user.get('id')
+        if not user_id:
+            raise SyncError('Invalid administrator session.', 401)
+        query = urllib.parse.urlencode({
+            'select': 'active,access_roles(is_admin)', 'user_id': 'eq.' + user_id})
+        profiles = json_request(SUPABASE_URL + '/rest/v1/user_profiles?' + query, headers=headers)
+    except SyncError as error:
+        raise SyncError('Administrator verification failed. Sign in again or check the connection.',
+                        401 if error.status in (401, 403) else 503)
+    if not isinstance(profiles, list) or len(profiles) != 1:
+        raise SyncError('Active administrator access is required.', 403)
+    profile = profiles[0]
+    role = profile.get('access_roles')
+    if isinstance(role, list):
+        role = role[0] if len(role) == 1 else None
+    if not profile.get('active') or not isinstance(role, dict) or role.get('is_admin') is not True:
+        raise SyncError('Active administrator access is required.', 403)
+
+
+install_sync_routes(app, get_sync_engine, require_sync_admin)
+
 
 def verify_auth():
     """Verify clinic secret key from headers or query parameters."""
@@ -163,6 +209,9 @@ def check_authentication():
     # Public health check
     if request.path == "/api/health":
         return
+    # These routes validate their own separate server-to-server pairing credentials.
+    if request.path.startswith('/api/sync/peer/'):
+        return
     # Check key for other routes
     if not verify_auth():
         return jsonify({"error": "Unauthorized. Invalid or missing clinic secret key."}), 401
@@ -171,7 +220,7 @@ def check_authentication():
 def health_check():
     """Health check endpoint to verify server status and storage access."""
     try:
-        total_folders = len([d for d in STORAGE_ROOT.iterdir() if d.is_dir()])
+        total_folders = len([d for d in STORAGE_ROOT.iterdir() if d.is_dir() and not d.name.startswith('.')])
     except Exception:
         total_folders = 0
     return jsonify({
@@ -180,7 +229,8 @@ def health_check():
         "timestamp": datetime.now().isoformat(),
         "storageRoot": str(STORAGE_ROOT),
         "totalPatientFolders": total_folders,
-        "maxFileSizeMB": config["max_file_size_mb"]
+        "maxFileSizeMB": config["max_file_size_mb"],
+        "syncProtocol": 1
     })
 
 @app.route("/api/upload", methods=["POST"])
@@ -217,8 +267,7 @@ def upload_file():
     saved_filename = f"{date_str}_{timestamp_unique}_{original_filename}"
 
     file_path = target_dir / saved_filename
-    uploaded_file.save(str(file_path))
-    generate_thumbnail(file_path)
+    get_sync_engine().save_upload(uploaded_file, file_path.relative_to(STORAGE_ROOT).as_posix())
 
     relative_path = str(file_path.relative_to(STORAGE_ROOT)).replace("\\", "/")
     file_size = file_path.stat().st_size
@@ -259,7 +308,7 @@ def list_patient_files(patient_id):
 
     # 3. Match legacy folders starting with patient_id_ or ending with _patient_name
     for d in STORAGE_ROOT.iterdir():
-        if d.is_dir() and d not in matched_dirs:
+        if d.is_dir() and not d.name.startswith('.') and d not in matched_dirs:
             if d.name.startswith(f"{safe_patient_id}_"):
                 matched_dirs.append(d)
             elif safe_patient_name and d.name.endswith(f"_{safe_patient_name}"):
@@ -267,8 +316,11 @@ def list_patient_files(patient_id):
 
     files_list = []
     for patient_dir in matched_dirs:
-        for root, _, files in os.walk(patient_dir):
+        for root, directories, files in os.walk(patient_dir):
+            directories[:] = [name for name in directories if not name.startswith('.')]
             for filename in files:
+                if filename.startswith('.'):
+                    continue
                 full_path = Path(root) / filename
                 rel_path = full_path.relative_to(STORAGE_ROOT)
                 category = full_path.parent.name
@@ -295,17 +347,14 @@ def delete_file():
         return jsonify({"error": "relativePath parameter is required."}), 400
 
     # Ensure path stays within STORAGE_ROOT (prevent directory traversal)
-    clean_rel_path = Path(rel_path_str.replace("\\", "/")).as_posix().lstrip("/")
-    target_path = (STORAGE_ROOT / clean_rel_path).resolve()
-
-    if not str(target_path).startswith(str(STORAGE_ROOT)):
-        return jsonify({"error": "Forbidden path access."}), 403
+    target_path = safe_path(STORAGE_ROOT, rel_path_str)
+    clean_rel_path = target_path.relative_to(STORAGE_ROOT).as_posix()
 
     if not target_path.exists() or not target_path.is_file():
         return jsonify({"error": "File not found."}), 404
 
     try:
-        target_path.unlink()
+        get_sync_engine().delete_local(clean_rel_path)
         thumb_candidate = (THUMBNAIL_ROOT / clean_rel_path).with_suffix(".webp")
         if thumb_candidate.exists():
             try:
@@ -314,6 +363,8 @@ def delete_file():
                 pass
         logger.info(f"Deleted: {clean_rel_path}")
         return jsonify({"success": True, "message": "File deleted successfully", "deletedPath": clean_rel_path})
+    except SyncError:
+        raise
     except Exception as e:
         logger.error(f"Failed to delete {clean_rel_path}: {e}")
         return jsonify({"error": f"Failed to delete file: {e}"}), 500
@@ -328,11 +379,8 @@ def move_file():
     if not rel_path_str or not target_category:
         return jsonify({"error": "relativePath and targetCategory are required."}), 400
 
-    clean_rel_path = Path(rel_path_str.replace("\\", "/")).as_posix().lstrip("/")
-    source_path = (STORAGE_ROOT / clean_rel_path).resolve()
-
-    if not str(source_path).startswith(str(STORAGE_ROOT)):
-        return jsonify({"error": "Forbidden path access."}), 403
+    source_path = safe_path(STORAGE_ROOT, rel_path_str)
+    clean_rel_path = source_path.relative_to(STORAGE_ROOT).as_posix()
 
     if not source_path.exists() or not source_path.is_file():
         return jsonify({"error": "Source file not found."}), 404
@@ -361,7 +409,7 @@ def move_file():
             suffix = dest_path.suffix
             dest_path = dest_dir / f"{stem}_{int(datetime.now().timestamp())}{suffix}"
 
-        shutil.move(str(source_path), str(dest_path))
+        get_sync_engine().move_local(clean_rel_path, dest_path.relative_to(STORAGE_ROOT).as_posix())
 
         # Move or update thumbnail
         old_thumb = (THUMBNAIL_ROOT / clean_rel_path).with_suffix(".webp")
@@ -387,6 +435,8 @@ def move_file():
             "newCategory": target_category,
             "filename": dest_path.name
         })
+    except SyncError:
+        raise
     except Exception as e:
         logger.error(f"Failed to move file {clean_rel_path}: {e}")
         return jsonify({"error": f"Failed to move file: {e}"}), 500
@@ -395,10 +445,8 @@ def move_file():
 def get_thumbnail(filename):
     """Serve a lightweight, compressed WebP thumbnail (max 480x480) for instant preview loading."""
     try:
-        clean_filename = Path(filename.replace("\\", "/")).as_posix().lstrip("/")
-        requested = (STORAGE_ROOT / clean_filename).resolve()
-        if not str(requested).startswith(str(STORAGE_ROOT)):
-            return jsonify({"error": "Access denied."}), 403
+        requested = safe_path(STORAGE_ROOT, filename)
+        clean_filename = requested.relative_to(STORAGE_ROOT).as_posix()
 
         if not requested.exists() or not requested.is_file():
             return jsonify({"error": "File not found."}), 404
@@ -414,6 +462,8 @@ def get_thumbnail(filename):
         resp = send_from_directory(STORAGE_ROOT, clean_filename)
         resp.headers["Cache-Control"] = "public, max-age=86400"
         return resp
+    except SyncError:
+        raise
     except Exception as e:
         logger.error(f"Error serving thumbnail {filename}: {e}")
         return jsonify({"error": str(e)}), 500
@@ -421,7 +471,7 @@ def get_thumbnail(filename):
 @app.route("/files/<path:filename>", methods=["GET"])
 def serve_file(filename):
     """Stream or serve the raw full-resolution image / file to the browser."""
-    clean_filename = Path(filename.replace("\\", "/")).as_posix().lstrip("/")
+    clean_filename = safe_path(STORAGE_ROOT, filename).relative_to(STORAGE_ROOT).as_posix()
     resp = send_from_directory(STORAGE_ROOT, clean_filename)
     resp.headers["Cache-Control"] = "public, max-age=86400"
     return resp

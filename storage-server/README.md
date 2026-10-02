@@ -73,3 +73,52 @@ You can edit `config.json` in Notepad to customize:
 * Cloudflare needs outbound access to `api.trycloudflare.com` on port 443 to create a quick tunnel and to its tunnel endpoints on port 7844 (UDP for QUIC, TCP for HTTP/2). HTTP/2 cannot fix a network that blocks both protocols. See [Cloudflare connection troubleshooting](https://developers.cloudflare.com/tunnel/troubleshooting/).
 * If the server is not ready, check `http://127.0.0.1:5000/api/health` on the storage computer, substituting the configured port if different. Check `server.log` or the `start-server.bat` window for the underlying error.
 * Quick tunnel URLs change after restarting. Use the URL verified by the current running launcher; `start-storage.bat` syncs it automatically when the database is reachable.
+
+## One-click patient-file synchronization
+
+Install the updated `server.py` and its new companion `file_sync.py` on **both**
+computers, keeping each computer's own `config.json`, storage folders, and private
+`.lumin-sync` directory. Restart each storage server using its existing launcher.
+No new Python packages or Supabase migrations are required.
+
+In **Admin → Storage Server**:
+
+1. Save the laptop and dedicated PC URLs and clinic keys in **Saved servers**.
+   Both addresses must be reachable from the dedicated PC. A laptop's `localhost`
+   address identifies the dedicated PC when used there; use its LAN or HTTPS address instead.
+2. In **Sync patient files**, select the dedicated PC and laptop, then click
+   **Pair servers** once. Pairing requires an active Lumin administrator session
+   and stores a separate secret on the servers. It does not switch active storage.
+3. Verify with disposable patient files first, then click **Sync now** to transfer
+   patient files. Both computers must stay on. The browser may be closed after
+   starting; reopen the panel to recover the current job and its progress.
+
+The first run merges files. Subsequent runs replicate additions, changes,
+deletions, and category moves in both directions. If one copy is edited while
+the other is deleted, the edited copy is preserved and marked for review.
+Conflicting edits keep both originals and create deterministic conflict copies.
+Review these files before deciding which version to retain. There is no automatic schedule.
+
+Progress shows scanning, transfer bytes/file counts, deletions, verification, and
+completion. A restart or connection failure leaves a failed job; **Retry** scans
+again, skips verified transfers, and restarts unfinished files. Updated tunnel
+URLs can be applied by editing the saved profile and clicking **Update pairing**.
+The existing coordinator remains the dedicated PC.
+
+Private runtime data lives in `storage-server/.lumin-sync/` (or the optional
+`sync_state_path` configured outside patient storage). `archive/<unique-id>/`
+retains original folder paths for files removed or replaced through Lumin or sync.
+To recover a version, copy it from that archive back to its original patient path;
+the next sync recognizes it as a new local change. Archives are retained until
+manually cleared and are not served or replicated. Ordinary File Explorer
+deletions can only be archived on the other server while its copy still exists.
+
+Back up each machine's patient folders **and its own private sync state**. Do not
+copy `.lumin-sync` from one computer to the other: each machine needs a distinct
+identity and deletion history. Patient files, pairing credentials, archives, and
+runtime databases must stay out of Git and deployment packages.
+
+Administrator verification uses Supabase Auth and the existing active
+`user_profiles → access_roles.is_admin` relationship. No service-role key is used.
+If administrator verification is unavailable, starting or pairing a job fails
+closed; an already authorized background job uses its server pairing credentials.
