@@ -4,6 +4,7 @@ const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
+const vm = require('node:vm');
 let chromium;
 try { ({ chromium } = require('playwright')); } catch (_) {}
 const root = path.resolve(__dirname, '..');
@@ -17,6 +18,33 @@ const head = html.slice(0, html.indexOf('</head>') + 7).replace(/<script\b[^>]*>
 const chartStart = html.indexOf('    <section id="view-chart"');
 const chart = html.slice(chartStart, html.indexOf('    </section>', chartStart) + 14).replace('class="hidden space-y-6"', 'class="space-y-6"');
 const helpers = ['isPrimaryToothId', 'palmerPositionForSlot', 'palmerQuadrantForSlot', 'palmerQuadrantLabel', 'palmerToothNotation', 'chartToothLabel', 'renderToothHTML', 'renderEmptyToothHTML', 'toothDentitionLongPressTarget', 'beginToothDentitionLongPress', 'cancelToothDentitionLongPress', 'initLuminVoiceSpacebarShortcut', 'patientMediaToothLabel', 'patientMediaDisplayName', 'patientMediaDownloadName', 'patientMediaFileUrl', 'openPatientMediaLightboxByIndex', 'updateAppViewportDimensions'].map(source).join('\n');
+
+test('X-ray upload dates use upload timestamps, retain the saved upload date after edits, and handle older files', () => {
+  const context=vm.createContext({window:{matchMedia:()=>({matches:false})},document:{addEventListener(){}},currentUiLanguage:'en',escapeHtml:value=>String(value)});
+  vm.runInContext(fs.readFileSync(path.join(root,'lumin-chart-media.js'),'utf8'),context);
+  const markup=context.chartXrayUploadDateMarkup({uploadedAt:'2026-09-12T12:00:00Z',modifiedAt:'2026-10-02T12:00:00Z'});
+  assert.match(markup,/Uploaded/);
+  assert.match(markup,/12 Sept 2026/);
+  assert.match(markup,/datetime="2026-09-12T12:00:00.000Z"/);
+  const savedEpoch=Date.parse('2026-09-12T12:00:00Z')/1000;
+  assert.match(context.chartXrayUploadDateMarkup({filename:`2026-09-12_${savedEpoch}_xray.png`,modifiedAt:'2026-10-02T12:00:00Z'}),/12 Sept 2026/);
+  assert.match(context.chartXrayUploadDateMarkup({modifiedAt:'2026-09-01T12:00:00Z'}),/1 Sept 2026/);
+  for(const file of [{},{modifiedAt:'invalid'},{uploadedAt:'<script>alert(1)</script>'}]) {
+    assert.match(context.chartXrayUploadDateMarkup(file),/Upload date unavailable/);
+    assert.doesNotMatch(context.chartXrayUploadDateMarkup(file),/<script>|Invalid Date|1970/);
+  }
+  context.currentUiLanguage='ar';
+  assert.match(context.chartXrayUploadDateMarkup({modifiedAt:'2026-09-12T12:00:00Z'}),/تاريخ الرفع/);
+  assert.match(context.chartXrayUploadDateMarkup({}),/تاريخ الرفع غير متوفر/);
+});
+
+async function settleChartMediaMotion(page) {
+  await page.evaluate(async()=>{
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    const running=document.getElementById('chart-clinical-workspace').getAnimations({subtree:true}).filter(animation=>Number.isFinite(animation.effect.getTiming().iterations));
+    await Promise.all(running.map(animation=>animation.finished.catch(()=>{})));
+  });
+}
 
 test('landscape chart viewer stays on the right while scrolling; attachment previews and patient changes are isolated', { skip: !chromium && 'Playwright is not available' }, async t => {
   const fixture = head + '<body><header id="app-header" style="height:64px;padding:20px;font-weight:600">LUMIN · Dental clinic</header><main id="app-main"><header id="patient-workspace-header" style="height:64px;padding:20px;background:white;border-radius:16px;margin-bottom:16px">Ahmed Hassan · Dental chart</header>' + chart + '</main></body></html>';
@@ -33,7 +61,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
   t.after(() => new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }));
   const browser = await chromium.launch({ headless: true, channel: process.env.LUMIN_TEST_BROWSER_CHANNEL || undefined });
   t.after(() => browser.close());
-  const page = await browser.newPage();
+  const page = await browser.newPage({reducedMotion:'reduce',timezoneId:'Africa/Cairo'});
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/api/thumbnail/**', route => route.fulfill({contentType:'image/svg+xml', body:'<svg xmlns="http://www.w3.org/2000/svg" width="600" height="460"><rect width="600" height="460" fill="#151b23"/><path d="M150 160 Q200 110 245 160 L265 330 L240 330 L205 230 L170 330 L150 320 Z M295 160 Q350 110 395 160 L410 330 L385 330 L350 240 L310 330 L290 320 Z" fill="#b4bac4" stroke="#697386" stroke-width="8"/><text x="160" y="410" font-size="24" fill="#94a3b8">Test radiograph</text></svg>'}));
@@ -65,8 +93,8 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
     const SLOT_BY_PRIMARY_TOOTH = Object.fromEntries(Object.entries(PRIMARY_TOOTH_BY_SLOT).map(([slot,tooth]) => [tooth,Number(slot)]));
     const filesByPatient = {
       'patient-1': [
-        {filename:'preop.png',relativePath:'Ahmed/Periapical/preop.png',category:'Periapical',sizeBytes:2048},
-        {filename:'child.png',relativePath:'Ahmed/Panoramic/child.png',category:'Panoramic',sizeBytes:1024},
+        {filename:'preop.png',relativePath:'Ahmed/Periapical/preop.png',category:'Periapical',sizeBytes:2048,uploadedAt:'2026-09-12T12:00:00Z',modifiedAt:'2026-10-02T12:00:00Z'},
+        {filename:'child.png',relativePath:'Ahmed/Panoramic/child.png',category:'Panoramic',sizeBytes:1024,modifiedAt:'2026-09-01T12:00:00Z'},
         {filename:'lab.pdf',relativePath:'Ahmed/Lab/lab.pdf',category:'Lab',sizeBytes:4096},
         {filename:'report.txt',relativePath:'Ahmed/General/report.txt',category:'General',sizeBytes:128},
         {filename:'scan.dcm',relativePath:'Ahmed/General/scan.dcm',category:'General',sizeBytes:4096},
@@ -96,7 +124,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
     ${helpers}
   ` });
   await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-media-teeth.js?v=1`});
-  await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-chart-media.js?v=5`});
+  await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-chart-media.js?v=6`});
   await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-mobile-nav.js?v=1`});
   await page.evaluate(() => {
     document.dispatchEvent(new Event('DOMContentLoaded'));
@@ -127,6 +155,8 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
       assert.equal(await page.locator('#chart-media-panel').evaluate(element => getComputedStyle(element).direction),language === 'ar' ? 'rtl' : 'ltr');
       assert.equal(await page.locator('.chart-media-thumbnail').count(), 1, 'Viewer is filtered to the tapped tooth');
       assert.equal(await page.locator('.chart-media-caption h4').textContent(), 'UR6 before treatment');
+      assert.equal(await page.locator('.chart-media-upload-date time').getAttribute('datetime'),'2026-09-12T12:00:00.000Z');
+      assert.match(await page.locator('.chart-media-upload-date').textContent(),language==='ar'?/تاريخ الرفع/:/Uploaded 12 Sept 2026/);
       assert.equal(await page.evaluate(() => [window.toothSelections, window.dentitionSwitches].join(',')), '0,0', 'Indicators do not select teeth or switch dentition');
       assert.ok(await page.locator('.chart-media-filter').isVisible());
       await page.locator('.chart-media-filter button').click();
@@ -198,6 +228,84 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
     }
   }
   await page.setViewportSize({width:1180,height:820});
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  for(const language of ['en','ar']) {
+    await page.setViewportSize({width:1280,height:820});
+    await page.evaluate(language=>{currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';chartPatientMedia.collapsed=true;renderChartMediaPanel();window.scrollTo(0,0);},language);
+    await settleChartMediaMotion(page);
+    const rail=await page.locator('#chart-media-panel').boundingBox();
+    assert.ok(rail.width<=57);
+    await page.locator('[data-tooth-xray-slot="3"] button').click();
+    const opening=await page.evaluate(()=>document.getElementById('chart-clinical-workspace').getAnimations({subtree:true}).filter(animation=>animation.playState==='running').length);
+    assert.ok(opening>0,'Opening animates the width and morphing header');
+    await page.waitForTimeout(90);
+    const middle=await page.locator('#chart-media-panel').boundingBox();
+    await settleChartMediaMotion(page);
+    const expanded=await page.locator('#chart-media-panel').boundingBox();
+    assert.ok(middle.width>rail.width+2&&middle.width<expanded.width-1,'Panel widens gradually from the rail');
+    assert.ok(middle.height>rail.height&&middle.height<expanded.height+1,'The rail morphs into the taller viewer');
+    assert.equal(await page.locator('.chart-media-upload-date time').getAttribute('datetime'),'2026-09-12T12:00:00.000Z');
+    if(language==='en')await page.screenshot({path:path.join(screenshots,'chart-xray-upload-date.png')});
+    await page.locator('#chart-media-collapse').click();
+    assert.equal(await page.locator('#chart-media-panel-body').evaluate(body=>body.inert),true,'Collapsing content cannot receive focus');
+    await page.waitForTimeout(90);
+    const closing=await page.locator('#chart-media-panel').boundingBox();
+    assert.ok(closing.width>rail.width+1&&closing.width<expanded.width-2,'Closing smoothly returns to the rail');
+    await settleChartMediaMotion(page);
+    assert.ok(!(await page.locator('#chart-media-panel-body').isVisible()));
+    const title=await page.locator('.chart-media-panel-header h3').boundingBox();
+    const collapsed=await page.locator('#chart-media-panel').boundingBox();
+    assert.ok(title.x>=collapsed.x&&title.x+title.width<=collapsed.x+collapsed.width+1,'Morphed title stays inside the rail in both languages');
+    await page.evaluate(async()=>{
+      toggleChartMediaPanel();await new Promise(resolve=>setTimeout(resolve,80));
+      toggleChartMediaPanel();await new Promise(resolve=>setTimeout(resolve,60));
+      toggleChartMediaPanel();
+    });
+    await settleChartMediaMotion(page);
+    assert.equal(await page.locator('#chart-media-collapse').getAttribute('aria-expanded'),'true');
+    assert.equal(await page.locator('.chart-media-thumbnail').count(),1,'Rapid reversal retains the tooth filter');
+    assert.equal(await page.locator('#chart-media-panel-body').evaluate(body=>body.inert),false);
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    await page.locator('#chart-media-collapse').click();await settleChartMediaMotion(page);
+  }
+  await page.setViewportSize({width:390,height:844});
+  await page.locator('[data-tooth-xray-slot="3"] button').click();
+  assert.ok(await page.evaluate(()=>chartMediaSheetAnimation?.playState==='running'),'Phone sheet slides in');
+  await settleChartMediaMotion(page);
+  assert.ok(await page.locator('.chart-media-preview').isVisible());
+  await page.keyboard.press('Escape');
+  assert.ok(await page.evaluate(()=>chartMediaSheetAnimation?.playState==='running'),'Phone sheet slides out');
+  await settleChartMediaMotion(page);
+  assert.ok(!(await page.locator('#chart-media-panel').isVisible()));
+  assert.equal(await page.evaluate(()=>document.body.classList.contains('chart-media-sheet-open')),false,'Closing restores page scrolling');
+  await page.evaluate(async()=>{
+    showChartToothXrays('3');await new Promise(resolve=>setTimeout(resolve,70));
+    toggleChartMediaPanel();await new Promise(resolve=>setTimeout(resolve,60));
+    showChartToothXrays('4');
+  });
+  await settleChartMediaMotion(page);
+  assert.ok(await page.locator('.chart-media-preview').isVisible(),'Reversing a mobile close preserves the reopened sheet');
+  assert.equal(await page.evaluate(()=>chartPatientMedia.filterToothId),'4');
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await page.keyboard.press('Escape');
+  assert.ok(!(await page.locator('#chart-media-panel').isVisible()),'Reduced motion closes immediately');
+  assert.equal(await page.evaluate(()=>chartMediaSheetAnimation),null);
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  await page.locator('[data-tooth-xray-slot="3"] button').click();
+  await page.evaluate(async()=>{activePatientId='patient-2';await loadChartPatientMedia();});
+  assert.ok(!(await page.locator('#chart-media-panel').isVisible()),'Changing patients immediately cancels an old sheet animation');
+  assert.equal(await page.evaluate(()=>chartMediaSheetAnimation),null);
+  assert.equal(await page.evaluate(()=>document.body.classList.contains('chart-media-sheet-open')),false);
+  await page.evaluate(async()=>{activePatientId='patient-1';await loadChartPatientMedia();});
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await page.setViewportSize({width:1280,height:820});
+  await page.locator('#chart-media-collapse').click();
+  assert.equal(await page.evaluate(()=>{
+    const workspace=document.getElementById('chart-clinical-workspace'),panel=document.getElementById('chart-media-panel');
+    return workspace.getAnimations({subtree:true}).filter(animation=>animation.effect.target===workspace||panel.contains(animation.effect.target)).length;
+  }),0,'Reduced motion skips morphing and sliding');
+  await page.locator('#chart-media-collapse').click();
+
   await page.evaluate(async () => {
     currentUiLanguage='en'; document.documentElement.dir='ltr'; window.scrollTo(0,0);
     filesByPatient['patient-1'].push({filename:'followup.png',relativePath:'Ahmed/Periapical/followup.png',category:'Periapical'}, {filename:'unassigned.png',relativePath:'Ahmed/Panoramic/unassigned.png',category:'Panoramic'});
@@ -319,7 +427,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
     ${helpers}
   `});
   await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-media-teeth.js?v=1`});
-  await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-chart-media.js?v=5`});
+  await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-chart-media.js?v=6`});
   await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-mobile-nav.js?v=1`});
   await page.evaluate(() => {
     document.getElementById('auth-gate').classList.add('hidden');

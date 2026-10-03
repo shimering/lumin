@@ -79,7 +79,7 @@
   <script src="lumin-patient-swipe.js?v=1"></script>
   <script src="lumin-patients.js?v=4"></script>
   <script src="lumin-chart-sync.js?v=1"></script>
-  <script src="lumin-chart-media.js?v=5"></script>
+  <script src="lumin-chart-media.js?v=6"></script>
   <script src="lumin-chart-dates.js?v=1"></script>
   <link rel="stylesheet" href="lumin-chart-dates.css?v=1" />
   <script src="lumin-media-teeth.js?v=1"></script>
@@ -5478,7 +5478,7 @@
   <link rel="stylesheet" href="lumin-patients.css?v=3" />
   <link rel="stylesheet" href="lumin-finance-sync.css?v=2" />
   <link rel="stylesheet" href="lumin-mobile-nav.css?v=2" />
-  <link rel="stylesheet" href="lumin-chart-media.css?v=2" />
+  <link rel="stylesheet" href="lumin-chart-media.css?v=3" />
   <link rel="stylesheet" href="lumin-media-teeth.css?v=1" />
   <style id="finance-ledger-styles">
     #finance-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -6916,7 +6916,7 @@
       </div>
       <aside id="chart-media-panel" class="chart-media-panel" aria-labelledby="chart-media-panel-title">
         <header class="chart-media-panel-header"><h3><i data-lucide="scan-line" aria-hidden="true"></i><span id="chart-media-panel-title">X-rays</span></h3><button id="chart-media-collapse" type="button" class="chart-media-button" onclick="toggleChartMediaPanel()" aria-controls="chart-media-panel-body" aria-expanded="false" aria-label="Expand X-ray viewer"><i data-lucide="panel-right-open"></i></button></header>
-        <div id="chart-media-panel-body" class="chart-media-panel-body" aria-live="polite"></div>
+        <div class="chart-media-panel-content"><div class="chart-media-panel-scroll"><div id="chart-media-panel-body" class="chart-media-panel-body" aria-live="polite"></div></div></div>
       </aside>
       </div>
       <button id="findings-invoice-button" type="button" onclick="invoiceSelectedFindings()" disabled aria-hidden="true" class="hidden fixed left-1/2 z-[72] min-w-40 -translate-x-1/2 items-center justify-center gap-2 rounded-full border border-violet-400/30 bg-violet-600 px-6 py-3.5 text-sm font-black text-white shadow-[0_16px_38px_rgba(76,29,149,0.38)] transition hover:bg-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-wait disabled:opacity-75">

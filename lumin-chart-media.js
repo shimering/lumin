@@ -4,9 +4,60 @@ let chartMediaPreviousFocus = null;
 let patientAttachmentState = null;
 let patientAttachmentRequest = 0;
 const chartMediaLandscape = window.matchMedia('(min-width: 768px) and (orientation: landscape)');
+const chartMediaReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+let chartMediaSheetAnimation = null;
+let chartMediaSheetTargetOpen = false;
+let chartMediaSheetPatientId = null;
 
 function chartMediaText(english, arabic) {
   return currentUiLanguage === 'ar' ? arabic : english;
+}
+
+function chartXrayUploadDateMarkup(file) {
+  // Uploads retain their Unix timestamp in the storage filename, even after edits.
+  const savedTimestamp = /^\d{4}-\d{2}-\d{2}_(\d{10})_/.exec(String(file.filename || ''))?.[1];
+  const rawDate = file.uploadedAt || (savedTimestamp ? new Date(Number(savedTimestamp) * 1000).toISOString() : file.modifiedAt);
+  const timestamp = rawDate ? Date.parse(rawDate) : NaN;
+  if (!Number.isFinite(timestamp)) return `<p class="chart-media-upload-date"><i data-lucide="calendar-days" aria-hidden="true"></i><span>${chartMediaText('Upload date unavailable', 'تاريخ الرفع غير متوفر')}</span></p>`;
+  const date = new Date(timestamp);
+  const label = new Intl.DateTimeFormat(currentUiLanguage === 'ar' ? 'ar-EG' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+  return `<p class="chart-media-upload-date"><i data-lucide="calendar-days" aria-hidden="true"></i><span>${chartMediaText('Uploaded', 'تاريخ الرفع')}</span> <time datetime="${date.toISOString()}">${escapeHtml(label)}</time></p>`;
+}
+
+function updateChartMediaSheetVisibility(panel, open, chartActive) {
+  const root = document.documentElement;
+  const wasVisible = root.classList.contains('chart-media-sheet-open');
+  const samePatient = chartMediaSheetPatientId === chartPatientMedia.patientId;
+  const animate = !chartMediaReducedMotion.matches && typeof panel.animate === 'function' && chartActive && !chartMediaIsLandscape()
+    && (open || (wasVisible && samePatient));
+  if (chartMediaSheetAnimation && animate && samePatient && chartMediaSheetTargetOpen === open) return;
+  const oldTransform = wasVisible ? getComputedStyle(panel).transform : 'translateY(100%) scale(.98)';
+  const oldOpacity = wasVisible ? getComputedStyle(panel).opacity : '0';
+  chartMediaSheetAnimation?.cancel();
+  chartMediaSheetAnimation = null;
+  chartMediaSheetTargetOpen = open;
+  chartMediaSheetPatientId = chartPatientMedia.patientId;
+  const show = visible => {
+    root.classList.toggle('chart-media-sheet-open', visible);
+    document.body.classList.toggle('chart-media-sheet-open', visible);
+    const backdrop = document.getElementById('chart-media-backdrop');
+    if (backdrop) backdrop.hidden = !visible;
+    if (visible) { panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true'); }
+    else { panel.removeAttribute('role'); panel.removeAttribute('aria-modal'); }
+  };
+  show(open || (animate && wasVisible));
+  if (!animate || (wasVisible === open && oldTransform === 'none')) return;
+  const animation = panel.animate([
+    { transform: oldTransform, opacity: oldOpacity },
+    { transform: open ? 'translateY(0) scale(1)' : 'translateY(100%) scale(.98)', opacity: open ? 1 : 0 }
+  ], { duration: 360, easing: 'cubic-bezier(.22, 1, .36, 1)', fill: 'both' });
+  chartMediaSheetAnimation = animation;
+  animation.finished.then(() => {
+    if (chartMediaSheetAnimation !== animation) return;
+    chartMediaSheetAnimation = null;
+    show(open);
+    animation.cancel();
+  }).catch(() => {});
 }
 
 function chartMediaIsLandscape() {
@@ -181,18 +232,15 @@ function renderChartMediaPanel() {
   document.body.classList.toggle('chart-media-active', chartActive);
   workspace.classList.toggle('is-media-collapsed', chartPatientMedia.collapsed);
   const sheetOpen = chartActive && !chartMediaIsLandscape() && !chartPatientMedia.collapsed;
-  document.documentElement.classList.toggle('chart-media-sheet-open', sheetOpen);
-  document.body.classList.toggle('chart-media-sheet-open', sheetOpen);
   let backdrop = document.getElementById('chart-media-backdrop');
   if (sheetOpen && !backdrop) {
     backdrop = document.createElement('div');
     backdrop.id = 'chart-media-backdrop';
-    backdrop.addEventListener('click', toggleChartMediaPanel);
+    backdrop.addEventListener('click', () => { if (!chartPatientMedia.collapsed) toggleChartMediaPanel(); });
     document.body.appendChild(backdrop);
   }
-  if (backdrop) backdrop.hidden = !sheetOpen;
-  if (sheetOpen) { panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true'); }
-  else { panel.removeAttribute('role'); panel.removeAttribute('aria-modal'); }
+  body.inert = chartPatientMedia.collapsed;
+  body.setAttribute('aria-hidden', String(chartPatientMedia.collapsed));
   const expand = chartMediaText('Expand X-ray viewer', 'توسيع عارض الأشعة');
   const collapse = sheetOpen ? chartMediaText('Close X-ray viewer', 'إغلاق عارض الأشعة') : chartMediaText('Collapse X-ray viewer', 'طي عارض الأشعة');
   const panelToggle = document.getElementById('chart-media-collapse');
@@ -226,13 +274,14 @@ function renderChartMediaPanel() {
     body.innerHTML = `
       <p class="chart-media-summary" data-media-user-content dir="auto">${escapeHtml(getKnownPatient(chartPatientMedia.patientId)?.name || '')}</p>
       <button type="button" class="chart-media-preview" onclick="openChartPatientMediaFile(${index})" aria-label="${escapeHtml(chartMediaText('Open X-ray: ', 'فتح الأشعة: ') + name)}"><img src="${escapeHtml(patientMediaThumbnailUrl(file))}" alt="${escapeHtml(name)}" data-media-user-content onerror="fallbackChartMediaImage(this, ${index})" /></button>
-      <div class="chart-media-caption"><h4 data-media-user-content dir="auto">${escapeHtml(name)}</h4>${tooth ? `<span class="chart-media-tooth" dir="auto">${escapeHtml(tooth)}</span>` : ''}${note ? `<p class="chart-media-note" data-media-user-content dir="auto">${escapeHtml(note)}</p>` : ''}</div>
+      <div class="chart-media-caption"><h4 data-media-user-content dir="auto">${escapeHtml(name)}</h4>${chartXrayUploadDateMarkup(file)}${tooth ? `<span class="chart-media-tooth" dir="auto">${escapeHtml(tooth)}</span>` : ''}${note ? `<p class="chart-media-note" data-media-user-content dir="auto">${escapeHtml(note)}</p>` : ''}</div>
       <div class="chart-media-nav"><button type="button" class="chart-media-button is-neutral" onclick="stepChartPatientXray(-1)" aria-label="${chartMediaText('Previous X-ray', 'الأشعة السابقة')}" ${xrays.length < 2 ? 'disabled' : ''}><i data-lucide="chevron-left"></i></button><span dir="ltr">${selected + 1} / ${xrays.length}</span><button type="button" class="chart-media-button is-neutral" onclick="openChartPatientMediaFile(${index})" aria-label="${chartMediaText('Enlarge X-ray', 'تكبير الأشعة')}"><i data-lucide="maximize-2"></i></button><button type="button" class="chart-media-button is-neutral" onclick="stepChartPatientXray(1)" aria-label="${chartMediaText('Next X-ray', 'الأشعة التالية')}" ${xrays.length < 2 ? 'disabled' : ''}><i data-lucide="chevron-right"></i></button></div>
       <div class="chart-media-thumbnails" aria-label="${chartMediaText('Patient X-rays', 'أشعة المريض')}">${xrays.map(item => `<button type="button" class="chart-media-thumbnail" onclick="selectChartPatientXray(${chartPatientMedia.files.indexOf(item)})" aria-pressed="${item === file}" aria-label="${escapeHtml(patientMediaDisplayName(item))}"><img src="${escapeHtml(patientMediaThumbnailUrl(item))}" alt="" loading="lazy" onerror="fallbackChartMediaImage(this, ${chartPatientMedia.files.indexOf(item)})" /></button>`).join('')}</div>${chartMediaPanelActions()}`;
   }
   if (chartPatientMedia.detailsError) body.insertAdjacentHTML('afterbegin', `<p class="chart-media-summary" role="status">${chartMediaText('Saved names, tooth assignments, and notes could not be loaded.', 'تعذر تحميل الأسماء وتحديد الأسنان والملاحظات المحفوظة.')}</p>`);
   if (chartPatientMedia.filterToothId) body.insertAdjacentHTML('afterbegin', `<div class="chart-media-filter"><span class="chart-media-tooth" dir="auto"><i data-lucide="filter" aria-hidden="true"></i>${escapeHtml(patientMediaToothLabel(chartPatientMedia.filterToothId))}</span><button type="button" class="chart-media-button is-neutral" onclick="clearChartXrayFilter()"><i data-lucide="x" aria-hidden="true"></i>${chartMediaText('Show all X-rays', 'عرض كل الأشعة')}</button></div>`);
   renderChartToothXrayIndicators();
+  updateChartMediaSheetVisibility(panel, sheetOpen, chartActive);
   updateChartMediaStickyTop();
   if (window.lucide) lucide.createIcons();
   if (sheetOpen && focusWasInsidePanel && !panel.contains(document.activeElement)) panelToggle.focus({ preventScroll: true });
@@ -436,11 +485,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const observer = new ResizeObserver(updateChartMediaStickyTop);
   ['app-header', 'patient-workspace-header'].forEach(id => { const element = document.getElementById(id); if (element) observer.observe(element); });
   chartMediaLandscape.addEventListener('change', () => renderChartMediaPanel());
+  chartMediaReducedMotion.addEventListener('change', () => renderChartMediaPanel());
   renderChartMediaPanel();
 });
 
 document.addEventListener('keydown', event => {
-  if (!document.documentElement.classList.contains('chart-media-sheet-open') || patientAttachmentState
+  if (!document.documentElement.classList.contains('chart-media-sheet-open') || chartPatientMedia.collapsed || patientAttachmentState
     || document.querySelector('#patient-media-lightbox:not(.hidden)')) return;
   if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); toggleChartMediaPanel(); return; }
   if (event.key !== 'Tab') return;
