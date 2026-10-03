@@ -224,7 +224,7 @@ test('real finding cards retain controls during rapid chart edits on mobile, tab
     const page=await browser.newPage({viewport:{width,height:915}});
     const errors=[];page.on('pageerror',error=>errors.push(error.message));
     try{
-      await page.setContent('<div id="findings-invoice-selection-summary"></div><button id="findings-invoice-button"></button><div id="findings-container" style="height:400px;overflow:auto"></div>');
+      await page.setContent('<button id="findings-invoice-button"></button><div id="findings-container" style="height:400px;overflow:auto"></div>');
       await page.addScriptTag({path:path.join(root,'vendor/lucide.min.js')});
       await page.addScriptTag({content:bootstrap+`
         var windowLucide=window.lucide, documentedFindingsTab='treatment',documentedFindingsStatusFilter='all';

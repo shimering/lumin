@@ -51,6 +51,7 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
   await page.addScriptTag({ url: `http://127.0.0.1:${server.address().port}/vendor/lucide.min.js` });
+  await page.addScriptTag({ url: `http://127.0.0.1:${server.address().port}/lumin-chart-dates.js?v=1` });
   await page.addScriptTag({ url: `http://127.0.0.1:${server.address().port}/lumin-mobile-nav.js?v=1` });
   await page.addScriptTag({ content: `
     let appointmentCalendarResizeFrame = null, patientQueryResizeFrame = null, dashboardResizeFrame = null;

@@ -17,7 +17,7 @@ function source(name) {
 const head = html.slice(0, html.indexOf('</head>') + 7).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
 const chartStart = html.indexOf('    <section id="view-chart"');
 const chart = html.slice(chartStart, html.indexOf('    </section>', chartStart) + 14).replace('class="hidden space-y-6"', 'class="space-y-6"');
-const helpers = ['isPrimaryToothId', 'palmerPositionForSlot', 'palmerQuadrantForSlot', 'palmerQuadrantLabel', 'palmerToothNotation', 'chartToothLabel', 'renderToothHTML', 'renderEmptyToothHTML', 'toothDentitionLongPressTarget', 'beginToothDentitionLongPress', 'cancelToothDentitionLongPress', 'initLuminVoiceSpacebarShortcut', 'patientMediaToothLabel', 'patientMediaDisplayName', 'patientMediaDownloadName', 'patientMediaFileUrl', 'openPatientMediaLightboxByIndex', 'updateAppViewportDimensions'].map(source).join('\n');
+const helpers = ['isPrimaryToothId', 'palmerPositionForSlot', 'palmerQuadrantForSlot', 'palmerQuadrantLabel', 'palmerToothNotation', 'chartToothLabel', 'renderToothHTML', 'renderEmptyToothHTML', 'toothDentitionLongPressTarget', 'beginToothDentitionLongPress', 'cancelToothDentitionLongPress', 'patientMediaToothLabel', 'patientMediaDisplayName', 'patientMediaDownloadName', 'patientMediaFileUrl', 'openPatientMediaLightboxByIndex', 'updateAppViewportDimensions'].map(source).join('\n');
 
 test('X-ray upload dates use upload timestamps, retain the saved upload date after edits, and handle older files', () => {
   const context=vm.createContext({window:{matchMedia:()=>({matches:false})},document:{addEventListener(){}},currentUiLanguage:'en',escapeHtml:value=>String(value)});
@@ -80,10 +80,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
     let toothDentitionLongPressGesture = null, toothDentitionLongPressSuppressClickUntil = 0;
     const TOOTH_DENTITION_LONG_PRESS_DELAY = 550;
     window.toothSelections = 0; window.dentitionSwitches = 0;
-    let luminVoiceRecordingActive=false, luminVoiceProcessingActive=false, luminVoiceStarting=false;
-    window.voiceStarts=0;
-    function startLuminVoiceRecording() { window.voiceStarts++; }
-    function stopLuminVoiceRecording() {}
+
     function getActivePatient() { return getKnownPatient(activePatientId); }
     function chartToothHasFinding() { return false; }
     function toggleToothDentition() { window.dentitionSwitches++; }
@@ -124,17 +121,17 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
     ${helpers}
   ` });
   await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-media-teeth.js?v=1`});
-  await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-chart-media.js?v=6`});
+  await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-chart-media.js?v=7`});
   await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-mobile-nav.js?v=1`});
   await page.evaluate(() => {
     document.dispatchEvent(new Event('DOMContentLoaded'));
-    initLuminVoiceSpacebarShortcut();
     for (const [id, offset] of [['upper-arch',0],['lower-arch',16]]) document.getElementById(id).innerHTML = Array.from({length:16}, (_,i) => renderToothHTML({slot:i+offset+1,toothId:String(i+offset+1),dentition:'permanent'})).join('');
     document.addEventListener('pointerdown', beginToothDentitionLongPress);
     document.addEventListener('click', event => { if (event.target.closest('[data-tooth-card]')) window.toothSelections++; });
     document.getElementById('findings-container').innerHTML = Array.from({length:16}, (_,i) => '<article style="min-height:76px;padding:20px;border-radius:12px;background:white;margin-top:8px">Finding ' + (i+1) + ' · UR6 · In progress</article>').join('');
   });
   assert.equal(await page.evaluate(() => chartPatientMedia.collapsed), true, 'Default state is collapsed without stored preferences');
+  assert.equal(await page.locator('#chart-attachments-button, .chart-media-toolbar, #chart-voice-fab-container, #chart-voice-action-btn, #findings-invoice-toolbar').count(),0);
   assert.equal(await page.locator('#chart-media-toggle').count(),0, 'Only the right rail and tooth indicators open the viewer');
   const screenshots = process.env.LUMIN_MEDIA_SCREENSHOT_DIR || path.join(os.tmpdir(), 'lumin-chart-media-preview');
   fs.mkdirSync(screenshots, {recursive:true});
@@ -174,7 +171,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
         assert.equal(await toothIndicator.evaluate(element => element === document.activeElement),true, 'Closing returns focus to the tooth indicator');
       }
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `${viewport.width} ${language} overflow`);
-      assert.equal(await page.locator('#chart-attachments-count').textContent(), '4');
+      assert.equal(await page.locator('[data-chart-attachments] .chart-media-count').textContent(), '4');
       if (landscape) {
         const before = await page.locator('#chart-media-panel').boundingBox();
         const main = await page.locator('.chart-clinical-column').boundingBox();
@@ -212,7 +209,8 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
         assert.ok(await page.locator('.chart-media-preview').isVisible());
         await page.keyboard.press('Escape');
       }
-      await page.locator('#chart-attachments-button').click();
+      if(!(await page.locator('[data-chart-attachments]').isVisible()))await toothIndicator.click();
+      await page.locator('[data-chart-attachments]').click();
       assert.equal(await page.evaluate(() => getComputedStyle(document.body).overflowY),'hidden');
       assert.equal(await page.locator('#patient-attachment-title').textContent(), language === 'ar' ? 'المرفقات' : 'Attachments');
       assert.equal(await page.locator('.patient-attachment-row').count(),4);
@@ -344,7 +342,6 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
   await page.locator('[data-tooth-xray-slot="A"] button').focus();
   await page.keyboard.press('Space');
   assert.equal(await page.evaluate(() => window.toothSelections),0, 'Keyboard indicator activation does not select a tooth');
-  assert.equal(await page.evaluate(() => window.voiceStarts),0, 'Keyboard indicator activation does not start dictation');
   await page.locator('[data-tooth-xray-slot="A"] button').dispatchEvent('pointerdown',{button:0,isPrimary:true,clientX:100,clientY:100,pointerId:1});
   await page.waitForTimeout(600);
   assert.equal(await page.evaluate(() => window.dentitionSwitches),0, 'Holding an indicator does not change dentition');
@@ -408,7 +405,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
   await page.evaluate(() => { canReadPatients=false; return loadChartPatientMedia(); });
   assert.equal(await page.evaluate(() => chartPatientMedia.files.length),0);
   assert.equal(await page.locator('.chart-tooth-xray-indicator').count(),0);
-  assert.ok(await page.locator('#chart-attachments-button').isDisabled());
+  assert.equal(await page.locator('[data-chart-attachments]').count(),0,'Attachment actions are absent without patient access');
   await page.evaluate(() => { canReadPatients=true; storageUrl=''; return loadChartPatientMedia(); });
   assert.match(await page.locator('#chart-media-panel-body').textContent(), /Connect your clinic storage/);
   await page.evaluate(() => { storageUrl=location.origin; metadataError=false; return loadChartPatientMedia(); });
@@ -427,7 +424,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
     ${helpers}
   `});
   await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-media-teeth.js?v=1`});
-  await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-chart-media.js?v=6`});
+  await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-chart-media.js?v=7`});
   await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-mobile-nav.js?v=1`});
   await page.evaluate(() => {
     document.getElementById('auth-gate').classList.add('hidden');

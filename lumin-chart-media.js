@@ -249,10 +249,6 @@ function renderChartMediaPanel() {
   panelToggle.title = chartPatientMedia.collapsed ? expand : collapse;
   panelToggle.innerHTML = `<i data-lucide="${sheetOpen ? 'x' : chartPatientMedia.collapsed ? 'panel-right-open' : 'panel-right-close'}"></i>`;
   document.getElementById('chart-media-panel-title').textContent = chartMediaText('X-rays', 'الأشعة');
-  const attachmentButton = document.getElementById('chart-attachments-button');
-  attachmentButton.querySelector('[data-attachment-label]').textContent = chartMediaText('Attachments', 'المرفقات');
-  attachmentButton.disabled = !hasPageAccess('patients');
-  document.getElementById('chart-attachments-count').textContent = chartPatientMedia.status === 'ready' ? chartPatientAttachments().length : '—';
   const xrays = chartPatientXrays();
   if (chartPatientMedia.status === 'loading') {
     body.innerHTML = `<div class="chart-media-skeleton"></div><p class="chart-media-summary" style="margin-top:16px" role="status">${chartMediaText('Loading patient files…', 'جارٍ تحميل ملفات المريض…')}</p>`;
@@ -288,7 +284,7 @@ function renderChartMediaPanel() {
 }
 
 function chartMediaPanelActions() {
-  return `<div class="chart-media-panel-actions"><button type="button" class="chart-media-button" onclick="openPatientAttachmentList()"><i data-lucide="paperclip"></i>${chartMediaText('Attachments', 'المرفقات')}<span class="chart-media-count">${chartPatientAttachments().length}</span></button><button type="button" class="chart-media-button is-neutral" onclick="openChartMediaGallery()"><i data-lucide="images"></i>${chartMediaText('Gallery', 'المعرض')}</button></div>`;
+  return `<div class="chart-media-panel-actions"><button type="button" data-chart-attachments class="chart-media-button" onclick="openPatientAttachmentList()"><i data-lucide="paperclip"></i>${chartMediaText('Attachments', 'المرفقات')}<span class="chart-media-count">${chartPatientAttachments().length}</span></button><button type="button" class="chart-media-button is-neutral" onclick="openChartMediaGallery()"><i data-lucide="images"></i>${chartMediaText('Gallery', 'المعرض')}</button></div>`;
 }
 
 function openChartMediaGallery() {

@@ -12,7 +12,6 @@
 .chart-tooth-xray-indicator:active { transform: scale(.98); }
 .chart-tooth-xray-indicator:focus-visible { outline: 2px solid #93c5fd; outline-offset: -2px; }
 .chart-tooth-xray-indicator:disabled { opacity: .5; pointer-events: none; }
-.chart-media-toolbar { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
 .chart-media-button {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   min-width: 44px; min-height: 44px; padding: 10px 12px; border: 0; border-radius: 12px;
@@ -91,11 +90,11 @@ body.patient-attachment-open { overflow: hidden !important; }
   .patient-attachment-modal { align-items: center; padding: 24px; }
   .patient-attachment-dialog { border-radius: 20px; max-height: calc(var(--lumin-app-viewport-height, 100dvh) - 48px); }
 }
-html[dir="rtl"] .chart-media-toolbar, html[dir="rtl"] .chart-media-panel { direction: rtl; }
+html[dir="rtl"] .chart-media-panel { direction: rtl; }
 @media (min-width: 768px) and (orientation: landscape) {
   html.chart-media-landscape.chart-media-active, html.chart-media-landscape body.chart-media-active, html.chart-media-landscape body.chart-media-active #app-shell { overflow-x: clip; overflow-y: visible; }
   .chart-clinical-workspace { grid-template-columns: minmax(0, 1fr) clamp(248px, 24vw, 320px); align-items: start; direction: ltr; transition: grid-template-columns 360ms cubic-bezier(.22, 1, .36, 1); }
-  html[dir="rtl"] .chart-media-toolbar, html[dir="rtl"] .chart-media-panel { direction: rtl; }
+  html[dir="rtl"] .chart-media-panel { direction: rtl; }
   .chart-clinical-workspace.is-media-collapsed { grid-template-columns: minmax(0, 1fr) 56px; }
   .chart-media-panel { display: flex; flex-direction: column; position: sticky; top: var(--chart-media-sticky-top, 144px); max-height: calc(var(--lumin-app-viewport-height, 100dvh) - var(--chart-media-sticky-top, 144px) - 20px - env(safe-area-inset-bottom)); }
   .chart-media-panel-header { position: relative; height: 68px; padding: 0; transition: height 360ms cubic-bezier(.22, 1, .36, 1), border-color 220ms ease-out; }
@@ -121,7 +120,6 @@ html[dir="rtl"] .chart-media-toolbar, html[dir="rtl"] .chart-media-panel { direc
 #chart-media-backdrop { position: fixed; inset: 0; z-index: 84; background: rgba(15,23,42,.4); backdrop-filter: blur(6px); }
 #chart-media-backdrop[hidden] { display: none; }
 body.chart-media-sheet-open { overflow: hidden !important; }
-body.chart-media-sheet-open #chart-voice-fab-container { display: none; }
 html.chart-media-sheet-open .chart-media-panel { display: flex; flex-direction: column; position: fixed; inset-inline: 0; bottom: 0; top: auto; z-index: 85; width: 100%; max-height: calc(var(--lumin-app-viewport-height, 100dvh) * .9); border-radius: 20px 20px 0 0; }
 html.chart-media-sheet-open .chart-media-panel-body { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
 @media (prefers-reduced-motion: reduce) {
