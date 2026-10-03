@@ -201,9 +201,6 @@ function renderChartMediaPanel() {
   panelToggle.title = chartPatientMedia.collapsed ? expand : collapse;
   panelToggle.innerHTML = `<i data-lucide="${sheetOpen ? 'x' : chartPatientMedia.collapsed ? 'panel-right-open' : 'panel-right-close'}"></i>`;
   document.getElementById('chart-media-panel-title').textContent = chartMediaText('X-rays', 'الأشعة');
-  const toolbarToggle = document.getElementById('chart-media-toggle');
-  toolbarToggle.setAttribute('aria-expanded', String(!chartPatientMedia.collapsed && chartActive));
-  toolbarToggle.querySelector('span').textContent = chartMediaText('X-rays', 'الأشعة');
   const attachmentButton = document.getElementById('chart-attachments-button');
   attachmentButton.querySelector('[data-attachment-label]').textContent = chartMediaText('Attachments', 'المرفقات');
   attachmentButton.disabled = !hasPageAccess('patients');

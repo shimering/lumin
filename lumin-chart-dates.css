@@ -1,0 +1,50 @@
+.finding-date-edit-button {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 44px;
+  width: 44px; min-height: 44px; border: 0; border-radius: 10px;
+  background: #f3eefe; color: #6d28d9; cursor: pointer; transition: background .15s, transform .15s;
+}
+.finding-begin-date-control .finding-date-edit-button { background: #eff6ff; color: #2563eb; }
+.finding-date-edit-button:hover { background: #e9dffa; }
+.finding-begin-date-control .finding-date-edit-button:hover { background: #dbeafe; }
+.finding-date-edit-button svg { width: 16px; height: 16px; }
+.finding-date-edit-button:active, .chart-date-button:active { transform: scale(.98); }
+.finding-date-edit-button:focus-visible, .chart-date-button:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+.finding-date-edit-button:disabled, .chart-date-button:disabled { opacity: .5; pointer-events: none; }
+#chart-finding-date-dialog {
+  inset: 0; margin: auto;
+  width: min(480px, calc(100% - 32px)); max-width: none; max-height: calc(100dvh - 32px);
+  padding: 0; border: 1px solid #e2e8f0; border-radius: 20px; color: #334155;
+  background: var(--lumin-face, #fff); box-shadow: 0 24px 72px #0f172a33; overflow: hidden;
+}
+#chart-finding-date-dialog:not([open]) { display: none; }
+#chart-finding-date-dialog::backdrop { background: #0f172a66; backdrop-filter: blur(6px); }
+.chart-date-dialog-content { display: flex; flex-direction: column; max-height: inherit; margin: 0; }
+.chart-date-dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 24px; }
+.chart-date-dialog-header > div { min-width: 0; }
+.chart-date-dialog-header h2 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.025em; color: #0f172a; }
+.chart-date-dialog-header p { margin: 8px 0 0; font-size: 13px; color: #64748b; overflow-wrap: anywhere; }
+.chart-date-dialog-body { padding: 0 24px 24px; overflow-y: auto; }
+.chart-date-dialog-body label { display: block; margin-bottom: 12px; font-size: 14px; font-weight: 600; }
+.chart-date-dialog-body input {
+  display: block; box-sizing: border-box; width: 100%; min-width: 0; min-height: 48px; padding: 12px;
+  border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; color: #334155; font-size: 16px;
+}
+.chart-date-dialog-body input:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+.chart-date-dialog-body input:disabled { opacity: .6; }
+#chart-finding-date-error { margin-top: 16px; font-size: 13px; color: #be123c; }
+.chart-date-dialog-footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; padding: 16px 24px; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+.chart-date-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px;
+  padding: 10px 16px; border: 0; border-radius: 12px; background: var(--lumin-face, #fff);
+  box-shadow: var(--lumin-small-raised, 0 2px 6px #0f172a0d); color: #475569; font-size: 14px;
+  font-weight: 600; cursor: pointer; transition: background .15s, transform .15s;
+}
+.chart-date-button:hover { background: #eef2f6; }
+.chart-date-button svg { width: 18px; height: 18px; }
+.chart-date-close { flex-shrink: 0; width: 44px; padding: 0; background: #f1f5f9; }
+.chart-date-save { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; }
+.chart-date-save:hover { background: linear-gradient(135deg, #1d4ed8, #1e40af); }
+@media (max-width: 767px) {
+  #chart-finding-date-dialog { inset: auto 0 0; margin: 0; width: 100%; max-height: 90dvh; border-radius: 20px 20px 0 0; }
+  .chart-date-dialog-footer { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+}

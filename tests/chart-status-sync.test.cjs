@@ -134,6 +134,27 @@ test('saving one procedure preserves a manually entered date on another procedur
   ctx.releaseWrite(0); await save;
 });
 
+for (const field of ['createdAt','beginDate']) test(`a rejected ${field} edit preserves a neighboring queued status and can be retried`, async () => {
+  const ctx=setup(), patient=ctx.patients[0];
+  const previous=ctx.clonePatientChart(patient.chartState);
+  const original=patient.chartState['1'].wholeOperations[0][field];
+  ctx.updateChartFindingsByIds(patient,['a'],finding=>({...finding,[field]:'2026-10-02T08:45:00Z'}));
+  const dateSave=ctx.saveActivePatientChart(patient,{previousChartState:previous});
+  const statusSave=ctx.updateFindingGroupStatusFromControl(control('b','C'));
+  ctx.releaseWrite(0,{message:'Offline'});await tick();
+  assert.equal(patient.chartState['1'].wholeOperations[0][field],original);
+  assert.equal(ctx.fixtureWrites[1].chart['1'].wholeOperations[0][field],original);
+  ctx.releaseWrite(1);
+  assert.equal(await dateSave,false);
+  await statusSave;
+  assert.equal(ctx.fixtureServerRows[0].chartState['1'].wholeOperations[1].status,'C');
+  ctx.updateChartFindingsByIds(patient,['a'],finding=>({...finding,[field]:'2026-10-02T08:45:00Z'}));
+  const retry=ctx.saveActivePatientChart(patient);
+  assert.equal(ctx.fixtureWrites[2].chart['1'].wholeOperations[0][field],'2026-10-02T08:45:00Z');
+  assert.equal(ctx.fixtureWrites[2].chart['1'].wholeOperations[1].status,'C');
+  ctx.releaseWrite(2);assert.equal(await retry,true);
+});
+
 test('doctor sync rejection is compensated before another queued chart write', async () => {
   const ctx=setup(), patient=ctx.patients[0];
   patient.chartState['1'].wholeOperations[0].doctorId='doctor';
@@ -222,6 +243,7 @@ test('real finding cards retain controls during rapid chart edits on mobile, tab
         function chartToothLabel(id){return 'Tooth '+id}
         function dentalOperationLabel(code){return code}
         function palmerNotationSVG(){return '<svg></svg>'}
+        function syncChartFindingDateDialogContext(){}
         function formatChartOperationCreatedAt(value){return value||''}
         function chartOperationDateInputValue(value){return (value||'').slice(0,16)}
         ${['setStableHtml','renderFindingInvoiceToolbar','renderFindingsList','chartFindingPaymentButton','chartFindingInvoiceColumn','chartFindingNoteTargetLabel',

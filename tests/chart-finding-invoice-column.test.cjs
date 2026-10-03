@@ -32,37 +32,39 @@ function setup() {
   return context;
 }
 
-test('the fraction uses the full invoice paid amount and discounted total, rather than the procedure price', () => {
+test('the fraction uses the procedure allocation and discounted invoiced price snapshot', () => {
   const context = setup(), record = invoice(1,300,150);
   context.chartInvoiceItemsByFindingId.set('crown',{invoice:record,item:record.items[0]});
   const markup = context.chartFindingInvoiceColumn(['crown']);
-  assert.match(markup,/EGP 300 \/ 850/);
+  assert.match(markup,/EGP 300 \/ 378\.57/);
   assert.match(markup,/data-invoice-id="1" data-item-id="10"/);
   assert.match(markup,/finding-invoice-badge [^"]*">Invoiced/);
   context.currentUiLanguage = 'ar';
   assert.match(context.chartFindingInvoiceColumn(['crown']),/مفوترة/);
-  assert.match(context.chartFindingInvoiceColumn(['crown']),/المدفوع \/ إجمالي الفاتورة/);
+  assert.match(context.chartFindingInvoiceColumn(['crown']),/المدفوع للإجراء \/ إجمالي الإجراء المفوتر/);
 });
 
-test('a batch counts each linked invoice once and keeps every procedure payment button', () => {
+test('a batch totals its distinct invoice items and keeps each procedure payment button', () => {
   const context = setup(), first = invoice(1,300), second = invoice(2,1000);
   context.chartInvoiceItemsByFindingId.set('a',{invoice:first,item:first.items[0]});
   context.chartInvoiceItemsByFindingId.set('b',{invoice:first,item:first.items[1]});
   context.chartInvoiceItemsByFindingId.set('c',{invoice:second,item:second.items[0]});
   assert.match(context.chartFindingInvoiceColumn(['a','b']),/EGP 300 \/ 1,000/);
   const markup = context.chartFindingInvoiceColumn(['a','b','c'],{partial:true});
-  assert.match(markup,/EGP 1,300 \/ 2,000/);
+  assert.match(markup,/EGP 700 \/ 1,400/);
   assert.match(markup,/Partly invoiced/);
   assert.equal((markup.match(/data-item-id=/g)||[]).length,3);
+  context.chartInvoiceItemsByFindingId.set('alias',{invoice:first,item:first.items[0]});
+  assert.equal(context.chartFindingInvoiceColumn(['a','a','alias']),context.chartFindingInvoiceColumn(['a']), 'Multiple references to one invoice item cannot inflate the amount');
   assert.equal(context.chartFindingInvoiceColumn(['not-invoiced']),'');
 });
 
-test('zero-paid and fully-paid invoices show their amounts without changing the procedure payment action', () => {
+test('zero-paid and fully-paid procedures show their own amounts and payment action', () => {
   const context = setup();
   for (const paid of [0,1000]) {
     const record = invoice(1,paid);
     context.chartInvoiceItemsByFindingId.set('a',{invoice:record,item:record.items[0]});
-    assert.ok(context.chartFindingInvoiceColumn(['a']).includes(`EGP ${paid ? '1,000' : '0'} / 1,000`));
+    assert.ok(context.chartFindingInvoiceColumn(['a']).includes(`EGP ${paid ? '400' : '0'} / 400`));
   }
   assert.match(context.chartFindingInvoiceColumn(['a']),/data-lucide="check"/);
 });
@@ -82,7 +84,7 @@ test('invoice column stays beside the tick and below the badge without overlappi
   t.after(() => new Promise(resolve => {server.close(resolve);server.closeAllConnections();}));
   const browser = await chromium.launch({headless:true,channel:process.env.LUMIN_TEST_BROWSER_CHANNEL || undefined});
   t.after(() => browser.close());
-  const page = await browser.newPage(), errors = [];
+  const page = await browser.newPage({timezoneId:'Africa/Cairo'}), errors = [];
   page.on('pageerror',error => errors.push(error.message));
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
   await page.addScriptTag({path:path.join(root,'vendor/lucide.min.js')});
@@ -111,7 +113,18 @@ test('invoice column stays beside the tick and below the badge without overlappi
       ['v1',{invoice:partialInvoice,item:partialInvoice.items[1]}],
     ]);
     function escapeHtml(value){const node=document.createElement('span');node.textContent=String(value);return node.innerHTML.replaceAll('"','&quot;');}
-    function getActivePatient(){return {id:'test'};}
+    const fixturePatient={id:'test',chartState:{findings}};
+    let activeFixturePatient=fixturePatient, dateSaveFails=false, dateSaveCount=0;
+    const dateImplantSyncs=[];
+    function getActivePatient(){return activeFixturePatient;}
+    function clonePatientChart(chart){return JSON.parse(JSON.stringify(chart));}
+    function updateChartFindingsByIds(patient,ids,updater){let updated=false;findings.forEach(finding=>{if(ids.includes(finding.id)){Object.assign(finding,updater({...finding}));updated=true;} (finding.memberFindings||[]).forEach(member=>{if(ids.includes(member.id)){Object.assign(member,updater({...member}));updated=true;}})});return updated;}
+    async function saveActivePatientChart(patient,{previousChartState}={}){dateSaveCount++;if(dateSaveFails){findings.forEach((finding,i)=>Object.assign(finding,previousChartState.findings[i]));return false;}return true;}
+    function renderChartFindingTeeth(){}
+    const CHART_META_KEY='_meta';
+    function ensureWholeOperations(data){return data.findings||[];}
+    async function syncImplantProgressFromChartOperation(patient,tooth,finding){dateImplantSyncs.push(finding.id);}
+
     function collectDocumentedFindings(){return findings;}
     function renderDocumentedFindingsTabs(){}
     function renderFindingInvoiceToolbar(){}
@@ -126,15 +139,16 @@ test('invoice column stays beside the tick and below the badge without overlappi
     function chartToothLabel(id){return 'Tooth '+id;}
     function palmerNotationSVG(){return '<svg width="40" height="28"><text x="12" y="20">6</text></svg>';}
     function formatChartOperationCreatedAt(){return '23 Sep 2026 at 09:00';}
-    function chartOperationDateInputValue(value){return (value||'').slice(0,16);}
+    ${['chartFindingCreatedAtTimestamp','chartOperationDateInputValue'].map(source).join('\n')}
     function setStableHtml(element,markup){element.innerHTML=markup;return true;}
     function reconcileChartFindingNode(){}
     function renderChartFindingIcons(){if(window.lucide)lucide.createIcons();}
     function invoiceNumber(id){return 'INV-'+id;}
     function openInvoicePaymentModal(invoiceId,itemId){window.lastPayment=[invoiceId,itemId];}
     ${moneyHelpers}
-    ${['normaliseOperationStatus','operationStatusDefinition','operationStatusSelectOptions','chartDoctorSelectOptions','chartProcedureStepStatusOptions','toggleFindingCardSelection','renderFindingsList'].map(source).join('\n')}
+    ${['openFindingDateEditor','openFindingBeginDateEditor','chartFindingIdsFromControl','chartFindingToothIdsFromControl','normaliseOperationStatus','operationStatusDefinition','operationStatusSelectOptions','chartDoctorSelectOptions','chartProcedureStepStatusOptions','toggleFindingSelectionFromControl','toggleFindingCardSelection','renderFindingsList'].map(source).join('\n')}
   `});
+  await page.addScriptTag({path:path.join(root,'lumin-chart-dates.js')});
   const screenshots = process.env.LUMIN_MEDIA_SCREENSHOT_DIR || path.join(os.tmpdir(),'lumin-invoice-column');
   fs.mkdirSync(screenshots,{recursive:true});
   for (const viewport of [{width:390,height:844},{width:834,height:1112},{width:1180,height:820},{width:1937,height:1280}]) {
@@ -143,10 +157,10 @@ test('invoice column stays beside the tick and below the badge without overlappi
       await page.evaluate(language => {currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';renderFindingsList();},language);
       const paid = page.locator('[data-refresh-key="paid"]');
       assert.equal(await paid.locator('.finding-invoice-badge').textContent(),language==='ar'?'مفوترة':'Invoiced');
-      assert.equal(await paid.locator('.finding-invoice-amount').textContent(),'EGP 1,000 / 1,000');
-      assert.equal(await page.locator('[data-refresh-key="partial"] .finding-invoice-amount').textContent(),'EGP 300 / 850');
+      assert.equal(await paid.locator('.finding-invoice-amount').textContent(),'EGP 400 / 400');
+      assert.equal(await page.locator('[data-refresh-key="partial"] .finding-invoice-amount').textContent(),'EGP 300 / 378.57');
       assert.equal(await page.locator('[data-refresh-key="b1"] .finding-invoice-badge').textContent(),language==='ar'?'مفوترة جزئياً':'Partly invoiced');
-      assert.equal(await page.locator('.ortho-visit-invoice .finding-invoice-amount').textContent(),'EGP 300 / 850');
+      assert.equal(await page.locator('.ortho-visit-invoice .finding-invoice-amount').textContent(),'EGP 0 / 471.43');
       const geometry = await page.evaluate(() => {
         const rect = element => {const r=element.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom};};
         const rows=[...document.querySelectorAll('.finding-row')].map(row => ({summary:rect(row.querySelector('.finding-row-summary')),invoice:rect(row.querySelector('.finding-row-actions > .finding-invoice-control')),dates:rect(row.querySelector('.finding-dates-group'))}));
@@ -163,6 +177,76 @@ test('invoice column stays beside the tick and below the badge without overlappi
       assert.equal(await page.locator('.finding-operation-heading .finding-invoice-badge').count(),0);
       await paid.locator('[data-item-id="10"]').click();
       assert.deepEqual(await page.evaluate(()=>window.lastPayment),['1','10']);
+      const planningButton = paid.locator('.finding-date-control button');
+      const beforeSize = await paid.boundingBox();
+      const beforeDate = await page.evaluate(() => findings.find(f=>f.id==='paid').createdAt);
+      const beforeBegin = await page.evaluate(() => findings.find(f=>f.id==='paid').beginDate);
+      const beforeSaves = await page.evaluate(() => dateSaveCount);
+      await planningButton.click();
+      const dateDialog = page.locator('#chart-finding-date-dialog');
+      assert.ok(await dateDialog.isVisible());
+      assert.equal(await dateDialog.locator('h2').textContent(),language==='ar'?'تعديل تاريخ التخطيط':'Edit planning date');
+      assert.equal(await dateDialog.locator('input').inputValue(),await page.evaluate(value=>chartOperationDateInputValue(value),beforeDate));
+      const afterSize = await paid.boundingBox();
+      assert.equal(afterSize.width,beforeSize.width);
+      assert.equal(afterSize.height,beforeSize.height,'Editing a date does not expand the clinical row');
+      assert.equal(await page.evaluate(()=>selectedFindingIds.size),0,'Date pencils do not toggle invoice selection');
+      assert.equal(await paid.locator('.finding-date-editor, .finding-begin-date-editor').count(),0);
+      const dialogBounds = await dateDialog.boundingBox();
+      assert.ok(dialogBounds.x>=0&&dialogBounds.y>=0&&dialogBounds.x+dialogBounds.width<=viewport.width+1&&dialogBounds.y+dialogBounds.height<=viewport.height+1);
+      if(viewport.width>=768){assert.ok(Math.abs(dialogBounds.x+dialogBounds.width/2-viewport.width/2)<2);assert.ok(Math.abs(dialogBounds.y+dialogBounds.height/2-viewport.height/2)<2,'Desktop and tablet dialogs are centered');}
+      if(viewport.width<768)assert.ok(Math.abs(dialogBounds.y+dialogBounds.height-viewport.height)<2,'Mobile uses a bottom sheet');
+      for(const button of await dateDialog.locator('button').all()) {
+        const bounds=await button.boundingBox();assert.ok(bounds.width>=44&&bounds.height>=44,'Dialog touch targets');
+      }
+      for(let i=0;i<6;i++) {
+        await page.keyboard.press('Tab');
+        assert.ok(await dateDialog.evaluate(dialog=>dialog.contains(document.activeElement)),'Keyboard focus stays in the modal');
+      }
+      await dateDialog.locator('input').fill('2026-10-02T11:45');
+      if(viewport.width===1180&&language==='en')await page.screenshot({path:path.join(screenshots,'finding-date-dialog-desktop.png')});
+      if(viewport.width===390&&language==='ar')await page.screenshot({path:path.join(screenshots,'finding-date-dialog-mobile-ar.png')});
+      await dateDialog.locator('[data-date-cancel]').click();
+      assert.equal(await page.evaluate(()=>dateSaveCount),beforeSaves);
+      assert.equal(await page.evaluate(()=>findings.find(f=>f.id==='paid').createdAt),beforeDate);
+      await planningButton.click();
+      await page.keyboard.press('Escape');
+      assert.ok(!(await dateDialog.isVisible()));
+      await planningButton.click();
+      await dateDialog.locator('input').fill('');
+      await dateDialog.locator('[data-date-save]').click();
+      assert.ok(await dateDialog.isVisible());
+      assert.equal(await page.evaluate(()=>dateSaveCount),beforeSaves,'Blank dates cannot be saved');
+      await dateDialog.locator('input').fill('2026-10-02T11:45');
+      await dateDialog.locator('[data-date-save]').click();
+      await dateDialog.waitFor({state:'hidden'});
+      assert.equal(await page.evaluate(()=>findings.find(f=>f.id==='paid').createdAt),new Date('2026-10-02T08:45:00Z').toISOString());
+      assert.equal(await page.evaluate(()=>findings.find(f=>f.id==='paid').beginDate),beforeBegin,'Planning edit preserves the begin date');
+      await paid.locator('.finding-begin-date-control button').click();
+      await dateDialog.locator('input').fill('2026-10-03T08:15');
+      await page.evaluate(()=>{dateSaveFails=true;});
+      const previousSyncs=await page.evaluate(()=>dateImplantSyncs.length);
+      await dateDialog.locator('[data-date-save]').click();
+      await dateDialog.locator('#chart-finding-date-error').waitFor({state:'visible'});
+      assert.equal(await page.evaluate(()=>findings.find(f=>f.id==='paid').beginDate),beforeBegin,'Failed saves restore the persisted date');
+      assert.equal(await page.evaluate(()=>dateImplantSyncs.length),previousSyncs,'Rejected date edits cannot sync implant progress');
+      assert.equal(await dateDialog.locator('input').inputValue(),'2026-10-03T08:15','Retry preserves the entered date');
+      await page.evaluate(()=>{dateSaveFails=false;});
+      await dateDialog.locator('[data-date-save]').click();
+      await dateDialog.waitFor({state:'hidden'});
+      assert.equal(await page.evaluate(()=>findings.find(f=>f.id==='paid').beginDate),new Date('2026-10-03T05:15:00Z').toISOString());
+      assert.equal(await page.evaluate(()=>findings.find(f=>f.id==='paid').status),'C');
+      await page.locator('[data-refresh-key="b1"] .finding-date-control button').click();
+      await dateDialog.locator('input').fill('2026-10-01T09:30');
+      await dateDialog.locator('[data-date-save]').click();
+      await dateDialog.waitFor({state:'hidden'});
+      assert.ok(await page.evaluate(()=>findings.find(f=>f.id==='b1').memberFindings.every(f=>f.createdAt===new Date('2026-10-01T09:30').toISOString())),'A batch date edit updates every selected procedure');
+      await planningButton.click();
+      const savedCount=await page.evaluate(()=>dateSaveCount);
+      await page.evaluate(()=>{activeFixturePatient={id:'another-patient',chartState:{}};renderFindingsList();});
+      assert.ok(!(await dateDialog.isVisible()),'Changing patients closes the date dialog');
+      assert.equal(await page.evaluate(()=>dateSaveCount),savedCount);
+      await page.evaluate(()=>{activeFixturePatient=fixturePatient;renderFindingsList();});
       if(viewport.width===1937&&language==='en')await page.screenshot({path:path.join(screenshots,'finding-invoice-column-desktop.png')});
       if(viewport.width===834&&language==='ar')await page.screenshot({path:path.join(screenshots,'finding-invoice-column-tablet-ar.png')});
     }

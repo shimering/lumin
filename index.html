@@ -79,7 +79,9 @@
   <script src="lumin-patient-swipe.js?v=1"></script>
   <script src="lumin-patients.js?v=4"></script>
   <script src="lumin-chart-sync.js?v=1"></script>
-  <script src="lumin-chart-media.js?v=4"></script>
+  <script src="lumin-chart-media.js?v=5"></script>
+  <script src="lumin-chart-dates.js?v=1"></script>
+  <link rel="stylesheet" href="lumin-chart-dates.css?v=1" />
   <script src="lumin-media-teeth.js?v=1"></script>
   <script src="lumin-mobile-nav.js?v=1"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
@@ -6739,7 +6741,6 @@
       <div id="chart-clinical-workspace" class="chart-clinical-workspace is-media-collapsed">
       <div class="chart-clinical-column">
       <div class="chart-media-toolbar">
-        <button id="chart-media-toggle" type="button" class="chart-media-button" onclick="toggleChartMediaPanel()" aria-controls="chart-media-panel" aria-expanded="false"><i data-lucide="scan-line"></i><span>X-rays</span></button>
         <button id="chart-attachments-button" type="button" class="chart-media-button is-neutral" onclick="openPatientAttachmentList()"><i data-lucide="paperclip"></i><span data-attachment-label>Attachments</span><span id="chart-attachments-count" class="chart-media-count">—</span></button>
       </div>
 
@@ -12868,6 +12869,7 @@
 
     async function applyAuthSession(session) {
       if (!session) {
+        closeChartFindingDateDialog({ force: true, restoreFocus: false });
         resetChartPatientMedia();
         closeWhatsAppTemplatePicker();
         resetAuthRecoveryState();
@@ -28927,6 +28929,7 @@
     }
 
     async function switchView(viewName) {
+      closeChartFindingDateDialog({ force: true, restoreFocus: false });
       patientWorkspaceSwipe?.cancel();
       closeMobileHeaderOverlay();
       closeWhatsAppTemplatePicker();
@@ -29163,6 +29166,7 @@
     }
 
     function loadActivePatientChart() {
+      syncChartFindingDateDialogContext();
       const patient = patients.find(p => p.id === activePatientId) || patients[0];
       if (!patient) return;
 
@@ -30038,92 +30042,14 @@
       return localDate.toISOString().slice(0, 16);
     }
 
-    function openFindingDateEditor(button) {
-      const control = button.closest('.finding-date-control');
-      if (!control) return;
-      control.querySelector('.finding-date-display')?.classList.add('hidden');
-      const editor = control.querySelector('.finding-date-editor');
-      editor?.classList.remove('hidden');
-      editor?.classList.add('inline-flex');
-      editor?.querySelector('input')?.focus();
+    function openFindingDateEditor(button, event) {
+      event?.stopPropagation();
+      openChartFindingDateDialog(button, 'createdAt');
     }
 
-    function cancelFindingDateEditor(button) {
-      const control = button.closest('.finding-date-control');
-      if (!control) return;
-      const editor = control.querySelector('.finding-date-editor');
-      editor?.classList.add('hidden');
-      editor?.classList.remove('inline-flex');
-      control.querySelector('.finding-date-display')?.classList.remove('hidden');
-    }
-
-    async function updateFindingCreatedAtFromControl(button) {
-      const patient = getActivePatient();
-      const card = button.closest('[data-finding-id]');
-      const input = card?.querySelector('.finding-date-input');
-      if (!patient || !card || !input) return;
-
-      const timestamp = Date.parse(input.value);
-      if (!Number.isFinite(timestamp)) {
-        alert(currentUiLanguage === 'ar' ? 'يرجى اختيار تاريخ ووقت صحيحين.' : 'Please choose a valid planning date and time.');
-        input.focus();
-        return;
-      }
-
-      const createdAt = new Date(timestamp).toISOString();
-      const findingIds = chartFindingIdsFromControl(button);
-      if (!updateChartFindingsByIds(patient, findingIds, finding => ({ ...finding, createdAt }))) return;
-      renderChartFindingTeeth(chartFindingToothIdsFromControl(button));
-      renderFindingsList();
-      await saveActivePatientChart();
-    }
-
-    function openFindingBeginDateEditor(button) {
-      const control = button.closest('.finding-begin-date-control');
-      if (!control) return;
-      control.querySelector('.finding-begin-date-display')?.classList.add('hidden');
-      const editor = control.querySelector('.finding-begin-date-editor');
-      editor?.classList.remove('hidden');
-      editor?.classList.add('inline-flex');
-      editor?.querySelector('input')?.focus();
-    }
-
-    function cancelFindingBeginDateEditor(button) {
-      const control = button.closest('.finding-begin-date-control');
-      if (!control) return;
-      const editor = control.querySelector('.finding-begin-date-editor');
-      editor?.classList.add('hidden');
-      editor?.classList.remove('inline-flex');
-      control.querySelector('.finding-begin-date-display')?.classList.remove('hidden');
-    }
-
-    async function updateFindingBeginDateFromControl(button) {
-      const patient = getActivePatient();
-      const card = button.closest('[data-finding-id]');
-      const input = card?.querySelector('.finding-begin-date-input');
-      if (!patient || !card || !input) return;
-
-      const timestamp = Date.parse(input.value);
-      if (!Number.isFinite(timestamp)) {
-        alert(currentUiLanguage === 'ar' ? 'يرجى اختيار تاريخ ووقت صحيحين لبدء الإجراء.' : 'Please choose a valid begin date and time.');
-        input.focus();
-        return;
-      }
-
-      const beginDate = new Date(timestamp).toISOString();
-      const findingIds = chartFindingIdsFromControl(button);
-      if (!updateChartFindingsByIds(patient, findingIds, finding => ({ ...finding, beginDate }))) return;
-      renderChartFindingTeeth(chartFindingToothIdsFromControl(button));
-      renderFindingsList();
-      await saveActivePatientChart();
-
-      findingIds.forEach(fid => {
-        Object.entries(patient.chartState || {}).forEach(([toothId, toothData]) => {
-          if (toothId === CHART_META_KEY || !toothData || typeof toothData !== 'object') return;
-          const match = ensureWholeOperations(toothData).find(f => f.id === fid);
-          if (match) void syncImplantProgressFromChartOperation(patient, toothId, match, null);
-        });
-      });
+    function openFindingBeginDateEditor(button, event) {
+      event?.stopPropagation();
+      openChartFindingDateDialog(button, 'beginDate');
     }
 
     async function deleteFindingFromControl(button) {
@@ -31708,22 +31634,24 @@
     }
 
     function chartFindingInvoiceColumn(findingIds, { partial = false, label = '', showPayments = true } = {}) {
-      const linked = findingIds.map(id => ({ id, record: chartInvoiceItemsByFindingId.get(id) })).filter(entry => entry.record);
+      const linked = [...new Map(findingIds.map(id => ({ id, record: chartInvoiceItemsByFindingId.get(id) }))
+        .filter(entry => entry.record)
+        .map(entry => [`${entry.record.invoice.id}:${entry.record.item.id}`, entry])).values()];
       if (!linked.length) return '';
-      // A batch can contain multiple items from the same invoice. Count each invoice once.
-      const invoices = [...new Map(linked.map(({ record }) => [record.invoice.id, record.invoice])).values()];
-      const paid = invoices.reduce((sum, invoice) => sum + (Number(invoice.paidAmount) || 0), 0);
-      const total = invoices.reduce((sum, invoice) => sum + invoiceTotal(invoice), 0);
+      // Use the invoiced price snapshot and payments allocated to these procedures.
+      const paid = linked.reduce((sum, { record }) => sum + invoiceItemPaidAmount(record.invoice, record.item.id), 0);
+      const total = linked.reduce((sum, { record }) => sum + invoiceItemPatientTotal(record.invoice, record.item), 0);
       const amount = `${formatInvoiceMoney(paid)} / ${formatInvoiceMoney(total).replace(/^EGP\s+/, '')}`;
       const amountLabel = currentUiLanguage === 'ar'
-        ? `${invoices.length > 1 ? 'المدفوع / إجمالي الفواتير' : 'المدفوع / إجمالي الفاتورة'}: ${amount}`
-        : `${invoices.length > 1 ? 'Paid / total invoices' : 'Paid / total invoice'}: ${amount}`;
+        ? `المدفوع للإجراء / إجمالي الإجراء المفوتر: ${amount}`
+        : `Procedure paid / invoiced total: ${amount}`;
       const badge = label || (currentUiLanguage === 'ar' ? (partial ? 'مفوترة جزئياً' : 'مفوترة') : (partial ? 'Partly invoiced' : 'Invoiced'));
       const buttons = showPayments ? linked.map(({ id, record }) => chartFindingPaymentButton(id, linked.length > 1 ? chartToothLabel(record.item.toothId || '') : '')).join('') : '';
       return `<div class="finding-invoice-status">${buttons ? `<div class="finding-payment-controls">${buttons}</div>` : ''}<div class="finding-invoice-details"><span class="finding-invoice-badge ${partial ? 'is-partial' : ''}">${escapeHtml(badge)}</span><span class="finding-invoice-amount" dir="ltr" title="${escapeHtml(amountLabel)}" aria-label="${escapeHtml(amountLabel)}">${escapeHtml(amount)}</span></div></div>`;
     }
 
     function renderFindingsList() {
+      syncChartFindingDateDialogContext();
       const container = document.getElementById('findings-container');
       const patient = getActivePatient();
       const findings = collectDocumentedFindings(patient);
@@ -31953,15 +31881,10 @@
           ? `<time datetime="${escapeHtml(finding.createdAt)}" class="inline-flex items-center gap-1 rounded-lg border border-violet-100 bg-white/80 px-2 py-0.5 text-[9px] font-black text-slate-600 shadow-2xs" title="Planning date"><span class="w-8 shrink-0 text-[8px] font-black uppercase text-violet-600">Plan</span><i data-lucide="calendar" class="h-3 w-3 text-violet-500 shrink-0"></i><span class="truncate">${escapeHtml(createdAtLabel)}</span></time>`
           : '<span class="inline-flex items-center gap-1 rounded-lg border border-slate-100 bg-white/70 px-2 py-0.5 text-[9px] font-semibold text-slate-300" title="This operation was saved before creation-date tracking was added"><span class="w-8 shrink-0 text-[8px] font-bold uppercase text-slate-400">Plan</span><span class="truncate">Date unavailable</span></span>';
         const createdAtMarkup = `
-          <span class="finding-date-control inline-flex max-w-full items-center justify-end">
+          <span class="finding-date-control inline-flex max-w-full items-center justify-end" data-date-value="${escapeHtml(finding.createdAt || '')}">
             <span class="finding-date-display inline-flex items-center gap-1">
               ${createdAtDisplay}
-              <button type="button" onclick="openFindingDateEditor(this)" class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-violet-200 bg-violet-100/65 text-violet-700 transition hover:bg-violet-100" title="Edit planning date" aria-label="Edit planning date"><i data-lucide="pencil" class="h-2.5 w-2.5"></i></button>
-            </span>
-            <span class="finding-date-editor hidden max-w-full items-center gap-1">
-              <input type="datetime-local" value="${chartOperationDateInputValue(finding.createdAt)}" class="finding-date-input w-44 rounded-lg border border-violet-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/15" aria-label="Operation planning date and time">
-              <button type="button" data-save-date onclick="updateFindingCreatedAtFromControl(this)" class="rounded-lg bg-violet-600 px-2 py-1 text-[9px] font-black text-white hover:bg-violet-700">Save</button>
-              <button type="button" onclick="cancelFindingDateEditor(this)" class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[9px] font-black text-slate-500 hover:bg-slate-50">Cancel</button>
+              <button type="button" onclick="openFindingDateEditor(this,event)" class="finding-date-edit-button" aria-haspopup="dialog" title="${currentUiLanguage === 'ar' ? 'تعديل تاريخ التخطيط' : 'Edit planning date'}" aria-label="${currentUiLanguage === 'ar' ? 'تعديل تاريخ التخطيط' : 'Edit planning date'}"><i data-lucide="pencil" class="h-2.5 w-2.5"></i></button>
             </span>
           </span>`;
 
@@ -31974,41 +31897,31 @@
         if (isPlanning) {
           const displayLabel = beginDateLabel || (currentUiLanguage === 'ar' ? 'لم يبدأ' : 'Not started');
           beginDateMarkup = `
-            <span class="finding-begin-date-control inline-flex max-w-full items-center justify-end">
+            <span class="finding-begin-date-control inline-flex max-w-full items-center justify-end" data-date-value="${escapeHtml(rawBeginDate || '')}">
               <span class="finding-begin-date-display inline-flex items-center gap-1">
                 <time datetime="${escapeHtml(rawBeginDate || '')}" class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-100/80 px-2 py-0.5 text-[9px] font-bold text-slate-400" title="Treatment begin date — Planning stage (not started)">
                   <span class="w-8 shrink-0 text-[8px] font-bold uppercase text-slate-400">Begin</span>
                   <i data-lucide="clock" class="h-3 w-3 text-slate-400 shrink-0"></i>
                   <span class="truncate">${escapeHtml(displayLabel)}</span>
                 </time>
-                <button type="button" onclick="openFindingBeginDateEditor(this)" class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-100 text-slate-400 transition hover:border-slate-300 hover:bg-white hover:text-slate-600" title="Set begin date" aria-label="Set begin date">
+                <button type="button" onclick="openFindingBeginDateEditor(this,event)" class="finding-date-edit-button" aria-haspopup="dialog" title="${currentUiLanguage === 'ar' ? 'تحديد تاريخ بدء الإجراء' : 'Set begin date'}" aria-label="${currentUiLanguage === 'ar' ? 'تحديد تاريخ بدء الإجراء' : 'Set begin date'}">
                   <i data-lucide="pencil" class="h-2.5 w-2.5"></i>
                 </button>
-              </span>
-              <span class="finding-begin-date-editor hidden max-w-full items-center gap-1">
-                <input type="datetime-local" value="${chartOperationDateInputValue(rawBeginDate || new Date().toISOString())}" class="finding-begin-date-input w-44 rounded-lg border border-blue-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15" aria-label="Procedure begin date and time">
-                <button type="button" data-save-date onclick="updateFindingBeginDateFromControl(this)" class="rounded-lg bg-blue-600 px-2 py-1 text-[9px] font-black text-white hover:bg-blue-700">Save</button>
-                <button type="button" onclick="cancelFindingBeginDateEditor(this)" class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[9px] font-black text-slate-500 hover:bg-slate-50">Cancel</button>
               </span>
             </span>`;
         } else if (!isExisted || rawBeginDate) {
           const displayLabel = beginDateLabel || (currentUiLanguage === 'ar' ? 'تاريخ غير متوفر' : 'Date unavailable');
           beginDateMarkup = `
-            <span class="finding-begin-date-control inline-flex max-w-full items-center justify-end">
+            <span class="finding-begin-date-control inline-flex max-w-full items-center justify-end" data-date-value="${escapeHtml(rawBeginDate || '')}">
               <span class="finding-begin-date-display inline-flex items-center gap-1">
                 <time datetime="${escapeHtml(rawBeginDate || '')}" class="inline-flex items-center gap-1 rounded-lg border border-blue-100 bg-white/80 px-2 py-0.5 text-[9px] font-black text-slate-600 shadow-2xs" title="Treatment begin date">
                   <span class="w-8 shrink-0 text-[8px] font-black uppercase text-blue-600">Begin</span>
                   <i data-lucide="clock" class="h-3 w-3 text-blue-500 shrink-0"></i>
                   <span class="truncate">${escapeHtml(displayLabel)}</span>
                 </time>
-                <button type="button" onclick="openFindingBeginDateEditor(this)" class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-blue-200 bg-blue-50 text-blue-700 transition hover:bg-blue-100" title="Edit begin date" aria-label="Edit begin date">
+                <button type="button" onclick="openFindingBeginDateEditor(this,event)" class="finding-date-edit-button" aria-haspopup="dialog" title="${currentUiLanguage === 'ar' ? 'تعديل تاريخ بدء الإجراء' : 'Edit begin date'}" aria-label="${currentUiLanguage === 'ar' ? 'تعديل تاريخ بدء الإجراء' : 'Edit begin date'}">
                   <i data-lucide="pencil" class="h-2.5 w-2.5"></i>
                 </button>
-              </span>
-              <span class="finding-begin-date-editor hidden max-w-full items-center gap-1">
-                <input type="datetime-local" value="${chartOperationDateInputValue(rawBeginDate || new Date().toISOString())}" class="finding-begin-date-input w-44 rounded-lg border border-blue-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15" aria-label="Procedure begin date and time">
-                <button type="button" data-save-date onclick="updateFindingBeginDateFromControl(this)" class="rounded-lg bg-blue-600 px-2 py-1 text-[9px] font-black text-white hover:bg-blue-700">Save</button>
-                <button type="button" onclick="cancelFindingBeginDateEditor(this)" class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[9px] font-black text-slate-500 hover:bg-slate-50">Cancel</button>
               </span>
             </span>`;
         }

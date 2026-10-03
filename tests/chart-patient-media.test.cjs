@@ -96,7 +96,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
     ${helpers}
   ` });
   await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-media-teeth.js?v=1`});
-  await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-chart-media.js?v=4`});
+  await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-chart-media.js?v=5`});
   await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-mobile-nav.js?v=1`});
   await page.evaluate(() => {
     document.dispatchEvent(new Event('DOMContentLoaded'));
@@ -107,6 +107,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
     document.getElementById('findings-container').innerHTML = Array.from({length:16}, (_,i) => '<article style="min-height:76px;padding:20px;border-radius:12px;background:white;margin-top:8px">Finding ' + (i+1) + ' · UR6 · In progress</article>').join('');
   });
   assert.equal(await page.evaluate(() => chartPatientMedia.collapsed), true, 'Default state is collapsed without stored preferences');
+  assert.equal(await page.locator('#chart-media-toggle').count(),0, 'Only the right rail and tooth indicators open the viewer');
   const screenshots = process.env.LUMIN_MEDIA_SCREENSHOT_DIR || path.join(os.tmpdir(), 'lumin-chart-media-preview');
   fs.mkdirSync(screenshots, {recursive:true});
   for (const viewport of [{width:1440,height:900},{width:1180,height:820},{width:1024,height:768},{width:800,height:600},{width:834,height:1112},{width:390,height:844}]) {
@@ -122,7 +123,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
       const target = await toothIndicator.boundingBox();
       assert.ok(target.width >= 44 && target.height >= 44);
       await toothIndicator.click();
-      assert.equal(await page.locator('#chart-media-toggle').getAttribute('aria-expanded'), 'true');
+      assert.equal(await page.locator('#chart-media-collapse').getAttribute('aria-expanded'), 'true');
       assert.equal(await page.locator('#chart-media-panel').evaluate(element => getComputedStyle(element).direction),language === 'ar' ? 'rtl' : 'ltr');
       assert.equal(await page.locator('.chart-media-thumbnail').count(), 1, 'Viewer is filtered to the tapped tooth');
       assert.equal(await page.locator('.chart-media-caption h4').textContent(), 'UR6 before treatment');
@@ -177,7 +178,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
         if (viewport.width === 1180 && language === 'en') await page.screenshot({path:path.join(screenshots,'chart-xray-landscape.png')});
         if (viewport.width === 1024 && language === 'ar') await page.screenshot({path:path.join(screenshots,'chart-xray-tablet-ar.png')});
       } else {
-        await page.locator('#chart-media-toggle').click();
+        await page.locator('[data-tooth-xray-slot="3"] button').click();
         assert.ok(await page.locator('.chart-media-preview').isVisible());
         await page.keyboard.press('Escape');
       }
@@ -217,7 +218,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
   await page.locator('.chart-media-nav button').last().click();
   assert.equal(await page.locator('.chart-media-caption h4').textContent(),'UR6 before treatment', 'Navigation wraps only inside the filter');
   await page.locator('#chart-media-collapse').click();
-  await page.locator('#chart-media-toggle').click();
+  await page.locator('#chart-media-collapse').click();
   assert.equal(await page.locator('.chart-media-thumbnail').count(),2, 'Collapsing and reopening retains the filter');
   await page.screenshot({path:path.join(screenshots,'chart-xray-tooth-filter.png')});
   await page.locator('.chart-media-filter button').click();
@@ -270,7 +271,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
   await page.setViewportSize({width:844,height:390});
   await page.evaluate(() => { Object.defineProperty(navigator,'userAgent',{configurable:true,value:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148'}); renderChartMediaPanel(); });
   assert.ok(!(await page.locator('#chart-media-panel').isVisible()), 'Landscape phones keep a single-column chart');
-  await page.locator('#chart-media-toggle').click();
+  await page.locator('[data-tooth-xray-slot="3"] button').click();
   assert.ok(await page.locator('.chart-media-preview').isVisible(), 'Landscape phones open the X-ray sheet');
   await page.keyboard.press('Escape');
   await page.evaluate(() => { delete navigator.userAgent; });
@@ -318,7 +319,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
     ${helpers}
   `});
   await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-media-teeth.js?v=1`});
-  await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-chart-media.js?v=4`});
+  await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-chart-media.js?v=5`});
   await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-mobile-nav.js?v=1`});
   await page.evaluate(() => {
     document.getElementById('auth-gate').classList.add('hidden');
@@ -341,7 +342,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
       },{language,zoom});
       const collapsed = await page.locator('#chart-media-panel').boundingBox();
       assert.ok(collapsed.y >= 0 && collapsed.y+collapsed.height <= viewport.height+1, `Collapsed viewer is on screen with the real navigation rail: ${JSON.stringify({viewport,language,zoom,collapsed})}`);
-      await page.locator('#chart-media-toggle').click();
+      await page.locator('#chart-media-collapse').click();
       const opened = await page.locator('#chart-media-panel').boundingBox();
       assert.ok(opened.y >= 0 && opened.y+opened.height <= viewport.height+1, 'Expanded viewer fits beside the real application navigation');
       assert.ok(await page.locator('.chart-media-preview').isVisible());
