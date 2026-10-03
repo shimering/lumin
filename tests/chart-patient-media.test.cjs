@@ -23,6 +23,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
     if (url.pathname === '/') { res.setHeader('Content-Type', 'text/html'); res.end(fixture); return; }
+    if (url.pathname === '/shell') { res.setHeader('Content-Type', 'text/html'); res.end(html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')); return; }
     const target = path.resolve(root, '.' + decodeURIComponent(url.pathname));
     if (!target.startsWith(root + path.sep) || !fs.existsSync(target) || !fs.statSync(target).isFile()) { res.statusCode = 404; res.end(); return; }
     res.setHeader('Content-Type', target.endsWith('.css') ? 'text/css' : 'application/javascript');
@@ -95,7 +96,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
     ${helpers}
   ` });
   await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-media-teeth.js?v=1`});
-  await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-chart-media.js?v=3`});
+  await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-chart-media.js?v=4`});
   await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-mobile-nav.js?v=1`});
   await page.evaluate(() => {
     document.dispatchEvent(new Event('DOMContentLoaded'));
@@ -305,5 +306,56 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
   await page.evaluate(() => { document.body.classList.add('lumin-raised'); renderChartMediaPanel(); openPatientAttachmentList(); resetChartPatientMedia(); });
   assert.ok(!(await page.locator('#patient-attachment-modal').isVisible()));
   assert.equal(await page.evaluate(() => chartPatientMedia.files.length),0);
+  await page.goto(`http://127.0.0.1:${server.address().port}/shell`);
+  await page.addScriptTag({ url:`http://127.0.0.1:${server.address().port}/vendor/lucide.min.js` });
+  await page.addScriptTag({content:`
+    let currentUiLanguage='en', activePatientId='patient-1';
+    function hasPageAccess() { return true; }
+    function getKnownPatient(id) { return {id,name:'Ahmed Hassan'}; }
+    function getStorageServerConfig() { return {url:location.origin,key:'test-key'}; }
+    function escapeHtml(value) { const node=document.createElement('span'); node.textContent=String(value); return node.innerHTML.replaceAll('"','&quot;'); }
+    const PRIMARY_TOOTH_BY_SLOT={4:'A'}, SLOT_BY_PRIMARY_TOOTH={A:4};
+    ${helpers}
+  `});
+  await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-media-teeth.js?v=1`});
+  await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-chart-media.js?v=4`});
+  await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-mobile-nav.js?v=1`});
+  await page.evaluate(() => {
+    document.getElementById('auth-gate').classList.add('hidden');
+    document.getElementById('app-shell').classList.remove('hidden');
+    document.querySelectorAll('#app-main > section, #app-main > div').forEach(element => element.classList.add('hidden'));
+    ['patient-workspace-sheet','patient-workspace-header','view-chart'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+    document.getElementById('upper-arch').innerHTML='<div data-tooth-card="3"><div class="chart-tooth-xray-slot" data-tooth-xray-slot="3"></div></div>';
+    document.getElementById('findings-container').innerHTML=Array.from({length:25}, () => '<article style="height:100px;padding:20px">Clinical finding</article>').join('');
+    chartPatientMedia.patientId='patient-1'; chartPatientMedia.status='ready';
+    chartPatientMedia.files=[{filename:'preop.png',relativePath:'Ahmed/Periapical/preop.png',category:'Periapical',mediaDetails:{tooth_ids:['3'],display_name:'UR6 before treatment'}}];
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+  });
+  for (const viewport of [{width:1440,height:900},{width:1280,height:720},{width:1024,height:768},{width:800,height:600}]) {
+    await page.setViewportSize(viewport);
+    for (const language of ['en','ar']) for (const zoom of [.8,1,1.25]) {
+      await page.evaluate(({language,zoom}) => {
+        currentUiLanguage=language; document.documentElement.dir=language === 'ar' ? 'rtl' : 'ltr';
+        document.documentElement.style.zoom=zoom; updateAppViewportDimensions();
+        chartPatientMedia.collapsed=true; chartPatientMedia.filterToothId=''; renderChartMediaPanel(); window.scrollTo(0,0);
+      },{language,zoom});
+      const collapsed = await page.locator('#chart-media-panel').boundingBox();
+      assert.ok(collapsed.y >= 0 && collapsed.y+collapsed.height <= viewport.height+1, `Collapsed viewer is on screen with the real navigation rail: ${JSON.stringify({viewport,language,zoom,collapsed})}`);
+      await page.locator('#chart-media-toggle').click();
+      const opened = await page.locator('#chart-media-panel').boundingBox();
+      assert.ok(opened.y >= 0 && opened.y+opened.height <= viewport.height+1, 'Expanded viewer fits beside the real application navigation');
+      assert.ok(await page.locator('.chart-media-preview').isVisible());
+      await page.locator('[data-tooth-xray-slot="3"] button').click();
+      assert.equal(await page.locator('.chart-media-thumbnail').count(),1);
+      await page.evaluate(() => window.scrollTo(0,600));
+      const sticky=await page.locator('#chart-media-panel').boundingBox();
+      const header=await page.locator('#patient-workspace-header').boundingBox();
+      assert.ok(sticky.y >= header.y+header.height && sticky.y+sticky.height <= viewport.height+1, 'Viewer stays below patient tabs and inside the viewport while scrolling');
+      await page.evaluate(() => window.scrollTo(0,1000));
+      const further=await page.locator('#chart-media-panel').boundingBox();
+      assert.ok(Math.abs(sticky.y-further.y)<2, 'Real-shell viewer remains frozen as findings scroll');
+      if (viewport.width===1280 && language==='en' && zoom===1) await page.screenshot({path:path.join(screenshots,'chart-xray-real-shell.png')});
+    }
+  }
   assert.deepEqual(errors,[]);
 });

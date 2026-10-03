@@ -93,11 +93,22 @@ function updateChartMediaStickyTop() {
   const panel = document.getElementById('chart-media-panel');
   if (!panel) return;
   const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
-  const heights = ['app-header', 'patient-workspace-header'].map(id => {
+  const panelBounds = panel.getBoundingClientRect();
+  let stickyTop = 24;
+  ['app-header', 'patient-workspace-header'].forEach(id => {
+    // On desktop this header is a full-height navigation rail, not a top header.
+    if (id === 'app-header' && window.matchMedia('(min-width: 1024px)').matches) return;
     const element = document.getElementById(id);
-    return element && !element.classList.contains('hidden') ? element.getBoundingClientRect().height / zoom : 0;
+    if (!element || element.classList.contains('hidden')) return;
+    const style = getComputedStyle(element);
+    if (!['fixed', 'sticky'].includes(style.position) || style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return;
+    const bounds = element.getBoundingClientRect();
+    if (bounds.right <= panelBounds.left || bounds.left >= panelBounds.right) return;
+    const top = Number.parseFloat(style.top);
+    if (!Number.isFinite(top)) return;
+    stickyTop = Math.max(stickyTop, top + bounds.height / zoom + 16);
   });
-  panel.style.setProperty('--chart-media-sticky-top', `${Math.ceil(heights.reduce((sum, height) => sum + height, 0) + 24)}px`);
+  panel.style.setProperty('--chart-media-sticky-top', `${Math.ceil(stickyTop)}px`);
 }
 
 function toggleChartMediaPanel() {
