@@ -13,7 +13,7 @@ function source(name) {
   return rest.slice(0, end + 1);
 }
 const bootstrap = `
-  var currentSession = {user:{id:'staff'}}, currentUiLanguage = 'en', activePatientId = 'patient';
+  var currentSession = {user:{id:'staff'}}, currentUiLanguage = 'en', activePatientId = 'patient', patientWorkspaceLoadingId = null;
   var OPERATION_STATUSES = {P:{key:'P',label:'Planned',color:'#dc2626'},In:{key:'In',label:'In progress',color:'#2563eb'},C:{key:'C',label:'Completed',color:'#16a34a'},E:{key:'E',label:'Existed',color:'#475569'}};
   var CHART_META_KEY = '_meta', hrDirectoryLoaded = true, financeInvoicesLoaded = true;
   var patients = [{id:'patient',name:'Fixture',chartState:{'1':{wholeOperations:[

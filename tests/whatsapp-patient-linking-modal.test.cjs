@@ -551,7 +551,7 @@ test('renderPatientProfile auto-resolves missing whatsappCode from linked conver
     lucide: { createIcons: () => {} }
   };
 
-  const fnStart = html.indexOf('async function renderPatientProfile()');
+  const fnStart = html.indexOf('async function renderPatientProfile(');
   const fnEnd = html.indexOf('function firstAuthorizedClinicManagementTab', fnStart);
   const snippet = html.slice(fnStart, fnEnd);
 
@@ -563,6 +563,10 @@ test('renderPatientProfile auto-resolves missing whatsappCode from linked conver
   assert.equal(elements['profile-patient-whatsapp-code'].textContent, '+EG.1372864025001690');
   assert.ok(updatedDbPatch);
   assert.equal(updatedDbPatch.whatsapp_code, '+EG.1372864025001690');
+  patient.whatsappCode = null;
+  updatedDbPatch = null;
+  await mockContext.renderPatientProfile({preview:true});
+  assert.equal(updatedDbPatch, null, 'cached profile preview must not persist inferred data');
   assert.equal(updatedPatientId, '66');
 });
 

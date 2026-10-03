@@ -66,6 +66,11 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
     let dashboardSelectedDate = new Date(appointmentToday);
     const appointmentDayFormatter = new Intl.DateTimeFormat('en-GB', { dateStyle: 'long' });
     let currentUserAccess = { isAdmin: false, isDoctor: false, permissions: new Set(['dashboard_invoices']) };
+    let workspaceNavigationToken = 0, currentSession = {user:{id:'fixture'}}, patientWorkspaceLoadingId = null;
+    const dashboardDayCache = new Map();
+    let appointmentsLoaded = true;
+    function dashboardDayContext() {return 'fixture-day'}
+    async function ensureDashboardAppointmentsLoaded() {return true}
     function refreshMyAttendanceState() {}
     function renderDashboardDoctorFilter() { return null; }
     function dashboardAppointmentsForDate() { return []; }

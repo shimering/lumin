@@ -71,6 +71,7 @@
   <!-- Precompiled utilities avoid compiling Tailwind in every browser session. -->
   <link rel="stylesheet" href="lumin-app.css" />
   <script src="vendor/lucide.min.js"></script>
+  <link rel="stylesheet" href="lumin-loading.css?v=1" />
   <script src="vendor/supabase.js"></script>
   <script src="lumin-loyalty.js?v=5"></script>
   <script src="lumin-finance-sync.js?v=2"></script>
@@ -6086,8 +6087,8 @@
             </button>
           </div>
           <div class="grid gap-3 lg:grid-cols-[minmax(240px,1.4fr)_minmax(190px,0.7fr)_auto]">
-            <label class="block"><span class="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-400">Search expenses</span><span class="relative block"><i data-lucide="search" class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i><input id="finance-expense-search" type="search" oninput="renderFinanceExpenseRows()" placeholder="Search by expense name or description" class="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-500/15" /></span></label>
-            <label class="block"><span class="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-400">Expense type</span><select id="finance-expense-type" onchange="renderFinanceExpenseRows()" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-700 outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-500/15"><option value="all">All expense types</option></select></label>
+            <label class="block"><span class="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-400">Search expenses</span><span class="relative block"><i data-lucide="search" class="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i><input id="finance-expense-search" type="search" oninput="financeExpenseFiltersChanged(true)" placeholder="Search by expense name or description" class="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-500/15" /></span></label>
+            <label class="block"><span class="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-400">Expense type</span><select id="finance-expense-type" onchange="financeExpenseFiltersChanged()" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-700 outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-500/15"><option value="all">All expense types</option></select></label>
             <div class="flex items-end"><button type="button" onclick="clearFinanceExpenseFilters()" class="min-h-[42px] w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-500 transition hover:bg-slate-50 hover:text-slate-800 lg:w-auto">Clear expense filters</button></div>
           </div>
         </div>
@@ -6208,6 +6209,7 @@
             <tbody id="finance-expenses-table-body" class="divide-y divide-slate-100 font-medium text-slate-700"><tr><td colspan="8" class="px-5 py-12 text-center text-sm font-bold text-slate-400">Loading expenses...</td></tr></tbody>
           </table>
         </div>
+        <div id="finance-expense-pagination" class="loading-pagination"></div>
       </div>
 
       <div id="finance-depts-results" class="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
@@ -6221,6 +6223,7 @@
         <div id="finance-depts-list" class="divide-y divide-slate-100">
           <div class="px-5 py-12 text-center text-sm font-bold text-slate-400">Loading patient depts...</div>
         </div>
+        <div id="finance-debt-pagination" class="loading-pagination"></div>
       </div>
     </section>
 
@@ -9835,6 +9838,12 @@
 
     let patients = [];
     let patientsLoaded = false;
+    const patientDetailReads = new Map();
+    const patientDetailFreshness = new Map();
+    let workspaceNavigationToken = 0;
+    let patientWorkspaceLoadingId = null;
+    const dashboardDayCache = new Map();
+    let targetedLoadingGeneration = 0;
     let patientsLoadPromise = null;
     const PATIENT_QUERY_PAGE_SIZE = 10;
     let patientQueryPage = 1;
@@ -9975,7 +9984,15 @@
     let financePaymentTotalCount = 0;
     let financePaymentRenderToken = 0;
     let financePaymentSearchTimer = null;
-    let financeDeptInvoices = [];
+    let financeDebtGroups = [];
+    let financeDebtPage = 1;
+    let financeDebtPageSize = 10;
+    let financeDebtSummary = { total_count: 0, invoice_count: 0, remaining_total: 0 };
+    const financeDebtDetails = new Map();
+    let financeExpensePage = 1;
+    let financeExpensePageSize = 10;
+    let financeExpenseSummary = { total_count: 0, paid_total: 0, remaining_total: 0 };
+    let financeExpenseSearchTimer = null;
     let financeDeptsLoaded = false;
     let financeDeptsLoadPromise = null;
     let financeDeptsRenderToken = 0;
@@ -12741,6 +12758,7 @@
         currentUserAccess = null;
         resetLoyaltyState();
         resetFinanceSyncState();
+        resetTargetedLoading();
         patients = [];
         patientsLoaded = false;
         patientsLoadPromise = null;
@@ -12810,7 +12828,6 @@
         financePaymentPage = 1;
         financePaymentTotalCount = 0;
         financePaymentRenderToken += 1;
-        financeDeptInvoices = [];
         setStableHtml(document.getElementById('finance-depts-list'), '');
         financeDeptsLoaded = false;
         financeDeptsLoadPromise = null;
@@ -12926,6 +12943,7 @@
         setLoginError('');
         renderAuthorizedNavigation();
 
+        resetTargetedLoading();
         patients = [];
         patientsLoaded = false;
         patientsLoadPromise = null;
@@ -12981,7 +12999,6 @@
         financePaymentPage = 1;
         financePaymentTotalCount = 0;
         financePaymentRenderToken += 1;
-        financeDeptInvoices = [];
         setStableHtml(document.getElementById('finance-depts-list'), '');
         financeDeptsLoaded = false;
         financeDeptsLoadPromise = null;
@@ -18979,8 +18996,8 @@
       realtimePendingTables.add('clinic_settings');
       realtimePendingTables.add('loyalty_settings');
       if (realtimeViewIsVisible('loyalty')) REALTIME_LOYALTY_TABLES.forEach(tableName => realtimePendingTables.add(tableName));
-      if (patientsLoaded) realtimePendingTables.add('patients');
-      if (appointmentsLoaded) realtimePendingTables.add('appointments');
+      if (patientsLoaded || patientDetailFreshness.size) realtimePendingTables.add('patients');
+      if (appointmentsLoaded || realtimeViewIsVisible('dashboard')) realtimePendingTables.add('appointments');
       if (realtimeViewIsVisible('patient-appointments')) realtimePendingTables.add('appointments');
       if (realtimeViewIsVisible('patient-prescriptions')) {
         ['prescription_print_settings', 'medication_catalog', 'prescription_templates', 'prescriptions', 'prescription_items']
@@ -19030,6 +19047,7 @@
         const access = await loadCurrentUserAccess(currentSession);
         currentUserAccess = access;
         if (previousAccessSignature === accessRefreshSignature(access)) return true;
+        resetTargetedLoading();
         resetPatientsPageState();
         if (access.language !== previousLanguage) applyUiLanguage(access.language, false);
         renderAuthorizedNavigation();
@@ -19124,11 +19142,24 @@
           await renderPatientPrescriptions({ throwOnError: true });
         }
 
-        if ((refreshLoadedResourcesForAccess || changedTables.has('patients')) && patientsLoaded) {
-          await fetchPatientsFromDB();
-        } else if (changedTables.has('patients') && patientDirectoryLoaded && realtimeViewIsVisible('patients')) {
-          patientDirectoryLoaded = false;
-          await ensurePatientDirectoryPageLoaded();
+        if (refreshLoadedResourcesForAccess || changedTables.has('patients')) {
+          patientDetailFreshness.clear();
+          if (realtimeViewIsVisible('patients')) {
+            if (patientsLoaded) await fetchPatientsFromDB();
+            else {
+              patientDirectoryLoaded = false;
+              await ensurePatientDirectoryPageLoaded();
+            }
+          }
+          if (activeWorkspacePatientId && ['patient-profile','chart','invoices','payments','loyalty','patient-appointments','patient-media','patient-prescriptions'].some(realtimeViewIsVisible)) {
+            const patientId = activeWorkspacePatientId;
+            const token = workspaceNavigationToken;
+            const patient = await ensureKnownPatient(patientId, { force: true, throwOnError: true });
+            if (patient && token === workspaceNavigationToken && activeWorkspacePatientId === patientId) {
+              if (realtimeViewIsVisible('chart')) loadActivePatientChart();
+              else if (realtimeViewIsVisible('patient-profile')) void renderPatientProfile();
+            }
+          }
         }
         if (changedTables.has('patients')) {
           financeInvoicesLoaded = false;
@@ -19143,6 +19174,10 @@
           const previousAppointments = appointments.slice();
           await fetchAppointmentsFromDB({ refreshStaff: accessChanged, throwOnError: true });
           if (changedTables.has('appointments')) notifyRealtimeAppointmentChanges(previousAppointments, appointments);
+        }
+        if (accessChanged || changedTables.has('appointments') || changedTables.has('patients') || appointmentVisitTypesChanged) {
+          dashboardDayCache.forEach(entry => { entry.expiresAt = 0; });
+          if (realtimeViewIsVisible('dashboard')) await ensureDashboardAppointmentsLoaded({ refresh: true, notify: changedTables.has('appointments') && !appointmentsLoaded });
         }
         if ((accessChanged || changedTables.has('appointments') || changedTables.has('patients') || appointmentVisitTypesChanged) && realtimeViewIsVisible('patient-appointments') && canViewPatientAppointments()) {
           await renderPatientAppointments({ throwOnError: true });
@@ -19913,6 +19948,7 @@
     }
 
     const PATIENT_SELECT_FIELDS = 'id, patient_number, legacy_patient_id, name, first_name, last_name, phone, secondary_phone, address, age, birth_date, gender, medical_history, chart_state, created_at, whatsapp_username, whatsapp_code';
+    const PATIENT_SUMMARY_SELECT_FIELDS = PATIENT_SELECT_FIELDS.replace(', chart_state', '');
 
     function normalisePatientRecord(patient) {
       return {
@@ -19931,7 +19967,8 @@
         birthDate: patient.birth_date || null,
         gender: patient.gender,
         medicalHistory: patient.medical_history,
-        chartState: patient.chart_state || {}
+        recordComplete: Object.prototype.hasOwnProperty.call(patient, 'chart_state'),
+        chartState: Object.prototype.hasOwnProperty.call(patient, 'chart_state') ? (patient.chart_state || {}) : undefined
       };
     }
 
@@ -19943,25 +19980,41 @@
         || null;
     }
 
-    async function ensureKnownPatient(patientId) {
+    async function ensureKnownPatient(patientId, options = {}) {
       if (!patientId) return null;
       const existing = getKnownPatient(patientId);
-      if (existing) return existing;
       if (!currentSession) return null;
+      const userId = currentSession.user.id;
+      const generation = targetedLoadingGeneration;
+      const context = contentRefreshContext('patient-detail', patientId);
+      if (!options.force && existing && existing.recordComplete !== false
+        && Date.now() - (patientDetailFreshness.get(context) || 0) < 15000) return existing;
+      if (!options.force && patientDetailReads.has(context)) return patientDetailReads.get(context);
+      const read = coalesceRefreshRead(context, async () => {
+        const readRevision = patientChartWriteRevision;
+        const result = await db.from('patients').select(PATIENT_SELECT_FIELDS).eq('id', patientId).maybeSingle();
+        return { ...result, readRevision };
+      });
+      const pending = read.then(({ data, error, readRevision }) => {
+        if (currentSession?.user?.id !== userId || generation !== targetedLoadingGeneration) return null;
+        if (error) throw error;
+        if (!data) return null;
+        const patient = normalisePatientRecord(data);
+        if (patientChartSaveStates.has(patientChartSaveKey(patient.id))) rememberPatientChartSnapshot(patient, readRevision);
+        const index = patients.findIndex(item => item.id === patient.id);
+        if (index < 0) patients.unshift(patient);
+        else patients[index] = patient;
+        patientDetailFreshness.set(context, Date.now());
+        return patient;
+      }).finally(() => {
+        if (patientDetailReads.get(context) === pending) patientDetailReads.delete(context);
+      });
+      patientDetailReads.set(context, pending);
       try {
-        const { data, error } = await db
-          .from('patients')
-          .select(PATIENT_SELECT_FIELDS)
-          .eq('id', patientId)
-          .maybeSingle();
-        if (error || !data) return null;
-        const normalised = normalisePatientRecord(data);
-        if (Array.isArray(patients) && patientsLoaded && !patients.some(p => p.id === normalised.id)) {
-          patients.unshift(normalised);
-        }
-        return normalised;
+        return await pending;
       } catch (e) {
         console.warn('ensureKnownPatient failed:', e);
+        if (options.throwOnError) throw e;
         return null;
       }
     }
@@ -20054,11 +20107,12 @@
     }
 
     async function fetchPatientDirectoryPage() {
+      const userId = currentSession?.user?.id;
       const requestedPage = patientQueryPage;
       const from = (requestedPage - 1) * PATIENT_QUERY_PAGE_SIZE;
       const { data, error, count } = await db
         .from('patients')
-        .select(PATIENT_SELECT_FIELDS, { count: 'exact' })
+        .select(PATIENT_SUMMARY_SELECT_FIELDS, { count: 'exact' })
         .order('created_at', { ascending: false })
         .range(from, from + PATIENT_QUERY_PAGE_SIZE - 1);
       if (error) {
@@ -20068,7 +20122,7 @@
         patientDirectoryLoaded = false;
         return false;
       }
-      if (requestedPage !== patientQueryPage || patientsLoaded) return true;
+      if (currentSession?.user?.id !== userId || requestedPage !== patientQueryPage || patientsLoaded) return true;
       patientDirectoryRows = (data || []).map(normalisePatientRecord);
       patientDirectoryTotal = Number(count) || 0;
       patientDirectoryLoaded = true;
@@ -20209,6 +20263,72 @@
       if (activePatientId && !document.getElementById('view-chart')?.classList.contains('hidden')) renderFindingsList();
     }
 
+    function dashboardDayContext(date = dashboardSelectedDate) {
+      return contentRefreshContext('dashboard-day', appointmentDateKey(date));
+    }
+
+    async function ensureDashboardAppointmentsLoaded(options = {}) {
+      if (!currentSession || !currentUserAccess || !hasPageAccess('dashboard')) return false;
+      const date = new Date(dashboardSelectedDate);
+      const context = dashboardDayContext(date);
+      const cached = dashboardDayCache.get(context);
+      if (!options.refresh && cached?.expiresAt > Date.now()) return true;
+      if (!options.refresh && cached?.promise) return cached.promise;
+      const userId = currentSession.user.id;
+      const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const end = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+      const entry = cached || { data: null, expiresAt: 0, error: null };
+      entry.error = null;
+      dashboardDayCache.set(context, entry);
+      const request = coalesceRefreshRead(context, async () => {
+        const records = [];
+        for (let offset = 0; ; offset += 1000) {
+          const { data, error } = await db.from('appointments').select(APPOINTMENT_SELECT_FIELDS)
+            .gte('appointment_at', start.toISOString()).lt('appointment_at', end.toISOString())
+            .order('appointment_at', { ascending: true }).order('id', { ascending: true }).range(offset, offset + 999);
+          if (error) throw error;
+          records.push(...(data || []));
+          if ((data || []).length < 1000) return records;
+        }
+      });
+      const pending = request.then(records => {
+        if (currentSession?.user?.id !== userId || dashboardDayCache.get(context) !== entry) return false;
+        const previous = appointments.filter(item => item.date === appointmentDateKey(date));
+        const fetched = records.map(normaliseAppointmentRecord);
+        const ids = new Set(fetched.map(item => item.id));
+        const merged = fetched.map(item => appointmentMoveStates.get(item.id)?.optimisticRecord || item);
+        appointmentMoveStates.forEach((state, id) => {
+          if (!ids.has(id) && state.optimisticRecord?.date === appointmentDateKey(date)) merged.push(state.optimisticRecord);
+        });
+        appointments = appointments.filter(item => item.date !== appointmentDateKey(date)).concat(merged);
+        entry.data = records;
+        entry.expiresAt = Date.now() + 15000;
+        entry.error = null;
+        if (options.notify) notifyRealtimeAppointmentChanges(previous, merged);
+        return true;
+      }).catch(error => {
+        if (currentSession?.user?.id === userId && dashboardDayCache.get(context) === entry) {
+          entry.error = error;
+          entry.expiresAt = Date.now() + 5000;
+        }
+        console.warn('Dashboard day refresh failed:', error);
+        return false;
+      }).finally(() => {
+        if (entry.promise === pending) entry.promise = null;
+        if (currentSession?.user?.id === userId && context === dashboardDayContext() && realtimeViewIsVisible('dashboard')) renderDashboard();
+      });
+      entry.promise = pending;
+      void Promise.allSettled([ensureAppointmentStaffLoaded(), ensureAppointmentVisitTypesLoaded()]).then(() => {
+        if (currentSession?.user?.id !== userId) return;
+        if (entry.data) {
+          const enriched = new Map(entry.data.map(record => [record.id, normaliseAppointmentRecord(record)]));
+          appointments = appointments.map(item => enriched.has(item.id) ? (appointmentMoveStates.get(item.id)?.optimisticRecord || enriched.get(item.id)) : item);
+        }
+        if (context === dashboardDayContext() && realtimeViewIsVisible('dashboard')) renderDashboard();
+      });
+      return pending;
+    }
+
     async function ensureAppointmentsLoaded() {
       if (appointmentsLoaded) {
         if (!appointmentVisitTypesLoaded) await ensureAppointmentVisitTypesLoaded();
@@ -20230,6 +20350,7 @@
     }
 
     async function fetchAppointmentsFromDB(options = {}) {
+      if (!appointmentsLoaded && realtimeViewIsVisible('dashboard')) return ensureDashboardAppointmentsLoaded({ refresh: true });
       const { refreshStaff = true, throwOnError = false } = options;
       const userId = currentSession?.user?.id;
       try {
@@ -22366,7 +22487,7 @@
     }
 
     async function saveActivePatientChart(patient = getActivePatient(), options = {}) {
-      if (!patient) return false;
+      if (!patient || patient.recordComplete === false || patientWorkspaceLoadingId === patient.id) return false;
       rebuildChartProcedureStepPayrollFindings(patient);
       return enqueuePatientChartSave(patient, options);
     }
@@ -23437,8 +23558,8 @@
     }
 
     const INVOICE_SELECT_FIELDS = 'id, patient_id, invoice_date, status, paid_amount, loyalty_discount_amount, manual_discount_type, manual_discount_value, manual_discount_amount, created_by, created_at, updated_at, patients(name, phone, patient_number), patient_invoice_items(id, invoice_id, finding_id, operation_id, operation_code, operation_name, operation_status, tooth_id, surfaces, unit_price, quantity, doctor_id, doctor_name, created_at), invoice_payments(id, invoice_id, invoice_item_id, patient_id, payment_method_id, payment_method_name, amount, payment_date, created_by, created_at, invoice_payment_allocations(invoice_item_id, amount)), invoice_releases(id, invoice_id, amount, release_date, created_by, created_at)';
-    const FINANCE_INVOICE_SELECT_FIELDS = INVOICE_SELECT_FIELDS.replace('patients(', 'patients!inner(');
-    const FINANCE_DEPT_INVOICE_SELECT_FIELDS = 'id, patient_id, invoice_date, status, paid_amount, loyalty_discount_amount, manual_discount_amount, created_by, created_at, updated_at, patients!inner(name, phone, patient_number), patient_invoice_items(id, unit_price, quantity), invoice_releases(id, invoice_id, amount, release_date, created_by, created_at)';
+    const INVOICE_SUMMARY_SELECT_FIELDS = 'id, patient_id, invoice_date, status, paid_amount, loyalty_discount_amount, manual_discount_type, manual_discount_value, manual_discount_amount, created_at, updated_at, patients(name, phone, patient_number), patient_invoice_items(id, operation_name, unit_price, quantity), invoice_payments(amount), invoice_releases(id, amount, created_at)';
+    const FINANCE_INVOICE_SELECT_FIELDS = INVOICE_SUMMARY_SELECT_FIELDS.replace('patients(', 'patients!inner(');
     const FINANCE_PAYMENT_SELECT_FIELDS = 'id, invoice_id, patient_id, payment_method_id, payment_method_name, amount, payment_date, created_by, created_at, patients!inner(name, phone, patient_number)';
 
     async function fetchPatientDoctorSalaryTransfers(patientId) {
@@ -23689,7 +23810,7 @@
       return coalesceRefreshRead(contentRefreshContext('invoices', filters), async () => {
         let query = db
           .from('patient_invoices')
-          .select(INVOICE_SELECT_FIELDS)
+          .select(filters.summary ? INVOICE_SUMMARY_SELECT_FIELDS : INVOICE_SELECT_FIELDS)
           .order('invoice_date', { ascending: false })
           .order('created_at', { ascending: false });
         if (filters.patientId) query = query.eq('patient_id', filters.patientId);
@@ -23811,7 +23932,7 @@
     function refreshFinanceFilteredResults() {
       renderFinanceOverview({ refresh: true });
       if (activeFinanceTab === 'payments') renderFinancePayments({ refresh: true });
-      else if (activeFinanceTab === 'expenses') renderFinanceExpenses();
+      else if (activeFinanceTab === 'expenses') renderFinanceExpenses({ refresh: true });
       else if (activeFinanceTab === 'depts') renderFinanceDepts({ refresh: true });
       else renderFinanceInvoices({ refresh: true });
     }
@@ -23819,6 +23940,10 @@
     function financeUniversalFiltersChanged(options = {}) {
       financeInvoicePage = 1;
       financePaymentPage = 1;
+      financeExpensePage = financeDebtPage = 1;
+      financeExpensesLoaded = false;
+      financeExpenseRenderToken += 1;
+      financeDebtDetails.clear();
       financeInvoicesLoaded = false;
       financePaymentsLoaded = false;
       financeDeptsLoaded = false;
@@ -24073,54 +24198,129 @@
       finishContentRefresh(body, context, body.luminRenderedHtml);
     }
 
-    async function fetchFinanceDeptInvoiceRecords(filters = financeUniversalQueryFilters()) {
-      const pageSize = 200;
-      const invoices = [];
-      let from = 0;
-      while (true) {
-        let query = db
-          .from('patient_invoices')
-          .select(FINANCE_DEPT_INVOICE_SELECT_FIELDS)
-          .in('status', ['unpaid', 'partial'])
-          .order('invoice_date', { ascending: false })
-          .order('created_at', { ascending: false })
-          .order('id', { ascending: false });
-        if (filters.search) query = query.ilike('patients.name', `%${filters.search}%`);
-        if (filters.startDate) query = query.gte('invoice_date', filters.startDate);
-        if (filters.endDate) query = query.lte('invoice_date', filters.endDate);
-        const { data, error } = await query.range(from, from + pageSize - 1);
-        if (error) throw error;
-        const records = data || [];
-        invoices.push(...records.map(normaliseInvoiceRecord).filter(invoice => invoiceRemaining(invoice) > 0));
-        if (records.length < pageSize) break;
-        from += pageSize;
-      }
-      return invoices;
+    function financeExpenseQueryFilters() {
+      const filters = financeUniversalQueryFilters();
+      return { search: document.getElementById('finance-expense-search')?.value.trim() || '',
+        type: document.getElementById('finance-expense-type')?.value || 'all',
+        startDate: filters.startDate, endDate: filters.endDate };
     }
 
-    function groupFinanceDeptInvoices(invoices = financeDeptInvoices) {
-      const groupsByPatient = new Map();
-      invoices.forEach(invoice => {
-        const patientKey = invoice.patientId || `${invoice.patientName}:${invoice.patientPhone}`;
-        if (!groupsByPatient.has(patientKey)) {
-          groupsByPatient.set(patientKey, {
-            patientId: invoice.patientId,
-            patientName: invoice.patientName || 'Unknown patient',
-            patientPhone: invoice.patientPhone || '',
-            patientNumber: invoice.patientNumber,
-            remaining: 0,
-            invoices: []
-          });
-        }
-        const group = groupsByPatient.get(patientKey);
-        group.invoices.push(invoice);
-        group.remaining += invoiceRemaining(invoice);
-      });
-      return [...groupsByPatient.values()].sort((left, right) => right.remaining - left.remaining || left.patientName.localeCompare(right.patientName));
+    function financeExpenseFiltersChanged(debounce = false) {
+      financeExpensePage = 1;
+      financeExpensesLoaded = false;
+      financeExpenseRenderToken += 1;
+      if (financeExpenseSearchTimer) clearTimeout(financeExpenseSearchTimer);
+      if (debounce) financeExpenseSearchTimer = setTimeout(() => {
+        financeExpenseSearchTimer = null;
+        void renderFinanceExpenses({ refresh: true });
+      }, 250);
+      else void renderFinanceExpenses({ refresh: true });
     }
+
+    function renderFinancePagedFooter(kind, page, pageSize, totalCount) {
+      const footer = document.getElementById(`finance-${kind}-pagination`);
+      if (!footer) return;
+      const pages = Math.max(1, Math.ceil(totalCount / pageSize));
+      const ar = currentUiLanguage === 'ar';
+      setStableHtml(footer, `<span class="text-xs text-slate-500">${ar ? `الصفحة ${page} من ${pages}` : `Page ${page} of ${pages}`}</span>
+        <div class="flex flex-wrap items-center gap-2"><label class="flex items-center gap-2 text-xs text-slate-500">${ar ? 'لكل صفحة' : 'Per page'}<select class="loading-page-button" aria-label="${ar ? 'عدد النتائج لكل صفحة' : 'Results per page'}" onchange="changeFinancePagedSize('${kind}', this.value)">${[10,20,50].map(size => `<option value="${size}" ${size === pageSize ? 'selected' : ''}>${size}</option>`).join('')}</select></label>
+        <button type="button" class="loading-page-button" onclick="changeFinancePagedPage('${kind}', -1)" ${page <= 1 ? 'disabled' : ''}><i data-lucide="chevron-left" class="h-4 w-4"></i>${ar ? 'السابق' : 'Previous'}</button>
+        <button type="button" class="loading-page-button" onclick="changeFinancePagedPage('${kind}', 1)" ${page >= pages ? 'disabled' : ''}>${ar ? 'التالي' : 'Next'}<i data-lucide="chevron-right" class="h-4 w-4"></i></button></div>`);
+    }
+
+    function changeFinancePagedPage(kind, delta) {
+      if (kind === 'debt') {
+        financeDebtPage = Math.max(1, Math.min(Math.ceil(financeDebtSummary.total_count / financeDebtPageSize) || 1, financeDebtPage + delta));
+        void renderFinanceDepts({ refresh: true });
+      } else {
+        financeExpensePage = Math.max(1, Math.min(Math.ceil(financeExpenseSummary.total_count / financeExpensePageSize) || 1, financeExpensePage + delta));
+        void renderFinanceExpenses({ refresh: true });
+      }
+    }
+
+    function changeFinancePagedSize(kind, value) {
+      const size = Number(value);
+      if (![10,20,50].includes(size)) return;
+      if (kind === 'debt') {
+        financeDebtPageSize = size;
+        financeDebtPage = 1;
+        financeDebtDetails.clear();
+        void renderFinanceDepts({ refresh: true });
+      } else {
+        financeExpensePageSize = size;
+        financeExpensePage = 1;
+        void renderFinanceExpenses({ refresh: true });
+      }
+    }
+
+    function financeDebtInvoicePagerMarkup(group, detail) {
+      if (!detail) return '';
+      const pages = Math.max(1, Math.ceil(detail.totalCount / financeDebtPageSize));
+      const ar = currentUiLanguage === 'ar';
+      return `<div class="loading-pagination"><span class="text-xs text-slate-500">${ar ? `الصفحة ${detail.page} من ${pages}` : `Page ${detail.page} of ${pages}`}</span><div class="flex gap-2">
+        <button type="button" class="loading-page-button" data-patient-id="${escapeHtml(group.patientId)}" onclick="loadFinanceDebtDetails(this.dataset.patientId, ${detail.page - 1})" ${detail.page <= 1 ? 'disabled' : ''}>${ar ? 'السابق' : 'Previous'}</button>
+        <button type="button" class="loading-page-button" data-patient-id="${escapeHtml(group.patientId)}" onclick="loadFinanceDebtDetails(this.dataset.patientId, ${detail.page + 1})" ${detail.page >= pages ? 'disabled' : ''}>${ar ? 'التالي' : 'Next'}</button></div></div>`;
+    }
+
+    function toggleFinanceDebtDetails(patientId) {
+      const detail = financeDebtDetails.get(patientId) || { page: 1, invoices: [], expanded: false };
+      detail.expanded = !detail.expanded;
+      financeDebtDetails.set(patientId, detail);
+      renderFinanceDeptRows();
+      if (detail.expanded) void loadFinanceDebtDetails(patientId, detail.page);
+    }
+
+    async function loadFinanceDebtDetails(patientId, page = 1) {
+      if (!canViewFinanceDepts() || !financeDeptGroupForPatient(patientId)) return;
+      const navigationToken = workspaceNavigationToken;
+      const generation = targetedLoadingGeneration;
+      const filters = financeUniversalQueryFilters();
+      const context = contentRefreshContext('debt-invoices', patientId, filters, financeDebtPageSize);
+      const detail = financeDebtDetails.get(patientId) || { expanded: true, invoices: [] };
+      const token = (detail.token || 0) + 1;
+      Object.assign(detail, { token, context, page: Math.max(1, page), loading: true, error: null });
+      financeDebtDetails.set(patientId, detail);
+      renderFinanceDeptRows();
+      try {
+        const { data, error } = await coalesceRefreshRead(`${context}:${detail.page}`, () => db.rpc('get_finance_debt_invoices', {
+          p_patient_id: patientId, p_start_date: filters.startDate || null, p_end_date: filters.endDate || null,
+          p_page: detail.page, p_page_size: financeDebtPageSize
+        }));
+        if (error) throw error;
+        if (navigationToken !== workspaceNavigationToken || generation !== targetedLoadingGeneration
+          || financeDebtDetails.get(patientId) !== detail || token !== detail.token || !canViewFinanceDepts()
+          || context !== contentRefreshContext('debt-invoices', patientId, financeUniversalQueryFilters(), financeDebtPageSize)) return;
+        const pages = Math.max(1, Math.ceil(Number(data.total_count) / financeDebtPageSize));
+        if (detail.page > pages) { await loadFinanceDebtDetails(patientId, pages); return; }
+        detail.totalCount = Number(data.total_count);
+        detail.invoices = (data.invoices || []).map(record => ({ id: record.id, invoiceDate: record.invoice_date,
+          items: [{ unitPrice: Number(record.total_amount), quantity: 1 }], paidAmount: Number(record.paid_amount),
+          releasedAmount: Number(record.released_amount), loyaltyDiscount: 0, manualDiscount: 0 }));
+      } catch (error) {
+        if (navigationToken === workspaceNavigationToken && generation === targetedLoadingGeneration
+          && financeDebtDetails.get(patientId) === detail && token === detail.token) detail.error = error;
+      } finally {
+        if (financeDebtDetails.get(patientId) === detail && token === detail.token) {
+          detail.loading = false;
+          if (navigationToken === workspaceNavigationToken && generation === targetedLoadingGeneration
+            && canViewFinanceDepts()) renderFinanceDeptRows();
+        }
+      }
+    }
+
+    async function fetchFinanceDeptInvoiceRecords(filters = financeUniversalQueryFilters()) {
+      const { data, error } = await db.rpc('get_finance_debt_page', {
+        p_patient_search: filters.search || null, p_start_date: filters.startDate || null,
+        p_end_date: filters.endDate || null, p_page: financeDebtPage, p_page_size: financeDebtPageSize
+      });
+      if (error) throw error;
+      return data;
+    }
+
+
 
     function financeDeptGroupForPatient(patientId) {
-      return groupFinanceDeptInvoices().find(group => group.patientId === patientId) || null;
+      return financeDebtGroups.find(group => group.patientId === patientId) || null;
     }
 
     function openFinanceDeptWhatsApp(event, patientId) {
@@ -24283,7 +24483,9 @@
       const invoiceAction = group.patientId && canViewPatientInvoices()
         ? `<button type="button" data-patient-id="${escapeHtml(group.patientId)}" onclick="openPatientInvoices(this.dataset.patientId, 'finances')" class="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-[11px] font-black text-violet-700 transition hover:bg-violet-100"><i data-lucide="receipt-text" class="h-3.5 w-3.5"></i> Invoice</button>`
         : '';
-      const invoiceRows = group.invoices.map(invoice => {
+      const detail = financeDebtDetails.get(group.patientId);
+      const expanded = detail?.expanded === true;
+      const invoiceRows = (detail?.invoices || []).map(invoice => {
         const remaining = invoiceRemaining(invoice);
         const payAction = canRecordInvoicePayment()
           ? `<button type="button" onclick="openInvoicePaymentModal(${invoice.id})" class="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-[11px] font-black text-white transition hover:bg-emerald-700"><i data-lucide="badge-dollar-sign" class="h-3.5 w-3.5"></i> Pay</button>`
@@ -24300,12 +24502,12 @@
           </div>`;
       }).join('');
       return `
-        <article>
+        <article data-refresh-key="${escapeHtml(group.patientId)}">
           <div class="flex flex-col gap-3 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div class="min-w-0"><h4 class="truncate text-sm font-black text-slate-900">${escapeHtml(group.patientName)}</h4><p class="mt-1 text-[11px] font-bold text-slate-400">${escapeHtml(patientMeta)}</p></div>
-            <div class="flex flex-wrap items-center gap-2"><span class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800">${escapeHtml(formatInvoiceMoney(group.remaining))} unpaid</span>${invoiceAction}${financeDeptContactMarkup(group)}</div>
+            <div class="flex flex-wrap items-center gap-2"><span class="rounded-full bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">${escapeHtml(formatInvoiceMoney(group.remaining))} ${currentUiLanguage === 'ar' ? 'غير مدفوع' : 'unpaid'}</span><button type="button" class="loading-page-button" data-patient-id="${escapeHtml(group.patientId)}" onclick="toggleFinanceDebtDetails(this.dataset.patientId)" aria-expanded="${expanded}"><i data-lucide="${expanded ? 'chevron-up' : 'chevron-down'}" class="h-4 w-4"></i>${currentUiLanguage === 'ar' ? 'الفواتير' : 'Invoices'} · ${group.invoiceCount}</button>${invoiceAction}${financeDeptContactMarkup(group)}</div>
           </div>
-          <div class="bg-slate-50/45">${invoiceRows}</div>
+          ${expanded ? `<div class="bg-slate-50">${detail?.loading ? '<div class="p-5"><div class="h-16 rounded-xl bg-slate-100 animate-pulse"></div></div>' : detail?.error ? `<div class="p-5 text-sm text-slate-500">${currentUiLanguage === 'ar' ? 'تعذر تحميل الفواتير.' : 'Could not load invoices.'}<button type="button" class="loading-page-button" data-patient-id="${escapeHtml(group.patientId)}" onclick="loadFinanceDebtDetails(this.dataset.patientId)">${currentUiLanguage === 'ar' ? 'إعادة المحاولة' : 'Retry'}</button></div>` : invoiceRows + financeDebtInvoicePagerMarkup(group, detail)}</div>` : ''}
         </article>`;
     }
 
@@ -24314,26 +24516,26 @@
       const summary = document.getElementById('finance-depts-results-summary');
       const count = document.getElementById('finance-dept-count');
       if (!list || !summary || !count || !financeDeptsLoaded) return;
-      const groups = groupFinanceDeptInvoices();
-      const remainingTotal = groups.reduce((sum, group) => sum + group.remaining, 0);
-      count.textContent = String(groups.length);
+      count.textContent = String(financeDebtSummary.total_count);
       summary.textContent = currentUiLanguage === 'ar'
-        ? `${groups.length} مريض · ${financeDeptInvoices.length} فاتورة غير مدفوعة · المتبقي ${formatInvoiceMoney(remainingTotal)}`
-        : `${groups.length} patients · ${financeDeptInvoices.length} unpaid invoices · ${formatInvoiceMoney(remainingTotal)} remaining`;
-      setStableHtml(list, groups.length
-        ? groups.map(financeDeptPatientMarkup).join('')
-        : '<div class="px-5 py-14 text-center"><span class="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600"><i data-lucide="circle-check-big" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-600">No unpaid invoices match these filters.</p></div>');
+        ? `${financeDebtSummary.total_count} مريض · ${financeDebtSummary.invoice_count} فاتورة غير مدفوعة · المتبقي ${formatInvoiceMoney(financeDebtSummary.remaining_total)}`
+        : `${financeDebtSummary.total_count} patients · ${financeDebtSummary.invoice_count} unpaid invoices · ${formatInvoiceMoney(financeDebtSummary.remaining_total)} remaining`;
+      setStableHtml(list, financeDebtGroups.length ? financeDebtGroups.map(financeDeptPatientMarkup).join('')
+        : `<div class="p-6 text-center"><span class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"><i data-lucide="circle-check-big" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-semibold text-slate-700">${currentUiLanguage === 'ar' ? 'لا توجد فواتير غير مدفوعة' : 'No outstanding invoices'}</p><p class="mt-2 text-xs text-slate-500">${currentUiLanguage === 'ar' ? 'جرّب تغيير المرشحات لعرض نتائج أخرى.' : 'Adjust the filters to explore other results.'}</p><button type="button" class="loading-page-button mt-4" onclick="clearFinanceUniversalFilters()">${currentUiLanguage === 'ar' ? 'مسح المرشحات' : 'Clear filters'}</button></div>`);
+      renderFinancePagedFooter('debt', financeDebtPage, financeDebtPageSize, financeDebtSummary.total_count);
       refreshWhatsAppTemplatePickerAnchor();
       translateUiTree(document.getElementById('view-finances'), currentUiLanguage);
-      lucide.createIcons();
+      if (window.lucide) lucide.createIcons();
     }
 
     async function renderFinanceDepts(options = {}) {
       if (!canViewFinanceDepts()) return;
+      const navigationToken = workspaceNavigationToken;
+      const generation = targetedLoadingGeneration;
       const list = document.getElementById('finance-depts-list');
       const summary = document.getElementById('finance-depts-results-summary');
       if (!list || !summary) return;
-      const context = contentRefreshContext('finance-depts', financeUniversalQueryFilters());
+      const context = contentRefreshContext('finance-depts', financeDebtPage, financeDebtPageSize, financeUniversalQueryFilters());
       if (options.refresh) financeDeptsLoaded = false;
       if (!financeDeptsLoaded) {
         beginContentRefresh(list, context, '<div class="px-5 py-12 text-center text-sm font-bold text-slate-400"><span class="inline-flex items-center gap-2"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Loading patient depts...</span></div>');
@@ -24344,12 +24546,26 @@
         const loadPromise = coalesceRefreshRead(context, () => fetchFinanceDeptInvoiceRecords(filters));
         financeDeptsLoadPromise = loadPromise;
         try {
-          const invoices = await loadPromise;
-          if (requestToken !== financeDeptsRenderToken || context !== contentRefreshContext('finance-depts', financeUniversalQueryFilters())) return;
-          financeDeptInvoices = invoices;
+          const result = await loadPromise;
+          if (navigationToken !== workspaceNavigationToken || generation !== targetedLoadingGeneration
+            || requestToken !== financeDeptsRenderToken || context !== contentRefreshContext('finance-depts', financeDebtPage, financeDebtPageSize, financeUniversalQueryFilters())) return;
+          const totalPages = Math.max(1, Math.ceil(Number(result.total_count) / financeDebtPageSize));
+          if (financeDebtPage > totalPages) {
+            financeDebtPage = totalPages;
+            await renderFinanceDepts({ refresh: true });
+            return;
+          }
+          financeDebtSummary = result;
+          financeDebtGroups = (result.groups || []).map(group => ({ patientId: group.patient_id,
+            patientName: group.patient_name, patientPhone: group.patient_phone || '', patientNumber: group.patient_number,
+            remaining: Number(group.remaining), invoiceCount: Number(group.invoice_count), invoices: [] }));
           financeDeptsLoaded = true;
+          financeDebtDetails.forEach((detail, patientId) => {
+            if (detail.expanded && financeDeptGroupForPatient(patientId)) void loadFinanceDebtDetails(patientId, detail.page);
+          });
         } catch (error) {
-          if (requestToken !== financeDeptsRenderToken || context !== contentRefreshContext('finance-depts', financeUniversalQueryFilters())) return;
+          if (navigationToken !== workspaceNavigationToken || generation !== targetedLoadingGeneration
+            || requestToken !== financeDeptsRenderToken || context !== contentRefreshContext('finance-depts', financeDebtPage, financeDebtPageSize, financeUniversalQueryFilters())) return;
           financeDeptsLoaded = false;
           failContentRefresh(list, context, '<div class="px-5 py-12 text-center text-sm font-bold text-red-600">Could not load patient depts: ' + escapeHtml(error.message || 'Unknown error') + '</div>');
           refreshWhatsAppTemplatePickerAnchor();
@@ -24593,25 +24809,25 @@
       };
     }
 
-    async function fetchFinanceExpenseRecords() {
-      const batchSize = 250;
-      const records = [];
-      let offset = 0;
-      while (true) {
-        const { data, error } = await db.from('expenses').select('id, expense_type_id, name, total, paid_amount, quantity, expense_date, description, paid, created_at, updated_at, expense_types(id, name, color, active, sort_order)').order('expense_date', { ascending: false }).order('created_at', { ascending: false }).range(offset, offset + batchSize - 1);
-        if (error) throw error;
-        const batch = data || [];
-        records.push(...batch);
-        if (batch.length < batchSize) break;
-        offset += batchSize;
-      }
+    async function fetchFinanceExpenseRecords(options = {}) {
+      const filters = options.filters || financeExpenseQueryFilters();
+      const { data, error } = await db.rpc('get_finance_expense_page', {
+        p_search: filters.search || null, p_expense_type_id: filters.type === 'all' ? null : filters.type,
+        p_start_date: filters.startDate || null, p_end_date: filters.endDate || null,
+        p_page: options.page || financeExpensePage, p_page_size: options.pageSize || financeExpensePageSize
+      });
+      if (error) throw error;
+      const records = data?.expenses || [];
       let doctorSalaryByExpenseId = new Map();
-      if (canModifyHr()) {
-        const { data, error } = await db.from('hr_salary_payments').select('id, expense_id, user_id, payment_kind, scope_start, scope_end, case_count');
-        if (error) throw error;
-        doctorSalaryByExpenseId = new Map((data || []).map(payment => [String(payment.expense_id), payment]));
+      if (canModifyHr() && records.length) {
+        const { data: payments, error: salaryError } = await db.from('hr_salary_payments')
+          .select('id, expense_id, user_id, payment_kind, scope_start, scope_end, case_count')
+          .in('expense_id', records.map(record => record.id));
+        if (salaryError) throw salaryError;
+        doctorSalaryByExpenseId = new Map((payments || []).map(payment => [String(payment.expense_id), payment]));
       }
-      return records.map(record => normaliseExpenseRecord({ ...record, salary_payment: doctorSalaryByExpenseId.get(String(record.id)) || null }));
+      return { ...data, expenses: records.map(record => normaliseExpenseRecord({ ...record,
+        salary_payment: doctorSalaryByExpenseId.get(String(record.id)) || null })) };
     }
 
     function clearFinanceExpenseFilters() {
@@ -24621,21 +24837,11 @@
       };
       if (controls.search) controls.search.value = '';
       if (controls.type) controls.type.value = 'all';
-      renderFinanceExpenseRows();
+      financeExpenseFiltersChanged();
     }
 
     function filteredFinanceExpenses() {
-      const search = document.getElementById('finance-expense-search')?.value.trim().toLocaleLowerCase() || '';
-      const typeId = document.getElementById('finance-expense-type')?.value || 'all';
-      const { startDate, endDate } = financeUniversalQueryFilters();
-      return financeExpenses.filter(expense => {
-        const searchText = `${expense.name} ${expense.description}`.toLocaleLowerCase();
-        if (search && !searchText.includes(search)) return false;
-        if (typeId !== 'all' && expense.expenseTypeId !== typeId) return false;
-        if (startDate && expense.expenseDate < startDate) return false;
-        if (endDate && expense.expenseDate > endDate) return false;
-        return true;
-      });
+      return financeExpenses;
     }
 
     function expenseRemaining(expense) {
@@ -24739,27 +24945,28 @@
       const summary = document.getElementById('finance-expense-results-summary');
       const count = document.getElementById('finance-expense-count');
       if (!body || !summary || !count || !financeExpensesLoaded) return;
-      const filtered = filteredFinanceExpenses();
-      const paidTotal = filtered.reduce((sum, expense) => sum + expense.paidAmount, 0);
-      const remainingTotal = filtered.reduce((sum, expense) => sum + expenseRemaining(expense), 0);
-      count.textContent = String(financeExpenses.length);
+      count.textContent = String(financeExpenseSummary.total_count);
       summary.textContent = currentUiLanguage === 'ar'
-        ? `عرض ${filtered.length} من ${financeExpenses.length} مصروف · المصروف المدفوع ${formatInvoiceMoney(paidTotal)} · المتبقي ${formatInvoiceMoney(remainingTotal)}`
-        : `Showing ${filtered.length} of ${financeExpenses.length} expenses · Paid expenses ${formatInvoiceMoney(paidTotal)} · Outstanding ${formatInvoiceMoney(remainingTotal)}`;
-      setStableHtml(body, filtered.length ? filtered.map(financeExpenseRowMarkup).join('') : '<tr><td colspan="8" class="px-5 py-14 text-center"><span class="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"><i data-lucide="search-x" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-600">No expenses match these filters.</p></td></tr>');
+        ? `عرض ${financeExpenses.length} من ${financeExpenseSummary.total_count} مصروف · المدفوع ${formatInvoiceMoney(financeExpenseSummary.paid_total)} · المتبقي ${formatInvoiceMoney(financeExpenseSummary.remaining_total)}`
+        : `Showing ${financeExpenses.length} of ${financeExpenseSummary.total_count} expenses · Paid expenses ${formatInvoiceMoney(financeExpenseSummary.paid_total)} · Outstanding ${formatInvoiceMoney(financeExpenseSummary.remaining_total)}`;
+      setStableHtml(body, financeExpenses.length ? financeExpenses.map(financeExpenseRowMarkup).join('')
+        : `<tr><td colspan="8" class="p-6 text-center"><span class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500"><i data-lucide="search-x" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-semibold text-slate-700">${currentUiLanguage === 'ar' ? 'لا توجد مصروفات مطابقة' : 'No matching expenses'}</p><p class="mt-2 text-xs text-slate-500">${currentUiLanguage === 'ar' ? 'جرّب تغيير الاسم أو نوع المصروف أو الفترة.' : 'Try a different name, expense type, or date range.'}</p><button type="button" class="loading-page-button mt-4" onclick="clearFinanceExpenseFilters()">${currentUiLanguage === 'ar' ? 'مسح مرشحات المصروفات' : 'Clear expense filters'}</button></td></tr>`);
+      renderFinancePagedFooter('expense', financeExpensePage, financeExpensePageSize, financeExpenseSummary.total_count);
       translateUiTree(document.getElementById('view-finances'), currentUiLanguage);
-      lucide.createIcons();
+      if (window.lucide) lucide.createIcons();
     }
 
     async function renderFinanceExpenses(options = {}) {
       if (!hasPageAccess('finances')) return;
+      const navigationToken = workspaceNavigationToken;
+      const generation = targetedLoadingGeneration;
       const body = document.getElementById('finance-expenses-table-body');
       const summary = document.getElementById('finance-expense-results-summary');
       if (!body || !summary) return;
-      const context = contentRefreshContext('finance-expenses', canModifyHr());
+      const context = contentRefreshContext('finance-expenses', financeExpensePage, financeExpensePageSize, financeExpenseQueryFilters(), canModifyHr());
       const requestToken = ++financeExpenseRenderToken;
       if (options.refresh) financeExpensesLoaded = false;
-      await ensureExpenseTypesLoaded();
+      void ensureExpenseTypesLoaded().catch(error => console.warn('Expense types refresh failed:', error));
       if (!financeExpensesLoaded) {
         beginContentRefresh(body, context, '<tr><td colspan="8" class="px-5 py-12 text-center text-sm font-bold text-slate-400"><span class="inline-flex items-center gap-2"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Loading expenses...</span></td></tr>');
         if (body.luminRefreshContext !== context) summary.textContent = 'Loading expenses...';
@@ -24768,11 +24975,20 @@
         financeExpenseLoadPromise = loadPromise;
         try {
           const result = await loadPromise;
-          if (requestToken !== financeExpenseRenderToken || context !== contentRefreshContext('finance-expenses', canModifyHr())) return;
-          financeExpenses = result;
+          if (navigationToken !== workspaceNavigationToken || generation !== targetedLoadingGeneration
+            || requestToken !== financeExpenseRenderToken || context !== contentRefreshContext('finance-expenses', financeExpensePage, financeExpensePageSize, financeExpenseQueryFilters(), canModifyHr())) return;
+          const totalPages = Math.max(1, Math.ceil(Number(result.total_count) / financeExpensePageSize));
+          if (financeExpensePage > totalPages) {
+            financeExpensePage = totalPages;
+            await renderFinanceExpenses({ refresh: true });
+            return;
+          }
+          financeExpenses = result.expenses;
+          financeExpenseSummary = result;
           financeExpensesLoaded = true;
         } catch (error) {
-          if (requestToken !== financeExpenseRenderToken || context !== contentRefreshContext('finance-expenses', canModifyHr())) return;
+          if (navigationToken !== workspaceNavigationToken || generation !== targetedLoadingGeneration
+            || requestToken !== financeExpenseRenderToken || context !== contentRefreshContext('finance-expenses', financeExpensePage, financeExpensePageSize, financeExpenseQueryFilters(), canModifyHr())) return;
           financeExpensesLoaded = false;
           failContentRefresh(body, context, '<tr><td colspan="8" class="px-5 py-12 text-center text-sm font-bold text-red-600">Could not load expenses: ' + escapeHtml(error.message || 'Unknown error') + '</td></tr>');
           if (body.luminRefreshContext !== context) summary.textContent = 'Could not load expenses.';
@@ -24809,13 +25025,13 @@
         if (count) count.className = `rounded-full px-2 py-0.5 text-[10px] ${isActive ? 'bg-white text-emerald-700 shadow-xs' : 'bg-slate-100 text-slate-500'}`;
       });
       const ledgerRender = activeFinanceTab === 'payments'
-        ? renderFinancePayments()
+        ? renderFinancePayments({ refresh: true })
         : activeFinanceTab === 'expenses'
-          ? renderFinanceExpenses()
+          ? renderFinanceExpenses({ refresh: true })
           : activeFinanceTab === 'depts'
-            ? renderFinanceDepts()
-          : renderFinanceInvoices();
-      await Promise.all([renderFinanceOverview(), ledgerRender]);
+            ? renderFinanceDepts({ refresh: true })
+          : renderFinanceInvoices({ refresh: true });
+      await Promise.all([renderFinanceOverview({ refresh: true }), ledgerRender]);
       translateUiTree(document.getElementById('view-finances'), currentUiLanguage);
       lucide.createIcons();
     }
@@ -26217,13 +26433,54 @@
       return activeWorkspacePatientId || activePatientId || activeInvoicePatientId || patients[0]?.id || null;
     }
 
+    function resetTargetedLoading() {
+      workspaceNavigationToken += 1;
+      patientDetailFreshness.clear();
+      patientDetailReads.clear();
+      dashboardDayCache.clear();
+      targetedLoadingGeneration += 1;
+      patientWorkspaceLoadingId = null;
+      financeDebtGroups = [];
+      financeDebtDetails.clear();
+      financeDebtPage = financeExpensePage = 1;
+      document.getElementById('patient-load-status')?.remove();
+      document.querySelectorAll('[data-patient-loading]').forEach(view => {
+        view.inert = false;
+        view.style.removeProperty('visibility');
+        delete view.dataset.patientLoading;
+      });
+    }
+
+    function patientWorkspaceLoadState(viewName, patientId, loading, error = null) {
+      const view = document.getElementById(`view-${viewName}`);
+      if (!view) return;
+      patientWorkspaceLoadingId = loading || error ? patientId : null;
+      view.inert = Boolean(loading || error);
+      view.dataset.patientLoading = String(Boolean(loading || error));
+      view.setAttribute('aria-busy', String(loading));
+      const cached = getKnownPatient(patientId);
+      const sameContent = view.dataset.loadedPatientId === patientId;
+      view.style.visibility = (loading || error) && !sameContent ? 'hidden' : '';
+      if (!loading && !error) view.dataset.loadedPatientId = patientId;
+      updatePatientWorkspaceNavigation(cached || { id: patientId, name: currentUiLanguage === 'ar' ? 'ملف المريض' : 'Patient record' }, viewName === 'patient-profile' ? 'profile' : viewName.replace('patient-', ''));
+      const editPatientButton = document.getElementById('profile-edit-patient-button');
+      if (editPatientButton) editPatientButton.disabled = Boolean(loading || error);
+      let status = document.getElementById('patient-load-status');
+      if (!status) {
+        status = document.createElement('div');
+        status.id = 'patient-load-status';
+        status.className = 'lumin-raised rounded-xl bg-white p-4 text-sm text-slate-600';
+        status.setAttribute('role', 'status');
+        document.getElementById('patient-workspace-header')?.after(status);
+      }
+      status.hidden = !loading && !error;
+      status.innerHTML = error
+        ? `<div class="flex flex-wrap items-center justify-between gap-3"><span>${currentUiLanguage === 'ar' ? 'تعذر تحديث ملف المريض. حاول مرة أخرى.' : 'Could not refresh the patient record. Try again.'}</span><button type="button" class="loading-page-button" onclick="switchView('${escapeHtml(viewName)}')">${currentUiLanguage === 'ar' ? 'إعادة المحاولة' : 'Retry'}</button></div>`
+        : `<div class="flex items-center gap-3"><span class="h-4 w-4 rounded-full bg-slate-200 animate-pulse"></span><span>${currentUiLanguage === 'ar' ? 'جارٍ تحديث ملف المريض…' : 'Refreshing patient record…'}</span></div>`;
+    }
+
     async function openPatientWorkspace(patientId, tabName = 'profile', returnView = null) {
       if (!patientId) return;
-      await ensurePatientsLoaded();
-      if (!patients.some(patient => patient.id === patientId)) {
-        const loadedPatient = await ensureKnownPatient(patientId);
-        if (!loadedPatient && !patients.some(patient => patient.id === patientId)) return;
-      }
       rememberPatientWorkspaceOrigin(returnView);
       activeWorkspacePatientId = patientId;
       activePatientId = patientId;
@@ -27980,7 +28237,7 @@
       selectAppointmentPatient(patientId);
     }
 
-    async function renderPatientProfile() {
+    async function renderPatientProfile(options = {}) {
       const patientId = patientWorkspaceId();
       let patient = getKnownPatient(patientId);
       if (!patient && patientId) {
@@ -28028,7 +28285,7 @@
             patch.whatsapp_username = patient.whatsappUsername;
             shouldPersist = true;
           }
-          if (shouldPersist && currentSession) {
+          if (shouldPersist && currentSession && !options.preview) {
             patch.updated_at = new Date().toISOString();
             void db.from('patients').update(patch).eq('id', patient.id);
           }
@@ -28812,6 +29069,18 @@
         return;
       }
 
+      const navigationToken = ++workspaceNavigationToken;
+      const navigationUserId = currentSession?.user?.id;
+      const workspaceView = ['patient-profile', 'chart', 'invoices', 'payments', 'loyalty', 'patient-appointments', 'patient-prescriptions', 'patient-media'].includes(viewName);
+      const requestedPatientId = workspaceView ? patientWorkspaceId() : null;
+      const navigationIsCurrent = () => navigationToken === workspaceNavigationToken && currentSession?.user?.id === navigationUserId
+        && (!workspaceView || patientWorkspaceId() === requestedPatientId);
+      if (!workspaceView) {
+        patientWorkspaceLoadingId = null;
+        const loadingStatus = document.getElementById('patient-load-status');
+        if (loadingStatus) loadingStatus.hidden = true;
+      }
+
       // Synchronously update navigation rail & mobile bottom bar highlights immediately (zero delay)
       const primaryNavTarget = ['invoices', 'patient-profile', 'payments', 'loyalty', 'patient-appointments', 'patient-prescriptions', 'patient-media'].includes(viewName)
         ? 'patients'
@@ -28844,26 +29113,6 @@
       window.location.hash = viewName;
       document.documentElement.classList.toggle('whatsapp-view-active', viewName === 'whatsapp');
       document.body.classList.toggle('whatsapp-view-active', viewName === 'whatsapp');
-
-      if (viewName === 'dashboard') {
-        await ensureAppointmentsLoaded();
-      } else if (viewName === 'patients') {
-        if (activePatientsTab === 'browse' && hasPageAccess('patients')) await ensurePatientDirectoryPageLoaded();
-      } else if (['patient-profile', 'invoices', 'payments', 'loyalty', 'patient-appointments', 'patient-media'].includes(viewName) || viewName === 'patient-prescriptions') {
-        await ensurePatientsLoaded();
-      } else if (viewName === 'chart') {
-        if (!chartStructureInitialized) {
-          initChartStructure();
-          chartStructureInitialized = true;
-        }
-        await Promise.all([ensurePatientsLoaded(), ensureDentalCustomizationLoaded(), ensureChartDoctorsLoaded()]);
-      } else if (viewName === 'appointments') {
-        await ensureAppointmentsLoaded();
-      } else if (viewName === 'whatsapp') {
-        await ensureWhatsAppLoaded();
-      } else if (viewName === 'prices') {
-        await ensureDentalCustomizationLoaded();
-      }
 
       const viewDashboard = document.getElementById('view-dashboard');
       const viewPatients = document.getElementById('view-patients');
@@ -28933,6 +29182,47 @@
       if (appointmentsCalendarActive) resetAppointmentsCalendarWindowScroll();
       if (whatsAppActive) resetWhatsAppWindowScroll();
 
+      document.getElementById(`view-${viewName}`)?.classList.remove('hidden');
+      if (workspaceView) {
+        const cachedPatient = getKnownPatient(requestedPatientId);
+        if (cachedPatient && cachedPatient.recordComplete !== false) {
+          if (viewName === 'patient-profile') {
+            void renderPatientProfile({ preview: true });
+            viewPatientProfile.dataset.loadedPatientId = requestedPatientId;
+          } else if (viewName === 'chart' && chartStructureInitialized && dentalCustomizationLoaded) {
+            loadActivePatientChart({ preview: true });
+            viewChart.dataset.loadedPatientId = requestedPatientId;
+          }
+        }
+        patientWorkspaceLoadState(viewName, requestedPatientId, true);
+        try {
+          const [patient] = await Promise.all([
+            ensureKnownPatient(requestedPatientId, { force: true, throwOnError: true }),
+            viewName === 'chart' ? ensureDentalCustomizationLoaded() : Promise.resolve(),
+            viewName === 'chart' ? ensureChartDoctorsLoaded() : Promise.resolve()
+          ]);
+          if (!navigationIsCurrent()) return;
+          if (!patient) throw new Error('Patient record unavailable');
+          patientWorkspaceLoadState(viewName, requestedPatientId, false);
+          if (viewName === 'chart' && !chartStructureInitialized) {
+            initChartStructure();
+            chartStructureInitialized = true;
+          }
+        } catch (error) {
+          if (navigationIsCurrent()) patientWorkspaceLoadState(viewName, requestedPatientId, false, error);
+          return;
+        }
+      } else if (viewName === 'patients') {
+        if (activePatientsTab === 'browse' && hasPageAccess('patients')) await ensurePatientDirectoryPageLoaded();
+      } else if (viewName === 'appointments') {
+        await ensureAppointmentsLoaded();
+      } else if (viewName === 'whatsapp') {
+        await ensureWhatsAppLoaded();
+      } else if (viewName === 'prices') {
+        await ensureDentalCustomizationLoaded();
+      }
+      if (!navigationIsCurrent()) return;
+
       if (viewName === 'dashboard') {
         viewDashboard.classList.remove('hidden');
         renderDashboard();
@@ -28985,7 +29275,7 @@
         renderPricesPage();
       } else if (viewName === 'clinic-management') {
         viewClinicManagement.classList.remove('hidden');
-        await switchClinicManagementTab(firstAuthorizedClinicManagementTab(), { updateHash: false });
+        await switchClinicManagementTab(activeClinicManagementTab, { updateHash: false });
       } else if (viewName === 'admin') {
         viewAdmin.classList.remove('hidden');
         try {
@@ -29004,8 +29294,7 @@
 
     async function openPatientChart(patientId, returnView = null) {
       if (!hasPageAccess('chart')) return;
-      await ensurePatientsLoaded();
-      if (!patients.some(patient => patient.id === patientId)) return;
+      if (!patientId) return;
       rememberPatientWorkspaceOrigin(returnView);
       if (activePatientId !== patientId) {
         activeSelection = emptyChartSelection();
@@ -29020,9 +29309,9 @@
       await switchView('chart');
     }
 
-    function loadActivePatientChart() {
+    function loadActivePatientChart(options = {}) {
       syncChartFindingDateDialogContext();
-      const patient = patients.find(p => p.id === activePatientId) || patients[0];
+      const patient = patients.find(p => p.id === activePatientId);
       if (!patient) return;
 
       activePatientId = patient.id;
@@ -29030,7 +29319,7 @@
       updatePatientWorkspaceNavigation(patient, 'chart');
       void loadChartPatientMedia(patient.id);
 
-      rememberPatientChartSnapshot(patient);
+      if (!options.preview) rememberPatientChartSnapshot(patient);
       ensureChartMeta(patient);
       const chartMetadataChanged = ensureChartFindingMetadata(patient);
       const visibleChartTeeth = new Set([...getVisibleChartTeeth().upper, ...getVisibleChartTeeth().lower].map(entry => String(entry.toothId || '')));
@@ -29038,6 +29327,7 @@
       renderChartStructure();
       updateSelectionUI();
       renderFindingsList();
+      if (options.preview) return;
       if (chartMetadataChanged) {
         void saveActivePatientChart().then(() => refreshChartFindingInvoiceState(patient.id));
       } else {
@@ -29428,7 +29718,8 @@
 
     function getActivePatient() {
       const targetId = activePatientId || activeWorkspacePatientId || (typeof patientWorkspaceId === 'function' ? patientWorkspaceId() : null);
-      return patients.find(p => p.id === targetId);
+      const patient = patients.find(p => p.id === targetId);
+      return patient?.recordComplete === false ? undefined : patient;
     }
 
     function getOrCreateChartTooth(patient, toothId) {
@@ -33605,6 +33896,7 @@
 
     function renderDashboard() {
       void refreshMyAttendanceState();
+      void ensureDashboardAppointmentsLoaded();
       const heading = document.getElementById('dashboard-date-heading');
       const doctorHeading = document.getElementById('dashboard-doctor-heading');
       const eyebrow = document.getElementById('dashboard-day-eyebrow');
@@ -33624,6 +33916,7 @@
 
       const selectedDoctor = renderDashboardDoctorFilter();
       const entries = dashboardAppointmentsForDate(dashboardSelectedDate);
+      const dayState = dashboardDayCache.get(dashboardDayContext());
       const isToday = sameAppointmentDate(dashboardSelectedDate, appointmentToday);
       heading.textContent = appointmentDayFormatter.format(dashboardSelectedDate);
       doctorHeading.textContent = selectedDoctor
@@ -33631,7 +33924,15 @@
         : (currentUiLanguage === 'ar' ? 'مواعيد كل الأطباء' : "All doctors' appointments");
       eyebrow.textContent = isToday ? 'Today' : 'Selected date';
       todayButton.classList.toggle('hidden', isToday);
-      if (showDashboardInvoices) void renderDashboardInvoices(entries);
+      if (showDashboardInvoices && (dayState?.data || appointmentsLoaded)) void renderDashboardInvoices(entries);
+
+      if (!dayState?.data && !appointmentsLoaded && !entries.length) {
+        setStableHtml(list, dayState?.error
+          ? `<div class="p-6 text-center text-sm text-slate-600"><p>${currentUiLanguage === 'ar' ? 'تعذر تحميل المواعيد.' : 'Could not load appointments.'}</p><button class="loading-page-button" type="button" onclick="ensureDashboardAppointmentsLoaded({refresh:true})">${currentUiLanguage === 'ar' ? 'إعادة المحاولة' : 'Retry'}</button></div>`
+          : '<div class="space-y-4 p-5" role="status" aria-label="Loading appointments"><div class="h-16 rounded-xl bg-slate-100 animate-pulse"></div><div class="h-16 rounded-xl bg-slate-100 animate-pulse"></div><div class="h-16 rounded-xl bg-slate-100 animate-pulse"></div></div>');
+        if (showDashboardInvoices) document.getElementById('dashboard-invoices-list').innerHTML = '<div class="p-5"><div class="h-16 rounded-xl bg-slate-100 animate-pulse"></div></div>';
+        return;
+      }
 
       if (!entries.length) {
         expandedDashboardAppointmentId = null;
@@ -33799,7 +34100,7 @@
       if (cached?.data && cached.expiresAt > Date.now()) return cached.data;
       if (cached?.promise) return cached.promise;
 
-      const promise = fetchInvoiceRecords({ patientIds })
+      const promise = fetchInvoiceRecords({ patientIds, summary: true })
         .then(invoices => invoices.filter(invoice => invoice.status !== 'cancelled' && invoiceRemaining(invoice) > 0))
         .then(invoices => {
           if (dashboardInvoiceCache.get(cacheKey)?.promise === promise) {

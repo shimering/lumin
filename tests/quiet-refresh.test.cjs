@@ -99,7 +99,7 @@ test('real invoice renderer refreshes quietly and preserves unaffected controls'
     const db = {from: () => ({select(){return this},order(){return this},eq(){return this},in(){return this},
       then(resolve,reject) { fixtureReadCount++; return (fixtureRead || Promise.resolve()).then(() => resolve({data:fixtureRows.map(row=>({...row})),error:null}),reject); }
     })};
-    const INVOICE_SELECT_FIELDS = '*';
+    const INVOICE_SELECT_FIELDS = '*', INVOICE_SUMMARY_SELECT_FIELDS = 'fixture-summary';
     function stableJsonStringify(value){return JSON.stringify(value)}
     function appointmentDateKey(value){return value.toISOString().slice(0,10)}
     function canViewDashboardInvoices(){return true}
