@@ -79,7 +79,7 @@
   <script src="lumin-patient-swipe.js?v=1"></script>
   <script src="lumin-patients.js?v=4"></script>
   <script src="lumin-chart-sync.js?v=1"></script>
-  <script src="lumin-chart-media.js?v=2"></script>
+  <script src="lumin-chart-media.js?v=3"></script>
   <script src="lumin-media-teeth.js?v=1"></script>
   <script src="lumin-mobile-nav.js?v=1"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
@@ -5476,7 +5476,7 @@
   <link rel="stylesheet" href="lumin-patients.css?v=3" />
   <link rel="stylesheet" href="lumin-finance-sync.css?v=2" />
   <link rel="stylesheet" href="lumin-mobile-nav.css?v=2" />
-  <link rel="stylesheet" href="lumin-chart-media.css?v=1" />
+  <link rel="stylesheet" href="lumin-chart-media.css?v=2" />
   <link rel="stylesheet" href="lumin-media-teeth.css?v=1" />
   <style id="finance-ledger-styles">
     #finance-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -6736,10 +6736,10 @@
     <!-- ================= VIEW 2: ACTIVE DENTAL CHART ================= -->
     <section id="view-chart" class="hidden space-y-6">
 
-      <div id="chart-clinical-workspace" class="chart-clinical-workspace">
+      <div id="chart-clinical-workspace" class="chart-clinical-workspace is-media-collapsed">
       <div class="chart-clinical-column">
       <div class="chart-media-toolbar">
-        <button id="chart-media-toggle" type="button" class="chart-media-button" onclick="toggleChartMediaPanel()" aria-controls="chart-media-panel" aria-expanded="true"><i data-lucide="scan-line"></i><span>X-rays</span></button>
+        <button id="chart-media-toggle" type="button" class="chart-media-button" onclick="toggleChartMediaPanel()" aria-controls="chart-media-panel" aria-expanded="false"><i data-lucide="scan-line"></i><span>X-rays</span></button>
         <button id="chart-attachments-button" type="button" class="chart-media-button is-neutral" onclick="openPatientAttachmentList()"><i data-lucide="paperclip"></i><span data-attachment-label>Attachments</span><span id="chart-attachments-count" class="chart-media-count">—</span></button>
       </div>
 
@@ -6914,7 +6914,7 @@
       </div>
       </div>
       <aside id="chart-media-panel" class="chart-media-panel" aria-labelledby="chart-media-panel-title">
-        <header class="chart-media-panel-header"><h3><i data-lucide="scan-line" aria-hidden="true"></i><span id="chart-media-panel-title">X-rays</span></h3><button id="chart-media-collapse" type="button" class="chart-media-button" onclick="toggleChartMediaPanel()" aria-controls="chart-media-panel-body" aria-expanded="true" aria-label="Collapse X-ray viewer"><i data-lucide="panel-right-close"></i></button></header>
+        <header class="chart-media-panel-header"><h3><i data-lucide="scan-line" aria-hidden="true"></i><span id="chart-media-panel-title">X-rays</span></h3><button id="chart-media-collapse" type="button" class="chart-media-button" onclick="toggleChartMediaPanel()" aria-controls="chart-media-panel-body" aria-expanded="false" aria-label="Expand X-ray viewer"><i data-lucide="panel-right-open"></i></button></header>
         <div id="chart-media-panel-body" class="chart-media-panel-body" aria-live="polite"></div>
       </aside>
       </div>
@@ -18807,6 +18807,7 @@
           : 'an empty position in deciduous dentition';
       const longPressLabel = `Press and hold for more than half a second to switch this position to ${targetLabel}`;
       const hasFinding = chartToothHasFinding(getActivePatient(), id);
+      const xraySlot = `<div class="chart-tooth-xray-slot" data-tooth-xray-slot="${id}"></div>`;
 
       return `
         <div id="tooth-card-${id}"
@@ -18820,8 +18821,8 @@
              title="${escapeHtml(longPressLabel)}"
              class="tooth-card relative flex min-w-0 flex-1 cursor-pointer select-none flex-col items-center transition-colors ${isPrimary ? 'is-primary-tooth' : ''} ${hasFinding ? 'has-charted-finding' : ''}">
           ${isUpper
-            ? anatomyPhoto + surfaceMap + `<span class="tooth-number-badge pointer-events-none">${escapeHtml(palmerQuadrantLabel(id, slot))}</span>`
-            : `<span class="tooth-number-badge pointer-events-none">${escapeHtml(palmerQuadrantLabel(id, slot))}</span>` + surfaceMap + anatomyPhoto}
+            ? anatomyPhoto + surfaceMap + `<span class="tooth-number-badge pointer-events-none">${escapeHtml(palmerQuadrantLabel(id, slot))}</span>` + xraySlot
+            : xraySlot + `<span class="tooth-number-badge pointer-events-none">${escapeHtml(palmerQuadrantLabel(id, slot))}</span>` + surfaceMap + anatomyPhoto}
         </div>`;
     }
 
@@ -18855,6 +18856,7 @@
       document.querySelectorAll('[data-tooth-card]').forEach(card => renderToothVisuals(card.dataset.toothCard));
       updateDentitionToolbar();
       updateSelectionUI();
+      renderChartToothXrayIndicators();
       try {
         if (window.lucide?.createIcons) lucide.createIcons();
       } catch (iconError) {
@@ -18907,6 +18909,7 @@
     }
 
     function toothDentitionLongPressTarget(eventTarget) {
+      if (eventTarget?.closest?.('.chart-tooth-xray-indicator')) return null;
       return eventTarget?.closest?.('[data-tooth-card], [data-empty-dentition-slot]') || null;
     }
 
@@ -29039,6 +29042,7 @@
       viewInvoices.classList.add('hidden');
       viewPayments.classList.add('hidden');
       viewChart.classList.add('hidden');
+      if (viewName !== 'chart' && typeof renderChartMediaPanel === 'function') renderChartMediaPanel();
       viewAppointments.classList.add('hidden');
       document.getElementById('view-whatsapp')?.classList.add('hidden');
       if (viewName !== 'whatsapp') {
@@ -29368,6 +29372,7 @@
 
       // Global Event Delegation for all surfaces and teeth
       document.addEventListener('click', (e) => {
+        if (e.target.closest('.chart-tooth-xray-indicator')) return;
         if (Date.now() < toothDentitionLongPressSuppressClickUntil && toothDentitionLongPressTarget(e.target)) {
           e.preventDefault();
           return;
@@ -33776,7 +33781,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     function initLuminVoiceSpacebarShortcut() {
       window.addEventListener('keydown', (e) => {
         if (e.code !== 'Space' || e.repeat) return;
-        if (e.target?.closest?.('#patient-attachment-modal, #chart-media-panel, .chart-media-toolbar, #patient-media-lightbox, #patient-media-tooth-picker')) return;
+        if (e.target?.closest?.('#patient-attachment-modal, #chart-media-panel, .chart-media-toolbar, .chart-tooth-xray-indicator, #patient-media-lightbox, #patient-media-tooth-picker')) return;
         const chartView = document.getElementById('view-chart');
         if (!chartView || chartView.classList.contains('hidden')) return;
         const activeEl = document.activeElement;
@@ -33790,7 +33795,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
 
       window.addEventListener('keyup', (e) => {
         if (e.code !== 'Space') return;
-        if (e.target?.closest?.('#patient-attachment-modal, #chart-media-panel, .chart-media-toolbar, #patient-media-lightbox, #patient-media-tooth-picker')) return;
+        if (e.target?.closest?.('#patient-attachment-modal, #chart-media-panel, .chart-media-toolbar, .chart-tooth-xray-indicator, #patient-media-lightbox, #patient-media-tooth-picker')) return;
         const chartView = document.getElementById('view-chart');
         if (!chartView || chartView.classList.contains('hidden')) return;
         const activeEl = document.activeElement;

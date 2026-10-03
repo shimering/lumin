@@ -16,7 +16,7 @@ function source(name) {
 const head = html.slice(0, html.indexOf('</head>') + 7).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
 const chartStart = html.indexOf('    <section id="view-chart"');
 const chart = html.slice(chartStart, html.indexOf('    </section>', chartStart) + 14).replace('class="hidden space-y-6"', 'class="space-y-6"');
-const helpers = ['isPrimaryToothId', 'palmerPositionForSlot', 'palmerQuadrantForSlot', 'palmerQuadrantLabel', 'patientMediaToothLabel', 'patientMediaDisplayName', 'patientMediaDownloadName', 'patientMediaFileUrl', 'openPatientMediaLightboxByIndex', 'updateAppViewportDimensions'].map(source).join('\n');
+const helpers = ['isPrimaryToothId', 'palmerPositionForSlot', 'palmerQuadrantForSlot', 'palmerQuadrantLabel', 'palmerToothNotation', 'chartToothLabel', 'renderToothHTML', 'renderEmptyToothHTML', 'toothDentitionLongPressTarget', 'beginToothDentitionLongPress', 'cancelToothDentitionLongPress', 'initLuminVoiceSpacebarShortcut', 'patientMediaToothLabel', 'patientMediaDisplayName', 'patientMediaDownloadName', 'patientMediaFileUrl', 'openPatientMediaLightboxByIndex', 'updateAppViewportDimensions'].map(source).join('\n');
 
 test('landscape chart viewer stays on the right while scrolling; attachment previews and patient changes are isolated', { skip: !chromium && 'Playwright is not available' }, async t => {
   const fixture = head + '<body><header id="app-header" style="height:64px;padding:20px;font-weight:600">LUMIN · Dental clinic</header><main id="app-main"><header id="patient-workspace-header" style="height:64px;padding:20px;background:white;border-radius:16px;margin-bottom:16px">Ahmed Hassan · Dental chart</header>' + chart + '</main></body></html>';
@@ -48,6 +48,18 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
     let currentUiLanguage = 'en', activePatientId = 'patient-1', activeWorkspacePatientId = 'patient-1';
     let currentPatientMediaFiles = [], activePatientMediaPatientId = 'patient-1', patientMediaDetailsError = false;
     let canReadPatients = true, metadataError = false, storageUrl = location.origin;
+    let toothDentitionLongPressGesture = null, toothDentitionLongPressSuppressClickUntil = 0;
+    const TOOTH_DENTITION_LONG_PRESS_DELAY = 550;
+    window.toothSelections = 0; window.dentitionSwitches = 0;
+    let luminVoiceRecordingActive=false, luminVoiceProcessingActive=false, luminVoiceStarting=false;
+    window.voiceStarts=0;
+    function startLuminVoiceRecording() { window.voiceStarts++; }
+    function stopLuminVoiceRecording() {}
+    function getActivePatient() { return getKnownPatient(activePatientId); }
+    function chartToothHasFinding() { return false; }
+    function toggleToothDentition() { window.dentitionSwitches++; }
+    function generateRealisticToothPhoto() { return '<svg class="odontogram-anatomy" width="40" height="100" viewBox="0 0 40 100"><path d="M4 24 Q0 0 20 4 Q40 0 36 24 L31 90 L22 90 L19 58 L10 90 Z" fill="#f3f0e9" stroke="#cbd5e1"/></svg>'; }
+    function generateSurfaceMapSVG() { return '<div class="odontogram-surface-view" style="height:40px"></div>'; }
     const PRIMARY_TOOTH_BY_SLOT = {4:'A',5:'B',6:'C',7:'D',8:'E',9:'F',10:'G',11:'H',12:'I',13:'J',20:'K',21:'L',22:'M',23:'N',24:'O',25:'P',26:'Q',27:'R',28:'S',29:'T'};
     const SLOT_BY_PRIMARY_TOOTH = Object.fromEntries(Object.entries(PRIMARY_TOOTH_BY_SLOT).map(([slot,tooth]) => [tooth,Number(slot)]));
     const filesByPatient = {
@@ -83,21 +95,52 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
     ${helpers}
   ` });
   await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-media-teeth.js?v=1`});
-  await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-chart-media.js?v=2`});
+  await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-chart-media.js?v=3`});
   await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-mobile-nav.js?v=1`});
   await page.evaluate(() => {
     document.dispatchEvent(new Event('DOMContentLoaded'));
-    for (const id of ['upper-arch','lower-arch']) document.getElementById(id).innerHTML = Array.from({length:16}, (_,i) => '<button class="tooth-card" style="height:140px"><span style="font-size:12px">' + (i+1) + '</span><svg width="40" height="100" viewBox="0 0 40 100"><path d="M4 24 Q0 0 20 4 Q40 0 36 24 L31 90 L22 90 L19 58 L10 90 Z" fill="#f3f0e9" stroke="#cbd5e1"/></svg></button>').join('');
+    initLuminVoiceSpacebarShortcut();
+    for (const [id, offset] of [['upper-arch',0],['lower-arch',16]]) document.getElementById(id).innerHTML = Array.from({length:16}, (_,i) => renderToothHTML({slot:i+offset+1,toothId:String(i+offset+1),dentition:'permanent'})).join('');
+    document.addEventListener('pointerdown', beginToothDentitionLongPress);
+    document.addEventListener('click', event => { if (event.target.closest('[data-tooth-card]')) window.toothSelections++; });
     document.getElementById('findings-container').innerHTML = Array.from({length:16}, (_,i) => '<article style="min-height:76px;padding:20px;border-radius:12px;background:white;margin-top:8px">Finding ' + (i+1) + ' · UR6 · In progress</article>').join('');
   });
+  assert.equal(await page.evaluate(() => chartPatientMedia.collapsed), true, 'Default state is collapsed without stored preferences');
   const screenshots = process.env.LUMIN_MEDIA_SCREENSHOT_DIR || path.join(os.tmpdir(), 'lumin-chart-media-preview');
   fs.mkdirSync(screenshots, {recursive:true});
   for (const viewport of [{width:1440,height:900},{width:1180,height:820},{width:1024,height:768},{width:800,height:600},{width:834,height:1112},{width:390,height:844}]) {
     await page.setViewportSize(viewport);
     const landscape = viewport.width >= 768 && viewport.width > viewport.height;
     for (const language of ['en','ar']) {
-      await page.evaluate(async language => { currentUiLanguage = language; document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr'; chartPatientMedia.collapsed = false; window.scrollTo(0,0); await loadChartPatientMedia(); }, language);
+      await page.evaluate(async language => { currentUiLanguage = language; document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr'; chartPatientMedia.collapsed = true; chartPatientMedia.filterToothId = ''; window.scrollTo(0,0); await loadChartPatientMedia(); }, language);
       assert.equal(await page.locator('#chart-media-panel').isVisible(), landscape);
+      assert.ok(!(await page.locator('#chart-media-panel-body').isVisible()), 'Viewer starts collapsed');
+      assert.equal(await page.locator('.chart-tooth-xray-indicator').count(), 2, 'Both teeth assigned to one image have indicators');
+      const toothIndicator = page.locator('[data-tooth-xray-slot="3"] button');
+      assert.equal(await toothIndicator.locator('small').textContent(), '1');
+      const target = await toothIndicator.boundingBox();
+      assert.ok(target.width >= 44 && target.height >= 44);
+      await toothIndicator.click();
+      assert.equal(await page.locator('#chart-media-toggle').getAttribute('aria-expanded'), 'true');
+      assert.equal(await page.locator('#chart-media-panel').evaluate(element => getComputedStyle(element).direction),language === 'ar' ? 'rtl' : 'ltr');
+      assert.equal(await page.locator('.chart-media-thumbnail').count(), 1, 'Viewer is filtered to the tapped tooth');
+      assert.equal(await page.locator('.chart-media-caption h4').textContent(), 'UR6 before treatment');
+      assert.equal(await page.evaluate(() => [window.toothSelections, window.dentitionSwitches].join(',')), '0,0', 'Indicators do not select teeth or switch dentition');
+      assert.ok(await page.locator('.chart-media-filter').isVisible());
+      await page.locator('.chart-media-filter button').click();
+      assert.equal(await page.locator('.chart-media-thumbnail').count(), 2, 'Clear filter restores all X-rays');
+      if (!landscape) {
+        assert.equal(await page.locator('#chart-media-panel').getAttribute('aria-modal'), 'true');
+        const sheet = await page.locator('#chart-media-panel').boundingBox();
+        assert.ok(sheet.x >= 0 && sheet.x + sheet.width <= viewport.width + 1 && sheet.y >= 0 && sheet.y + sheet.height <= viewport.height + 1);
+        await page.locator('#chart-media-collapse').focus();
+        await page.keyboard.press('Shift+Tab');
+        assert.equal(await page.evaluate(() => document.getElementById('chart-media-panel').contains(document.activeElement)),true, 'Sheet traps keyboard focus');
+        if (viewport.width === 390 && language === 'ar') await page.screenshot({path:path.join(screenshots,'chart-xray-sheet-ar.png')});
+        await page.keyboard.press('Escape');
+        assert.ok(!(await page.locator('#chart-media-panel').isVisible()));
+        assert.equal(await toothIndicator.evaluate(element => element === document.activeElement),true, 'Closing returns focus to the tooth indicator');
+      }
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `${viewport.width} ${language} overflow`);
       assert.equal(await page.locator('#chart-attachments-count').textContent(), '4');
       if (landscape) {
@@ -134,7 +177,8 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
         if (viewport.width === 1024 && language === 'ar') await page.screenshot({path:path.join(screenshots,'chart-xray-tablet-ar.png')});
       } else {
         await page.locator('#chart-media-toggle').click();
-        assert.equal(await page.evaluate(() => window.lastWorkspaceTab), 'media');
+        assert.ok(await page.locator('.chart-media-preview').isVisible());
+        await page.keyboard.press('Escape');
       }
       await page.locator('#chart-attachments-button').click();
       assert.equal(await page.evaluate(() => getComputedStyle(document.body).overflowY),'hidden');
@@ -151,6 +195,59 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
       assert.ok(!(await page.locator('#patient-attachment-modal').isVisible()));
     }
   }
+  await page.setViewportSize({width:1180,height:820});
+  await page.evaluate(async () => {
+    currentUiLanguage='en'; document.documentElement.dir='ltr'; window.scrollTo(0,0);
+    filesByPatient['patient-1'].push({filename:'followup.png',relativePath:'Ahmed/Periapical/followup.png',category:'Periapical'}, {filename:'unassigned.png',relativePath:'Ahmed/Panoramic/unassigned.png',category:'Panoramic'});
+    details.push({relative_path:'Ahmed/Periapical/followup.png',display_name:'UR6 after treatment',tooth_ids:['3']}, {relative_path:'Ahmed/Intraoral/photo.jpg',tooth_ids:['5']}, {relative_path:'Ahmed/Lab/lab.pdf',tooth_ids:['6']});
+    await loadChartPatientMedia();
+  });
+  assert.equal(await page.locator('[data-tooth-xray-slot="3"] small').textContent(),'2');
+  assert.equal(await page.locator('[data-tooth-xray-slot="5"] button, [data-tooth-xray-slot="6"] button').count(),0, 'Assigned photos and PDFs are not X-ray indicators');
+  await page.locator('[data-tooth-xray-slot="3"] button').click();
+  assert.equal(await page.locator('.chart-media-thumbnail').count(),2);
+  await page.locator('.chart-media-nav button').last().click();
+  assert.equal(await page.locator('.chart-media-caption h4').textContent(),'UR6 after treatment');
+  await page.evaluate(() => selectChartPatientXray(1));
+  assert.equal(await page.locator('.chart-media-caption h4').textContent(),'UR6 after treatment', 'Selection cannot escape the active tooth filter');
+  await page.evaluate(() => loadChartPatientMedia());
+  assert.equal(await page.locator('.chart-media-caption h4').textContent(),'UR6 after treatment', 'Refresh preserves the selected assigned image');
+  assert.equal(await page.evaluate(() => chartPatientMedia.filterToothId),'3');
+  await page.locator('.chart-media-nav button').last().click();
+  assert.equal(await page.locator('.chart-media-caption h4').textContent(),'UR6 before treatment', 'Navigation wraps only inside the filter');
+  await page.locator('#chart-media-collapse').click();
+  await page.locator('#chart-media-toggle').click();
+  assert.equal(await page.locator('.chart-media-thumbnail').count(),2, 'Collapsing and reopening retains the filter');
+  await page.screenshot({path:path.join(screenshots,'chart-xray-tooth-filter.png')});
+  await page.locator('.chart-media-filter button').click();
+  assert.equal(await page.locator('.chart-media-thumbnail').count(),4);
+  await page.locator('[data-tooth-xray-slot="4"] button').click();
+  assert.equal(await page.locator('.chart-media-thumbnail').count(),1);
+  await page.evaluate(() => {
+    document.getElementById('tooth-card-4').outerHTML=renderToothHTML({slot:4,toothId:'A',dentition:'primary'});
+    renderChartToothXrayIndicators();
+  });
+  assert.equal(await page.locator('[data-tooth-xray-slot="A"] small').textContent(),'1');
+  await page.locator('[data-tooth-xray-slot="A"] button').click();
+  assert.equal(await page.locator('.chart-media-caption h4').textContent(),'Deciduous follow-up', 'Primary tooth is distinct from the permanent tooth at the same position');
+  assert.equal(await page.evaluate(() => chartPatientMedia.filterToothId),'A');
+  await page.locator('[data-tooth-xray-slot="A"] button').focus();
+  await page.keyboard.press('Space');
+  assert.equal(await page.evaluate(() => window.toothSelections),0, 'Keyboard indicator activation does not select a tooth');
+  assert.equal(await page.evaluate(() => window.voiceStarts),0, 'Keyboard indicator activation does not start dictation');
+  await page.locator('[data-tooth-xray-slot="A"] button').dispatchEvent('pointerdown',{button:0,isPrimary:true,clientX:100,clientY:100,pointerId:1});
+  await page.waitForTimeout(600);
+  assert.equal(await page.evaluate(() => window.dentitionSwitches),0, 'Holding an indicator does not change dentition');
+  assert.equal(await page.evaluate(() => toothDentitionLongPressTarget(document.querySelector('[data-tooth-xray-slot="A"] button'))),null);
+  await page.evaluate(async () => { details[1].tooth_ids=[]; await loadChartPatientMedia(); });
+  assert.equal(await page.locator('[data-tooth-xray-slot="A"] button').count(),0, 'Assignment removal removes the indicator');
+  assert.match(await page.locator('#chart-media-panel-body').textContent(),/No X-rays assigned to this tooth/);
+  assert.equal(await page.evaluate(() => chartPatientMedia.filterToothId),'A', 'Empty filters remain until explicitly cleared');
+  await page.locator('.chart-media-filter button').click();
+  assert.equal(await page.locator('.chart-media-thumbnail').count(),4);
+  await page.evaluate(() => { document.getElementById('tooth-card-A').outerHTML=renderToothHTML({slot:4,toothId:'4',dentition:'permanent'}); renderChartToothXrayIndicators(); });
+  await page.locator('#chart-media-collapse').click();
+  await page.setViewportSize({width:390,height:844});
   await page.evaluate(() => { currentUiLanguage='en'; document.documentElement.dir='ltr'; openPatientAttachmentList(); });
   await page.locator('.patient-attachment-row button').nth(1).click();
   await page.waitForSelector('#patient-attachment-content pre');
@@ -173,9 +270,11 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
   await page.evaluate(() => { Object.defineProperty(navigator,'userAgent',{configurable:true,value:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148'}); renderChartMediaPanel(); });
   assert.ok(!(await page.locator('#chart-media-panel').isVisible()), 'Landscape phones keep a single-column chart');
   await page.locator('#chart-media-toggle').click();
-  assert.equal(await page.evaluate(() => window.lastWorkspaceTab),'media');
+  assert.ok(await page.locator('.chart-media-preview').isVisible(), 'Landscape phones open the X-ray sheet');
+  await page.keyboard.press('Escape');
   await page.evaluate(() => { delete navigator.userAgent; });
   await page.setViewportSize({width:1024,height:768});
+  await page.evaluate(() => { chartPatientMedia.collapsed=false; renderChartMediaPanel(); });
   for (const zoom of [.8,1.25]) {
     await page.evaluate(zoom => { document.documentElement.style.zoom=zoom; updateAppViewportDimensions(); renderChartMediaPanel(); window.scrollTo(0,600); },zoom);
     const bounds = await page.locator('#chart-media-panel').boundingBox();
@@ -190,10 +289,15 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
   await page.evaluate(async () => { releasePatientOne(); await window.staleLoad; holdPatientOne=false; });
   assert.equal(await page.evaluate(() => chartPatientMedia.files[0].relativePath), 'Sara/Periapical/second.png');
   assert.equal(await page.evaluate(() => chartPatientMedia.patientId), 'patient-2');
+  assert.equal(await page.evaluate(() => chartPatientMedia.filterToothId),'');
+  assert.equal(await page.evaluate(() => chartPatientMedia.collapsed),true, 'Changing patient restores the default collapsed viewer');
+  assert.equal(await page.locator('.chart-tooth-xray-indicator').count(),0, 'Another patient cannot retain the previous indicators');
   await page.evaluate(() => { activePatientId='patient-1'; metadataError=true; return loadChartPatientMedia(); });
   assert.match(await page.locator('#chart-media-panel-body').textContent(), /could not be loaded/);
+  assert.equal(await page.locator('.chart-tooth-xray-indicator').count(),0, 'Unavailable metadata cannot create misleading indicators');
   await page.evaluate(() => { canReadPatients=false; return loadChartPatientMedia(); });
   assert.equal(await page.evaluate(() => chartPatientMedia.files.length),0);
+  assert.equal(await page.locator('.chart-tooth-xray-indicator').count(),0);
   assert.ok(await page.locator('#chart-attachments-button').isDisabled());
   await page.evaluate(() => { canReadPatients=true; storageUrl=''; return loadChartPatientMedia(); });
   assert.match(await page.locator('#chart-media-panel-body').textContent(), /Connect your clinic storage/);
