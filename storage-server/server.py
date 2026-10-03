@@ -12,6 +12,8 @@ import logging
 from datetime import datetime
 from pathlib import Path
 import shutil
+import subprocess
+import time
 import urllib.request
 import urllib.parse
 import threading
@@ -146,11 +148,31 @@ def generate_thumbnail(original_file_path: Path):
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, resources={r"/*": {"origins": "*"}}, max_age=600)
 app.config['MAX_CONTENT_LENGTH'] = config["max_file_size_mb"] * 1024 * 1024
 
 _sync_engine = None
 _sync_engine_lock = threading.Lock()
+
+
+def _tailscale_keepalive_worker():
+    """Keep the Tailscale Funnel / DERP connection warm to prevent idle drops on Windows."""
+    while True:
+        try:
+            time.sleep(60)
+            exe = shutil.which("tailscale")
+            if not exe:
+                cand = Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "Tailscale/tailscale.exe"
+                if cand.is_file():
+                    exe = str(cand)
+            if exe:
+                subprocess.run([exe, "status"], capture_output=True, timeout=5, check=False)
+        except Exception:
+            pass
+
+
+_keepalive_thread = threading.Thread(target=_tailscale_keepalive_worker, daemon=True)
+_keepalive_thread.start()
 
 
 def get_sync_engine():

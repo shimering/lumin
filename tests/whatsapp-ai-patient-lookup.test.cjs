@@ -394,5 +394,39 @@ test('findPatientsByWhatsApp guards against single first-name matching and BSUID
   assert.ok(fullNameMatches.length > 0, 'Full name with >= 2 words is allowed to match');
 });
 
+test('systemInstruction and lookup_patient strictly enforce privacy by never suggesting database names to patients', () => {
+  // 1. systemInstruction defines CRITICAL PRIVACY RULE section
+  assert.match(webhookContent, /CRITICAL PRIVACY RULE - NEVER SUGGEST NAMES FROM THE DATABASE/);
+  assert.match(webhookContent, /STRICT PROHIBITION AGAINST REVEALING DATABASE NAMES/);
+  assert.match(webhookContent, /JUST ASK FOR THE NAME AND PHONE NUMBER/);
+  assert.match(webhookContent, /MATCH ONLY ON EXPLICIT GIVEN PHONE NUMBER/);
+
+  // 2. General Rules contains privacy protection
+  assert.match(webhookContent, /Patient Privacy & Data Protection:/);
+  assert.match(webhookContent, /STRICT PRIVACY: NEVER suggest, guess, or reveal patient names from the database in the chat/);
+
+  // 3. lookup_patient tool definition forbids revealing names
+  assert.match(webhookContent, /STRICT PRIVACY RULE: NEVER suggest or reveal patient names from the database to the customer/);
+
+  // 4. lookup_patient handler does NOT output patient names list to the patient in its duplicate message
+  assert.doesNotMatch(webhookContent, /تنبيه: يوجد \$\{matches\.length\} مرضى مسجلين بنفس رقم الهاتف \(\$\{matches\.map/);
+  assert.match(webhookContent, /قاعدة الخصوصية الصارمة: ممنوع منعاً باتاً ذكر أو اقتراح أو إفشاء أي اسم من هذه الأسماء للمريض في الشات/);
+
+  // 5. patientContextSection does NOT format duplicate patient names into customer prompt questions
+  assert.doesNotMatch(webhookContent, /يوجد لدينا أكثر من ملف مسجل بحساب الواتساب هذا:\s*\n\s*\$\{matchedPatients\.map/);
+  assert.doesNotMatch(webhookContent, /يوجد لدينا أكثر من ملف مسجل بهذا الرقم:\s*\n\s*\$\{matchedPatients\.map/);
+
+  // 6. Incoming webhook filters out any previous messages mentioning duplicate registered files to prevent leaking
+  assert.match(webhookContent, /if \(c\.includes\("يوجد لدينا أكثر من ملف مسجل"\)\) return false;/);
+  assert.match(webhookContent, /if \(c\.includes\("ملف مسجل بهذا الرقم في النظام"\)\) return false;/);
+  assert.match(webhookContent, /if \(c\.includes\("ملف مسجل بحساب الواتساب"\)\) return false;/);
+});
+
+test('patient matching strictly requires explicit given phone number and prohibits querying patients table by WhatsApp display username', () => {
+  // WhatsApp display username must NEVER query patients table by name
+  assert.doesNotMatch(webhookContent, /\.ilike\("name", cleanUser\)/);
+  assert.match(webhookContent, /CRITICAL PRIVACY & SECURITY GUARD: Never query patients table by WhatsApp display username/);
+});
+
 
 

@@ -208,33 +208,10 @@ async function findPatientsByWhatsApp(
         }
       }
 
-      // Also check if username matches patient name in database (fuzzy full name match)
-      // CRITICAL GUARD: Only attempt full name matching if username consists of AT LEAST 2 words (e.g. First + Last name)
+      // CRITICAL PRIVACY & SECURITY GUARD: Never query patients table by WhatsApp display username!
       // A single first name (e.g. "هدى", "Ahmed", "Sarah") must NEVER match arbitrary patients across the clinic!
-      if (uniqueMap.size === 0) {
-        const normUser = normalizeArabicName(cleanUser);
-        const words = normUser.split(" ").filter(Boolean);
-        if (words.length >= 2 && words[0].length >= 2 && words[1].length >= 2) {
-          const firstWord = words[0];
-          const secondWord = words[1];
-          const { data: nameCandidates } = await supabase
-            .from("patients")
-            .select(selectCols)
-            .ilike("name", `${firstWord} ${secondWord}%`)
-            .limit(10);
-
-          if (Array.isArray(nameCandidates)) {
-            for (const p of nameCandidates) {
-              if (p?.id && !uniqueMap.has(p.id)) {
-                const score = matchPatientNameScore(cleanUser, p.name);
-                if (score >= 90) {
-                  uniqueMap.set(p.id, p);
-                }
-              }
-            }
-          }
-        }
-      }
+      // Even if words.length >= 2, we never suggest or match patients from database by WhatsApp display name.
+      // Matching can ONLY happen if whatsapp_code or explicitly saved whatsapp_username matches, or if a phone number is given.
     }
   }
 
@@ -1169,7 +1146,7 @@ function buildGeminiTools(doctorNames: string[] = [], visitTypeNames: string[] =
         },
         {
           name: "lookup_patient",
-          description: "Search clinic database for existing registered patient(s) by mobile phone number. Use when the patient mentions or provides a phone number in the chat, or to check for existing profiles. Returns matching patient name(s) and alerts if duplicate records exist.",
+          description: "Search clinic database for existing registered patient(s) ONLY by a mobile phone number explicitly given by the patient in the chat. STRICT PRIVACY RULE: NEVER suggest or reveal patient names from the database to the customer. Returns matching patient record if found, or alerts if duplicate records exist under this number.",
           parameters: {
             type: "OBJECT",
             properties: {
@@ -1663,7 +1640,7 @@ async function handleGeminiToolCall(
       found: true,
       count: matches.length,
       duplicates: matches.map((p: any) => ({ id: p.id, name: p.name, phone: p.phone })),
-      message: `تنبيه: يوجد ${matches.length} مرضى مسجلين بنفس رقم الهاتف (${matches.map((p: any) => `"${p.name}" (ID: ${p.id})`).join("، ")}). اسأل المريض أي من هذه الأسماء المسجلة هو صاحب الحجز، واستخدم اسمه في book_appointment (أو assign_patient). ممنوع تماماً استدعاء create_patient لأي اسم من هذه الأسماء المسجلة.`,
+      message: `تنبيه: يوجد أكثر من ملف مريض مسجل بهذا الرقم (${rawPhone}). قاعدة الخصوصية الصارمة: ممنوع منعاً باتاً ذكر أو اقتراح أو إفشاء أي اسم من هذه الأسماء للمريض في الشات! فقط اطلب منه اسمه الكامل بشكل طبيعي دون اقتراح أي اسم ("ما هو الاسم الكامل لحجز الموعد؟"). إذا ذكر المريض اسماً يطابق أحد هذه الملفات المسجلة داخلياً، قم بربطه عبر assign_patient. وإذا كان شخصاً جديداً، استخدم create_patient.`,
     };
   }
 
@@ -2463,72 +2440,59 @@ MANDATORY RULES FOR PATIENT WITH AN ACTUAL PROFILE:
 4. If the patient explicitly states they are contacting on behalf of someone else or a new family member:
    Ask for that person's full name, and ONLY THEN call \`create_patient\` to register them.`;
   } else if (matchedPatients.length > 1) {
-    const dupList = matchedPatients
-      .map((p: any, idx: number) => `  ${idx + 1}. "${p.name}" (ID: ${p.id})`)
-      .join("\n");
     const assignedNote = conversation?.patient_id
       ? `Currently assigned profile: "${conversation.patient_name}" (ID: ${conversation.patient_id})`
       : `Currently unassigned among duplicates`;
 
     const isMaskedBsuid = isBsuid(conversation?.phone);
-    const channelTerm = isMaskedBsuid ? "حساب الواتساب هذا" : "هذا الرقم";
 
     patientContextSection = isMaskedBsuid
       ? `CRITICAL PATIENT CONTEXT - DUPLICATE PATIENTS FOUND FOR WHATSAPP ACCOUNT ${formatWhatsAppCode(conversation?.phone)}:
-- Status: There are MULTIPLE (${matchedPatients.length}) existing patient records linked to this WhatsApp account:
-${dupList}
+- Status: There are MULTIPLE (${matchedPatients.length}) existing patient records linked to this WhatsApp account in the clinic system.
 - ${assignedNote}
 
 MANDATORY RULES FOR DUPLICATE PATIENTS:
 1. WHATSAPP ACCOUNT (NOT A PHONE NUMBER): This user is messaging via a masked WhatsApp account (${formatWhatsAppCode(conversation?.phone)}). DO NOT refer to this WhatsApp code as a phone number!
 2. ALWAYS ASK THE PATIENT WHICH ONE TO ASSIGN:
-   ${!conversation?.patient_id ? `Because there are multiple patient profiles linked to this WhatsApp account, you MUST ask the patient which one of these duplicate profiles they are (or if they are contacting for someone new / a new patient).
-   Ask warmly in their language, for example:
-   "أهلاً بك في عيادة لومين لطب الأسنان! 🦷✨
-   يوجد لدينا أكثر من ملف مسجل بحساب الواتساب هذا:
-${matchedPatients.map((p: any, i: number) => `   ${i + 1}. ${p.name}`).join("\n")}
-   هل التواصل بخصوص أحد هذه الأسماء، أم لشخص جديد؟"` : `If the patient indicates they are contacting or booking for another name on the list or a new person, update or create accordingly.`}
+   - STRICT PRIVACY RULE - NEVER SUGGEST NAMES FROM THE DATABASE: Under NO circumstances should you list, suggest, guess, or recite any names from the database to the customer in the chat!
+   - Simply ask the customer for their full name (e.g. "ما هو الاسم الكامل لحجز الموعد؟" or "يرجى تزويدنا بالاسم الكريم ورقم الهاتف").
+   - DO NOT list candidate names or ask multiple-choice questions with patient names.
 3. ASSIGNING AN EXISTING PROFILE:
-   When the patient indicates which duplicate profile they are (by name or number):
-   - Immediately call \`assign_patient\` with that patient's \`patient_id\` and \`patient_name\`.
-   - Greet or confirm to them warmly by name, and proceed with their requested service.
+   When the patient provides their full name:
+   - If their stated name matches one of the existing patient profiles internally, immediately call \`assign_patient\` with that profile's \`patient_id\` and \`patient_name\`.
+   - Greet or confirm to them warmly by their stated name, and proceed with their requested service.
    - Once assigned, they have an actual profile: if their file has a phone number, do not ask for it again; if not, ask for their mobile phone number.
 4. CREATING A NEW PATIENT:
-   - ONLY IF the patient explicitly clarifies that they are a NEW patient (i.e. not any of the duplicate profiles listed above):
-     Ask for their full name and mobile phone number.
+   - ONLY IF the patient provides a name that does NOT match any of the registered duplicate profiles:
+     Ask for their mobile phone number (if not provided yet).
      ONLY THEN call \`create_patient\` to make a new patient record!
-   - NEVER create a new patient profile if they match or choose one of the existing duplicate profiles!`
+   - NEVER create a new patient profile if their stated name matches one of the existing duplicate profiles!`
       : `CRITICAL PATIENT CONTEXT - DUPLICATE PATIENTS FOUND FOR PHONE +${conversation?.phone}:
-- Status: There are MULTIPLE (${matchedPatients.length}) existing patient records registered with this phone number:
-${dupList}
+- Status: There are MULTIPLE (${matchedPatients.length}) existing patient records registered with this phone number in the clinic system.
 - ${assignedNote}
 
 MANDATORY RULES FOR DUPLICATE PATIENTS:
 1. PHONE NUMBER ALREADY REGISTERED: The phone number (+${conversation?.phone}) is already registered and known. Do NOT ask for the phone number again!
 2. ALWAYS ASK THE PATIENT WHICH ONE TO ASSIGN:
-   ${!conversation?.patient_id ? `Because there are duplicate patient profiles registered under this mobile number, you MUST ask the patient which one of these duplicate profiles they are (or if they are contacting for someone new / a new patient).
-   Ask warmly in their language, for example:
-   "أهلاً بك في عيادة لومين لطب الأسنان! 🦷✨
-   يوجد لدينا أكثر من ملف مسجل بهذا الرقم:
-${matchedPatients.map((p: any, i: number) => `   ${i + 1}. ${p.name}`).join("\n")}
-   هل التواصل بخصوص أحد هذه الأسماء، أم لشخص جديد؟"` : `If the patient indicates they are contacting or booking for another name on the list or a new person, update or create accordingly.`}
+   - STRICT PRIVACY RULE - NEVER SUGGEST NAMES FROM THE DATABASE: Under NO circumstances should you list, suggest, guess, or recite any names from the database to the customer in the chat!
+   - Simply ask the customer for their full name without offering any names from the database (e.g. "ما هو الاسم الكامل لتأكيد الحجز؟").
+   - DO NOT list candidate names or ask multiple-choice questions with patient names.
 3. ASSIGNING AN EXISTING PROFILE:
-   When the patient indicates which duplicate profile they are (by name or number):
-   - Immediately call \`assign_patient\` with that patient's \`patient_id\` and \`patient_name\`.
-   - Greet or confirm to them warmly by name, and proceed with their requested service.
+   When the patient states their full name:
+   - If their stated name matches one of the existing patient profiles internally, immediately call \`assign_patient\` with that profile's \`patient_id\` and \`patient_name\`.
+   - Greet or confirm to them warmly by their stated name, and proceed with their requested service.
    - Once assigned, they have an actual profile: DO NOT ask for their phone number again! You may only confirm the phone number associated with their profile (+${conversation?.phone}) if needed.
 4. CREATING A NEW PATIENT:
-   - ONLY IF the patient explicitly clarifies that they are a NEW patient (i.e. not any of the duplicate profiles listed above):
-     Ask for their full name (if not yet provided).
+   - ONLY IF the patient provides a name that does NOT match any of the existing duplicate profiles:
      ONLY THEN call \`create_patient\` to make a new patient record and assign this mobile number to them!
-   - NEVER create a new patient profile if they match or choose one of the existing duplicate profiles!`;
+   - NEVER create a new patient profile if their stated name matches one of the existing duplicate profiles!`;
   } else if (isBsuid(conversation?.phone)) {
     patientContextSection = `PATIENT IDENTIFICATION STATUS (MASKED WHATSAPP USERNAME):
 - This patient is contacting via a masked WhatsApp username (phone number hidden).
 - Current contact name: "${conversation?.patient_name || "WhatsApp User"}"
 - WhatsApp code: "${formatWhatsAppCode(conversation?.phone)}"
 - If the patient provides a mobile number in the chat, IMMEDIATELY call the \`lookup_patient\` tool with that number.
-- When booking or registering, politely ask for their mobile phone number and full name.`;
+- MANDATORY BOOKING ORDER: When this patient asks for an appointment or states what they need (cause of appointment), ALWAYS give the available appointments first for that cause. THEN ask for their full name and mobile phone number to confirm the booking.`;
   } else {
     patientContextSection = `PATIENT CONTEXT - UNREGISTERED PHONE (+${conversation?.phone || "None"}):
 - Status: No existing patient record found with this phone number.
@@ -2536,9 +2500,11 @@ ${matchedPatients.map((p: any, i: number) => `   ${i + 1}. ${p.name}`).join("\n"
 
 RULES:
 1. If the patient provides a different phone number in chat, call \`lookup_patient\` with that number.
-2. If they want to book an appointment or register:
-   Ask for their full name.
-   ONLY THEN call \`create_patient\` (or \`book_appointment\`) to create a new patient record and assign this mobile number to them.`;
+2. MANDATORY BOOKING ORDER: When they ask to book an appointment or mention their dental issue (cause of appointment):
+   - FIRST: Give them the available appointments for what they ask (call \`check_available_slots\` and present convenient vacant slots).
+   - THEN: Ask for their full name and mobile phone number (or confirm this mobile number) to complete the booking.
+   - ONLY AFTER getting their choice and details, call \`create_patient\` (or \`book_appointment\`) to create a new patient record and assign this mobile number to them.
+3. NEVER ask for their name or number before presenting the available appointment slots for what they asked!`;
   }
 
   // 3. Precompute 10-day lookahead calendar reference (strictly Middle Eastern clinic week starting Saturday)
@@ -2607,10 +2573,30 @@ PHONE NUMBER LOOKUP & ASSIGNMENT RULES:
      * You MAY confirm with him the phone number associated with his profile (e.g. "هل رقم التواصل المسجل هو ...؟" / "الموعد مسجل لرقم هاتفك ..."), but NEVER ask him to provide or re-enter it from scratch.
      * Book appointments and manage requests directly using his existing profile and associated phone number.
 2. When a patient provides a mobile number in the chat (or if the sender's phone is masked and they provide their phone number):
-   - You MUST call \`lookup_patient(phone)\` with the provided mobile number.
-   - If 1 patient is found: fetch their name, greet them warmly by name, and call \`assign_patient\`. Since their profile is now identified, DO NOT ask for their phone number again; you may only confirm the number on file if needed.
-   - If duplicate patients are found: you MUST ask the patient which one of the duplicate patients to assign (or if they are a new patient). When they clarify, call \`assign_patient\`.
-   - ONLY IF they clarify that they are a new patient, ask for their full name, and ONLY THEN call \`create_patient\` to make a new patient and assign this number to him.
+   - You MUST call \`lookup_patient(phone)\` with the explicitly provided mobile number. Patient matching must ONLY occur if a mobile phone number explicitly given by the patient in the chat matches a record in the database.
+   - STRICT PRIVACY RULE - NEVER SUGGEST NAMES FROM THE DATABASE: Under NO circumstances should you list, suggest, guess, or recite names found in the database to the patient! Just ask the patient for their full name and mobile number.
+   - If 1 patient is found:
+     * If the patient already provided their full name in the chat and it matches the profile (or is clearly the same person), call \`assign_patient\` and greet them warmly by name. Since their profile is now identified, DO NOT ask for their phone number again; you may only confirm the number on file if needed.
+     * If the patient only provided their phone number and has not stated their name yet, DO NOT guess or reveal the name from the database! Ask: "ما هو الاسم الكامل لحجز الموعد؟" to obtain their name.
+     * If the patient provided a completely different name (family member/new patient), proceed to register that person via \`create_patient\`.
+   - If duplicate patients are found:
+     * You MUST ask the patient for their full name (without listing or suggesting any names from the database).
+     * When they provide their full name, internally match it with the duplicate records and call \`assign_patient\`.
+   - ONLY IF they clarify that they are a new patient or their name does not match any registered profile, ask for their full name (if not yet provided), and ONLY THEN call \`create_patient\` to make a new patient and assign this number to him.
+================================================================================
+
+================================================================================
+CRITICAL PRIVACY RULE - NEVER SUGGEST NAMES FROM THE DATABASE:
+1. STRICT PROHIBITION AGAINST REVEALING DATABASE NAMES:
+   - Under NO circumstance should you ever list, suggest, guess, or recite candidate patient names from the clinic database to users in the chat (e.g. NEVER say: "يوجد لدينا ملفات مسجلة: 1. أحمد 2. سارة... هل أنت أحدهم؟" or "هل أنت فلان الفلاني؟").
+   - Leaking database patient names is a severe violation of patient medical confidentiality and data privacy!
+2. JUST ASK FOR THE NAME AND PHONE NUMBER:
+   - Always ask the customer directly for their full name and mobile phone number (e.g. "يرجى تزويدنا بالاسم الكريم ورقم الهاتف لتأكيد الحجز").
+   - Do NOT offer multiple-choice names or guesses.
+3. MATCH ONLY ON EXPLICIT GIVEN PHONE NUMBER:
+   - Patient matching must ONLY happen if a mobile phone number explicitly given by the patient in the chat (or an existing unmasked verified caller number) matches a number in the database.
+   - WhatsApp display usernames (e.g. "Ahmed", "Sarah") must NEVER be used to search for or suggest patient names.
+   - When a given phone number matches one or more patient files, match the patient's stated name INTERNALLY without ever exposing the names of other patients who share that number.
 ================================================================================
 
 ================================================================================
@@ -2629,19 +2615,52 @@ CRITICAL APPOINTMENT DURATION RULES (1 HOUR DEFAULT):
    - IF NO specific duration is mentioned in the admin instructions for a service, ALWAYS default to 1 hour (60 minutes).
 ================================================================================
 
+================================================================================
+CRITICAL CONVERSATION FLOW - AVAILABLE APPOINTMENTS FIRST FOR CAUSE, THEN NAME & NUMBER:
+When a customer inquires about booking an appointment, asks about availability, or mentions their dental issue / service:
+1. STEP 1 (ALWAYS FIRST) - GIVE THE CUSTOMER THE AVAILABLE APPOINTMENTS FIRST FOR WHAT HE ASKS (CAUSE OF APPOINTMENT):
+   - Immediately identify what the customer is asking for (the cause of the appointment / reason / complaint / procedure: e.g. checkup / كشف, cleaning & polishing / تنظيف وتلميع, toothache / dental pain / ألم أو وجع, root canal / علاج عصب أو حشو جذور, extraction / خلع, restoration / حشو تجميلي أو عادي, braces / تقويم أسنان, pediatric dental / أسنان أطفال, dental crown / تركيبات, consultation / استشارة, etc.).
+   - Check if the clinic instructions assign this cause/procedure to a specific doctor (e.g. pediatric under 12 with Dr. Mariam Soliman, root canal with Dr. Abdelreheem El Sayed, cleaning with Dr. Salma El Sayed, general checkup / new patient exam with Dr. Mohamed El Gazzar) or specific duration.
+   - You MUST IMMEDIATELY call \`check_available_slots\` (with \`days_ahead: 7\` or specific requested date, duration, doctor, and visit type) to fetch actual live vacancies.
+   - YOU MUST PRESENT THE AVAILABLE APPOINTMENT SLOTS FIRST TO THE CUSTOMER in your response!
+     Offer 2 to 4 convenient upcoming days/time slots in strict chronological order (e.g. "المواعيد المتاحة لـ [سبب الموعد / تنظيف الأسنان / الكشف ...] هي: يوم السبت ... الساعة ... أو يوم الأحد ... الساعة ...").
+   - STRICT PROHIBITION:
+     * NEVER ask the customer for their name or phone number BEFORE providing the available appointment options!
+     * DO NOT send a response that only asks "What is your name and phone number?" or delays showing appointments until they provide personal information.
+     * The customer must ALWAYS receive the available appointment times for their cause/request first.
+
+2. STEP 2 (THEN) - ASK FOR THEIR NAME AND PHONE NUMBER:
+   - AFTER (or alongside) presenting the available appointment options for the requested cause:
+     * If the patient is not yet identified (unregistered phone or masked WhatsApp account):
+       Ask them which of the presented appointment times suits them best, AND ask them for their full name and mobile phone number to confirm the reservation and register their file (e.g. "أي من هذه المواعيد يناسبك؟ ويرجى تزويدنا بالاسم الكريم ورقم الهاتف لتأكيد الحجز لك." / "Which of these times works best for you? Also, please provide your full name and phone number to confirm your booking.").
+     * If the patient already has an existing registered profile found on file:
+       Present the available appointments first, and once they choose a time, confirm the booking under their registered name and phone on file without asking them to re-enter their phone number from scratch.
+
+3. STEP 3 - BOOKING CONFIRMATION:
+   - Once the patient selects a specific slot and their name (and phone number if unregistered) is provided:
+     * Call \`book_appointment\` (and \`create_patient\` if new unregistered profile) to save the reservation.
+     * Send a warm confirmation message summarizing the date, time, duration, doctor, and cause of visit.
+================================================================================
+
 General Rules:
 1. Speak in the patient's language naturally (Arabic or English). If the patient speaks Arabic or Iraqi/Egyptian dialect, respond in warm, polite Arabic.
-2. If the patient wants to book an appointment or asks about availability:
+2. Appointment Inquiries & Booking Flow:
+   - ALWAYS give the customer the available appointments FIRST for what he asks (the cause of appointment). NEVER ask for their name or phone number before giving the available appointment times!
+   - AFTER presenting the available appointments, ask them for their full name and mobile phone number (or confirm their existing registered profile) to finalize the booking.
    - Determine the appointment duration: check the admin instructions below for any custom duration specified for this service (e.g. consultation 30 mins). If no exception is specified in the admin instructions, the duration MUST be 1 hour (60 minutes).
    - For general availability, a doctor's schedule, or "next week", call \`check_available_slots\` with \`days_ahead: 7\` and \`duration_minutes\` (default 60). Propose the earliest available working day first (e.g. Saturday before Tuesday), offering 2-3 day options so the patient can choose.
    - For a specific date, call \`check_available_slots\` with that YYYY-MM-DD date and \`duration_minutes\`.
    - Propose 3 to 5 convenient vacant slots (from available_slots) to the patient.
-   - Ask for their full name if not already known.
+   - THEN ask for their full name and mobile phone number (if not already known from an existing profile).
    - CRITICAL - NO PHONE NUMBER REQUEST FOR EXISTING PROFILES: If the patient currently has an actual profile, DO NOT ask him for a phone number again! You may confirm with him the phone number associated with his profile if needed (e.g. "الموعد مسجل لرقم هاتفك المسجل لدينا ..." / "Confirming under your registered number ..."), but NEVER ask him to provide a phone number.
    - When the patient agrees on a specific date and time, call \`book_appointment\` with \`duration_minutes\` to save it to the system with the appropriate doctor and visit type.
    - Once booked, provide a clear, warm confirmation message summarizing the date, time, duration (e.g. 1 hour / ساعة واحدة), doctor, and service.
-3. If the patient has severe medical emergencies, pain that requires immediate triage, or requests to speak to a person, call \`request_human_support\` and politely inform the patient that our clinic team will reply shortly.
-4. Keep your responses concise, friendly, and formatted nicely for WhatsApp (use *bold* and bullet points sparingly). Do not use long markdown tables.
+3. Patient Privacy & Data Protection:
+   - STRICT PRIVACY: NEVER suggest, guess, or reveal patient names from the database in the chat under any circumstance.
+   - Just ask for the patient's full name and mobile phone number.
+   - Only match patient records if the mobile phone number explicitly given by the patient in the chat matches a record in the database.
+4. If the patient has severe medical emergencies, pain that requires immediate triage, or requests to speak to a person, call \`request_human_support\` and politely inform the patient that our clinic team will reply shortly.
+5. Keep your responses concise, friendly, and formatted nicely for WhatsApp (use *bold* and bullet points sparingly). Do not use long markdown tables.
 
 ${customInstructions ? `Additional clinic instruction sections:\n${customInstructions}` : ""}`;
 
@@ -3447,7 +3466,14 @@ Deno.serve(async (req: Request) => {
 
                       const history = (rawHistory || [])
                         .reverse()
-                        .filter((m: any) => !m.content?.includes("أهلاً بك في عيادة لومين لطب الأسنان! 🦷✨"));
+                        .filter((m: any) => {
+                          const c = String(m.content || "");
+                          if (c.includes("أهلاً بك في عيادة لومين لطب الأسنان! 🦷✨")) return false;
+                          if (c.includes("يوجد لدينا أكثر من ملف مسجل")) return false;
+                          if (c.includes("ملف مسجل بهذا الرقم في النظام")) return false;
+                          if (c.includes("ملف مسجل بحساب الواتساب")) return false;
+                          return true;
+                        });
 
                       const aiResponse = await runGeminiAgent(
                         supabase,

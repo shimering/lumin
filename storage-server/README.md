@@ -74,6 +74,23 @@ You can edit `config.json` in Notepad to customize:
 * If the server is not ready, check `http://127.0.0.1:5000/api/health` on the storage computer, substituting the configured port if different. Check `server.log` or the `start-server.bat` window for the underlying error.
 * Quick tunnel URLs change after restarting. Use the URL verified by the current running launcher; `start-storage.bat` syncs it automatically when the database is reachable.
 
+---
+
+## 🔄 Automatic Windows Startup & Permanent Access
+
+If you want the storage server to start automatically whenever your computer powers on:
+
+1. **Auto-Start on Boot**:
+   Double-click `install-startup.bat`.
+   * It creates a silent shortcut in your Windows Startup folder.
+   * On every boot, the server runs quietly in the background without opening any command prompt windows.
+   * To remove it from startup later, double-click `uninstall-startup.bat`.
+
+2. **Permanent Free Access via Tailscale Funnel (No Domain Needed)**:
+   * Double-click `start-tailscale-funnel.bat` (or run `tailscale funnel --bg 5000`).
+   * Gives you a permanent HTTPS URL like `https://your-pc.tailnet.ts.net`.
+   * Clients (iPads, phones, laptops) do not need any app installed—they open the URL directly in their web browser!
+
 ## One-click patient-file synchronization
 
 Install the updated `server.py` and its new companion `file_sync.py` on **both**
