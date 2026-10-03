@@ -1054,7 +1054,8 @@
         --finding-mobile-notes: 3rem;
         --finding-mobile-delete: 2.75rem;
         --finding-mobile-gap: 0.5rem;
-        --finding-mobile-row-width: 70rem;
+        --finding-mobile-invoice: 11.5rem;
+        --finding-mobile-row-width: 82rem;
         overflow-x: auto !important;
         overscroll-behavior-inline: contain;
         -webkit-overflow-scrolling: touch;
@@ -1121,6 +1122,7 @@
         grid-column: 2;
         display: grid !important;
         grid-template-columns:
+          var(--finding-mobile-invoice)
           var(--finding-mobile-dates)
           var(--finding-mobile-doctor)
           var(--finding-mobile-price)
@@ -1144,7 +1146,7 @@
         flex: 0 0 auto !important;
       }
       #findings-container .finding-dates-group {
-        grid-column: 1;
+        grid-column: 2;
         width: 100% !important;
         min-width: 0 !important;
         max-width: var(--finding-mobile-dates) !important;
@@ -1169,7 +1171,7 @@
         flex: 1 1 auto !important;
       }
       #findings-container .finding-doctor-control {
-        grid-column: 2;
+        grid-column: 3;
         width: 100% !important;
         min-width: 0 !important;
         max-width: var(--finding-mobile-doctor) !important;
@@ -1184,7 +1186,7 @@
         font-size: 9.5px !important;
       }
       #findings-container .finding-pricing-group {
-        grid-column: 3;
+        grid-column: 4;
         display: flex !important;
         flex-direction: column !important;
         width: 100% !important;
@@ -1253,7 +1255,7 @@
         font-size: 9.5px !important;
       }
       #findings-container .finding-status-control {
-        grid-column: 4;
+        grid-column: 5;
         width: 100% !important;
         min-width: 0 !important;
         max-width: var(--finding-mobile-status) !important;
@@ -1270,7 +1272,7 @@
         text-align-last: center !important;
       }
       #findings-container .finding-note-button {
-        grid-column: 6;
+        grid-column: 7;
         width: 100% !important;
         min-width: 2.75rem !important;
         max-width: var(--finding-mobile-notes) !important;
@@ -1280,7 +1282,7 @@
         justify-content: center !important;
       }
       #findings-container .finding-delete-button {
-        grid-column: 7;
+        grid-column: 8;
         width: 2.75rem !important;
         min-width: 2.75rem !important;
         max-width: 2.75rem !important;
@@ -1289,7 +1291,7 @@
         justify-content: center !important;
       }
       #findings-container .finding-separate-button {
-        grid-column: 5;
+        grid-column: 6;
         width: 100% !important;
         min-height: 2.75rem !important;
         justify-content: center !important;
@@ -1433,6 +1435,7 @@
         grid-column: 2;
         display: grid !important;
         grid-template-columns:
+          var(--finding-mobile-invoice)
           var(--finding-mobile-dates)
           var(--finding-mobile-doctor)
           var(--finding-mobile-price)
@@ -1466,7 +1469,7 @@
         --finding-mobile-price: 10.5rem;
         --finding-mobile-status: 11.5rem;
         --finding-mobile-notes: 4.75rem;
-        --finding-mobile-row-width: 83rem;
+        --finding-mobile-row-width: 95rem;
       }
     }
 
@@ -1474,6 +1477,7 @@
     @media (min-width: 900px) {
       #findings-container {
         --finding-summary-min: 18rem;
+        --finding-column-invoice: 11.5rem;
         --finding-column-dates: 13.5rem;
         --finding-column-doctor: 12.5rem;
         --finding-column-price: 10.5rem;
@@ -1482,7 +1486,7 @@
         --finding-column-notes: 4.75rem;
         --finding-column-delete: 2rem;
         --finding-column-gap: 0.5rem;
-        --finding-row-min-width: 86.5rem;
+        --finding-row-min-width: 98.5rem;
       }
       #findings-container .finding-row:not(.has-ortho-visits) {
         display: grid !important;
@@ -1506,6 +1510,7 @@
         grid-column: 2;
         display: grid !important;
         grid-template-columns:
+          var(--finding-column-invoice)
           var(--finding-column-dates)
           var(--finding-column-doctor)
           var(--finding-column-price)
@@ -1521,7 +1526,7 @@
         margin: 0 !important;
       }
       #findings-container .finding-dates-group {
-        grid-column: 1;
+        grid-column: 2;
         width: 100%;
         min-width: 0;
         margin: 0 !important;
@@ -1538,12 +1543,12 @@
         flex: 1 1 auto;
       }
       #findings-container .finding-doctor-control {
-        grid-column: 2;
+        grid-column: 3;
         width: 100%;
         min-width: 0;
       }
       #findings-container .finding-pricing-group {
-        grid-column: 3;
+        grid-column: 4;
         width: 100%;
         min-width: 0;
         align-items: stretch !important;
@@ -1562,22 +1567,22 @@
         flex: 1 1 auto;
       }
       #findings-container .finding-status-control {
-        grid-column: 4;
+        grid-column: 5;
         width: 100% !important;
         min-width: 0;
       }
       #findings-container .finding-separate-button {
-        grid-column: 5;
+        grid-column: 6;
         width: 100%;
         justify-content: center;
       }
       #findings-container .finding-note-button {
-        grid-column: 6;
+        grid-column: 7;
         width: 100% !important;
         justify-content: center;
       }
       #findings-container .finding-delete-button {
-        grid-column: 7;
+        grid-column: 8;
         justify-self: center;
       }
       #findings-container .finding-row.has-procedure-steps > [data-procedure-steps-panel] {
@@ -1608,6 +1613,62 @@
         overflow: hidden !important;
       }
     }
+
+    #findings-container .finding-invoice-control {
+      grid-column: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      min-width: 0;
+      width: 100%;
+      padding-inline: 4px;
+    }
+    #findings-container .finding-invoice-status {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      max-width: 100%;
+    }
+    #findings-container .finding-invoice-details { display: flex; flex: 1; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+    #findings-container .finding-payment-controls {
+      display: flex;
+      flex: 0 0 44px;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      min-width: 0;
+    }
+    #findings-container .finding-invoice-badge {
+      border: 0;
+      border-radius: 999px;
+      background: #ecfdf5;
+      color: #047857;
+      padding: 4px 8px;
+      font-size: 10px;
+      font-weight: 650;
+      line-height: 1.4;
+      text-align: center;
+    }
+    #findings-container .finding-invoice-badge.is-partial { background: #eff6ff; color: #1d4ed8; }
+    #findings-container .finding-invoice-badge.is-pending { background: #fef3c7; color: #92400e; }
+    #findings-container .finding-invoice-amount {
+      display: block;
+      max-width: 100%;
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 550;
+      line-height: 1.6;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      overflow-wrap: anywhere;
+    }
+    #findings-container .finding-operation-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    #findings-container .ortho-visit-invoice { flex: 0 0 11.5rem; width: 11.5rem; min-width: 0; }
 
     @media (max-width: 767.98px) {
       .procedure-step-clinical-row {
@@ -31638,7 +31699,23 @@
       const title = currentUiLanguage === 'ar'
         ? `فتح مدفوعات ${label || item.operationName} في ${invoiceNumber(invoice.id)} · ${percent}٪ مدفوع`
         : `Open payments for ${label || item.operationName} in ${invoiceNumber(invoice.id)} · ${percent}% paid`;
-      return `<button type="button" data-invoice-id="${Number(invoice.id)}" data-item-id="${Number(item.id)}" onclick="openInvoicePaymentModal(this.dataset.invoiceId,this.dataset.itemId)" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-all duration-150 ease-out hover:bg-blue-50 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">${invoiceItemPaymentIndicatorMarkup(invoice, item)}</button>`;
+      return `<button type="button" data-invoice-id="${Number(invoice.id)}" data-item-id="${Number(item.id)}" onclick="openInvoicePaymentModal(this.dataset.invoiceId,this.dataset.itemId)" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-all duration-150 ease-out hover:bg-blue-50 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">${invoiceItemPaymentIndicatorMarkup(invoice, item)}</button>`;
+    }
+
+    function chartFindingInvoiceColumn(findingIds, { partial = false, label = '', showPayments = true } = {}) {
+      const linked = findingIds.map(id => ({ id, record: chartInvoiceItemsByFindingId.get(id) })).filter(entry => entry.record);
+      if (!linked.length) return '';
+      // A batch can contain multiple items from the same invoice. Count each invoice once.
+      const invoices = [...new Map(linked.map(({ record }) => [record.invoice.id, record.invoice])).values()];
+      const paid = invoices.reduce((sum, invoice) => sum + (Number(invoice.paidAmount) || 0), 0);
+      const total = invoices.reduce((sum, invoice) => sum + invoiceTotal(invoice), 0);
+      const amount = `${formatInvoiceMoney(paid)} / ${formatInvoiceMoney(total).replace(/^EGP\s+/, '')}`;
+      const amountLabel = currentUiLanguage === 'ar'
+        ? `${invoices.length > 1 ? 'المدفوع / إجمالي الفواتير' : 'المدفوع / إجمالي الفاتورة'}: ${amount}`
+        : `${invoices.length > 1 ? 'Paid / total invoices' : 'Paid / total invoice'}: ${amount}`;
+      const badge = label || (currentUiLanguage === 'ar' ? (partial ? 'مفوترة جزئياً' : 'مفوترة') : (partial ? 'Partly invoiced' : 'Invoiced'));
+      const buttons = showPayments ? linked.map(({ id, record }) => chartFindingPaymentButton(id, linked.length > 1 ? chartToothLabel(record.item.toothId || '') : '')).join('') : '';
+      return `<div class="finding-invoice-status">${buttons ? `<div class="finding-payment-controls">${buttons}</div>` : ''}<div class="finding-invoice-details"><span class="finding-invoice-badge ${partial ? 'is-partial' : ''}">${escapeHtml(badge)}</span><span class="finding-invoice-amount" dir="ltr" title="${escapeHtml(amountLabel)}" aria-label="${escapeHtml(amountLabel)}">${escapeHtml(amount)}</span></div></div>`;
     }
 
     function renderFindingsList() {
@@ -31699,7 +31776,6 @@
         const remainingBalance = findingPrice - totalAllocatedPrice;
         const invoicedVisitsCount = orthoVisits.filter(v => invoicedFindingIds.has(v.id)).length;
         const isOrthoFullyInvoiced = Boolean(orthoVisits.length > 0 && invoicedVisitsCount === orthoVisits.length);
-        const isOrthoPartlyInvoiced = Boolean(invoicedVisitsCount > 0 && invoicedVisitsCount < orthoVisits.length);
         const isOrthoLocked = invoicedVisitsCount > 0;
 
         const procedureStepsMarkup = procedureSteps.length ? `<div class="${procedureStepsExpanded ? '' : 'hidden '}w-full border-t border-cyan-100 bg-cyan-50/35 px-3 py-3" data-procedure-steps-panel>
@@ -31743,11 +31819,10 @@
                     <span class="inline-flex items-center justify-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-black text-indigo-700">
                       ${currentUiLanguage === 'ar' ? 'زيارة' : 'Visit'} #${visit.visitNumber}
                     </span>
-                    ${isVisitInvoiced ? '<span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-black text-emerald-700">' + (currentUiLanguage === 'ar' ? 'مفوترة' : 'Invoiced') + '</span>' : ''}
-                    ${isVisitInvoiced ? chartFindingPaymentButton(visit.id) : ''}
                   </div>
 
                   <div class="flex flex-wrap items-center gap-2 ms-auto">
+                    <div class="ortho-visit-invoice finding-invoice-control">${isVisitInvoiced ? chartFindingInvoiceColumn([visit.id]) : ''}</div>
                     <!-- Date/Time Picker -->
                     <label class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50/70 px-2 py-1 text-[10px] font-bold text-slate-600 shadow-2xs" title="${currentUiLanguage === 'ar' ? 'تاريخ ووقت الزيارة' : 'Visit date & time'}">
                       <i data-lucide="calendar" class="h-3 w-3 text-indigo-500 shrink-0"></i>
@@ -31844,7 +31919,11 @@
           .map(member => ({ member, transfer: chartSalaryTransfersByFindingId.get(member.id) }))
           .filter(({ transfer }) => transfer?.transfer_status === 'eligible');
         const doctorSalaryActionMarkup = eligibleSalaryItems.map(({ member, transfer }) => `<button type="button" data-salary-transfer-item="${Number(transfer.invoiceItemId)}" onclick="transferDoctorSalaryInvoiceItem(${Number(transfer.invoiceItemId)})" class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-blue-50 px-3 text-[10px] font-black text-blue-700 transition-all duration-150 ease-out hover:bg-blue-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50" title="${currentUiLanguage === 'ar' ? 'تحويل الإجراء المكتمل والمفوتر لحساب راتب الطبيب' : 'Transfer this completed, invoiced procedure to doctor salary'}${eligibleSalaryItems.length > 1 ? ` · ${escapeHtml(chartFindingNoteTargetLabel(member))}` : ''}"><i data-lucide="arrow-right-left" class="h-4 w-4"></i>${currentUiLanguage === 'ar' ? 'تحويل للراتب' : 'Transfer to salary'}</button>`).join('');
-        const chartPaymentMarkup = isOrthoPackage ? '' : invoicedMemberIds.map(findingId => chartFindingPaymentButton(findingId, invoicedMemberIds.length > 1 ? chartToothLabel(memberFindings.find(member => member.id === findingId)?.toothId || '') : '')).join('');
+        const invoiceColumnMarkup = chartFindingInvoiceColumn(invoicedMemberIds, {
+          partial: !isFullyInvoiced,
+          showPayments: !isOrthoPackage,
+          label: isOrthoPackage ? (isOrthoFullyInvoiced ? (currentUiLanguage === 'ar' ? 'مكتملة الفوترة' : 'All visits invoiced') : `${invoicedVisitsCount}/${orthoVisits.length} ${currentUiLanguage === 'ar' ? 'زيارات مفوترة' : 'visits invoiced'}`) : '',
+        }) || (findingPrice <= 0 ? `<span class="finding-invoice-badge is-pending">${currentUiLanguage === 'ar' ? (isOrthoPackage ? 'تحديد سعر الباقة' : 'تحديد السعر') : (isOrthoPackage ? 'Set package fee' : 'Set price')}</span>` : '');
         const isSelected = Boolean(selectableMemberIds.length && selectableMemberIds.every(findingId => selectedFindingIds.has(findingId)));
         const isCheckboxChecked = isFullyInvoiced || isSelected;
         const canSelect = Boolean(selectableMemberIds.length && !chartInvoiceStateLoading);
@@ -31953,9 +32032,8 @@
               <div class="finding-operation-details min-w-0 flex-1">
                 <div class="finding-operation-heading flex flex-nowrap items-center gap-2">
                   ${procedureSteps.length ? `<button type="button" onclick="toggleFindingProcedureSteps(this)" aria-expanded="${procedureStepsExpanded}" class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-cyan-200 bg-cyan-50 text-cyan-700 transition hover:bg-cyan-100" title="${procedureStepsExpanded ? 'Collapse' : 'Open'} procedure steps" aria-label="${procedureStepsExpanded ? 'Collapse' : 'Open'} ${escapeHtml(dentalOperationLabel(finding.code))} steps"><i data-lucide="${procedureStepsExpanded ? 'minus' : 'plus'}" class="h-3 w-3"></i></button>` : ''}
-                  <h4 class="finding-operation-title text-xs sm:text-sm font-bold text-slate-900 whitespace-nowrap">${escapeHtml(dentalOperationLabel(finding.code))}</h4>
+                  <h4 class="finding-operation-title text-xs sm:text-sm font-bold text-slate-900 whitespace-nowrap" title="${escapeHtml(dentalOperationLabel(finding.code))}">${escapeHtml(dentalOperationLabel(finding.code))}</h4>
                   ${isOrthoPackage ? `
-                    ${isOrthoFullyInvoiced ? '<span class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-emerald-700 whitespace-nowrap">' + (currentUiLanguage === 'ar' ? 'مكتملة الفوترة' : 'All visits invoiced') + '</span>' : isOrthoPartlyInvoiced ? '<span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-blue-700 whitespace-nowrap">' + invoicedVisitsCount + '/' + orthoVisits.length + ' ' + (currentUiLanguage === 'ar' ? 'زيارات مفوترة' : 'visits invoiced') + '</span>' : findingPrice <= 0 ? '<span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-700 whitespace-nowrap">' + (currentUiLanguage === 'ar' ? 'تحديد سعر الباقة' : 'Set package fee') + '</span>' : ''}
                     <button type="button" onclick="toggleOrthoVisitsCollapse('${escapeHtml(finding.id)}')" aria-expanded="${!isOrthoCollapsed}" class="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 transition hover:bg-indigo-100 whitespace-nowrap" title="${isOrthoCollapsed ? (currentUiLanguage === 'ar' ? 'إظهار الزيارات' : 'Expand visits') : (currentUiLanguage === 'ar' ? 'إخفاء الزيارات' : 'Collapse visits')}">
                       <i data-lucide="${isOrthoCollapsed ? 'chevron-right' : 'chevron-down'}" class="h-3.5 w-3.5"></i>
                       <span>${orthoVisits.length} ${currentUiLanguage === 'ar' ? (orthoVisits.length === 1 ? 'زيارة' : 'زيارات') : (orthoVisits.length === 1 ? 'visit' : 'visits')}</span>
@@ -31964,9 +32042,7 @@
                       <i data-lucide="plus" class="h-3 w-3"></i>
                       <span>${currentUiLanguage === 'ar' ? 'إضافة زيارة' : 'Add Visit'}</span>
                     </button>
-                  ` : `
-                    ${isFullyInvoiced ? '<span class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-emerald-700">Invoiced</span>' : isInvoiced ? '<span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-blue-700">Partly invoiced</span>' : findingPrice <= 0 ? '<span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-700">Set price</span>' : ''}
-                  `}
+                  ` : ''}
                 </div>
                 ${!isOrthoPackage && isMouth
                   ? '<p class="mt-0.5 truncate text-[11px] font-normal text-slate-500">Applied once to the complete mouth · tooth selection ignored</p>'
@@ -31976,9 +32052,9 @@
                       ${surfaceToggleButtons}
                     </div>` : ''}
               </div>
-              ${chartPaymentMarkup ? `<div class="finding-payment-controls inline-flex shrink-0 items-center justify-end">${chartPaymentMarkup}</div>` : ''}
             </div>
             <div class="finding-row-actions flex flex-nowrap items-center gap-2 shrink-0 ml-auto">
+              <div class="finding-invoice-control" aria-label="${currentUiLanguage === 'ar' ? 'حالة الفاتورة والمدفوعات' : 'Invoice and payment status'}">${invoiceColumnMarkup}</div>
               <div class="finding-dates-group ${isOrthoPackage ? '' : 'ml-auto'} flex flex-col items-end justify-center gap-1 shrink-0">
                 ${createdAtMarkup}
                 ${beginDateMarkup}

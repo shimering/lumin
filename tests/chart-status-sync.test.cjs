@@ -224,7 +224,7 @@ test('real finding cards retain controls during rapid chart edits on mobile, tab
         function palmerNotationSVG(){return '<svg></svg>'}
         function formatChartOperationCreatedAt(value){return value||''}
         function chartOperationDateInputValue(value){return (value||'').slice(0,16)}
-        ${['setStableHtml','renderFindingInvoiceToolbar','renderFindingsList','chartFindingPaymentButton','chartFindingNoteTargetLabel',
+        ${['setStableHtml','renderFindingInvoiceToolbar','renderFindingsList','chartFindingPaymentButton','chartFindingInvoiceColumn','chartFindingNoteTargetLabel',
           'chartDoctorSelectOptions','chartProcedureStepStatusOptions','operationStatusSelectOptions'].map(source).join('\n')}
         renderFindingsList();
       `});

@@ -8,18 +8,19 @@ const html = fs.readFileSync(path.resolve(__dirname, '..', 'index.html'), 'utf8'
 test('desktop documented findings use a shared two-region row grid', () => {
   assert.match(html, /@media \(min-width: 900px\)[\s\S]*#findings-container \.finding-row:not\(\.has-ortho-visits\)\s*\{[\s\S]*display:\s*grid !important/);
   assert.match(html, /grid-template-columns:\s*minmax\(var\(--finding-summary-min\), 1fr\) max-content/);
-  assert.match(html, /--finding-row-min-width:\s*86\.5rem/);
+  assert.match(html, /--finding-row-min-width:\s*98\.5rem/);
 });
 
 test('finding action controls are assigned stable semantic columns', () => {
   const expectedColumns = [
-    ['finding-dates-group', 1],
-    ['finding-doctor-control', 2],
-    ['finding-pricing-group', 3],
-    ['finding-status-control', 4],
-    ['finding-separate-button', 5],
-    ['finding-note-button', 6],
-    ['finding-delete-button', 7]
+    ['finding-invoice-control', 1],
+    ['finding-dates-group', 2],
+    ['finding-doctor-control', 3],
+    ['finding-pricing-group', 4],
+    ['finding-status-control', 5],
+    ['finding-separate-button', 6],
+    ['finding-note-button', 7],
+    ['finding-delete-button', 8]
   ];
 
   for (const [className, column] of expectedColumns) {
@@ -35,8 +36,8 @@ test('conditional batch and expandable rows preserve the column contract', () =>
 
 test('tablet and mobile findings use one fixed card length with contained scrolling', () => {
   assert.match(html, /@media \(max-width: 899px\)[\s\S]*#findings-container\s*\{[\s\S]*overflow-x:\s*auto !important/);
-  assert.match(html, /--finding-mobile-row-width:\s*70rem/);
-  assert.match(html, /@media \(min-width: 640px\) and \(max-width: 899px\)[\s\S]*--finding-mobile-row-width:\s*83rem/);
+  assert.match(html, /--finding-mobile-row-width:\s*82rem/);
+  assert.match(html, /@media \(min-width: 640px\) and \(max-width: 899px\)[\s\S]*--finding-mobile-row-width:\s*95rem/);
   assert.match(html, /#findings-container \.finding-row\s*\{[\s\S]*grid-template-columns:\s*var\(--finding-mobile-summary\) max-content/);
   assert.match(html, /#findings-container \.finding-row\.is-batch-finding\s*\{[\s\S]*width:\s*var\(--finding-mobile-row-width\) !important/);
   assert.match(html, /#findings-container \.finding-row\.has-procedure-steps\s*\{[\s\S]*width:\s*var\(--finding-mobile-row-width\) !important/);
