@@ -79,6 +79,7 @@
   <script src="lumin-patient-swipe.js?v=1"></script>
   <script src="lumin-patients.js?v=4"></script>
   <script src="lumin-chart-sync.js?v=1"></script>
+  <script src="lumin-chart-media.js?v=1"></script>
   <script src="lumin-mobile-nav.js?v=1"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   
@@ -5414,6 +5415,7 @@
   <link rel="stylesheet" href="lumin-patients.css?v=3" />
   <link rel="stylesheet" href="lumin-finance-sync.css?v=2" />
   <link rel="stylesheet" href="lumin-mobile-nav.css?v=2" />
+  <link rel="stylesheet" href="lumin-chart-media.css?v=1" />
   <style id="finance-ledger-styles">
     #finance-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     #finance-summary-cards > div { min-width: 0; }
@@ -6672,6 +6674,13 @@
     <!-- ================= VIEW 2: ACTIVE DENTAL CHART ================= -->
     <section id="view-chart" class="hidden space-y-6">
 
+      <div id="chart-clinical-workspace" class="chart-clinical-workspace">
+      <div class="chart-clinical-column">
+      <div class="chart-media-toolbar">
+        <button id="chart-media-toggle" type="button" class="chart-media-button" onclick="toggleChartMediaPanel()" aria-controls="chart-media-panel" aria-expanded="true"><i data-lucide="scan-line"></i><span>X-rays</span></button>
+        <button id="chart-attachments-button" type="button" class="chart-media-button is-neutral" onclick="openPatientAttachmentList()"><i data-lucide="paperclip"></i><span data-attachment-label>Attachments</span><span id="chart-attachments-count" class="chart-media-count">—</span></button>
+      </div>
+
       <!-- Main Chart Layout -->
       <div class="grid grid-cols-1 gap-5 xl:grid-cols-12">
 
@@ -6840,6 +6849,12 @@
             <p class="mt-0.5 text-[10px] font-semibold text-slate-400">Each confirmed invoice keeps its own price snapshot.</p>
           </div>
         </div>
+      </div>
+      </div>
+      <aside id="chart-media-panel" class="chart-media-panel" aria-labelledby="chart-media-panel-title">
+        <header class="chart-media-panel-header"><h3><i data-lucide="scan-line" aria-hidden="true"></i><span id="chart-media-panel-title">X-rays</span></h3><button id="chart-media-collapse" type="button" class="chart-media-button" onclick="toggleChartMediaPanel()" aria-controls="chart-media-panel-body" aria-expanded="true" aria-label="Collapse X-ray viewer"><i data-lucide="panel-right-close"></i></button></header>
+        <div id="chart-media-panel-body" class="chart-media-panel-body" aria-live="polite"></div>
+      </aside>
       </div>
       <button id="findings-invoice-button" type="button" onclick="invoiceSelectedFindings()" disabled aria-hidden="true" class="hidden fixed left-1/2 z-[72] min-w-40 -translate-x-1/2 items-center justify-center gap-2 rounded-full border border-violet-400/30 bg-violet-600 px-6 py-3.5 text-sm font-black text-white shadow-[0_16px_38px_rgba(76,29,149,0.38)] transition hover:bg-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-wait disabled:opacity-75">
         <i data-lucide="receipt-text" class="h-4 w-4"></i>
@@ -8938,13 +8953,13 @@
 
         <!-- Dropzone -->
         <div>
-          <label for="upload-media-file-input" class="block text-xs font-bold text-slate-700 mb-1.5">Select File (Image, PDF, DICOM) *</label>
-          <input id="upload-media-file-input" type="file" accept="image/*,.pdf,.dcm" class="sr-only" onchange="handleMediaFileSelected(this)" />
+          <label for="upload-media-file-input" class="block text-xs font-bold text-slate-700 mb-1.5">Select File (Image, PDF, DICOM, or other files) *</label>
+          <input id="upload-media-file-input" type="file" class="sr-only" onchange="handleMediaFileSelected(this)" />
           <div id="media-dropzone" role="button" tabindex="0" onclick="document.getElementById('upload-media-file-input').click()" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); document.getElementById('upload-media-file-input').click(); }" class="relative flex min-h-11 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-6 text-center transition hover:border-slate-300 hover:bg-blue-50/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 active:scale-[0.98] cursor-pointer">
             <div id="dropzone-empty" class="space-y-2">
               <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600"><i data-lucide="cloud-arrow-up" class="h-6 w-6"></i></span>
               <p class="text-xs font-bold text-slate-700">Tap to choose or drag a file here</p>
-              <p class="text-[11px] text-slate-400">JPEG, PNG, WEBP, PDF up to 50MB</p>
+              <p class="text-[11px] text-slate-400">Images, PDFs, documents, and other files up to 50MB</p>
             </div>
             <div id="dropzone-preview" class="hidden space-y-2 w-full">
               <img id="upload-preview-img" src="" alt="Preview" class="mx-auto max-h-40 rounded-xl object-contain shadow-xs" />
@@ -10884,6 +10899,8 @@
       'No media uploaded for this patient yet.': 'لم يتم رفع أي أشعة أو صور لهذا المريض بعد.',
       'Upload Patient Media / X-Ray': 'رفع أشعة / وسائط المريض',
       'Photo name (optional)': 'اسم الصورة (اختياري)',
+      'Select File (Image, PDF, DICOM, or other files) *': 'اختر ملفًا (صورة أو PDF أو DICOM أو ملفات أخرى) *',
+      'Images, PDFs, documents, and other files up to 50MB': 'صور وملفات PDF ومستندات وملفات أخرى حتى 50 ميجابايت',
       'Photo name': 'اسم الصورة',
       'e.g. UR6 pre-op X-ray': 'مثال: أشعة UR6 قبل العلاج',
       'Tooth assignment': 'ربط الصورة بسن',
@@ -11481,6 +11498,8 @@
         time: appointmentTimeFormatter.format(new Date(entry.startAt))
       }));
       translateUiTree(document.body, currentUiLanguage);
+      if (typeof renderChartMediaPanel === 'function') renderChartMediaPanel();
+      if (typeof renderPatientAttachmentList === 'function') renderPatientAttachmentList();
       renderStorageConnectionStatus();
       if (typeof renderStorageServerPresets === 'function') renderStorageServerPresets();
       if (financeSyncSnapshot && hasPageAccess('admin')) renderFinanceSyncSnapshot();
@@ -12805,6 +12824,7 @@
 
     async function applyAuthSession(session) {
       if (!session) {
+        resetChartPatientMedia();
         closeWhatsAppTemplatePicker();
         resetAuthRecoveryState();
         stopRealtimeSync();
@@ -27066,6 +27086,10 @@
     function openPatientMediaLightboxByIndex(index) {
       const file = currentPatientMediaFiles[index];
       if (!file) return;
+      if (typeof openPatientMediaFile === 'function') {
+        openPatientMediaFile(file, activePatientMediaPatientId);
+        return;
+      }
       const config = getStorageServerConfig();
       const path = file.relativePath.split('/').map(encodeURIComponent).join('/');
       openMediaLightbox(patientMediaFileUrl(file), file.category, patientMediaDisplayName(file), file.modifiedAt?.split('T')[0] || '', `${config.url}/api/thumbnail/${path}?key=${encodeURIComponent(config.key)}`, file.relativePath);
@@ -27254,6 +27278,7 @@
         const deleteLabel = currentUiLanguage === 'ar' ? 'حذف' : 'Delete';
         const isPdf = file.filename.toLowerCase().endsWith('.pdf');
         const isDcm = file.filename.toLowerCase().endsWith('.dcm');
+        const isAttachment = typeof patientMediaFileKind === 'function' && patientMediaFileKind(file) !== 'image';
         const sizeKb = (file.sizeBytes / 1024).toFixed(0);
         const dateDisplay = file.modifiedAt ? file.modifiedAt.split('T')[0] : '';
         
@@ -27262,6 +27287,8 @@
           previewHtml = `<div class="flex h-44 w-full items-center justify-center bg-red-50 text-red-500"><i data-lucide="file-text" class="h-12 w-12"></i></div>`;
         } else if (isDcm) {
           previewHtml = `<div class="flex h-44 w-full items-center justify-center bg-indigo-50 text-indigo-500"><i data-lucide="box" class="h-12 w-12"></i></div>`;
+        } else if (isAttachment) {
+          previewHtml = `<div class="flex h-44 w-full items-center justify-center bg-slate-100 text-slate-500"><i data-lucide="file-text" class="h-12 w-12"></i></div>`;
         } else {
           previewHtml = `<img src="${escapeHtml(thumbUrl)}" alt="${escapeHtml(displayName)}" data-media-user-content loading="lazy" class="h-44 w-full object-cover transition duration-300 group-hover:scale-105" onerror="fallbackPatientMediaPreview(this, ${index})" />`;
         }
@@ -27895,7 +27922,11 @@
         renderPatientMediaGrid();
 
         // Refresh from server in background to sync state
-        void renderPatientMedia();
+        if (typeof loadChartPatientMedia === 'function' && !document.getElementById('view-chart')?.classList.contains('hidden')) {
+          void loadChartPatientMedia(patientId);
+        } else {
+          void renderPatientMedia();
+        }
       } catch (err) {
         console.error('Failed to move file category:', err);
         if (errorEl) {
@@ -29004,6 +29035,8 @@
       const patientQueryActive = viewName === 'patients';
       const dashboardActive = viewName === 'dashboard';
       const whatsAppActive = viewName === 'whatsapp';
+      document.documentElement.classList.toggle('chart-media-active', viewName === 'chart');
+      document.body.classList.toggle('chart-media-active', viewName === 'chart');
       document.documentElement.classList.toggle('appointments-calendar-active', appointmentsCalendarActive);
       document.body.classList.toggle('appointments-calendar-active', appointmentsCalendarActive);
       document.documentElement.classList.toggle('patient-query-active', patientQueryActive);
@@ -29113,6 +29146,7 @@
       activePatientId = patient.id;
       activeWorkspacePatientId = patient.id;
       updatePatientWorkspaceNavigation(patient, 'chart');
+      void loadChartPatientMedia(patient.id);
 
       rememberPatientChartSnapshot(patient);
       ensureChartMeta(patient);
@@ -29350,6 +29384,10 @@
         // 3. Click on Action Palette, Modal, or Navigation -> Maintain selection
         if (
           e.target.closest('#action-palette-card') ||
+          e.target.closest('#chart-media-panel') ||
+          e.target.closest('#patient-attachment-modal') ||
+          e.target.closest('#patient-media-lightbox') ||
+          e.target.closest('#patient-media-move-modal') ||
           e.target.closest('#modal-new-patient') ||
           e.target.closest('#modal-appointment') ||
           e.target.closest('#modal-payment') ||
@@ -33703,6 +33741,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     function initLuminVoiceSpacebarShortcut() {
       window.addEventListener('keydown', (e) => {
         if (e.code !== 'Space' || e.repeat) return;
+        if (e.target?.closest?.('#patient-attachment-modal, #chart-media-panel, .chart-media-toolbar, #patient-media-lightbox')) return;
         const chartView = document.getElementById('view-chart');
         if (!chartView || chartView.classList.contains('hidden')) return;
         const activeEl = document.activeElement;
@@ -33716,6 +33755,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
 
       window.addEventListener('keyup', (e) => {
         if (e.code !== 'Space') return;
+        if (e.target?.closest?.('#patient-attachment-modal, #chart-media-panel, .chart-media-toolbar, #patient-media-lightbox')) return;
         const chartView = document.getElementById('view-chart');
         if (!chartView || chartView.classList.contains('hidden')) return;
         const activeEl = document.activeElement;
