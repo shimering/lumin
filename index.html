@@ -85,6 +85,7 @@
   <link rel="stylesheet" href="lumin-chart-dates.css?v=1" />
   <script src="lumin-media-teeth.js?v=1"></script>
   <script src="lumin-mobile-nav.js?v=1"></script>
+  <script src="lumin-appointment-status.js?v=1"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   
   <style>
@@ -4522,7 +4523,7 @@
         width: 1.25rem;
         height: 1.25rem;
       }
-      html.is-laptop-device #view-dashboard [data-dashboard-appointment-status] select {
+      html.is-laptop-device #view-dashboard [data-dashboard-appointment-status] .lumin-status-trigger {
         font-size: calc(1.0625rem - var(--dashboard-card-font-reduction, 0pt)) !important;
         font-weight: 800;
         min-height: 2.85rem;
@@ -5443,7 +5444,8 @@
       .wa-settings-primary-button { flex: 1 1 0; }
     }
   </style>
-  <link rel="stylesheet" href="lumin-theme.css?v=20" />
+  <link rel="stylesheet" href="lumin-theme.css?v=21" />
+  <link rel="stylesheet" href="lumin-appointment-status.css?v=1" />
   <link rel="stylesheet" href="lumin-patients.css?v=3" />
   <link rel="stylesheet" href="lumin-finance-sync.css?v=2" />
   <link rel="stylesheet" href="lumin-mobile-nav.css?v=2" />
@@ -33794,11 +33796,13 @@
       openWhatsAppLink(url, message);
     }
 
-    function dashboardStatusOptions(selectedStatus) {
-      return APPOINTMENT_STATUSES.map(status => `
-        <option value="${status}" ${status === selectedStatus ? 'selected' : ''}>${status}</option>
-      `).join('');
-    }
+    const dashboardStatusPicker = window.createLuminAppointmentStatusPicker({
+      statuses: APPOINTMENT_STATUSES,
+      getLabel: status => currentUiLanguage === 'ar' ? arabicUiPhrase(status) : status,
+      getAccessibleLabel: entry => currentUiLanguage === 'ar' ? `تغيير حالة الموعد لـ ${entry.patient}` : `Change appointment status for ${entry.patient}`,
+      canModify: () => canModifyAppointments(),
+      onChange: changeDashboardAppointmentStatus
+    });
 
     function toggleDashboardAppointmentActions(appointmentId) {
       const nextAppointmentId = String(appointmentId || '');
@@ -33824,15 +33828,11 @@
       });
     }
 
-    async function changeDashboardAppointmentStatus(appointmentId, select) {
+    async function changeDashboardAppointmentStatus(appointmentId, nextStatus) {
       const entry = appointments.find(appointment => appointment.id === appointmentId);
-      if (!entry || !canModifyAppointments()) return;
+      if (!entry || !canModifyAppointments()) return false;
       const previousStatus = entry.status;
-      const nextStatus = String(select.value || '');
-      if (!APPOINTMENT_STATUSES.includes(nextStatus) || nextStatus === previousStatus) return;
-
-      select.disabled = true;
-      select.setAttribute('aria-busy', 'true');
+      if (!APPOINTMENT_STATUSES.includes(nextStatus) || nextStatus === previousStatus) return false;
       try {
         markLocalAppointmentChange(appointmentId);
         const { data, error } = await updateAppointmentRecordWithRetry(appointmentId, { status: nextStatus });
@@ -33844,12 +33844,11 @@
         });
         renderDashboard();
         if (!document.getElementById('view-appointments').classList.contains('hidden')) renderAppointments();
+        return true;
       } catch (error) {
         recentLocalAppointmentChanges.delete(appointmentId);
-        select.value = previousStatus;
-        select.disabled = false;
-        select.removeAttribute('aria-busy');
         alert(currentUiLanguage === 'ar' ? 'تعذر تغيير حالة الموعد: ' + error.message : 'Failed to change appointment status: ' + error.message);
+        return false;
       }
     }
 
@@ -33971,19 +33970,8 @@
         const closeActionsLabel = currentUiLanguage === 'ar'
           ? `إخفاء إجراءات موعد ${entry.patient}`
           : `Hide appointment actions for ${entry.patient}`;
-        const statusClass = entry.status === 'Cancelled'
-          ? 'border-red-200 bg-red-50 text-red-700'
-          : entry.status === 'Completed'
-            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-            : entry.status === 'Checked in'
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-              : entry.status === 'In progress'
-                ? 'border-violet-200 bg-violet-50 text-violet-700'
-            : entry.status === 'Confirmed'
-              ? 'border-blue-200 bg-blue-50 text-blue-700'
-              : 'border-amber-200 bg-amber-50 text-amber-700';
         return `
-          <article data-dashboard-appointment-card="${escapeAppointmentText(entry.id)}" class="relative flex gap-4 px-5 py-5 transition hover:bg-slate-50/70 ${entry.status === 'Cancelled' ? 'opacity-60' : ''}">
+          <article data-refresh-key="${escapeAppointmentText(entry.id)}" data-dashboard-appointment-card="${escapeAppointmentText(entry.id)}" class="relative flex gap-4 px-5 py-5 transition hover:bg-slate-50/70 ${entry.status === 'Cancelled' ? 'opacity-60' : ''}">
             <div class="w-20 shrink-0 text-center">
               <div class="dashboard-time-tile hidden" style="background-color:${appointmentColorRgba(entry.appointmentColor, 0.14)};color:${appointmentTextColor(entry.appointmentColor)}">
                 <i data-lucide="clock-3" class="h-5 w-5" aria-hidden="true"></i>
@@ -34001,13 +33989,10 @@
                   ${entry.isNote
                     ? `<h4 class="dashboard-patient-name flex min-w-0 items-center gap-2 text-lg font-black text-violet-900" dir="auto"><i data-lucide="notebook-pen" class="h-4 w-4 shrink-0 text-violet-600"></i><span class="truncate">${escapeAppointmentText(entry.noteTitle)}</span></h4>`
                     : `<h4 class="dashboard-patient-name min-w-0 text-lg font-black text-slate-900" dir="auto"><button type="button" class="dashboard-patient-link" data-patient-id="${escapeAppointmentText(entry.patientId)}" onclick="openDashboardPatientProfile(this.dataset.patientId)" ${hasPageAccess('patients') ? '' : 'disabled'}>${escapeAppointmentText(entry.patient)}</button></h4>`}
-                  <label data-dashboard-appointment-status class="flex shrink-0 flex-col items-end" dir="auto">
-                    <span class="sr-only">Change appointment status for ${escapeAppointmentText(entry.patient)}</span>
-                    <select onchange="changeDashboardAppointmentStatus('${entry.id}', this)" ${canModifyAppointments() ? '' : 'disabled'} aria-label="Change appointment status for ${escapeAppointmentText(entry.patient)}" class="cursor-pointer rounded-lg border px-2.5 py-1 text-[10px] font-black outline-none transition focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60 ${statusClass}">
-                      ${dashboardStatusOptions(entry.status)}
-                    </select>
+                  <div data-dashboard-appointment-status class="flex shrink-0 flex-col items-end">
+                    ${dashboardStatusPicker.markup(entry)}
                     ${checkedInWaitIndicatorMarkup(entry)}
-                  </label>
+                  </div>
                 </div>
                 ${entry.isNote ? '' : `<div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span data-dashboard-patient-age class="shrink-0 rounded-lg bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">${currentUiLanguage === 'ar' ? 'العمر' : 'Age'}: ${escapeAppointmentText(patientAge)}</span>
@@ -34048,7 +34033,7 @@
             </div>
           </article>
         `;
-      }).join(''));
+      }).join(''), { updateNode: dashboardStatusPicker.retainTrigger });
       refreshWhatsAppTemplatePickerAnchor();
       lucide.createIcons();
       ensureAppointmentWaitIndicatorTimer();
