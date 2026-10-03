@@ -4,16 +4,29 @@
 
   window.createLuminAppointmentStatusPicker = function ({ statuses, getLabel, getAccessibleLabel, canModify, onChange }) {
     const pending = new Set();
+    const labelAnimations = new WeakMap();
+    const iconCache = new Map();
     let anchor = null, menu = null, observer = null, positionFrame = null;
     let search = '', searchTime = 0, menuSequence = 0;
     const escape = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
     const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const findTrigger = id => Array.from(document.querySelectorAll('[data-appointment-status-trigger]')).find(button => button.dataset.appointmentId === id);
 
+    function iconMarkup(name, className, fallbackName) {
+      if (iconCache.has(name)) return iconCache.get(name);
+      if (!window.lucide?.createElement || !lucide.icons[name]) return `<i data-lucide="${fallbackName}" class="${className}" aria-hidden="true"></i>`;
+      // Render Lucide SVG once, without a data-lucide marker that global refreshes replace.
+      const svg = lucide.createElement(lucide.icons[name]);
+      svg.setAttribute('class', `lucide ${className}`);
+      svg.setAttribute('aria-hidden', 'true');
+      iconCache.set(name, svg.outerHTML);
+      return svg.outerHTML;
+    }
+
     function markup(entry) {
-      return `<button type="button" class="lumin-status-trigger" data-appointment-status-trigger data-appointment-id="${escape(entry.id)}" data-status="${escape(entry.status)}" aria-label="${escape(getAccessibleLabel(entry))}" aria-haspopup="listbox" aria-expanded="false" ${!canModify() || pending.has(String(entry.id)) ? 'disabled' : ''} ${pending.has(String(entry.id)) ? 'aria-busy="true"' : ''}>
-        <span data-status-label aria-live="polite" aria-atomic="true">${escape(getLabel(entry.status))}</span>
-        <i data-lucide="chevron-down" class="lumin-status-chevron" aria-hidden="true"></i>
+      return `<button type="button" class="lumin-status-trigger" data-appointment-status-trigger data-appointment-id="${escape(entry.id)}" data-status="${escape(entry.status)}" aria-label="${escape(getAccessibleLabel(entry))}" aria-haspopup="listbox" aria-expanded="false" ${!canModify() ? 'disabled' : ''} ${pending.has(String(entry.id)) ? 'aria-busy="true" aria-disabled="true"' : ''}>
+        <span class="lumin-status-label-slot"><span class="lumin-status-label-guides" aria-hidden="true">${statuses.map(status => `<span>${escape(getLabel(status))}</span>`).join('')}</span><span data-status-label aria-live="polite" aria-atomic="true">${escape(getLabel(entry.status))}</span></span>
+        ${iconMarkup('ChevronDown', 'lumin-status-chevron', 'chevron-down')}
       </button>`;
     }
 
@@ -21,29 +34,58 @@
       if (!button) return;
       const label = button.querySelector('[data-status-label]');
       const previousText = label.textContent;
-      const previousWidth = button.offsetWidth;
-      button.dataset.status = status;
-      label.textContent = getLabel(status);
+      const nextText = getLabel(status);
+      if (button.dataset.status === status && previousText === nextText) return;
+      labelAnimations.get(button)?.forEach(animation => animation.cancel());
+      button.querySelectorAll('.lumin-status-old-label').forEach(oldLabel => oldLabel.remove());
+      if (button.dataset.status !== status) button.dataset.status = status;
+      if (previousText !== nextText) label.textContent = nextText;
       if (!animate || previousText === label.textContent || reducedMotion() || !label.animate) return;
-      button.animate([{ width: `${previousWidth}px` }, { width: `${button.offsetWidth}px` }], { duration: 220, easing: 'cubic-bezier(.2,.8,.2,1)' });
       const oldLabel = document.createElement('span');
       oldLabel.className = 'lumin-status-old-label';
       oldLabel.textContent = previousText;
       oldLabel.setAttribute('aria-hidden', 'true');
-      button.appendChild(oldLabel);
-      oldLabel.animate([{ opacity: 1, transform: 'translateY(0)' }, { opacity: 0, transform: 'translateY(-6px)' }], { duration: 160, easing: 'ease-out', fill: 'forwards' }).finished.then(() => oldLabel.remove()).catch(() => oldLabel.remove());
-      label.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 220, easing: 'cubic-bezier(.2,.8,.2,1)' });
+      label.parentElement.appendChild(oldLabel);
+      const outgoing = oldLabel.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, easing: 'ease-out', fill: 'forwards' });
+      outgoing.finished.then(() => oldLabel.remove()).catch(() => oldLabel.remove());
+      const incoming = label.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' });
+      labelAnimations.set(button, [outgoing, incoming]);
     }
 
-    // Retain the actual control through a card refresh so its animation and focus survive a fast save.
+    // Patch around the control, keeping its card and ancestor chain connected.
+    // Moving a glass button into a new card restarts compositing and drops focus in WebKit.
     function retainTrigger(previousCard, nextCard) {
       const previous = previousCard.querySelector('[data-appointment-status-trigger]');
       const next = nextCard.querySelector('[data-appointment-status-trigger]');
       if (previous && next) {
-        previous.setAttribute('aria-label', next.getAttribute('aria-label'));
-        previous.disabled = next.disabled;
+        const nextLabel = next.getAttribute('aria-label');
+        if (previous.getAttribute('aria-label') !== nextLabel) previous.setAttribute('aria-label', nextLabel);
+        if (previous.disabled !== next.disabled) previous.disabled = next.disabled;
+        const guides = previous.querySelector('.lumin-status-label-guides');
+        const nextGuides = next.querySelector('.lumin-status-label-guides');
+        if (guides.innerHTML !== nextGuides.innerHTML) guides.innerHTML = nextGuides.innerHTML;
         if (!pending.has(previous.dataset.appointmentId)) paint(previous, next.dataset.status, true);
-        next.replaceWith(previous);
+        function patchBranch(current, incoming) {
+          if (current === previous) return;
+          for (const attribute of Array.from(current.attributes)) {
+            if (!incoming.hasAttribute(attribute.name)) current.removeAttribute(attribute.name);
+          }
+          for (const attribute of incoming.attributes) {
+            if (current.getAttribute(attribute.name) !== attribute.value) current.setAttribute(attribute.name, attribute.value);
+          }
+          const branch = Array.from(current.children).find(child => child === previous || child.contains(previous));
+          const nextBranch = Array.from(incoming.children).find(child => child === next || child.contains(next));
+          // Siblings may change, but the button and every ancestor stay in place.
+          Array.from(current.childNodes).forEach(child => { if (child !== branch) child.remove(); });
+          let afterBranch = false;
+          for (const child of Array.from(incoming.childNodes)) {
+            if (child === nextBranch) { patchBranch(branch, nextBranch); afterBranch = true; }
+            else if (afterBranch) current.appendChild(child);
+            else current.insertBefore(child, branch);
+          }
+        }
+        patchBranch(previousCard, nextCard);
+        return previousCard;
       }
       return nextCard;
     }
@@ -120,14 +162,14 @@
     }
 
     function open(button, first = false, last = false) {
-      if (button.disabled || !canModify()) return;
+      if (button.disabled || pending.has(button.dataset.appointmentId) || !canModify()) return;
       if (anchor === button) return close(true);
       close(false, false);
       anchor = button;
       menu = document.createElement('div');
       menu.className = 'lumin-status-menu';
       menu.id = `lumin-appointment-status-menu-${++menuSequence}`;
-      menu.innerHTML = `<div class="lumin-status-menu-panel" role="listbox" aria-label="${escape(button.getAttribute('aria-label'))}">${statuses.map(status => `<button type="button" class="lumin-status-option" role="option" tabindex="-1" data-status="${escape(status)}" aria-selected="${status === button.dataset.status}"><span class="lumin-status-dot" aria-hidden="true"></span><span>${escape(getLabel(status))}</span><i data-lucide="check" class="lumin-status-check" aria-hidden="true"></i></button>`).join('')}</div>`;
+      menu.innerHTML = `<div class="lumin-status-menu-panel" role="listbox" aria-label="${escape(button.getAttribute('aria-label'))}">${statuses.map(status => `<button type="button" class="lumin-status-option" role="option" tabindex="-1" data-status="${escape(status)}" aria-selected="${status === button.dataset.status}"><span class="lumin-status-dot" aria-hidden="true"></span><span>${escape(getLabel(status))}</span>${iconMarkup('Check', 'lumin-status-check', 'check')}</button>`).join('')}</div>`;
       document.body.appendChild(menu);
       button.setAttribute('aria-expanded', 'true');
       button.setAttribute('aria-controls', menu.id);
@@ -153,8 +195,8 @@
       close(true);
       if (status === previousStatus || pending.has(id) || !canModify()) return;
       pending.add(id);
-      button.disabled = true;
       button.setAttribute('aria-busy', 'true');
+      button.setAttribute('aria-disabled', 'true');
       paint(button, status, true);
       let saved = false;
       try { saved = await onChange(id, status); }
@@ -165,7 +207,7 @@
           paint(current, saved ? current.dataset.status : previousStatus, true);
           current.disabled = !canModify();
           current.removeAttribute('aria-busy');
-          if (document.activeElement === document.body || document.activeElement === button) current.focus({ preventScroll: true });
+          current.removeAttribute('aria-disabled');
         }
       }
     }

@@ -39,7 +39,7 @@ test('appointment picker animates and saves accessibly across responsive layouts
   const url = `http://127.0.0.1:${server.address().port}`;
   await page.goto(url);
   await page.addScriptTag({ url: `${url}/vendor/lucide.min.js` });
-  await page.addScriptTag({ url: `${url}/lumin-appointment-status.js?v=1` });
+  await page.addScriptTag({ url: `${url}/lumin-appointment-status.js?v=2` });
   await page.addScriptTag({ content: `
     ${source.match(/    const APPOINTMENT_STATUSES = [^\n]+/)[0]}
     let currentUiLanguage = 'en', expandedDashboardAppointmentId = null, dashboardInvoiceRenderToken = 0;
@@ -163,10 +163,12 @@ test('appointment picker animates and saves accessibly across responsive layouts
     await page.evaluate(() => { window.originalButton = document.querySelector('[data-appointment-id="a"]'); window.otherCard = document.querySelector('[data-dashboard-appointment-card="b"]'); });
     await page.keyboard.press('Enter');
     assert.equal(await trigger.getAttribute('data-status'), 'Checked in');
-    assert.equal(await trigger.isDisabled(), true);
+    assert.equal(await trigger.getAttribute('aria-disabled'), 'true');
+    assert.equal(await trigger.evaluate(button => button.disabled), false, 'pending saves retain keyboard focus');
+    assert.equal(await trigger.evaluate(button => button === document.activeElement), true);
     assert.equal(await page.evaluate(() => saveCalls), 1);
     await page.evaluate(() => finishSave(true));
-    await page.waitForFunction(() => !document.querySelector('[data-appointment-id="a"]').disabled);
+    await page.waitForFunction(() => !document.querySelector('[data-appointment-id="a"]').hasAttribute('aria-busy'));
     assert.equal(await trigger.evaluate(button => button === originalButton), true, 'fast saves retain the animated button');
     assert.equal(await page.evaluate(() => document.querySelector('[data-dashboard-appointment-card="b"]') === otherCard), true);
     assert.equal(await trigger.evaluate(button => button.getAnimations({ subtree: true }).length > 0), true);
@@ -183,7 +185,7 @@ test('appointment picker animates and saves accessibly across responsive layouts
     await listbox.locator('[data-status="Cancelled"]').click();
     assert.equal(await trigger.getAttribute('data-status'), 'Cancelled');
     await page.evaluate(() => finishSave(false));
-    await page.waitForFunction(() => !document.querySelector('[data-appointment-id="a"]').disabled);
+    await page.waitForFunction(() => !document.querySelector('[data-appointment-id="a"]').hasAttribute('aria-busy'));
     assert.equal(await trigger.getAttribute('data-status'), 'Checked in');
     assert.match(await page.evaluate(() => lastAlert), /Offline/);
     assert.equal(await page.evaluate(() => pushCalls.length), 1);
@@ -206,6 +208,68 @@ test('appointment picker animates and saves accessibly across responsive layouts
     assert.equal(await listbox.count(), 0);
   });
 
+  await t.test('save and refresh frames keep the glass control connected, focused and stationary', async () => {
+    for (const [width, height] of [[390, 844], [820, 1180], [1440, 900]]) {
+      await page.setViewportSize({ width, height });
+      for (const dir of ['ltr', 'rtl']) for (const theme of ['flat', 'raised']) {
+        await page.evaluate(({ dir, theme }) => {
+          dashboardStatusPicker.close(false, false);
+          document.documentElement.dir = dir;
+          document.documentElement.style.zoom = 1;
+          document.documentElement.classList.toggle('is-laptop-device', innerWidth >= 1024);
+          document.body.classList.toggle('lumin-raised', theme === 'raised');
+          currentUiLanguage = dir === 'rtl' ? 'ar' : 'en';
+          appointments[0].status = 'Confirmed';
+          renderDashboard();
+        }, { dir, theme });
+        await trigger.tap();
+        await page.waitForTimeout(220);
+        const glass = await listbox.evaluate(element => {
+          const style = getComputedStyle(element);
+          return { blur: style.backdropFilter || style.webkitBackdropFilter, background: style.backgroundImage };
+        });
+        assert.match(glass.blur, /blur\(24px\)/);
+        assert.match(glass.background, /rgba/);
+        await page.evaluate(() => {
+          const button = document.querySelector('[data-appointment-id="a"]');
+          window.originalAncestors = [];
+          window.originalChevron = button.querySelector('svg');
+          for (let node = button; node && node.id !== 'dashboard-appointments-list'; node = node.parentElement) originalAncestors.push(node);
+          window.detachedControl = false;
+          window.motionObserver = new MutationObserver(records => {
+            if (records.some(record => Array.from(record.removedNodes).some(node => originalAncestors.includes(node)))) detachedControl = true;
+          });
+          motionObserver.observe(document.getElementById('dashboard-appointments-list'), { childList: true, subtree: true });
+          const bounds = button.getBoundingClientRect();
+          window.stationaryBounds = { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height };
+        });
+        await listbox.locator('[data-status="Completed"]').tap();
+        const measurements = await page.evaluate(async () => {
+          const frames = [];
+          for (let frame = 0; frame < 18; frame++) {
+            if (frame === 2 || frame === 4 || frame === 9) { appointments[0].notes = 'Refresh ' + frame; renderDashboard(); }
+            if (frame === 6) finishSave(true);
+            await new Promise(resolve => requestAnimationFrame(resolve));
+            const button = document.querySelector('[data-appointment-id="a"]');
+            const bounds = button.getBoundingClientRect(), style = getComputedStyle(button);
+            frames.push({ x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height, focused: document.activeElement === button, connected: originalAncestors.every(node => node.isConnected), sameChevron: button.querySelector('svg') === originalChevron, opacity: style.opacity, background: style.backgroundColor });
+          }
+          motionObserver.disconnect();
+          return { frames, baseline: stationaryBounds, detached: detachedControl };
+        });
+        assert.equal(measurements.detached, false, 'no button ancestor detaches during refresh');
+        for (const frame of measurements.frames) {
+          for (const dimension of ['x', 'y', 'width', 'height']) assert.ok(Math.abs(frame[dimension] - measurements.baseline[dimension]) < .25, `${width} ${dir} ${theme}: ${dimension} stays steady`);
+          assert.equal(frame.connected, true);
+          assert.equal(frame.sameChevron, true, 'icon refreshes never replace the chevron');
+          assert.equal(frame.focused, true);
+          assert.equal(frame.opacity, '1', 'saving never dims the glass control');
+          assert.equal(frame.background, 'rgba(0, 0, 0, 0)', 'the control has no solid fill');
+        }
+      }
+    }
+  });
+
   await t.test('reduced motion removes animations while selection still works', async () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.waitForTimeout(250);
@@ -219,7 +283,7 @@ test('appointment picker animates and saves accessibly across responsive layouts
     assert.equal(await trigger.evaluate(button => button.getAnimations({ subtree: true }).length), 0);
     assert.equal(await trigger.evaluate(button => getComputedStyle(button).transitionDuration), '0s');
     await page.evaluate(() => finishSave(true));
-    await page.waitForFunction(() => !document.querySelector('[data-appointment-id="a"]').disabled);
+    await page.waitForFunction(() => !document.querySelector('[data-appointment-id="a"]').hasAttribute('aria-busy'));
   });
   assert.deepEqual(errors, []);
   if (process.env.LUMIN_TEST_SCREENSHOT) {
