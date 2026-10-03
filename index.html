@@ -107,9 +107,52 @@
     }
     #media-dropzone:active, #btn-paste-media-image:active { transform: scale(0.98); }
     #btn-paste-media-image:disabled { opacity: 0.5; pointer-events: none; }
+    .media-detail-field {
+      display: block; width: 100%; min-width: 0; min-height: 44px;
+      border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px 12px;
+      background: var(--lumin-face, #f8fafc); color: #334155; font-size: 14px;
+      transition: background 150ms ease-out, border-color 150ms ease-out;
+    }
+    .media-detail-field:hover { border-color: #cbd5e1; }
+    .media-detail-field:focus-visible { outline: 2px solid #bfdbfe; outline-offset: 2px; border-color: #2563eb; }
+    .media-detail-field:disabled { opacity: 0.5; pointer-events: none; }
+    textarea.media-detail-field { resize: vertical; }
+    .media-detail-label { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 600; color: #475569; }
+    .media-tooth-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .media-card { min-width: 0; background: var(--lumin-face, #fff); }
+    .media-card-preview { display: block; width: 100%; border: 0; text-align: start; }
+    .media-card-info { padding: 20px; }
+    .media-card-note { margin-top: 12px; font-size: 13px; line-height: 1.6; color: #475569; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .media-card-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 16px; }
+    .media-card-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+    .media-action {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 44px; min-width: 44px; border: 0; border-radius: 12px;
+      background: transparent; color: #64748b; font-size: 12px; font-weight: 600;
+      transition: background 150ms ease-out, transform 150ms ease-out;
+    }
+    .media-action:hover { background: #f1f5f9; color: #334155; }
+    .media-action:active, .media-card-preview:active { transform: scale(0.98); }
+    .media-action:focus-visible, .media-card-preview:focus-visible { outline: 2px solid #93c5fd; outline-offset: -2px; }
+    .media-action:disabled { opacity: 0.5; pointer-events: none; }
+    .media-action-edit { padding-inline: 12px; background: #eff6ff; color: #1d4ed8; }
+    .media-action-edit:hover { background: #dbeafe; color: #1d4ed8; }
+    .media-action-danger:hover { background: #fff1f2; color: #be123c; }
+    #patient-media-details-modal { padding-top: env(safe-area-inset-top); }
+    .media-details-dialog {
+      display: flex; flex-direction: column; width: 100%; max-width: 512px; max-height: 90dvh;
+      border: 1px solid #e2e8f0; border-radius: 20px 20px 0 0; overflow: hidden;
+      background: var(--lumin-face, #fff); box-shadow: 0 24px 64px -16px rgba(15,23,42,0.3);
+    }
+    .media-details-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 24px; border-bottom: 1px solid #f1f5f9; }
+    .media-details-form { display: flex; flex-direction: column; min-height: 0; }
+    .media-details-body { display: grid; gap: 24px; min-height: 0; padding: 24px; overflow-y: auto; }
+    .media-details-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px; padding-bottom: max(16px, env(safe-area-inset-bottom)); border-top: 1px solid #f1f5f9; background: #f8fafc; }
     @media (min-width: 640px) {
       #patient-media-upload-modal { padding: 1rem; }
       #patient-media-upload-modal > [role="dialog"] { border-radius: 1rem; }
+      #patient-media-details-modal { padding: 24px; }
+      .media-details-dialog { border-radius: 20px; }
     }
 
     .surface-poly {
@@ -8874,6 +8917,25 @@
           </select>
         </div>
 
+        <div>
+          <label for="upload-media-name" class="media-detail-label">Photo name (optional)</label>
+          <input id="upload-media-name" type="text" maxlength="160" placeholder="e.g. UR6 pre-op X-ray" class="media-detail-field" />
+        </div>
+        <div class="media-tooth-fields">
+          <div>
+            <label for="upload-media-dentition" class="media-detail-label">Tooth assignment</label>
+            <select id="upload-media-dentition" class="media-detail-field" onchange="updatePatientMediaToothOptions('upload')">
+              <option value="">Whole mouth / Unassigned</option>
+              <option value="permanent">Permanent tooth</option>
+              <option value="primary">Deciduous tooth</option>
+            </select>
+          </div>
+          <div>
+            <label for="upload-media-tooth" class="media-detail-label">Tooth</label>
+            <select id="upload-media-tooth" class="media-detail-field" disabled><option value="">Select tooth</option></select>
+          </div>
+        </div>
+
         <!-- Dropzone -->
         <div>
           <label for="upload-media-file-input" class="block text-xs font-bold text-slate-700 mb-1.5">Select File (Image, PDF, DICOM) *</label>
@@ -8898,8 +8960,8 @@
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1.5">Description / Note (Optional)</label>
-          <input id="upload-media-note" type="text" placeholder="e.g. Tooth #14 pre-op, Upper quadrant..." class="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <label for="upload-media-note" class="media-detail-label">Clinical note (optional)</label>
+          <textarea id="upload-media-note" rows="3" maxlength="4000" placeholder="Add a note to show under this photo" class="media-detail-field"></textarea>
         </div>
 
         <div id="upload-progress-container" class="hidden space-y-1.5">
@@ -8920,6 +8982,49 @@
             <i data-lucide="upload" class="h-3.5 w-3.5"></i>
             <span>Upload to Local Storage</span>
           </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="patient-media-details-modal" class="fixed inset-0 z-[95] hidden items-end justify-center bg-slate-900/40 backdrop-blur-sm sm:items-center" onclick="if (event.target === this) closePatientMediaDetailsModal()">
+    <div role="dialog" aria-modal="true" aria-labelledby="media-details-title" class="media-details-dialog">
+      <div class="media-details-header">
+        <div class="min-w-0">
+          <h3 id="media-details-title" class="text-lg font-semibold tracking-tight text-slate-900">Edit photo details</h3>
+          <p class="mt-1 text-xs text-slate-500">Rename, assign a tooth, or update the note.</p>
+        </div>
+        <button type="button" onclick="closePatientMediaDetailsModal()" class="media-action" aria-label="Close"><i data-lucide="x" class="h-5 w-5"></i></button>
+      </div>
+      <form class="media-details-form" onsubmit="savePatientMediaDetails(event)">
+        <div class="media-details-body">
+          <div>
+            <label for="edit-media-name" class="media-detail-label">Photo name</label>
+            <input id="edit-media-name" type="text" required maxlength="160" class="media-detail-field" />
+          </div>
+          <div class="media-tooth-fields">
+            <div>
+              <label for="edit-media-dentition" class="media-detail-label">Tooth assignment</label>
+              <select id="edit-media-dentition" class="media-detail-field" onchange="updatePatientMediaToothOptions('edit')">
+                <option value="">Whole mouth / Unassigned</option>
+                <option value="permanent">Permanent tooth</option>
+                <option value="primary">Deciduous tooth</option>
+              </select>
+            </div>
+            <div>
+              <label for="edit-media-tooth" class="media-detail-label">Tooth</label>
+              <select id="edit-media-tooth" class="media-detail-field" disabled><option value="">Select tooth</option></select>
+            </div>
+          </div>
+          <div>
+            <label for="edit-media-note" class="media-detail-label">Clinical note (optional)</label>
+            <textarea id="edit-media-note" rows="4" maxlength="4000" placeholder="Add a note to show under this photo" class="media-detail-field"></textarea>
+          </div>
+          <p id="edit-media-error" role="alert" class="hidden rounded-xl bg-rose-50 p-3 text-sm text-rose-700"></p>
+        </div>
+        <div class="media-details-footer">
+          <button type="button" onclick="closePatientMediaDetailsModal()" class="media-action px-4">Cancel</button>
+          <button id="btn-save-media-details" type="submit" class="media-action media-action-edit"><i data-lucide="check" class="h-4 w-4"></i><span>Save details</span></button>
         </div>
       </form>
     </div>
@@ -10778,6 +10883,20 @@
       'Lab Documents': 'تقارير المعمل',
       'No media uploaded for this patient yet.': 'لم يتم رفع أي أشعة أو صور لهذا المريض بعد.',
       'Upload Patient Media / X-Ray': 'رفع أشعة / وسائط المريض',
+      'Photo name (optional)': 'اسم الصورة (اختياري)',
+      'Photo name': 'اسم الصورة',
+      'e.g. UR6 pre-op X-ray': 'مثال: أشعة UR6 قبل العلاج',
+      'Tooth assignment': 'ربط الصورة بسن',
+      'Whole mouth / Unassigned': 'كامل الفم / غير محدد',
+      'Permanent tooth': 'سن دائم',
+      'Deciduous tooth': 'سن لبني',
+      'Select tooth': 'اختر السن',
+      'Clinical note (optional)': 'ملاحظة طبية (اختياري)',
+      'Add a note to show under this photo': 'أضف ملاحظة لتظهر أسفل هذه الصورة',
+      'Edit photo details': 'تعديل تفاصيل الصورة',
+      'Rename, assign a tooth, or update the note.': 'غيّر اسم الصورة أو اربطها بسن أو عدّل الملاحظة.',
+      'Edit details': 'تعديل التفاصيل',
+      'Save details': 'حفظ التفاصيل',
       'Tap to choose or drag a file here': 'اضغط لاختيار ملف أو اسحبه إلى هنا',
       'Paste image from clipboard': 'لصق صورة من الحافظة',
       'You can also press Ctrl+V or ⌘V while this window is open.': 'يمكنك أيضاً الضغط على Ctrl+V أو ⌘V أثناء فتح هذه النافذة.',
@@ -11191,7 +11310,7 @@
 
     function isUiTranslationExcluded(node) {
       const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
-      return Boolean(element?.closest('#view-chart, #view-admin, #view-prices, .patient-workspace-name, [data-storage-connection-badge], [data-storage-server-dialog]'));
+      return Boolean(element?.closest('#view-chart, #view-admin, #view-prices, .patient-workspace-name, [data-storage-connection-badge], [data-storage-server-dialog], [data-media-user-content]'));
     }
 
     function arabicUiPhrase(source) {
@@ -22120,20 +22239,21 @@
       message.textContent = `Keep holding the fingerprint to ${myOpenAttendanceSession ? 'check out' : 'check in'}.`;
     }
 
-    async function queueHrCheckInPushNotification(attendanceSessionId) {
+    async function queueHrAttendancePushNotification(attendanceSessionId, action) {
       if (!currentSession || !attendanceSessionId) return false;
       try {
         const { data, error } = await db.functions.invoke('hr-attendance-push', {
           body: {
             attendance_session_id: attendanceSessionId,
+            action,
             app_url: window.location.origin
           }
         });
         if (error) throw error;
-        if (!data?.sent) console.warn('HR check-in notification was skipped:', data?.reason || data);
+        if (!data?.sent) console.warn('HR attendance notification was skipped:', data?.reason || data);
         return Boolean(data?.sent);
       } catch (error) {
-        console.warn('HR check-in notification could not be sent:', error?.message || error);
+        console.warn('HR attendance notification could not be sent:', error?.message || error);
         return false;
       }
     }
@@ -22154,7 +22274,7 @@
         message.className = 'border-t border-emerald-100 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-700';
         message.textContent = action === 'check_out' ? 'Checked out successfully using server time.' : 'Checked in successfully using server time.';
         const attendanceSession = Array.isArray(data) ? data[0] : data;
-        if (action === 'check_in') void queueHrCheckInPushNotification(attendanceSession?.id);
+        void queueHrAttendancePushNotification(attendanceSession?.id, action);
         attendanceStateLoadedAt = 0;
         await refreshMyAttendanceState({ force: true });
       } catch (error) {
@@ -26283,6 +26403,10 @@
     let currentPatientMediaFiles = [];
     let activePatientMediaFilter = 'ALL';
     let activePatientMediaPatientId = null;
+    let patientMediaRenderToken = 0;
+    let patientMediaDetailsError = false;
+    let editingPatientMediaDetails = null;
+    let pendingPatientMediaUpload = null;
     let lightboxScale = 1;
     let lightboxRotation = 0;
     let lightboxInverted = false;
@@ -26872,7 +26996,155 @@
       }
     }
 
+    function patientMediaToothLabel(toothId) {
+      if (!toothId) return '';
+      const dentition = isPrimaryToothId(toothId)
+        ? (currentUiLanguage === 'ar' ? 'سن لبني' : 'Deciduous')
+        : (currentUiLanguage === 'ar' ? 'سن دائم' : 'Permanent');
+      return `${dentition} · ${palmerQuadrantLabel(toothId)}`;
+    }
+
+    function updatePatientMediaToothOptions(prefix, selectedTooth = '') {
+      const dentition = document.getElementById(`${prefix}-media-dentition`)?.value;
+      const select = document.getElementById(`${prefix}-media-tooth`);
+      if (!select) return;
+      const primary = dentition === 'primary';
+      const quadrants = [
+        { slots: [8,7,6,5,4,3,2,1], en: 'Upper right', ar: 'علوي أيمن' },
+        { slots: [9,10,11,12,13,14,15,16], en: 'Upper left', ar: 'علوي أيسر' },
+        { slots: [24,23,22,21,20,19,18,17], en: 'Lower left', ar: 'سفلي أيسر' },
+        { slots: [25,26,27,28,29,30,31,32], en: 'Lower right', ar: 'سفلي أيمن' },
+      ];
+      select.disabled = !dentition;
+      select.required = Boolean(dentition);
+      select.innerHTML = `<option value="">${currentUiLanguage === 'ar' ? 'اختر السن' : 'Select tooth'}</option>`;
+      if (dentition) {
+        select.innerHTML += quadrants.map(quadrant => {
+          const teeth = quadrant.slots.map(slot => primary ? PRIMARY_TOOTH_BY_SLOT[slot] : String(slot)).filter(Boolean);
+          return `<optgroup label="${currentUiLanguage === 'ar' ? quadrant.ar : quadrant.en}">${teeth.map(tooth => `<option value="${tooth}">${palmerQuadrantLabel(tooth)}</option>`).join('')}</optgroup>`;
+        }).join('');
+      }
+      select.value = selectedTooth;
+    }
+
+    function readPatientMediaDetails(prefix) {
+      const dentition = document.getElementById(`${prefix}-media-dentition`)?.value || '';
+      const tooth = document.getElementById(`${prefix}-media-tooth`)?.value || '';
+      if (dentition && (!/^([1-9]|[12][0-9]|3[0-2]|[A-T])$/.test(tooth) || (dentition === 'primary') !== isPrimaryToothId(tooth))) {
+        throw new Error(currentUiLanguage === 'ar' ? 'اختر سناً من نوع الأسنان المحدد.' : 'Select a tooth from the chosen dentition.');
+      }
+      return {
+        display_name: document.getElementById(`${prefix}-media-name`)?.value.trim() || '',
+        note: document.getElementById(`${prefix}-media-note`)?.value.trim() || '',
+        tooth_id: dentition ? tooth : null,
+      };
+    }
+
+    async function persistPatientMediaDetails(patientId, relativePath, details) {
+      if (!patientId || !relativePath) throw new Error(currentUiLanguage === 'ar' ? 'تعذر تحديد الصورة المحفوظة.' : 'The saved photo could not be identified.');
+      const { data, error } = await db.from('patient_media_details')
+        .upsert({ patient_id: patientId, relative_path: relativePath, ...details }, { onConflict: 'patient_id,relative_path' })
+        .select('relative_path,display_name,note,tooth_id').single();
+      if (error) throw error;
+      return data;
+    }
+
+    function patientMediaDisplayName(file) {
+      return file.mediaDetails?.display_name || file.originalName || file.filename;
+    }
+
+    function patientMediaDownloadName(file) {
+      const name = patientMediaDisplayName(file);
+      const extension = file.filename.match(/\.[^.]+$/)?.[0] || '';
+      return extension && !name.toLowerCase().endsWith(extension.toLowerCase()) ? name + extension : name;
+    }
+
+    function patientMediaFileUrl(file) {
+      return `${getStorageServerConfig().url}/files/${file.relativePath.split('/').map(encodeURIComponent).join('/')}`;
+    }
+
+    function openPatientMediaLightboxByIndex(index) {
+      const file = currentPatientMediaFiles[index];
+      if (!file) return;
+      const config = getStorageServerConfig();
+      const path = file.relativePath.split('/').map(encodeURIComponent).join('/');
+      openMediaLightbox(patientMediaFileUrl(file), file.category, patientMediaDisplayName(file), file.modifiedAt?.split('T')[0] || '', `${config.url}/api/thumbnail/${path}?key=${encodeURIComponent(config.key)}`, file.relativePath);
+    }
+
+    function fallbackPatientMediaPreview(image, index) {
+      const file = currentPatientMediaFiles[index];
+      if (!file) return;
+      image.onerror = null;
+      image.src = `${patientMediaFileUrl(file)}?key=${encodeURIComponent(getStorageServerConfig().key)}`;
+    }
+
+    function openPatientMediaMoveByIndex(index) {
+      const file = currentPatientMediaFiles[index];
+      if (file) openPatientMediaMoveModal(file.relativePath, file.category, patientMediaDisplayName(file));
+    }
+
+    function deletePatientMediaByIndex(index) {
+      const file = currentPatientMediaFiles[index];
+      if (file) void deletePatientMediaFile(file.relativePath);
+    }
+
+    function openPatientMediaDetailsModal(index) {
+      const file = currentPatientMediaFiles[index];
+      if (!file || patientMediaDetailsError || !hasPageAccess('patients')) return;
+      const modal = document.getElementById('patient-media-details-modal');
+      if (!modal) return;
+      editingPatientMediaDetails = { patientId: activePatientMediaPatientId, relativePath: file.relativePath, index };
+      const tooth = file.mediaDetails?.tooth_id || '';
+      document.getElementById('edit-media-name').value = patientMediaDisplayName(file).slice(0, 160);
+      document.getElementById('edit-media-note').value = file.mediaDetails?.note ?? file.note ?? '';
+      document.getElementById('edit-media-dentition').value = tooth ? (isPrimaryToothId(tooth) ? 'primary' : 'permanent') : '';
+      updatePatientMediaToothOptions('edit', tooth);
+      document.getElementById('edit-media-error').classList.add('hidden');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      translateUiTree(modal, currentUiLanguage);
+      if (window.lucide) lucide.createIcons();
+      document.getElementById('edit-media-name').focus();
+    }
+
+    function closePatientMediaDetailsModal() {
+      if (document.getElementById('btn-save-media-details')?.disabled) return;
+      const modal = document.getElementById('patient-media-details-modal');
+      modal?.classList.add('hidden');
+      modal?.classList.remove('flex');
+      const target = editingPatientMediaDetails;
+      editingPatientMediaDetails = null;
+      if (target?.patientId === activePatientMediaPatientId) document.querySelector(`[data-media-edit-index="${target.index}"]`)?.focus();
+    }
+
+    async function savePatientMediaDetails(event) {
+      event.preventDefault();
+      if (!editingPatientMediaDetails || !hasPageAccess('patients')) return;
+      const target = { ...editingPatientMediaDetails };
+      const button = document.getElementById('btn-save-media-details');
+      const errorElement = document.getElementById('edit-media-error');
+      errorElement.classList.add('hidden');
+      try {
+        const details = readPatientMediaDetails('edit');
+        if (!details.display_name) throw new Error(currentUiLanguage === 'ar' ? 'أدخل اسم الصورة.' : 'Enter a photo name.');
+        button.disabled = true;
+        const saved = await persistPatientMediaDetails(target.patientId, target.relativePath, details);
+        if (activePatientMediaPatientId === target.patientId) {
+          const file = currentPatientMediaFiles.find(item => item.relativePath === target.relativePath);
+          if (file) file.mediaDetails = saved;
+          renderPatientMediaGrid();
+          if (currentLightboxRelativePath === target.relativePath) document.getElementById('lightbox-filename').textContent = details.display_name;
+        }
+        button.disabled = false;
+        closePatientMediaDetailsModal();
+      } catch (error) {
+        errorElement.textContent = error.message || (currentUiLanguage === 'ar' ? 'تعذر حفظ تفاصيل الصورة.' : 'Could not save photo details.');
+        errorElement.classList.remove('hidden');
+      } finally { button.disabled = false; }
+    }
+
     async function renderPatientMedia() {
+      const renderToken = ++patientMediaRenderToken;
       const patientId = activeWorkspacePatientId || patientWorkspaceId();
       let patient = getKnownPatient(patientId);
       if (!patient && patientId) {
@@ -26880,7 +27152,10 @@
       }
       const content = document.getElementById('patient-media-content');
       const warning = document.getElementById('patient-media-server-warning');
-      if (!content || !patient) return;
+      if (!content || !patient || renderToken !== patientMediaRenderToken) return;
+      currentPatientMediaFiles = [];
+      activePatientMediaPatientId = patient.id;
+      patientMediaDetailsError = false;
 
       updatePatientWorkspaceNavigation(patient, 'media');
 
@@ -26911,10 +27186,16 @@
 
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
-        currentPatientMediaFiles = data.files || [];
+        const detailsResult = await db.from('patient_media_details').select('relative_path,display_name,note,tooth_id').eq('patient_id', patient.id);
+        if (renderToken !== patientMediaRenderToken) return;
+        patientMediaDetailsError = Boolean(detailsResult.error);
+        if (detailsResult.error) console.warn('Patient photo details could not be loaded:', detailsResult.error);
+        const detailsByPath = new Map((detailsResult.data || []).map(item => [item.relative_path, item]));
+        currentPatientMediaFiles = (data.files || []).map(file => ({ ...file, mediaDetails: detailsByPath.get(file.relativePath) || null }));
         activePatientMediaPatientId = patient.id;
         renderPatientMediaGrid();
       } catch (err) {
+        if (renderToken !== patientMediaRenderToken) return;
         console.error('Failed to load patient media:', err);
         if (warning) warning.classList.remove('hidden');
         content.innerHTML = `
@@ -26960,8 +27241,17 @@
       }
 
       const cards = filtered.map(file => {
-        const fileUrl = `${storageConfig.url}/files/${file.relativePath}`;
-        const thumbUrl = `${storageConfig.url}/api/thumbnail/${file.relativePath}?key=${encodeURIComponent(storageConfig.key)}`;
+        const index = currentPatientMediaFiles.indexOf(file);
+        const displayName = patientMediaDisplayName(file);
+        const note = file.mediaDetails?.note ?? file.note ?? '';
+        const toothLabel = patientMediaToothLabel(file.mediaDetails?.tooth_id);
+        const fileUrl = patientMediaFileUrl(file);
+        const encodedPath = file.relativePath.split('/').map(encodeURIComponent).join('/');
+        const thumbUrl = `${storageConfig.url}/api/thumbnail/${encodedPath}?key=${encodeURIComponent(storageConfig.key)}`;
+        const editLabel = currentUiLanguage === 'ar' ? 'تعديل التفاصيل' : 'Edit details';
+        const moveLabel = currentUiLanguage === 'ar' ? 'تغيير التصنيف' : 'Change Category';
+        const downloadLabel = currentUiLanguage === 'ar' ? 'تنزيل' : 'Download';
+        const deleteLabel = currentUiLanguage === 'ar' ? 'حذف' : 'Delete';
         const isPdf = file.filename.toLowerCase().endsWith('.pdf');
         const isDcm = file.filename.toLowerCase().endsWith('.dcm');
         const sizeKb = (file.sizeBytes / 1024).toFixed(0);
@@ -26973,24 +27263,27 @@
         } else if (isDcm) {
           previewHtml = `<div class="flex h-44 w-full items-center justify-center bg-indigo-50 text-indigo-500"><i data-lucide="box" class="h-12 w-12"></i></div>`;
         } else {
-          previewHtml = `<img src="${thumbUrl}" alt="${escapeHtml(file.filename)}" loading="lazy" class="h-44 w-full object-cover transition duration-300 group-hover:scale-105" onerror="this.onerror=null;this.src='${fileUrl}?key=${encodeURIComponent(storageConfig.key)}';" />`;
+          previewHtml = `<img src="${escapeHtml(thumbUrl)}" alt="${escapeHtml(displayName)}" data-media-user-content loading="lazy" class="h-44 w-full object-cover transition duration-300 group-hover:scale-105" onerror="fallbackPatientMediaPreview(this, ${index})" />`;
         }
 
         return `
-          <article class="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs transition hover:border-blue-300 hover:shadow-md">
-            <div class="relative cursor-pointer overflow-hidden bg-slate-100" onclick="openMediaLightbox('${fileUrl}', '${escapeHtml(file.category)}', '${escapeHtml(file.filename)}', '${escapeHtml(dateDisplay)}', '${thumbUrl}', '${escapeHtml(file.relativePath)}')">
+          <article class="media-card group relative overflow-hidden rounded-2xl border border-slate-200 shadow-xs transition hover:border-slate-300 hover:shadow-md">
+            <button type="button" class="media-card-preview relative cursor-pointer overflow-hidden bg-slate-100" onclick="openPatientMediaLightboxByIndex(${index})" aria-label="${escapeHtml(displayName)}">
               ${previewHtml}
-              <span class="absolute top-2.5 left-2.5 rounded-lg bg-slate-900/75 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white backdrop-blur-xs">${escapeHtml(file.category)}</span>
-              <span class="absolute bottom-2.5 right-2.5 rounded-lg bg-slate-900/60 px-1.5 py-0.5 text-[9px] font-mono font-bold text-white backdrop-blur-xs">${sizeKb} KB</span>
-            </div>
-            <div class="p-3">
-              <h5 class="truncate text-xs font-black text-slate-800" title="${escapeHtml(file.filename)}">${escapeHtml(file.filename)}</h5>
-              <div class="mt-2 flex items-center justify-between text-[11px] text-slate-400">
+              <span class="absolute top-2.5 rounded-full bg-slate-900/75 px-2 py-1 text-[10px] font-semibold text-white" style="inset-inline-start:10px">${escapeHtml(file.category)}</span>
+              <span class="absolute bottom-2.5 rounded-full bg-slate-900/60 px-2 py-1 text-[10px] font-medium text-white" style="inset-inline-end:10px">${sizeKb} KB</span>
+            </button>
+            <div class="media-card-info">
+              <h5 class="truncate text-sm font-semibold text-slate-800" title="${escapeHtml(displayName)}" data-media-user-content>${escapeHtml(displayName)}</h5>
+              ${toothLabel ? `<span class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700"><i data-lucide="scan-line" class="h-3.5 w-3.5"></i><span dir="auto">${escapeHtml(toothLabel)}</span></span>` : ''}
+              ${note ? `<p class="media-card-note" dir="auto" data-media-user-content>${escapeHtml(note)}</p>` : ''}
+              <div class="media-card-footer text-xs text-slate-400">
                 <span>${escapeHtml(dateDisplay)}</span>
-                <div class="flex items-center gap-1">
-                  <button type="button" onclick="openPatientMediaMoveModal('${escapeHtml(file.relativePath)}', '${escapeHtml(file.category)}', '${escapeHtml(file.filename)}')" title="Change Category" class="rounded-lg p-1 hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition"><i data-lucide="folder-input" class="h-3.5 w-3.5"></i></button>
-                  <a href="${fileUrl}?key=${encodeURIComponent(storageConfig.key)}" download target="_blank" title="Download" class="rounded-lg p-1 hover:bg-slate-100 text-slate-500 hover:text-slate-800"><i data-lucide="download" class="h-3.5 w-3.5"></i></a>
-                  <button type="button" onclick="deletePatientMediaFile('${escapeHtml(file.relativePath)}')" title="Delete" class="rounded-lg p-1 hover:bg-rose-50 text-slate-400 hover:text-rose-600"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button>
+                <div class="media-card-actions">
+                  <button type="button" onclick="openPatientMediaDetailsModal(${index})" data-media-edit-index="${index}" class="media-action media-action-edit" ${patientMediaDetailsError ? 'disabled' : ''}><i data-lucide="pencil" class="h-4 w-4"></i><span>${editLabel}</span></button>
+                  <button type="button" onclick="openPatientMediaMoveByIndex(${index})" title="${moveLabel}" aria-label="${moveLabel}" class="media-action" ${patientMediaDetailsError ? 'disabled' : ''}><i data-lucide="folder-input" class="h-4 w-4"></i></button>
+                  <a href="${escapeHtml(fileUrl)}?key=${encodeURIComponent(storageConfig.key)}" download="${escapeHtml(patientMediaDownloadName(file))}" target="_blank" rel="noopener" title="${downloadLabel}" aria-label="${downloadLabel}" class="media-action"><i data-lucide="download" class="h-4 w-4"></i></a>
+                  <button type="button" onclick="deletePatientMediaByIndex(${index})" title="${deleteLabel}" aria-label="${deleteLabel}" class="media-action media-action-danger"><i data-lucide="trash-2" class="h-4 w-4"></i></button>
                 </div>
               </div>
             </div>
@@ -26998,8 +27291,9 @@
         `;
       }).join('');
 
-      content.innerHTML = `<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">${cards}</div>`;
-      lucide.createIcons();
+      const detailsWarning = patientMediaDetailsError ? `<div role="status" class="mb-4 flex flex-wrap items-center gap-3 rounded-2xl bg-amber-50 p-4 text-sm text-amber-800"><i data-lucide="info" class="h-5 w-5"></i><p class="min-w-0 flex-1">${currentUiLanguage === 'ar' ? 'تعذر تحميل أسماء الصور والملاحظات وتحديد الأسنان. أعد المحاولة قبل تعديلها.' : 'Photo names, notes, and tooth assignments could not be loaded. Retry before editing.'}</p><button type="button" class="media-action" onclick="renderPatientMedia()">${currentUiLanguage === 'ar' ? 'إعادة المحاولة' : 'Retry'}</button></div>` : '';
+      content.innerHTML = `${detailsWarning}<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">${cards}</div>`;
+      if (window.lucide) lucide.createIcons();
     }
 
     let selectedPatientMediaUploadFile = null;
@@ -27027,6 +27321,8 @@
       const progress = document.getElementById('upload-progress-container');
       if (!modal) return;
       if (form) form.reset();
+      pendingPatientMediaUpload = null;
+      updatePatientMediaToothOptions('upload');
       if (error) error.classList.add('hidden');
       if (progress) progress.classList.add('hidden');
       selectedPatientMediaUploadFile = null;
@@ -27034,10 +27330,12 @@
       modal.classList.remove('hidden');
       modal.classList.add('flex');
       setupMediaDropzoneEvents();
-      lucide.createIcons();
+      translateUiTree(modal, currentUiLanguage);
+      if (window.lucide) lucide.createIcons();
     }
 
     function closePatientMediaUploadModal() {
+      if (document.getElementById('btn-submit-media-upload')?.disabled) return;
       const modal = document.getElementById('patient-media-upload-modal');
       if (modal) {
         modal.classList.add('hidden');
@@ -27133,6 +27431,7 @@
 
     function selectPatientMediaUploadFile(file, clearFileInput = false) {
       if (!file) return false;
+      if (selectedPatientMediaUploadFile !== file) pendingPatientMediaUpload = null;
       if (file.size > 50 * 1024 * 1024 || file.size === 0) {
         selectedPatientMediaUploadFile = null;
         resetMediaDropzonePreview();
@@ -27199,6 +27498,11 @@
         return;
       }
 
+      let details;
+      try { details = readPatientMediaDetails('upload'); }
+      catch (error) { showPatientMediaUploadError(error.message); return; }
+      if (!details.display_name) details.display_name = file.name.slice(0, 160);
+
       const storageConfig = getStorageServerConfig();
       if (!storageConfig.url) {
         if (errorEl) { errorEl.textContent = 'Storage server URL is not configured. Please open Settings.'; errorEl.classList.remove('hidden'); }
@@ -27224,7 +27528,9 @@
       if (noteInput?.value) formData.append('note', noteInput.value.trim());
 
       try {
-        await new Promise((resolve, reject) => {
+        const uploadResult = pendingPatientMediaUpload?.file === file && pendingPatientMediaUpload.patientId === patient.id
+          ? pendingPatientMediaUpload.result
+          : await new Promise((resolve, reject) => {
           const xhr = new XMLHttpRequest();
           xhr.open('POST', `${storageConfig.url}/api/upload`);
           xhr.setRequestHeader('x-lumin-key', storageConfig.key);
@@ -27259,12 +27565,18 @@
           xhr.send(formData);
         });
 
+        pendingPatientMediaUpload = { file, patientId: patient.id, result: uploadResult };
+        await persistPatientMediaDetails(patient.id, uploadResult.relativePath, details);
+        pendingPatientMediaUpload = null;
+        if (submitBtn) submitBtn.disabled = false;
         closePatientMediaUploadModal();
         await renderPatientMedia();
       } catch (err) {
         console.error('Upload failed:', err);
         if (errorEl) {
-          errorEl.textContent = err.message || 'Failed to upload image.';
+          errorEl.textContent = pendingPatientMediaUpload
+            ? (currentUiLanguage === 'ar' ? 'تم رفع الصورة، لكن تعذر حفظ تفاصيلها. اضغط الرفع مرة أخرى لإعادة حفظ التفاصيل دون رفع نسخة جديدة.' : 'The photo was uploaded, but its details could not be saved. Tap Upload again to retry saving details without uploading a duplicate.')
+            : (err.message || 'Failed to upload image.');
           errorEl.classList.remove('hidden');
         }
       } finally {
@@ -27275,6 +27587,7 @@
     async function deletePatientMediaFile(relativePath) {
       if (!confirm(currentUiLanguage === 'ar' ? 'هل أنت متأكد من حذف هذه الصورة/الأشعة نهائياً من الخادم المحلي؟' : 'Are you sure you want to permanently delete this file from local storage?')) return;
       const storageConfig = getStorageServerConfig();
+      const patientId = activePatientMediaPatientId;
       try {
         const resp = await fetch(`${storageConfig.url}/api/file`, {
           method: 'DELETE',
@@ -27285,6 +27598,8 @@
           body: JSON.stringify({ relativePath })
         });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const { error: detailsError } = await db.from('patient_media_details').delete().eq('patient_id', patientId).eq('relative_path', relativePath);
+        if (detailsError) console.warn('Deleted photo metadata could not be cleared:', detailsError);
         await renderPatientMedia();
       } catch (err) {
         alert(currentUiLanguage === 'ar' ? `تعذر حذف الملف: ${err.message}` : `Failed to delete file: ${err.message}`);
@@ -27425,7 +27740,8 @@
       if (dateLabel) dateLabel.textContent = dateStr;
       if (dlLink) {
         dlLink.href = fullUrl;
-        dlLink.download = filename;
+        const file = currentPatientMediaFiles.find(item => item.relativePath === relativePath);
+        dlLink.download = file ? patientMediaDownloadName(file) : filename;
       }
 
       modal.classList.remove('hidden');
@@ -27470,6 +27786,7 @@
     }
 
     function openPatientMediaMoveModal(relativePath, currentCategory, filename) {
+      if (patientMediaDetailsError) return;
       const modal = document.getElementById('patient-media-move-modal');
       const pathInput = document.getElementById('move-media-relative-path');
       const catSelect = document.getElementById('move-media-target-category');
@@ -27504,6 +27821,17 @@
       openPatientMediaMoveModal(currentLightboxRelativePath, currentCat, filename);
     }
 
+    async function requestPatientMediaMove(relativePath, targetCategory, storageConfig) {
+      const response = await fetch(`${storageConfig.url}/api/file/move`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-lumin-key': storageConfig.key },
+        body: JSON.stringify({ relativePath, targetCategory }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+      return result;
+    }
+
     async function handleMovePatientMediaSubmit(event) {
       event.preventDefault();
       const pathInput = document.getElementById('move-media-relative-path');
@@ -27517,29 +27845,35 @@
 
       const storageConfig = getStorageServerConfig();
       if (!storageConfig.url) return;
+      const patientId = activePatientMediaPatientId;
+      const fileRecord = currentPatientMediaFiles.find(file => file.relativePath === relativePath);
+      if (!fileRecord || patientMediaDetailsError) return;
 
       if (errorEl) errorEl.classList.add('hidden');
       if (submitBtn) submitBtn.disabled = true;
 
       try {
-        const resp = await fetch(`${storageConfig.url}/api/file/move`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-lumin-key': storageConfig.key
-          },
-          body: JSON.stringify({ relativePath, targetCategory })
-        });
-
-        const resData = await resp.json().catch(() => ({}));
-        if (!resp.ok) {
-          throw new Error(resData.error || `HTTP ${resp.status}`);
+        const resData = await requestPatientMediaMove(relativePath, targetCategory, storageConfig);
+        const newPath = resData.newRelativePath || relativePath;
+        if (fileRecord.mediaDetails && newPath !== relativePath) {
+          try {
+            await persistPatientMediaDetails(patientId, newPath, {
+              display_name: fileRecord.mediaDetails.display_name,
+              note: fileRecord.mediaDetails.note,
+              tooth_id: fileRecord.mediaDetails.tooth_id,
+            });
+          } catch (detailsError) {
+            // Keep the original metadata until the new path has been saved.
+            await requestPatientMediaMove(newPath, fileRecord.category, storageConfig);
+            throw new Error(currentUiLanguage === 'ar' ? 'تعذر حفظ تفاصيل الصورة في التصنيف الجديد. تمت إعادة الصورة إلى تصنيفها الأصلي.' : 'Could not save photo details in the new category. The photo was restored to its original category.');
+          }
+          const { error: cleanupError } = await db.from('patient_media_details').delete().eq('patient_id', patientId).eq('relative_path', relativePath);
+          if (cleanupError) console.warn('Previous photo metadata path could not be cleared:', cleanupError);
         }
 
         closePatientMediaMoveModal();
 
         // Update local memory list
-        const fileRecord = currentPatientMediaFiles.find(f => f.relativePath === relativePath);
         if (fileRecord) {
           fileRecord.category = resData.newCategory || targetCategory;
           fileRecord.relativePath = resData.newRelativePath || relativePath;
@@ -27550,13 +27884,18 @@
           currentLightboxRelativePath = resData.newRelativePath || relativePath;
           const badge = document.getElementById('lightbox-category-badge');
           if (badge) badge.textContent = resData.newCategory || targetCategory;
+          currentLightboxOriginalUrl = `${patientMediaFileUrl(fileRecord)}?key=${encodeURIComponent(storageConfig.key)}`;
+          const image = document.getElementById('lightbox-img');
+          if (image) image.src = currentLightboxOriginalUrl;
+          const download = document.getElementById('lightbox-download-link');
+          if (download) download.href = currentLightboxOriginalUrl;
         }
 
         // Re-render the media grid
         renderPatientMediaGrid();
 
         // Refresh from server in background to sync state
-        renderPatientMedia();
+        void renderPatientMedia();
       } catch (err) {
         console.error('Failed to move file category:', err);
         if (errorEl) {
@@ -27612,6 +27951,17 @@
     }
 
     document.addEventListener('keydown', (e) => {
+      const detailsModal = document.getElementById('patient-media-details-modal');
+      if (detailsModal && !detailsModal.classList.contains('hidden')) {
+        if (e.key === 'Escape') { e.preventDefault(); closePatientMediaDetailsModal(); }
+        if (e.key === 'Tab') {
+          const controls = Array.from(detailsModal.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled)'));
+          const first = controls[0], last = controls[controls.length - 1];
+          if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
+          else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+        }
+        return;
+      }
       if (e.key === 'Escape') closeMediaLightbox();
     });
 

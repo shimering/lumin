@@ -2,6 +2,7 @@
 
 A modern, high-performance Progressive Web Application (PWA) for comprehensive dental clinic management, featuring:
 - Clinical interactive odontograms & charting
+- Tooth-linked X-ray gallery with permanent/deciduous assignments, saved clinical notes, and editable photo names
 - Patient directory and records management
 - Appointment scheduling & calendar synchronization
 - Invoice, payment, and financial ledger tracking
