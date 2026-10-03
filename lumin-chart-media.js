@@ -84,7 +84,7 @@ async function loadChartPatientMedia(patientId = activePatientId) {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       response = await response.json();
     } finally { clearTimeout(timeout); }
-    const details = await db.from('patient_media_details').select('relative_path,display_name,note,tooth_id').eq('patient_id', patient.id);
+    const details = await db.from('patient_media_details').select('relative_path,display_name,note,tooth_id,tooth_ids').eq('patient_id', patient.id);
     if (request !== chartPatientMedia.request || activePatientId !== patient.id) return;
     const byPath = new Map((details.data || []).map(item => [item.relative_path, item]));
     chartPatientMedia.files = (response.files || []).map(file => ({ ...file, mediaDetails: byPath.get(file.relativePath) || null }));
@@ -140,7 +140,7 @@ function renderChartMediaPanel() {
     chartPatientMedia.selectedPath = file.relativePath;
     const index = chartPatientMedia.files.indexOf(file);
     const name = patientMediaDisplayName(file);
-    const tooth = patientMediaToothLabel(file.mediaDetails?.tooth_id);
+    const tooth = patientMediaTeethLabel(file.mediaDetails);
     const note = file.mediaDetails?.note ?? file.note ?? '';
     body.innerHTML = `${chartPatientMedia.detailsError ? `<p class="chart-media-summary" role="status">${chartMediaText('Saved names, tooth assignments, and notes could not be loaded.', 'تعذر تحميل الأسماء وتحديد الأسنان والملاحظات المحفوظة.')}</p>` : ''}
       <p class="chart-media-summary" data-media-user-content dir="auto">${escapeHtml(getKnownPatient(chartPatientMedia.patientId)?.name || '')}</p>
@@ -303,6 +303,7 @@ async function openPatientMediaFile(file, patientId) {
 }
 
 function resetChartPatientMedia() {
+  closePatientMediaToothPicker(false);
   chartPatientMedia.request++;
   chartPatientMedia.patientId = null;
   chartPatientMedia.files = [];

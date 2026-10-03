@@ -43,6 +43,59 @@ begin
     raise exception 'Rename and deciduous tooth did not persist.';
   end if;
 
+  -- New clients can select permanent and deciduous teeth together, without duplicates.
+  update public.patient_media_details set tooth_ids = array['3','4','A','3']
+  where patient_id = context.patient_id and relative_path = context.file_path;
+  select * into saved from public.patient_media_details
+  where patient_id = context.patient_id and relative_path = context.file_path;
+  if saved.tooth_ids is distinct from array['3','4','A'] or saved.tooth_id is distinct from '3' then
+    raise exception 'Multiple teeth were not saved and normalized.';
+  end if;
+
+  -- Supabase upserts from an older client omit tooth_ids (NULL in excluded).
+  insert into public.patient_media_details(patient_id, relative_path, display_name, note, tooth_id)
+  values (context.patient_id, context.file_path, 'Legacy rename', 'Edited note', '3')
+  on conflict (patient_id, relative_path) do update set display_name = excluded.display_name,
+    note = excluded.note, tooth_id = excluded.tooth_id, tooth_ids = excluded.tooth_ids;
+  select * into saved from public.patient_media_details
+  where patient_id = context.patient_id and relative_path = context.file_path;
+  if saved.tooth_ids is distinct from array['3','4','A'] or saved.display_name <> 'Legacy rename' then
+    raise exception 'A legacy metadata upsert erased multiple teeth.';
+  end if;
+
+  update public.patient_media_details set tooth_id = 'B'
+  where patient_id = context.patient_id and relative_path = context.file_path;
+  select * into saved from public.patient_media_details
+  where patient_id = context.patient_id and relative_path = context.file_path;
+  if saved.tooth_ids is distinct from array['B'] then raise exception 'Legacy tooth editing failed.'; end if;
+
+  update public.patient_media_details set tooth_ids = '{}'
+  where patient_id = context.patient_id and relative_path = context.file_path;
+  select * into saved from public.patient_media_details
+  where patient_id = context.patient_id and relative_path = context.file_path;
+  if saved.tooth_id is not null or cardinality(saved.tooth_ids) <> 0 then
+    raise exception 'Clearing all teeth failed.';
+  end if;
+
+  begin
+    update public.patient_media_details set tooth_ids = array['3','33']
+    where patient_id = context.patient_id and relative_path = context.file_path;
+    raise exception 'An invalid multiple tooth assignment was accepted.';
+  exception when check_violation then null;
+  end;
+  begin
+    update public.patient_media_details set tooth_ids = array['3',null]
+    where patient_id = context.patient_id and relative_path = context.file_path;
+    raise exception 'A null tooth was accepted.';
+  exception when check_violation then null;
+  end;
+  begin
+    update public.patient_media_details set tooth_ids = array[['3','4'],['A','B']]
+    where patient_id = context.patient_id and relative_path = context.file_path;
+    raise exception 'A multidimensional tooth array was accepted.';
+  exception when check_violation then null;
+  end;
+
   begin
     update public.patient_media_details set tooth_id = '33'
     where patient_id = context.patient_id and relative_path = context.file_path;

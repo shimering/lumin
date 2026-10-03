@@ -79,7 +79,8 @@
   <script src="lumin-patient-swipe.js?v=1"></script>
   <script src="lumin-patients.js?v=4"></script>
   <script src="lumin-chart-sync.js?v=1"></script>
-  <script src="lumin-chart-media.js?v=1"></script>
+  <script src="lumin-chart-media.js?v=2"></script>
+  <script src="lumin-media-teeth.js?v=1"></script>
   <script src="lumin-mobile-nav.js?v=1"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   
@@ -119,7 +120,6 @@
     .media-detail-field:disabled { opacity: 0.5; pointer-events: none; }
     textarea.media-detail-field { resize: vertical; }
     .media-detail-label { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 600; color: #475569; }
-    .media-tooth-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
     .media-card { min-width: 0; background: var(--lumin-face, #fff); }
     .media-card-preview { display: block; width: 100%; border: 0; text-align: start; }
     .media-card-info { padding: 20px; }
@@ -5416,6 +5416,7 @@
   <link rel="stylesheet" href="lumin-finance-sync.css?v=2" />
   <link rel="stylesheet" href="lumin-mobile-nav.css?v=2" />
   <link rel="stylesheet" href="lumin-chart-media.css?v=1" />
+  <link rel="stylesheet" href="lumin-media-teeth.css?v=1" />
   <style id="finance-ledger-styles">
     #finance-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     #finance-summary-cards > div { min-width: 0; }
@@ -8936,19 +8937,10 @@
           <label for="upload-media-name" class="media-detail-label">Photo name (optional)</label>
           <input id="upload-media-name" type="text" maxlength="160" placeholder="e.g. UR6 pre-op X-ray" class="media-detail-field" />
         </div>
-        <div class="media-tooth-fields">
-          <div>
-            <label for="upload-media-dentition" class="media-detail-label">Tooth assignment</label>
-            <select id="upload-media-dentition" class="media-detail-field" onchange="updatePatientMediaToothOptions('upload')">
-              <option value="">Whole mouth / Unassigned</option>
-              <option value="permanent">Permanent tooth</option>
-              <option value="primary">Deciduous tooth</option>
-            </select>
-          </div>
-          <div>
-            <label for="upload-media-tooth" class="media-detail-label">Tooth</label>
-            <select id="upload-media-tooth" class="media-detail-field" disabled><option value="">Select tooth</option></select>
-          </div>
+        <div>
+          <label for="upload-media-teeth-button" class="media-detail-label">Tooth assignment</label>
+          <input type="hidden" id="upload-media-tooth-ids" value="[]" />
+          <button type="button" id="upload-media-teeth-button" class="media-teeth-trigger" aria-haspopup="dialog" onclick="openPatientMediaToothPicker('upload')"><i data-lucide="scan-line"></i><span id="upload-media-teeth-summary" data-media-user-content>Whole mouth / Unassigned</span><i data-lucide="chevron-down"></i></button>
         </div>
 
         <!-- Dropzone -->
@@ -9017,19 +9009,10 @@
             <label for="edit-media-name" class="media-detail-label">Photo name</label>
             <input id="edit-media-name" type="text" required maxlength="160" class="media-detail-field" />
           </div>
-          <div class="media-tooth-fields">
-            <div>
-              <label for="edit-media-dentition" class="media-detail-label">Tooth assignment</label>
-              <select id="edit-media-dentition" class="media-detail-field" onchange="updatePatientMediaToothOptions('edit')">
-                <option value="">Whole mouth / Unassigned</option>
-                <option value="permanent">Permanent tooth</option>
-                <option value="primary">Deciduous tooth</option>
-              </select>
-            </div>
-            <div>
-              <label for="edit-media-tooth" class="media-detail-label">Tooth</label>
-              <select id="edit-media-tooth" class="media-detail-field" disabled><option value="">Select tooth</option></select>
-            </div>
+          <div>
+            <label for="edit-media-teeth-button" class="media-detail-label">Tooth assignment</label>
+            <input type="hidden" id="edit-media-tooth-ids" value="[]" />
+            <button type="button" id="edit-media-teeth-button" class="media-teeth-trigger" aria-haspopup="dialog" onclick="openPatientMediaToothPicker('edit')"><i data-lucide="scan-line"></i><span id="edit-media-teeth-summary" data-media-user-content>Whole mouth / Unassigned</span><i data-lucide="chevron-down"></i></button>
           </div>
           <div>
             <label for="edit-media-note" class="media-detail-label">Clinical note (optional)</label>
@@ -11327,7 +11310,7 @@
 
     function isUiTranslationExcluded(node) {
       const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
-      return Boolean(element?.closest('#view-chart, #view-admin, #view-prices, .patient-workspace-name, [data-storage-connection-badge], [data-storage-server-dialog], [data-media-user-content]'));
+      return Boolean(element?.closest('#view-chart, #view-admin, #view-prices, #patient-media-tooth-picker, .patient-workspace-name, [data-storage-connection-badge], [data-storage-server-dialog], [data-media-user-content]'));
     }
 
     function arabicUiPhrase(source) {
@@ -27024,39 +27007,13 @@
       return `${dentition} · ${palmerQuadrantLabel(toothId)}`;
     }
 
-    function updatePatientMediaToothOptions(prefix, selectedTooth = '') {
-      const dentition = document.getElementById(`${prefix}-media-dentition`)?.value;
-      const select = document.getElementById(`${prefix}-media-tooth`);
-      if (!select) return;
-      const primary = dentition === 'primary';
-      const quadrants = [
-        { slots: [8,7,6,5,4,3,2,1], en: 'Upper right', ar: 'علوي أيمن' },
-        { slots: [9,10,11,12,13,14,15,16], en: 'Upper left', ar: 'علوي أيسر' },
-        { slots: [24,23,22,21,20,19,18,17], en: 'Lower left', ar: 'سفلي أيسر' },
-        { slots: [25,26,27,28,29,30,31,32], en: 'Lower right', ar: 'سفلي أيمن' },
-      ];
-      select.disabled = !dentition;
-      select.required = Boolean(dentition);
-      select.innerHTML = `<option value="">${currentUiLanguage === 'ar' ? 'اختر السن' : 'Select tooth'}</option>`;
-      if (dentition) {
-        select.innerHTML += quadrants.map(quadrant => {
-          const teeth = quadrant.slots.map(slot => primary ? PRIMARY_TOOTH_BY_SLOT[slot] : String(slot)).filter(Boolean);
-          return `<optgroup label="${currentUiLanguage === 'ar' ? quadrant.ar : quadrant.en}">${teeth.map(tooth => `<option value="${tooth}">${palmerQuadrantLabel(tooth)}</option>`).join('')}</optgroup>`;
-        }).join('');
-      }
-      select.value = selectedTooth;
-    }
-
     function readPatientMediaDetails(prefix) {
-      const dentition = document.getElementById(`${prefix}-media-dentition`)?.value || '';
-      const tooth = document.getElementById(`${prefix}-media-tooth`)?.value || '';
-      if (dentition && (!/^([1-9]|[12][0-9]|3[0-2]|[A-T])$/.test(tooth) || (dentition === 'primary') !== isPrimaryToothId(tooth))) {
-        throw new Error(currentUiLanguage === 'ar' ? 'اختر سناً من نوع الأسنان المحدد.' : 'Select a tooth from the chosen dentition.');
-      }
+      const teeth = normalizePatientMediaTeeth(JSON.parse(document.getElementById(`${prefix}-media-tooth-ids`)?.value || '[]'));
       return {
         display_name: document.getElementById(`${prefix}-media-name`)?.value.trim() || '',
         note: document.getElementById(`${prefix}-media-note`)?.value.trim() || '',
-        tooth_id: dentition ? tooth : null,
+        tooth_id: teeth[0] || null,
+        tooth_ids: teeth,
       };
     }
 
@@ -27064,7 +27021,7 @@
       if (!patientId || !relativePath) throw new Error(currentUiLanguage === 'ar' ? 'تعذر تحديد الصورة المحفوظة.' : 'The saved photo could not be identified.');
       const { data, error } = await db.from('patient_media_details')
         .upsert({ patient_id: patientId, relative_path: relativePath, ...details }, { onConflict: 'patient_id,relative_path' })
-        .select('relative_path,display_name,note,tooth_id').single();
+        .select('relative_path,display_name,note,tooth_id,tooth_ids').single();
       if (error) throw error;
       return data;
     }
@@ -27118,11 +27075,9 @@
       const modal = document.getElementById('patient-media-details-modal');
       if (!modal) return;
       editingPatientMediaDetails = { patientId: activePatientMediaPatientId, relativePath: file.relativePath, index };
-      const tooth = file.mediaDetails?.tooth_id || '';
       document.getElementById('edit-media-name').value = patientMediaDisplayName(file).slice(0, 160);
       document.getElementById('edit-media-note').value = file.mediaDetails?.note ?? file.note ?? '';
-      document.getElementById('edit-media-dentition').value = tooth ? (isPrimaryToothId(tooth) ? 'primary' : 'permanent') : '';
-      updatePatientMediaToothOptions('edit', tooth);
+      setPatientMediaTeeth('edit', patientMediaToothIds(file.mediaDetails));
       document.getElementById('edit-media-error').classList.add('hidden');
       modal.classList.remove('hidden');
       modal.classList.add('flex');
@@ -27133,6 +27088,7 @@
 
     function closePatientMediaDetailsModal() {
       if (document.getElementById('btn-save-media-details')?.disabled) return;
+      closePatientMediaToothPicker(false);
       const modal = document.getElementById('patient-media-details-modal');
       modal?.classList.add('hidden');
       modal?.classList.remove('flex');
@@ -27210,7 +27166,7 @@
 
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
-        const detailsResult = await db.from('patient_media_details').select('relative_path,display_name,note,tooth_id').eq('patient_id', patient.id);
+        const detailsResult = await db.from('patient_media_details').select('relative_path,display_name,note,tooth_id,tooth_ids').eq('patient_id', patient.id);
         if (renderToken !== patientMediaRenderToken) return;
         patientMediaDetailsError = Boolean(detailsResult.error);
         if (detailsResult.error) console.warn('Patient photo details could not be loaded:', detailsResult.error);
@@ -27268,7 +27224,7 @@
         const index = currentPatientMediaFiles.indexOf(file);
         const displayName = patientMediaDisplayName(file);
         const note = file.mediaDetails?.note ?? file.note ?? '';
-        const toothLabel = patientMediaToothLabel(file.mediaDetails?.tooth_id);
+        const toothLabel = patientMediaTeethLabel(file.mediaDetails);
         const fileUrl = patientMediaFileUrl(file);
         const encodedPath = file.relativePath.split('/').map(encodeURIComponent).join('/');
         const thumbUrl = `${storageConfig.url}/api/thumbnail/${encodedPath}?key=${encodeURIComponent(storageConfig.key)}`;
@@ -27349,7 +27305,7 @@
       if (!modal) return;
       if (form) form.reset();
       pendingPatientMediaUpload = null;
-      updatePatientMediaToothOptions('upload');
+      setPatientMediaTeeth('upload', []);
       if (error) error.classList.add('hidden');
       if (progress) progress.classList.add('hidden');
       selectedPatientMediaUploadFile = null;
@@ -27363,6 +27319,7 @@
 
     function closePatientMediaUploadModal() {
       if (document.getElementById('btn-submit-media-upload')?.disabled) return;
+      closePatientMediaToothPicker(false);
       const modal = document.getElementById('patient-media-upload-modal');
       if (modal) {
         modal.classList.add('hidden');
@@ -27888,6 +27845,7 @@
               display_name: fileRecord.mediaDetails.display_name,
               note: fileRecord.mediaDetails.note,
               tooth_id: fileRecord.mediaDetails.tooth_id,
+              tooth_ids: patientMediaToothIds(fileRecord.mediaDetails),
             });
           } catch (detailsError) {
             // Keep the original metadata until the new path has been saved.
@@ -29388,6 +29346,7 @@
           e.target.closest('#patient-attachment-modal') ||
           e.target.closest('#patient-media-lightbox') ||
           e.target.closest('#patient-media-move-modal') ||
+          e.target.closest('#patient-media-tooth-picker') ||
           e.target.closest('#modal-new-patient') ||
           e.target.closest('#modal-appointment') ||
           e.target.closest('#modal-payment') ||
@@ -33741,7 +33700,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
     function initLuminVoiceSpacebarShortcut() {
       window.addEventListener('keydown', (e) => {
         if (e.code !== 'Space' || e.repeat) return;
-        if (e.target?.closest?.('#patient-attachment-modal, #chart-media-panel, .chart-media-toolbar, #patient-media-lightbox')) return;
+        if (e.target?.closest?.('#patient-attachment-modal, #chart-media-panel, .chart-media-toolbar, #patient-media-lightbox, #patient-media-tooth-picker')) return;
         const chartView = document.getElementById('view-chart');
         if (!chartView || chartView.classList.contains('hidden')) return;
         const activeEl = document.activeElement;
@@ -33755,7 +33714,7 @@ Your mission is to transcribe and convert voice utterances from a dentist or den
 
       window.addEventListener('keyup', (e) => {
         if (e.code !== 'Space') return;
-        if (e.target?.closest?.('#patient-attachment-modal, #chart-media-panel, .chart-media-toolbar, #patient-media-lightbox')) return;
+        if (e.target?.closest?.('#patient-attachment-modal, #chart-media-panel, .chart-media-toolbar, #patient-media-lightbox, #patient-media-tooth-picker')) return;
         const chartView = document.getElementById('view-chart');
         if (!chartView || chartView.classList.contains('hidden')) return;
         const activeEl = document.activeElement;

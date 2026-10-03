@@ -16,12 +16,15 @@ const head = html.slice(0, html.indexOf('</head>') + 7).replace(/<script\b[^>]*>
 const modals = html.slice(html.indexOf('  <div id="patient-media-upload-modal"'), html.indexOf('  <!-- Modal: Change Media Category'));
 const script = [
   'isPrimaryToothId','palmerPositionForSlot','palmerQuadrantForSlot','palmerQuadrantLabel',
-  'patientMediaToothLabel','updatePatientMediaToothOptions','patientMediaDisplayName','patientMediaDownloadName',
+  'patientMediaToothLabel','palmerNotationSVG','patientMediaDisplayName','patientMediaDownloadName',
   'patientMediaFileUrl','renderPatientMediaGrid','openPatientMediaDetailsModal','closePatientMediaDetailsModal',
 ].map(source).join('\n');
 const dictionaryStart = html.indexOf('    const ARABIC_UI_TEXT = Object.freeze(');
 const dictionary = html.slice(dictionaryStart, html.indexOf('\n    });', dictionaryStart) + 8);
 const translationHelpers = ['isUiTranslationExcluded','arabicUiPhrase','translateUiTextNode','translateUiAttribute','translateUiTree'].map(source).join('\n');
+const detailsKeyStart = html.indexOf("    document.addEventListener('keydown', (e) => {\n      const detailsModal");
+assert.ok(detailsKeyStart >= 0);
+const detailsKeys = html.slice(detailsKeyStart, html.indexOf('\n    });', detailsKeyStart) + 8);
 
 test('media gallery and edit sheet fit phone, tablet, and desktop in English and Arabic', { skip: !chromium && 'Playwright is not available' }, async t => {
   const fixture = head + '<body><main style="max-width:1200px;margin:auto;padding:24px;min-width:0"><div id="patient-media-content"></div></main>' + modals + '</body></html>';
@@ -49,22 +52,25 @@ test('media gallery and edit sheet fit phone, tablet, and desktop in English and
     const PRIMARY_TOOTH_BY_SLOT = {4:'A',5:'B',6:'C',7:'D',8:'E',9:'F',10:'G',11:'H',12:'I',13:'J',20:'K',21:'L',22:'M',23:'N',24:'O',25:'P',26:'Q',27:'R',28:'S',29:'T'};
     const SLOT_BY_PRIMARY_TOOTH = Object.fromEntries(Object.entries(PRIMARY_TOOTH_BY_SLOT).map(([slot,tooth]) => [tooth,Number(slot)]));
     const currentPatientMediaFiles = [
-      {filename:'test.png',relativePath:'Test/Periapical/test.png',category:'Periapical',sizeBytes:2048,modifiedAt:'2026-10-03T10:00:00',mediaDetails:{display_name:'UR6 before treatment',tooth_id:'3',note:'Review distal surface.\\nCompare with the previous image.'}},
+      {filename:'test.png',relativePath:'Test/Periapical/test.png',category:'Periapical',sizeBytes:2048,modifiedAt:'2026-10-03T10:00:00',mediaDetails:{display_name:'UR6 before treatment',tooth_id:'3',tooth_ids:['3','4'],note:'Review distal surface.\\nCompare with the previous image.'}},
       {filename:'second.png',relativePath:'Test/Periapical/second.png',category:'Periapical',sizeBytes:2048,mediaDetails:{display_name:'صورة متابعة لطفل باسم طويل جداً',tooth_id:'A',note:'ملاحظة سريرية تحت الصورة. '.repeat(8)}},
     ];
     function escapeHtml(value) { const element = document.createElement('span'); element.textContent = String(value); return element.innerHTML.replaceAll('"','&quot;'); }
     function getStorageServerConfig() { return {url:location.origin,key:'test-key'}; }
     function hasPageAccess() { return true; }
+    function closeMediaLightbox() {}
     const uiTextSources = new WeakMap(), uiTextLastApplied = new WeakMap(), uiAttributeStates = new WeakMap();
     const TRANSLATABLE_ATTRIBUTES = ['placeholder','title','aria-label'];
     const PATIENTS_UI_AR = {};
     ${dictionary}
     ${translationHelpers}
     ${script}
+    ${detailsKeys}
   ` });
+  await page.addScriptTag({ url:`http://127.0.0.1:${server.address().port}/lumin-media-teeth.js?v=1` });
   const screenshots = process.env.LUMIN_MEDIA_SCREENSHOT_DIR || path.join(os.tmpdir(),'lumin-media-preview');
   fs.mkdirSync(screenshots,{recursive:true});
-  for (const viewport of [{width:390,height:844},{width:834,height:1112},{width:1440,height:900}]) {
+  for (const viewport of [{width:320,height:568},{width:390,height:844},{width:800,height:600},{width:834,height:1112},{width:1440,height:900}]) {
     await page.setViewportSize(viewport);
     for (const language of ['en','ar']) {
       await page.evaluate(language => { currentUiLanguage = language; document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr'; renderPatientMediaGrid(); translateUiTree(document.body); }, language);
@@ -79,18 +85,50 @@ test('media gallery and edit sheet fit phone, tablet, and desktop in English and
       const sheet = page.locator('#patient-media-details-modal [role="dialog"]');
       assert.ok(await sheet.isVisible());
       assert.equal(await page.locator('#media-details-title').textContent(), language === 'ar' ? 'تعديل تفاصيل الصورة' : 'Edit photo details');
-      assert.equal(await page.locator('#edit-media-dentition').inputValue(),'primary');
-      assert.equal(await page.locator('#edit-media-tooth').inputValue(),'A');
-      assert.equal(await page.locator('#edit-media-tooth option[value]').count(),21);
+      assert.equal(await page.locator('#edit-media-tooth-ids').inputValue(),'["A"]');
+      await page.locator('#edit-media-teeth-button').click();
+      const picker = page.locator('#patient-media-tooth-picker');
+      assert.ok(await picker.isVisible());
+      assert.equal(await picker.locator('[data-media-tooth]').count(),20);
+      assert.equal(await picker.locator('[data-media-tooth="A"]').getAttribute('aria-pressed'),'true');
+      await picker.locator('[data-media-tooth="B"]').click();
+      await picker.locator('[data-media-dentition="permanent"]').click();
+      assert.equal(await picker.locator('[data-media-tooth]').count(),32);
+      await picker.locator('[data-media-tooth="3"]').click();
+      await picker.locator('[data-media-tooth="4"]').click();
+      const pickerBounds = await picker.locator('[role="dialog"]').boundingBox();
+      assert.ok(pickerBounds.x >= 0 && pickerBounds.x + pickerBounds.width <= viewport.width + 1);
+      assert.ok(pickerBounds.y >= 0 && pickerBounds.y + pickerBounds.height <= viewport.height + 1);
+      assert.ok(await picker.evaluate(element => [...element.querySelectorAll('button')].every(button => { const rect = button.getBoundingClientRect(); return rect.width >= 44 && rect.height >= 44; })));
+      assert.ok(await picker.locator('.media-teeth-save').isVisible());
+      if (viewport.width === 1440 && language === 'en') await page.screenshot({path:path.join(screenshots,'media-teeth-selector-desktop.png')});
+      if (viewport.width === 390 && language === 'ar') await page.screenshot({path:path.join(screenshots,'media-teeth-selector-mobile-ar.png')});
+      await picker.locator('.media-teeth-save').click();
+      assert.equal(await page.locator('#edit-media-tooth-ids').inputValue(),'["A","B","3","4"]');
+      assert.match(await page.locator('#edit-media-teeth-summary').textContent(), /URE.*URD.*UR6.*UR5/);
+      await page.locator('#edit-media-teeth-button').click();
+      await picker.locator('.media-teeth-clear').click();
+      await page.keyboard.press('Escape');
+      assert.ok(await sheet.isVisible(), 'Escape dismisses only the tooth selector');
+      assert.equal(await page.locator('#edit-media-tooth-ids').inputValue(),'["A","B","3","4"]', 'Cancelling discards draft edits');
+      assert.ok(await page.locator('#edit-media-teeth-button').evaluate(element => element === document.activeElement), 'Focus returns to assignment button');
+      await page.locator('#edit-media-teeth-button').click();
+      await picker.locator('.media-teeth-clear').click();
+      await picker.locator('.media-teeth-save').click();
+      assert.equal(await page.locator('#edit-media-tooth-ids').inputValue(),'[]');
+      await page.locator('#edit-media-teeth-button').click();
+      await picker.locator('.media-teeth-save').focus();
+      await page.keyboard.press('Tab');
+      assert.ok(await picker.locator('.media-tooth-picker-header button').evaluate(element => element === document.activeElement));
+      await page.keyboard.press('Shift+Tab');
+      assert.ok(await picker.locator('.media-teeth-save').evaluate(element => element === document.activeElement));
+      await page.keyboard.press('Escape');
       const bounds = await sheet.boundingBox();
       assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= viewport.width + 1);
       assert.ok(bounds.y >= 0 && bounds.y + bounds.height <= viewport.height + 1);
-      await page.locator('#edit-media-dentition').selectOption('permanent');
-      assert.equal(await page.locator('#edit-media-tooth option[value]').count(),33);
-      assert.equal(await page.locator('#edit-media-tooth').inputValue(),'');
       if (viewport.width === 390 && language === 'ar') await page.screenshot({path:path.join(screenshots,'media-edit-mobile-ar.png')});
       await page.evaluate(() => closePatientMediaDetailsModal());
-      await page.evaluate(() => { const modal = document.getElementById('patient-media-upload-modal'); modal.classList.remove('hidden'); modal.classList.add('flex'); document.getElementById('upload-media-dentition').value = 'primary'; updatePatientMediaToothOptions('upload'); translateUiTree(modal); });
+      await page.evaluate(() => { const modal = document.getElementById('patient-media-upload-modal'); modal.classList.remove('hidden'); modal.classList.add('flex'); setPatientMediaTeeth('upload', []); translateUiTree(modal); });
       const uploadBounds = await page.locator('#patient-media-upload-modal [role="dialog"]').boundingBox();
       assert.ok(uploadBounds.x >= 0 && uploadBounds.x + uploadBounds.width <= viewport.width + 1);
       assert.ok(uploadBounds.height <= viewport.height * 0.91);
@@ -100,6 +138,21 @@ test('media gallery and edit sheet fit phone, tablet, and desktop in English and
     }
   }
   await page.evaluate(() => { document.body.classList.add('lumin-raised'); renderPatientMediaGrid(); });
+  await page.setViewportSize({width:320,height:568});
+  await page.evaluate(() => {
+    currentPatientMediaFiles[0].mediaDetails.tooth_ids = [...patientMediaToothChoices(false).flat(), ...patientMediaToothChoices(true).flat()].map(tooth => tooth.id);
+    renderPatientMediaGrid();
+    openPatientMediaDetailsModal(0);
+  });
+  assert.match(await page.locator('#edit-media-teeth-summary').textContent(), /UR6.*LRA/);
+  assert.equal(await page.locator('#patient-media-details-modal [role="dialog"]').evaluate(element => element.scrollWidth > element.clientWidth),false, 'Long multi-tooth assignments fit the edit sheet');
+  await page.evaluate(() => closePatientMediaDetailsModal());
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),false);
+  await page.evaluate(() => { const modal = document.getElementById('patient-media-upload-modal'); modal.classList.remove('hidden'); setPatientMediaTeeth('upload', []); });
+  await page.locator('#upload-media-teeth-button').click();
+  await page.locator('[data-media-tooth="3"]').click();
+  await page.evaluate(() => { activePatientMediaPatientId = 'different-patient'; });
+  await page.locator('.media-teeth-save').click();
+  assert.equal(await page.locator('#upload-media-tooth-ids').inputValue(),'[]', 'A patient change discards a stale tooth selection');
   assert.deepEqual(errors,[]);
 });

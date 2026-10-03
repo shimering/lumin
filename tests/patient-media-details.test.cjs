@@ -14,7 +14,7 @@ function source(name) {
 }
 const names = [
   'isPrimaryToothId', 'palmerPositionForSlot', 'palmerQuadrantForSlot', 'palmerQuadrantLabel',
-  'patientMediaToothLabel', 'updatePatientMediaToothOptions', 'readPatientMediaDetails',
+  'patientMediaToothLabel', 'readPatientMediaDetails',
   'persistPatientMediaDetails', 'patientMediaDisplayName', 'patientMediaDownloadName', 'patientMediaFileUrl',
   'renderPatientMedia', 'renderPatientMediaGrid', 'openPatientMediaDetailsModal', 'closePatientMediaDetailsModal',
   'savePatientMediaDetails', 'handlePatientMediaUploadSubmit', 'showPatientMediaUploadError',
@@ -42,7 +42,7 @@ function createHarness() {
     selectedPatientMediaUploadFile: photo, currentLightboxRelativePath: '',
     PRIMARY_TOOTH_BY_SLOT: primary, SLOT_BY_PRIMARY_TOOTH: Object.fromEntries(Object.entries(primary).map(([slot, id]) => [id, Number(slot)])),
     FormData, window: { lucide: {} }, lucide: { createIcons() {} },
-    document: { getElementById: node, querySelector() { return null; } },
+    document: { getElementById: node, querySelector() { return null; }, addEventListener() {} },
     console: { warn() {}, error() {} },
     escapeHtml: value => String(value).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]),
     hasPageAccess: () => true, getStorageServerConfig: () => ({ url:'https://storage.example', key:'test-key' }),
@@ -88,41 +88,45 @@ function createHarness() {
   };
   vm.createContext(context);
   vm.runInContext(names.map(source).join('\n'), context);
+  vm.runInContext(fs.readFileSync(path.join(root, 'lumin-media-teeth.js'), 'utf8'), context);
   for (const prefix of ['upload', 'edit']) {
     node(prefix + '-media-name').value = 'UR6 pre-op';
     node(prefix + '-media-note').value = 'Review the distal surface.\nCompare after treatment.';
-    node(prefix + '-media-dentition').value = 'permanent';
-    node(prefix + '-media-tooth').value = '3';
+    node(prefix + '-media-tooth-ids').value = '["3","4","A"]';
   }
   node('upload-media-category').value = 'Periapical';
   return { context, node, rows, calls, failSaves: value => { saveError = value; } };
 }
 const submit = { preventDefault() {} };
 
-test('tooth selectors expose all 32 permanent and 20 deciduous teeth with separate identities', () => {
+test('visual tooth choices expose all 32 permanent and 20 deciduous teeth with separate identities', () => {
   const { context, node } = createHarness();
-  for (const [dentition, expected] of [['permanent',32], ['primary',20]]) {
-    node('upload-media-dentition').value = dentition;
-    context.updatePatientMediaToothOptions('upload');
-    const options = [...node('upload-media-tooth').innerHTML.matchAll(/<option value="([^"]+)"/g)].map(match => match[1]);
+  for (const [primary, expected] of [[false,32], [true,20]]) {
+    const options = context.patientMediaToothChoices(primary).flat().map(tooth => tooth.id);
     assert.equal(new Set(options).size, expected);
-    assert.equal(node('upload-media-tooth').required, true);
-    assert.ok(options.includes(dentition === 'primary' ? 'A' : '3'));
+    assert.ok(options.includes(primary ? 'A' : '3'));
   }
   assert.equal(context.patientMediaToothLabel('3'), 'Permanent · UR6');
   assert.equal(context.patientMediaToothLabel('A'), 'Deciduous · URE');
-  node('upload-media-dentition').value = '';
-  context.updatePatientMediaToothOptions('upload');
-  assert.equal(node('upload-media-tooth').disabled, true);
+  context.setPatientMediaTeeth('upload', []);
   assert.equal(context.readPatientMediaDetails('upload').tooth_id, null);
 });
 
-test('dentition must match the selected tooth before any upload', async () => {
+test('invalid or nested assignments are rejected before any upload', async () => {
   const { context, node, calls } = createHarness();
-  node('upload-media-dentition').value = 'primary';
-  await context.handlePatientMediaUploadSubmit(submit);
+  for (const invalid of [['33'], ['a'], [null], [['3']], '3']) {
+    node('upload-media-tooth-ids').value = JSON.stringify(invalid);
+    await context.handlePatientMediaUploadSubmit(submit);
+  }
   assert.equal(calls.uploads, 0);
-  assert.match(node('upload-media-error').textContent, /chosen dentition/);
+  assert.match(node('upload-media-error').textContent, /valid permanent or deciduous teeth/);
+});
+
+test('old records retain their tooth and an explicit empty array clears it; duplicates are removed', () => {
+  const { context } = createHarness();
+  assert.equal(JSON.stringify(context.patientMediaToothIds({tooth_id:'A'})), '["A"]');
+  assert.equal(JSON.stringify(context.patientMediaToothIds({tooth_id:'A',tooth_ids:[]})), '[]');
+  assert.equal(JSON.stringify(context.patientMediaToothIds({tooth_ids:['3','A','3']})), '["3","A"]');
 });
 
 test('upload saves the name, tooth, and multiline note; reloading the gallery restores them', async () => {
@@ -131,10 +135,12 @@ test('upload saves the name, tooth, and multiline note; reloading the gallery re
   assert.equal(calls.uploads, 1);
   const row = rows.get('patient-1:' + filePath);
   assert.equal(row.tooth_id, '3');
+  assert.deepEqual(row.tooth_ids, ['3','4','A']);
   assert.equal(row.display_name, 'UR6 pre-op');
   assert.equal(row.note, node('upload-media-note').value);
   assert.match(node('patient-media-content').innerHTML, /Review the distal surface/);
   assert.match(node('patient-media-content').innerHTML, /Permanent · UR6/);
+  assert.match(node('patient-media-content').innerHTML, /Permanent · UR5 · Deciduous · URE/);
   context.currentPatientMediaFiles = [];
   await context.renderPatientMedia();
   assert.equal(context.currentPatientMediaFiles[0].mediaDetails.note, row.note);
@@ -159,13 +165,13 @@ test('rename and assignment changes persist on an existing file without changing
   const originalUrl = harness.context.patientMediaFileUrl(harness.context.currentPatientMediaFiles[0]);
   harness.context.openPatientMediaDetailsModal(0);
   harness.node('edit-media-name').value = "Sara's follow-up";
-  harness.node('edit-media-dentition').value = 'primary';
-  harness.node('edit-media-tooth').value = 'A';
+  harness.context.setPatientMediaTeeth('edit', ['A','B']);
   await harness.context.savePatientMediaDetails(submit);
   await harness.context.renderPatientMedia();
   const file = harness.context.currentPatientMediaFiles[0];
   assert.equal(harness.context.patientMediaDisplayName(file), "Sara's follow-up");
   assert.equal(file.mediaDetails.tooth_id, 'A');
+  assert.deepEqual(file.mediaDetails.tooth_ids, ['A','B']);
   assert.equal(harness.context.patientMediaDownloadName(file), "Sara's follow-up.png");
   assert.equal(harness.context.patientMediaFileUrl(file), originalUrl);
 });
@@ -209,6 +215,7 @@ test('changing category preserves details, while a failed save restores the orig
       const newRow = harness.rows.get('patient-1:' + filePath.replace('/Periapical/', '/General/'));
       assert.equal(newRow.note, harness.node('upload-media-note').value);
       assert.equal(newRow.tooth_id, '3');
+      assert.deepEqual(newRow.tooth_ids, ['3','4','A']);
       assert.equal(harness.rows.has('patient-1:' + filePath), false);
     }
   }

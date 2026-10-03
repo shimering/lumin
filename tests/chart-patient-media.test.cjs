@@ -60,7 +60,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
         {filename:'photo.jpg',relativePath:'Ahmed/Intraoral/photo.jpg',category:'Intraoral',sizeBytes:1024}
       ], 'patient-2': [{filename:'second.png',relativePath:'Sara/Periapical/second.png',category:'Periapical',sizeBytes:2048}]
     };
-    const details = [{relative_path:'Ahmed/Periapical/preop.png',display_name:'UR6 before treatment',tooth_id:'3',note:'Review distal surface.\\nCompare with the previous image.'},{relative_path:'Ahmed/Panoramic/child.png',display_name:'Deciduous follow-up',tooth_id:'A',note:'ملاحظة متابعة للطفل'}];
+    const details = [{relative_path:'Ahmed/Periapical/preop.png',display_name:'UR6 before treatment',tooth_id:'3',tooth_ids:['3','4'],note:'Review distal surface.\\nCompare with the previous image.'},{relative_path:'Ahmed/Panoramic/child.png',display_name:'Deciduous follow-up',tooth_id:'A',note:'ملاحظة متابعة للطفل'}];
     function hasPageAccess() { return canReadPatients; }
     function getKnownPatient(id) { return {id, name:id === 'patient-1' ? 'Ahmed Hassan' : 'Sara Ahmed'}; }
     function getStorageServerConfig() { return {url:storageUrl,key:'test-key'}; }
@@ -82,7 +82,8 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
     };
     ${helpers}
   ` });
-  await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-chart-media.js?v=1`});
+  await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-media-teeth.js?v=1`});
+  await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-chart-media.js?v=2`});
   await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/lumin-mobile-nav.js?v=1`});
   await page.evaluate(() => {
     document.dispatchEvent(new Event('DOMContentLoaded'));
@@ -105,6 +106,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
         assert.ok(before.x >= main.x + main.width, 'Panel stays physically right in both languages');
         assert.ok(await page.locator('.chart-media-note').isVisible());
         assert.match(await page.locator('.chart-media-tooth').textContent(), /UR6/);
+        assert.match(await page.locator('.chart-media-tooth').textContent(), /UR5/);
         await page.locator('.chart-media-thumbnail').nth(1).click();
         assert.equal(await page.locator('.chart-media-caption h4').textContent(), 'Deciduous follow-up');
         assert.match(await page.locator('.chart-media-tooth').textContent(), /URE/);
