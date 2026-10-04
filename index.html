@@ -10215,6 +10215,8 @@
     let appointmentPatientSearchStatus = 'idle';
     let appointmentModalOpenSequence = 0;
     const recentLocalAppointmentChanges = new Map();
+    const appointmentSavedRecords = new Map();
+    let appointmentWriteRevision = 0;
     const appointmentMoveStates = new Map();
     let appointmentMoveSequence = 0;
     const APPOINTMENT_HOUR_HEIGHT_BASE = 64;
@@ -20295,9 +20297,11 @@
       const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
       const end = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
       const entry = cached || { data: null, expiresAt: 0, error: null };
+      entry.dateKey = appointmentDateKey(date);
       entry.error = null;
       dashboardDayCache.set(context, entry);
       const request = coalesceRefreshRead(context, async () => {
+        const readRevision = appointmentWriteRevision;
         const records = [];
         for (let offset = 0; ; offset += 1000) {
           const { data, error } = await db.from('appointments').select(APPOINTMENT_SELECT_FIELDS)
@@ -20305,11 +20309,12 @@
             .order('appointment_at', { ascending: true }).order('id', { ascending: true }).range(offset, offset + 999);
           if (error) throw error;
           records.push(...(data || []));
-          if ((data || []).length < 1000) return records;
+          if ((data || []).length < 1000) return { records, readRevision };
         }
       });
-      const pending = request.then(records => {
+      const pending = request.then(({ records, readRevision }) => {
         if (currentSession?.user?.id !== userId || dashboardDayCache.get(context) !== entry) return false;
+        records = appointmentRecordsAfterLocalWrites(records, readRevision, entry.dateKey);
         const previous = appointments.filter(item => item.date === appointmentDateKey(date));
         const fetched = records.map(normaliseAppointmentRecord);
         const ids = new Set(fetched.map(item => item.id));
@@ -20335,8 +20340,8 @@
         if (currentSession?.user?.id === userId && context === dashboardDayContext() && realtimeViewIsVisible('dashboard')) renderDashboard();
       });
       entry.promise = pending;
-      void Promise.allSettled([ensureAppointmentStaffLoaded(), ensureAppointmentVisitTypesLoaded()]).then(() => {
-        if (currentSession?.user?.id !== userId) return;
+      if (!appointmentStaffLoaded || !appointmentVisitTypesLoaded) void Promise.allSettled([ensureAppointmentStaffLoaded(), ensureAppointmentVisitTypesLoaded()]).then(() => {
+        if (currentSession?.user?.id !== userId || dashboardDayCache.get(context) !== entry) return;
         if (entry.data) {
           const enriched = new Map(entry.data.map(record => [record.id, normaliseAppointmentRecord(record)]));
           appointments = appointments.map(item => enriched.has(item.id) ? (appointmentMoveStates.get(item.id)?.optimisticRecord || enriched.get(item.id)) : item);
@@ -20372,17 +20377,18 @@
       const userId = currentSession?.user?.id;
       try {
         if (refreshStaff) await fetchAppointmentStaff();
-        const { data, error } = await coalesceRefreshRead(contentRefreshContext('appointments'), () => db
-          .from('appointments')
-          .select(APPOINTMENT_SELECT_FIELDS)
-          .order('appointment_at', { ascending: true }));
+        const { data, error, readRevision } = await coalesceRefreshRead(contentRefreshContext('appointments'), async () => {
+          const readRevision = appointmentWriteRevision;
+          const result = await db.from('appointments').select(APPOINTMENT_SELECT_FIELDS).order('appointment_at', { ascending: true });
+          return { ...result, readRevision };
+        });
         if (currentSession?.user?.id !== userId) return false;
 
         if (error) throw error;
 
         const appointmentsWereLoaded = appointmentsLoaded;
         const previousAppointmentsSignature = stableJsonStringify(appointments);
-        const fetchedAppointments = (data || []).map(normaliseAppointmentRecord);
+        const fetchedAppointments = appointmentRecordsAfterLocalWrites(data || [], readRevision).map(normaliseAppointmentRecord);
         const fetchedAppointmentIds = new Set();
         appointments = fetchedAppointments.map(appointment => {
           fetchedAppointmentIds.add(appointment.id);
@@ -26487,6 +26493,8 @@
       patientDetailFreshness.clear();
       patientDetailReads.clear();
       dashboardDayCache.clear();
+      appointmentSavedRecords.clear();
+      appointmentWriteRevision = 0;
       targetedLoadingGeneration += 1;
       patientWorkspaceLoadingId = null;
       financeDebtGroups = [];
@@ -34272,8 +34280,34 @@
       return normalized;
     }
 
+    // Reads that began before a successful write must not restore its old snapshot.
+    // A later read remains authoritative, including changes from other staff.
+    function appointmentRecordsAfterLocalWrites(records, readRevision, dateKey = null) {
+      const merged = new Map(records.map(record => [record.id, record]));
+      appointmentSavedRecords.forEach(({ record, revision }, id) => {
+        if (revision <= readRevision) return;
+        if (record) merged.set(id, record);
+        else merged.delete(id);
+      });
+      return Array.from(merged.values()).filter(record => !dateKey || appointmentDateKey(new Date(record.appointment_at)) === dateKey);
+    }
+
+    function rememberSavedAppointmentRecord(record) {
+      const normalized = normaliseAppointmentRecord(record);
+      appointmentSavedRecords.set(record.id, { record, revision: ++appointmentWriteRevision });
+      dashboardDayCache.forEach(entry => {
+        if (!entry.data) return;
+        const containsRecord = entry.data.some(item => item.id === record.id);
+        const belongsToDay = entry.dateKey === normalized.date;
+        if (!containsRecord && !belongsToDay) return;
+        entry.data = entry.data.filter(item => item.id !== record.id);
+        if (belongsToDay) entry.data.push(record);
+      });
+      return normalized;
+    }
+
     function replaceAppointmentRecord(record) {
-      return replaceNormalisedAppointmentRecord(normaliseAppointmentRecord(record));
+      return replaceNormalisedAppointmentRecord(rememberSavedAppointmentRecord(record));
     }
 
     function appointmentRecordAt(entry, appointmentAt) {
@@ -35879,7 +35913,7 @@
             return;
           }
 
-          moveState.confirmedRecord = normaliseAppointmentRecord(data);
+          moveState.confirmedRecord = rememberSavedAppointmentRecord(data);
           if (!moveState.latest && move.sequence === moveState.latestSequence) {
             moveState.optimisticRecord = moveState.confirmedRecord;
             replaceNormalisedAppointmentRecord(moveState.confirmedRecord);
@@ -37468,6 +37502,10 @@
         assigned_user_id: entry.assignedUserId
       });
       queueGoogleCalendarAppointmentSync(appointmentId);
+      appointmentSavedRecords.set(appointmentId, { record: null, revision: ++appointmentWriteRevision });
+      dashboardDayCache.forEach(entry => {
+        if (entry.data) entry.data = entry.data.filter(record => record.id !== appointmentId);
+      });
       appointments = appointments.filter(appointment => appointment.id !== appointmentId);
       selectedAppointmentId = null;
       if (editingAppointmentId === appointmentId) closeAppointmentModal();

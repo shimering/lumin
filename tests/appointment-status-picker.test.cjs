@@ -285,6 +285,72 @@ test('appointment picker animates and saves accessibly across responsive layouts
     await page.evaluate(() => finishSave(true));
     await page.waitForFunction(() => !document.querySelector('[data-appointment-id="a"]').hasAttribute('aria-busy'));
   });
+  await t.test('real day-cache refreshes never flash the old status after saving', async () => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.addScriptTag({ content: `
+      let currentSession = { user: { id: 'staff' } }, appointmentWriteRevision = 0;
+      let appointmentStaffLoaded = true, appointmentVisitTypesLoaded = true;
+      const appointmentSavedRecords = new Map(), appointmentMoveStates = new Map(), coalescedRefreshReads = new Map();
+      const APPOINTMENT_SELECT_FIELDS = 'id,appointment_at,status';
+      const stableJsonStringify = JSON.stringify;
+      const db = { from() { return { select() { return this; }, gte() { return this; }, lt() { return this; }, order() { return this; },
+        range() { window.dayReadCount = (window.dayReadCount || 0) + 1; return new Promise(resolve => window.finishDayRead = records => resolve({ data: records })); } }; } };
+      function ensureAppointmentStaffLoaded() { return new Promise(resolve => window.finishStaffRead = resolve); }
+      function ensureAppointmentVisitTypesLoaded() { return Promise.resolve(true); }
+      function realtimeViewIsVisible(view) { return view === 'dashboard'; }
+      function notifyRealtimeAppointmentChanges() {}
+      function normaliseAppointmentRecord(record) { return { ...record, date: appointmentDateKey(new Date(record.appointment_at)) }; }
+      ${helper('appointmentDateKey')}
+      ${helper('coalesceRefreshRead')}
+      ${helper('appointmentRecordsAfterLocalWrites')}
+      ${helper('replaceNormalisedAppointmentRecord')}
+      ${helper('rememberSavedAppointmentRecord')}
+      ${helper('replaceAppointmentRecord')}
+      ${helper('ensureDashboardAppointmentsLoaded')}
+      hasPageAccess = () => true;
+      currentUiLanguage = 'en';
+      document.documentElement.dir = 'ltr';
+      appointments = appointments.map(entry => ({ ...entry, appointment_at: new Date(2026, 9, 4, 18).toISOString(), status: 'Confirmed' }));
+      appointmentsLoaded = false;
+      dashboardDayCache.set(dashboardDayContext(), { data: appointments.map(entry => ({ ...entry })), dateKey: appointmentDateKey(dashboardSelectedDate), expiresAt: Date.now() + 15000 });
+      renderDashboard();
+      window.statusHistory = [];
+      window.statusObserver = new MutationObserver(records => {
+        records.filter(record => record.attributeName === 'data-status' && record.target.dataset.appointmentId === 'a')
+          .forEach(record => statusHistory.push(record.target.dataset.status));
+      });
+      statusObserver.observe(document.getElementById('dashboard-appointments-list'), { attributes: true, subtree: true });
+    ` });
+    await trigger.tap();
+    await listbox.locator('[data-status="Checked in"]').tap();
+    await page.evaluate(() => finishSave(true));
+    await page.waitForFunction(() => !document.querySelector('[data-appointment-id="a"]').hasAttribute('aria-busy'));
+    await page.evaluate(() => {
+      appointmentStaffLoaded = false;
+      window.refreshDone = ensureDashboardAppointmentsLoaded({ refresh: true });
+    });
+    await page.waitForFunction(() => window.dayReadCount === 1 && window.finishStaffRead);
+    await page.evaluate(() => { finishStaffRead(true); appointmentStaffLoaded = true; });
+    await page.waitForTimeout(80);
+    assert.equal(await trigger.getAttribute('data-status'), 'Checked in', 'metadata enrichment retains the saved status');
+    await page.evaluate(async () => { finishDayRead(dashboardDayCache.get(dashboardDayContext()).data); await refreshDone; });
+    await page.evaluate(() => { window.refreshDone = ensureDashboardAppointmentsLoaded({ refresh: true }); });
+    await page.waitForFunction(() => window.dayReadCount === 2);
+    await trigger.tap();
+    await listbox.locator('[data-status="Completed"]').tap();
+    await page.evaluate(() => finishSave(true));
+    await page.waitForFunction(() => !document.querySelector('[data-appointment-id="a"]').hasAttribute('aria-busy'));
+    await page.evaluate(async () => {
+      finishDayRead(dashboardDayCache.get(dashboardDayContext()).data.map(record => ({ ...record, status: 'Checked in' })));
+      await refreshDone;
+    });
+    await page.waitForTimeout(200);
+    assert.equal(await trigger.getAttribute('data-status'), 'Completed', 'a delayed snapshot cannot undo a later save');
+    const history = await page.evaluate(() => { statusObserver.disconnect(); return statusHistory; });
+    assert.deepEqual([...new Set(history)], ['Checked in', 'Completed']);
+    assert.equal(history.includes('Confirmed'), false);
+    assert.equal(history.slice(history.indexOf('Completed')).includes('Checked in'), false);
+  });
   assert.deepEqual(errors, []);
   if (process.env.LUMIN_TEST_SCREENSHOT) {
     await page.setViewportSize({ width: 671, height: 884 });

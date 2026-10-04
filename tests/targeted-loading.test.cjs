@@ -60,9 +60,10 @@ test('dashboard fetches exactly one day, without calendar working schedules', as
   const query={select(v){calls.push(['select',v]);return this},gte(k,v){calls.push(['gte',k,v]);return this},lt(k,v){calls.push(['lt',k,v]);return this},order(){return this},range(a,b){calls.push(['range',a,b]);return Promise.resolve({data:[]})}};
   const date=new Date(2026,9,4);
   const ctx=context({currentUserAccess:{},hasPageAccess:()=>true,dashboardSelectedDate:date,dashboardDayCache:new Map(),appointments:[],appointmentMoveStates:new Map(),
+    appointmentSavedRecords:new Map(),appointmentWriteRevision:0,appointmentStaffLoaded:true,appointmentVisitTypesLoaded:true,
     APPOINTMENT_SELECT_FIELDS:'id,appointment_at',appointmentDateKey:d=>`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`,normaliseAppointmentRecord:r=>r,
     ensureAppointmentStaffLoaded:async()=>true,ensureAppointmentVisitTypesLoaded:async()=>true,realtimeViewIsVisible:()=>false,
-    ensureDoctorWorkingSchedulesLoaded(){throw Error('Calendar schedules must not block the dashboard')},db:{from:()=>query}},['dashboardDayContext','ensureDashboardAppointmentsLoaded']);
+    ensureDoctorWorkingSchedulesLoaded(){throw Error('Calendar schedules must not block the dashboard')},db:{from:()=>query}},['dashboardDayContext','appointmentRecordsAfterLocalWrites','ensureDashboardAppointmentsLoaded']);
   assert.equal(await ctx.ensureDashboardAppointmentsLoaded(),true);
   assert.deepEqual(calls.find(c=>c[0]==='gte'),['gte','appointment_at',new Date(2026,9,4).toISOString()]);
   assert.deepEqual(calls.find(c=>c[0]==='lt'),['lt','appointment_at',new Date(2026,9,5).toISOString()]);

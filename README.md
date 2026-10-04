@@ -31,3 +31,5 @@ Clinic invoices and payments retain backend pagination. Expenses and patient deb
 Run `node --test tests/targeted-loading.test.cjs` for the request-scoping checks and `supabase/tests/finance_loading_pages.test.sql` for rolled-back live database checks. Browser regressions use Playwright (via `NODE_PATH`) and `LUMIN_TEST_BROWSER_CHANNEL=chrome` when a system Chrome installation is available.
 
 Appointment forms fetch patients only after typing, with a 250 ms debounce and a maximum of five lightweight matches. Apply the `appointment_patient_search` migration before publishing this frontend. Run `node --test tests/appointment-patient-search.test.cjs` with Playwright and `supabase/tests/appointment_patient_search.test.sql` for rolled-back search, result-limit, and permission checks.
+
+Dashboard appointment saves update the selected-day caches immediately. Reads started before a save preserve that change, while later reads accept updates from other staff. Run `node --test tests/dashboard-appointment-sync.test.cjs tests/appointment-status-picker.test.cjs` for cache races, failed saves, and visible status continuity.
