@@ -45,7 +45,8 @@ async function fixture(t, viewport, dir = 'ltr', reduced = false, scale = 1) {
     let activePatientId=null,activeInvoicePatientId=null,activeWorkspacePatientId=null,dashboardInvoiceRenderToken=0;
     const patients=[],paymentMethods=[{id:'cash',name:'Cash',active:true}],INVOICE_SELECT_FIELDS='fixture';
     const dashboardInvoiceCache=new Map(),DASHBOARD_INVOICE_CACHE_TTL=15000;
-    const appointmentDayFormatter={format:()=> '4 October 2026'},dashboardSelectedDate=new Date('2026-10-04T12:00:00Z');
+    const appointmentDayFormatter={format:()=> '4 October 2026'};
+    let dashboardSelectedDate=new Date('2026-10-04T12:00:00Z');
     const entries=[{patientId:'patient',patient:'Test patient'}];
     window.fixtureInvoices=[101,102,103].map(id=>({id,patientId:'patient',patientName:'Test patient '+id,
       paidAmount:250,releasedAmount:0,loyaltyDiscount:0,manualDiscount:0,status:'partial',
@@ -54,7 +55,8 @@ async function fixture(t, viewport, dir = 'ltr', reduced = false, scale = 1) {
     const nativeAnimate=Element.prototype.animate;
     Element.prototype.animate=function(frames,timing){
       animationRecords.push({id:this.id,card:this.getAttribute('data-refresh-key'),indicator:this.hasAttribute('data-invoice-payment-indicator'),
-        frames,timing,rect:this.getBoundingClientRect().toJSON(),localWidth:this.offsetWidth,at:performance.now()});
+        frames,timing,dialog:this.getAttribute('role')==='dialog',list:this.parentElement?.id,
+        rect:this.getBoundingClientRect().toJSON(),localWidth:this.offsetWidth,at:performance.now()});
       return nativeAnimate.call(this,frames,timing);
     };
     const db={from:table=>({select(){return this},eq(key,id){this.id=id;return this},
@@ -103,7 +105,7 @@ test('successful dashboard payment grows from Pay, returns to the ring, reveals 
   const buttonRect=await page.locator(pay).boundingBox();
   await page.locator(pay).click();
   await page.waitForFunction(()=>activePaymentInvoice && document.activeElement.id==='payment-amount');
-  const opening=await page.evaluate(()=>animationRecords[0]);
+  const opening=await page.evaluate(()=>animationRecords.find(record=>record.dialog));
   assert.equal(opening.timing.duration,300);
   const coords=opening.frames[0].transform.match(/translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([-\d.]+), ([-\d.]+)\)/).slice(1).map(Number);
   assert.ok(Math.abs(coords[0]-(buttonRect.x+buttonRect.width/2-opening.rect.x-opening.rect.width/2))<2);
@@ -206,7 +208,7 @@ test('scaled layouts keep both animation destinations accurate and an in-flight 
     const origin=await page.locator(pay).boundingBox();
     await page.locator(pay).click();
     await page.waitForFunction(()=>activePaymentInvoice&&document.activeElement.id==='payment-amount');
-    const opening=await page.evaluate(()=>animationRecords[0]);
+    const opening=await page.evaluate(()=>animationRecords.find(record=>record.dialog));
     const zoom=opening.rect.width/opening.localWidth;
     const openingCoords=opening.frames[0].transform.match(/translate\(([-\d.]+)px, ([-\d.]+)px\)/).slice(1).map(Number);
     assert.ok(Math.abs(openingCoords[0]*zoom-(origin.x+origin.width/2-opening.rect.x-opening.rect.width/2))<2);
@@ -244,5 +246,107 @@ test('dismissing during opening cancels motion and prevents a late read from tak
   assert.equal(await page.evaluate(()=>activePaymentInvoice),null);
   assert.equal(await page.locator(pay).evaluate(el=>document.activeElement===el),true);
   assert.equal(await page.evaluate(()=>LuminDashboardMotion.isHoldingInvoices()),false);
+  assert.deepEqual(errors,[]);
+});
+
+async function realDashboard(page, width) {
+  await page.addScriptTag({content:`
+    let currentUserAccess={isDoctor:false},expandedDashboardAppointmentId=null,appointmentsLoaded=true;
+    const appointmentToday=new Date(2026,9,4),dashboardDayCache=new Map();
+    window.fixtureAppointments=[1,2,3].map(id=>({id:'appointment-'+id,patientId:'patient',patient:'Test patient '+id,
+      patientAge:40,time:'09:00',duration:30,doctor:'Dr Sara',appointmentColor:'#2563eb',status:id===3?'Cancelled':'Scheduled'}));
+    function appointmentDateKey(date=new Date()){return [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-')}
+    function dashboardDayContext(){return contentRefreshContext('dashboard-day',appointmentDateKey(dashboardSelectedDate))}
+    function dashboardAppointmentsForDate(){return fixtureAppointments}
+    function refreshMyAttendanceState(){}function ensureDashboardAppointmentsLoaded(){return Promise.resolve()}
+    function renderDashboardDoctorFilter(){return null}function sameAppointmentDate(a,b){return a.toDateString()===b.toDateString()}
+    function syncDashboardMobileTabs(){}function scheduleDashboardViewportUpdate(){}
+    function patientAgeLabel(){return '40'}function normaliseCallPhone(){return ''}function normaliseWhatsAppPhone(){return ''}
+    function appointmentColorRgba(){return 'rgba(37,99,235,0.14)'}function appointmentTextColor(){return '#2563eb'}
+    const dashboardStatusPicker={markup:()=>'<span class="bg-blue-50">Scheduled</span>',retainTrigger:(old,node)=>node};
+    function checkedInWaitIndicatorMarkup(){return ''}function appointmentVisitTypeBadgeMarkup(){return ''}
+    function dashboardMobileContactActionsMarkup(){return ''}function canonicalAppointmentStatus(status){return status}
+    function refreshWhatsAppTemplatePickerAnchor(){}function ensureAppointmentWaitIndicatorTimer(){}
+    ${['escapeAppointmentText','appointmentDurationLabel','renderDashboard','changeDashboardDay','showDashboardToday'].map(source).join('\n')}
+    document.getElementById('dashboard-schedule-card').hidden=false;
+    document.getElementById('dashboard-scroll-panels').style.gridTemplate=${width}>=1024?'minmax(0,1fr) / repeat(2,minmax(0,1fr))':'repeat(2,minmax(0,1fr)) / minmax(0,1fr)';
+    LuminDashboardMotion.prepareCards();animationRecords.length=0;renderDashboard();
+  `});
+}
+
+test('both dashboard boxes fade cards top to bottom on entry and day changes without replaying during refresh', {skip: !chromium}, async t=>{
+  for(const [width,height,dir] of [[1440,1100,'ltr'],[820,1180,'rtl'],[390,844,'rtl']])await t.test(`${width}px ${dir}`,async t=>{
+    const {page,errors}=await fixture(t,{width,height},dir);
+    await realDashboard(page,width);
+    const ready=()=>page.waitForFunction(()=>['dashboard-appointments-list','dashboard-invoices-list'].every(id=>animationRecords.filter(record=>record.list===id&&record.frames[0].opacity===0).length===3));
+    await ready();
+    const records=await page.evaluate(()=>animationRecords);
+    for(const id of ['dashboard-appointments-list','dashboard-invoices-list']){
+      const rows=records.filter(record=>record.list===id&&record.frames[0].opacity===0);
+      assert.deepEqual(rows.map(record=>record.timing.delay),[0,80,160]);
+      assert.ok(rows.every(record=>record.timing.duration===200));
+    }
+    assert.equal(records.find(record=>record.card==='appointment-3').frames[1].opacity,'0.6','cancelled appointments retain their muted appearance');
+    const opacities=await page.evaluate(()=>{
+      LuminDashboardMotion.prepareCards();renderDashboard();
+      const cards=[...document.querySelectorAll('#dashboard-appointments-list > article')];
+      const animations=cards.map(card=>card.getAnimations()[0]);
+      animations.forEach(animation=>{animation.pause();animation.currentTime=120});
+      const values=cards.map(card=>Number(getComputedStyle(card).opacity));
+      animations.forEach(animation=>animation.play());return values;
+    });
+    assert.ok(opacities[0]>opacities[1]&&opacities[1]>opacities[2],'the upper cards become visible before lower cards');
+    await page.evaluate(()=>Promise.all(document.getAnimations().filter(animation=>animation.effect.getTiming().duration===200).map(animation=>animation.finished.catch(()=>{}))));
+    const before=await page.evaluate(()=>animationRecords.length);
+    await page.evaluate(()=>{renderDashboard();dashboardInvoiceCache.clear();return renderDashboardInvoices(entries)});
+    assert.equal(await page.evaluate(()=>animationRecords.length),before,'background refresh does not replay entry motion');
+    await page.evaluate(()=>{animationRecords.length=0;changeDashboardDay(1)});
+    await ready();
+    assert.equal(await page.evaluate(()=>dashboardSelectedDate.getDate()),5);
+    await page.evaluate(()=>{animationRecords.length=0;showDashboardToday()});
+    await ready();
+    assert.equal(await page.evaluate(()=>dashboardSelectedDate.getDate()),4);
+    await page.evaluate(()=>{LuminDashboardMotion.prepareCards();animationRecords.length=0;renderDashboard()});
+    await ready();
+    assert.deepEqual(errors,[]);
+  });
+});
+
+test('dashboard loading waits for real cards and reduced motion skips the stagger', {skip: !chromium}, async t=>{
+  const {page,errors}=await fixture(t,{width:1440,height:1100});
+  await realDashboard(page,1440);
+  await page.evaluate(()=>{
+    window.savedAppointments=fixtureAppointments;fixtureAppointments=[];appointmentsLoaded=false;
+    LuminDashboardMotion.prepareCards();animationRecords.length=0;renderDashboard();
+  });
+  assert.equal(await page.locator('#dashboard-appointments-list .animate-pulse').count(),3);
+  assert.equal(await page.evaluate(()=>animationRecords.length),0,'loading placeholders do not consume the card reveal');
+  await page.evaluate(()=>{fixtureAppointments=savedAppointments;appointmentsLoaded=true;renderDashboard()});
+  await page.waitForFunction(()=>animationRecords.some(record=>record.list==='dashboard-appointments-list'));
+  assert.deepEqual(errors,[]);
+  const reduced=await fixture(t,{width:390,height:844},'rtl',true);
+  await realDashboard(reduced.page,390);
+  await reduced.page.evaluate(()=>changeDashboardDay(1));
+  assert.equal(await reduced.page.evaluate(()=>animationRecords.length),0);
+  assert.equal(await reduced.page.locator('#dashboard-appointments-list > article').count(),3);
+  assert.deepEqual(reduced.errors,[]);
+});
+
+test('phone invoice cards wait until their panel is shown and do not replay on repeated tab changes', {skip: !chromium}, async t=>{
+  const {page,errors}=await fixture(t,{width:390,height:844},'rtl');
+  await realDashboard(page,390);
+  await page.addScriptTag({content:`
+    let activeDashboardMobileTab='schedule';
+    window.LuminMobileNav={isPhone:()=>true};document.documentElement.classList.add('lumin-phone-nav');
+    ${['syncDashboardMobileTabs','setDashboardMobileTab'].map(source).join('\n')}
+    LuminDashboardMotion.prepareCards();animationRecords.length=0;renderDashboard();
+  `});
+  await page.waitForFunction(()=>animationRecords.filter(record=>record.list==='dashboard-appointments-list').length===3);
+  assert.equal(await page.evaluate(()=>animationRecords.filter(record=>record.list==='dashboard-invoices-list').length),0);
+  await page.evaluate(()=>setDashboardMobileTab('invoices'));
+  assert.equal(await page.evaluate(()=>animationRecords.filter(record=>record.list==='dashboard-invoices-list').length),3);
+  const count=await page.evaluate(()=>animationRecords.length);
+  await page.evaluate(()=>{setDashboardMobileTab('schedule');setDashboardMobileTab('invoices')});
+  assert.equal(await page.evaluate(()=>animationRecords.length),count);
   assert.deepEqual(errors,[]);
 });

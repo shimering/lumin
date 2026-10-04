@@ -5,8 +5,38 @@
   const MINIMIZE_DURATION = 650;
   const PROGRESS_DURATION = 900;
   const TICK_DURATION = 420;
+  const cardReveals = new Map();
   const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const nextFrame = () => new Promise(resolve => requestAnimationFrame(resolve));
+
+  function prepareCards() {
+    cardReveals.forEach(state => state.animations.forEach(animation => animation.cancel()));
+    cardReveals.clear();
+  }
+
+  function revealCards(list, context) {
+    if (!list?.isConnected || !list.getClientRects().length) return;
+    if (cardReveals.get(list.id)?.context === context) return;
+    cardReveals.get(list.id)?.animations.forEach(animation => animation.cancel());
+    const state = { context, animations: new Set() };
+    cardReveals.set(list.id, state);
+    if (reducedMotion()) return;
+    const cards = Array.from(list.children).filter(card => card.tagName === 'ARTICLE');
+    // Keep long clinic schedules responsive while preserving the top-to-bottom order.
+    const stagger = Math.min(80, 600 / Math.max(1, cards.length - 1));
+    cards.forEach((card, index) => {
+      if (!card.animate) return;
+      const opacity = getComputedStyle(card).opacity;
+      const animation = card.animate([{ opacity: 0 }, { opacity }], {
+        duration: 200, delay: index * stagger, easing: 'ease-out', fill: 'both'
+      });
+      state.animations.add(animation);
+      animation.finished.catch(() => {}).finally(() => {
+        animation.cancel();
+        state.animations.delete(animation);
+      });
+    });
+  }
 
   function visibleRect(element) {
     if (!element?.isConnected) return null;
@@ -170,5 +200,5 @@
     }
   }
 
-  window.LuminDashboardMotion = { open, waitForOpen, holdInvoices, releaseInvoices, isHoldingInvoices, complete, reset };
+  window.LuminDashboardMotion = { prepareCards, revealCards, open, waitForOpen, holdInvoices, releaseInvoices, isHoldingInvoices, complete, reset };
 })();

@@ -86,7 +86,7 @@
   <script src="lumin-media-teeth.js?v=1"></script>
   <script src="lumin-mobile-nav.js?v=1"></script>
   <script src="lumin-appointment-status.js?v=2"></script>
-  <script src="lumin-dashboard-motion.js?v=2"></script>
+  <script src="lumin-dashboard-motion.js?v=3"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   
   <style>
@@ -29252,6 +29252,7 @@
 
       if (viewName === 'dashboard') {
         viewDashboard.classList.remove('hidden');
+        window.LuminDashboardMotion?.prepareCards();
         renderDashboard();
         scheduleDashboardViewportUpdate();
       } else if (viewName === 'patients') {
@@ -32540,6 +32541,8 @@
       if (tab === 'invoices' && !canViewDashboardInvoices()) return;
       activeDashboardMobileTab = tab;
       syncDashboardMobileTabs();
+      const list = document.getElementById(tab === 'schedule' ? 'dashboard-appointments-list' : 'dashboard-invoices-list');
+      if (list?.querySelector('article')) window.LuminDashboardMotion?.revealCards(list, dashboardDayContext());
       document.getElementById('app-shell').scrollTop = 0;
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
       scheduleDashboardViewportUpdate();
@@ -33967,6 +33970,7 @@
             <p class="mt-1 text-xs text-slate-400">${currentUserAccess.isDoctor ? 'There are no appointments assigned to you on this date.' : 'No appointments match the selected doctor and date.'}</p>
           </div>
         `);
+        window.LuminDashboardMotion?.revealCards(list, dashboardDayContext());
         refreshWhatsAppTemplatePickerAnchor();
         lucide.createIcons();
         ensureAppointmentWaitIndicatorTimer();
@@ -34059,6 +34063,7 @@
           </article>
         `;
       }).join(''), { updateNode: dashboardStatusPicker.retainTrigger });
+      window.LuminDashboardMotion?.revealCards(list, dashboardDayContext());
       refreshWhatsAppTemplatePickerAnchor();
       lucide.createIcons();
       ensureAppointmentWaitIndicatorTimer();
@@ -34142,10 +34147,12 @@
       const patientIds = [...new Set(entries.map(entry => entry.patientId).filter(Boolean))];
       const scheduledPatientNames = new Map(entries.map(entry => [entry.patientId, entry.patient]));
       const context = contentRefreshContext('dashboard-invoices', dateKey, patientIds.slice().sort());
+      if (list.luminRefreshContext === context && list.querySelector('article')) window.LuminDashboardMotion?.revealCards(list, contentRefreshContext('dashboard-day', dateKey));
       if (list.luminRefreshContext !== context) invoiceCount.textContent = '0 invoices';
       beginContentRefresh(list, context, '<div class="p-10 text-center text-sm font-bold text-slate-400"><span class="inline-flex items-center gap-2"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Loading invoices...</span></div>');
       if (!patientIds.length) {
         finishContentRefresh(list, context, '<div class="px-6 py-14 text-center"><span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"><i data-lucide="receipt-text" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-700">No scheduled-patient invoices.</p><p class="mt-1 text-xs text-slate-400">Invoices for patients in this day’s schedule will appear here.</p></div>');
+        window.LuminDashboardMotion?.revealCards(list, contentRefreshContext('dashboard-day', dateKey));
         lucide.createIcons();
         return;
       }
@@ -34159,6 +34166,7 @@
         finishContentRefresh(list, context, invoices.length
           ? invoices.map(invoice => dashboardInvoiceCardMarkup(invoice, scheduledPatientNames)).join('')
           : '<div class="px-6 py-14 text-center"><span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-400"><i data-lucide="receipt-text" class="h-5 w-5"></i></span><p class="mt-3 text-sm font-black text-slate-700">No invoices for scheduled patients.</p><p class="mt-1 text-xs text-slate-400">Priced chart operations added by a doctor will appear here instantly.</p></div>');
+        window.LuminDashboardMotion?.revealCards(list, contentRefreshContext('dashboard-day', dateKey));
         translateUiTree(document.getElementById('view-dashboard'), currentUiLanguage);
         lucide.createIcons();
       } catch (error) {
@@ -34168,6 +34176,7 @@
     }
 
     function changeDashboardDay(offset) {
+      window.LuminDashboardMotion?.prepareCards();
       dashboardSelectedDate = new Date(
         dashboardSelectedDate.getFullYear(),
         dashboardSelectedDate.getMonth(),
@@ -34177,6 +34186,7 @@
     }
 
     function showDashboardToday() {
+      window.LuminDashboardMotion?.prepareCards();
       dashboardSelectedDate = new Date(appointmentToday);
       renderDashboard();
     }
