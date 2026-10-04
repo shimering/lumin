@@ -2,6 +2,9 @@
   'use strict';
 
   let payment = null;
+  const MINIMIZE_DURATION = 650;
+  const PROGRESS_DURATION = 900;
+  const TICK_DURATION = 420;
   const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const nextFrame = () => new Promise(resolve => requestAnimationFrame(resolve));
 
@@ -18,13 +21,15 @@
     return `translate(${(target.left + target.width / 2 - rect.left - rect.width / 2) / zoom}px, ${(target.top + target.height / 2 - rect.top - rect.height / 2) / zoom}px) scale(${target.width / rect.width}, ${target.height / rect.height})`;
   }
 
-  async function animate(element, frames, duration) {
+  async function animate(element, frames, duration, { easing = 'cubic-bezier(0.22, 1, 0.36, 1)', keepFinalFrame = false } = {}) {
     if (!element || reducedMotion() || !element.animate) return;
-    const animation = element.animate(frames, { duration, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'both' });
+    const animation = element.animate(frames, { duration, easing, fill: 'both' });
     payment?.animations.add(animation);
     try { await animation.finished; } catch (_) { /* Dismissal cancels opening motion. */ }
-    animation.cancel();
-    payment?.animations.delete(animation);
+    if (!keepFinalFrame) {
+      animation.cancel();
+      payment?.animations.delete(animation);
+    }
   }
 
   function reset(modal, restoreFocus = false) {
@@ -86,8 +91,9 @@
       const startedAt = performance.now();
       await new Promise(resolve => {
         function frame(now) {
-          const progress = Math.min(1, (now - startedAt) / 420);
-          paint(from + (percent - from) * (1 - Math.pow(1 - progress, 3)));
+          const progress = Math.min(1, (now - startedAt) / PROGRESS_DURATION);
+          const eased = progress < 0.5 ? 4 * Math.pow(progress, 3) : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+          paint(from + (percent - from) * eased);
           if (progress < 1 && indicator.isConnected) requestAnimationFrame(frame);
           else resolve();
         }
@@ -106,8 +112,8 @@
           { transform: 'rotate(-120deg) scale(0.35)', opacity: 0 },
           { transform: 'rotate(12deg) scale(1.12)', opacity: 1, offset: 0.7 },
           { transform: 'rotate(0deg) scale(1)', opacity: 1 }
-        ], 320),
-        animate(indicator, [{ transform: 'scale(1)' }, { transform: 'scale(1.14)', offset: 0.45 }, { transform: 'scale(1)' }], 320)
+        ], TICK_DURATION),
+        animate(indicator, [{ transform: 'scale(1)' }, { transform: 'scale(1.14)', offset: 0.45 }, { transform: 'scale(1)' }], TICK_DURATION)
       ]);
       if (!reducedMotion()) await new Promise(resolve => setTimeout(resolve, 160));
     } else {
@@ -152,8 +158,9 @@
     try {
       await animate(dialog, [
         { transform: 'translate(0, 0) scale(1, 1)', opacity: 1 },
-        { transform: target ? transformTo(dialog, rect, target) : 'scale(0.92)', opacity: 0, borderRadius: '50%' }
-      ], target ? 280 : 160);
+        { transform: target ? transformTo(dialog, rect, target) : 'scale(0.92)', opacity: target ? 1 : 0, borderRadius: '50%' }
+      ], target ? MINIMIZE_DURATION : 160, { easing: 'cubic-bezier(0.4, 0, 0.2, 1)', keepFinalFrame: true });
+      // Keep the window opaque and at its destination until the minimizing motion finishes.
       modal.classList.add('hidden');
       modal.classList.remove('flex');
       if (target && payment === current) await animateIndicator(current.indicator, percent, fullyPaid);

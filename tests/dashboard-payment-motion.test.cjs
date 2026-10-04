@@ -120,12 +120,35 @@ test('successful dashboard payment grows from Pay, returns to the ring, reveals 
   await page.waitForFunction(()=>document.getElementById('modal-payment').classList.contains('is-payment-closing'));
   const targetRect=await page.locator(indicator).boundingBox();
   const closing=await page.evaluate(()=>animationRecords.find(record=>record.frames.at(-1).borderRadius==='50%'));
+  assert.equal(closing.timing.duration,650);
+  const arrival=await page.evaluate(()=>{
+    const modal=document.getElementById('modal-payment'),dialog=modal.querySelector('[role="dialog"]');
+    const motion=dialog.getAnimations().find(animation=>animation.effect.getKeyframes().at(-1).borderRadius==='50%');
+    motion.pause();
+    const duration=motion.effect.getTiming().duration;
+    motion.currentTime=duration*0.75;
+    const travelingOpacity=Number(getComputedStyle(dialog).opacity);
+    motion.currentTime=duration;
+    const result={travelingOpacity,arrivalOpacity:Number(getComputedStyle(dialog).opacity),hidden:modal.classList.contains('hidden'),rect:dialog.getBoundingClientRect().toJSON()};
+    // Rewind and resume so the rest of the sequence exercises its real durations.
+    motion.currentTime=0;motion.play();
+    return result;
+  });
+  assert.equal(arrival.hidden,false,'popup remains open until the minimizing animation completes');
+  assert.equal(arrival.travelingOpacity,1,'popup stays visible while traveling toward the circle');
+  assert.equal(arrival.arrivalOpacity,1,'popup reaches the circle before it disappears');
+  assert.ok(Math.abs(arrival.rect.width-targetRect.width)<2&&Math.abs(arrival.rect.height-targetRect.height)<2,'minimized popup reaches the circle size');
+  assert.ok(Math.abs(arrival.rect.x-targetRect.x)<2&&Math.abs(arrival.rect.y-targetRect.y)<2,'minimized popup reaches the circle position');
   const closeCoords=closing.frames.at(-1).transform.match(/translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([-\d.]+), ([-\d.]+)\)/).slice(1).map(Number);
   assert.ok(Math.abs(closeCoords[0]-(targetRect.x+targetRect.width/2-closing.rect.x-closing.rect.width/2))<2);
   assert.ok(Math.abs(closeCoords[1]-(targetRect.y+targetRect.height/2-closing.rect.y-closing.rect.height/2))<2);
   await page.evaluate(()=>{dashboardInvoiceCache.clear();return renderDashboardInvoices(entries)});
   assert.equal(await page.locator(card).count(),1,'realtime cannot remove the destination during motion');
   await page.locator(`${indicator} svg[data-lucide="check"]`).waitFor();
+  const tick=await page.evaluate(()=>animationRecords.find(record=>record.frames[0].transform==='rotate(-120deg) scale(0.35)'));
+  assert.equal(tick.timing.duration,420);
+  assert.ok(tick.at-closing.at-closing.timing.duration>=850,'circle fills gradually for 0.9 seconds before showing the tick');
+  assert.equal(await page.locator('#modal-payment').isVisible(),false,'popup closes before the circle completes');
   assert.equal(await page.locator(indicator).getAttribute('data-payment-percent'),'100');
   await page.waitForFunction(()=>animationRecords.some(record=>record.card==='101'&&record.frames.at(-1).transform==='translateX(100%)'));
   assert.equal(await page.locator(card).count(),1,'the row remains during its exit animation');
