@@ -99,7 +99,7 @@ test('invoice column stays beside the tick and below the badge without overlappi
     const findings=[
       {...base,id:'planned',code:'Composite filling (minimal)',status:'P'},
       {...base,id:'steps',code:'Root canal treatment (molar) with a long clinical description',status:'C',steps:[{id:'s1',name:'Preparation',percentage:100,status:'C'}]},
-      {...base,id:'paid',code:'Endo Three Canals',status:'C'},
+      {...base,id:'paid',code:'Endo Three Canals',status:'C',notes:[{text:'Review at next visit'}]},
       {...base,id:'partial',code:'Endo Four Canals',status:'C'},
       {...base,id:'b1',code:'Composite filling batch',status:'P',batchId:'batch',toothIds:['3','4'],memberFindings:[{...base,id:'b1'},{...base,id:'b2',toothId:'4'}]},
       {...base,id:'ortho',code:'Orthodontic package',status:'P',isOrthoPackage:true,orthoVisits:[{id:'v1',visitNumber:1,date:base.createdAt,price:100,status:'C',notes:''}]},
@@ -163,13 +163,39 @@ test('invoice column stays beside the tick and below the badge without overlappi
       assert.equal(await page.locator('.ortho-visit-invoice .finding-invoice-amount').textContent(),'EGP 0 / 471.43');
       const geometry = await page.evaluate(() => {
         const rect = element => {const r=element.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom};};
-        const rows=[...document.querySelectorAll('.finding-row')].map(row => ({summary:rect(row.querySelector('.finding-row-summary')),invoice:rect(row.querySelector('.finding-row-actions > .finding-invoice-control')),dates:rect(row.querySelector('.finding-dates-group'))}));
+        const rows=[...document.querySelectorAll('.finding-row')].map(row => ({summary:rect(row.querySelector('.finding-row-summary')),notes:rect(row.querySelector('.finding-note-button')),invoice:rect(row.querySelector('.finding-row-actions > .finding-invoice-control')),dates:rect(row.querySelector('.finding-dates-group')),price:rect(row.querySelector('.finding-price-control')),status:rect(row.querySelector('.finding-status-control'))}));
         const paid=document.querySelector('[data-refresh-key="paid"]');
-        return {rows,badge:rect(paid.querySelector('.finding-invoice-badge')),button:rect(paid.querySelector('[data-item-id]')),amount:rect(paid.querySelector('.finding-invoice-amount')),overflow:document.documentElement.scrollWidth>innerWidth};
+        const prices=[...document.querySelectorAll('.finding-price-control input')].map(input=>{
+          const styles=getComputedStyle(input), canvas=document.createElement('canvas'), context=canvas.getContext('2d');
+          context.font=`${styles.fontWeight} ${styles.fontSize} ${styles.fontFamily}`;
+          return {contentWidth:input.getBoundingClientRect().width-parseFloat(styles.paddingLeft)-parseFloat(styles.paddingRight),digitsWidth:context.measureText('00000').width};
+        });
+        const statuses=[...document.querySelectorAll('.finding-status-control select')].filter(select=>select.getBoundingClientRect().width).map(select=>{
+          const styles=getComputedStyle(select), canvas=document.createElement('canvas'), context=canvas.getContext('2d');
+          context.font=`${styles.fontWeight} ${styles.fontSize} ${styles.fontFamily}`;
+          const longestLabel=Math.max(...[...select.options].map(option=>context.measureText(option.textContent).width));
+          return {width:select.getBoundingClientRect().width,height:select.getBoundingClientRect().height,longestLabel,padding:parseFloat(styles.paddingLeft)+parseFloat(styles.paddingRight)};
+        });
+        return {rows,prices,statuses,badge:rect(paid.querySelector('.finding-invoice-badge')),button:rect(paid.querySelector('[data-item-id]')),amount:rect(paid.querySelector('.finding-invoice-amount')),overflow:document.documentElement.scrollWidth>innerWidth};
       });
       const overlaps=(a,b)=>a.x<b.right-1&&b.x<a.right-1&&a.y<b.bottom-1&&b.y<a.bottom-1;
       assert.equal(geometry.overflow,false,`${viewport.width} ${language} page overflow`);
       for(const row of geometry.rows){assert.equal(overlaps(row.summary,row.invoice),false);assert.equal(overlaps(row.invoice,row.dates),false);assert.ok(Math.abs(row.invoice.x-geometry.rows[0].invoice.x)<2,'Invoice column aligns across row types');}
+      for(const row of geometry.rows){
+        assert.ok(row.notes.width>=44&&row.notes.height>=44,'Notes remain easy to tap');
+        assert.equal(overlaps(row.notes,row.dates),false);
+        assert.equal(overlaps(row.price,row.status),false,'Compact controls do not overlap');
+        assert.ok(language==='ar'?row.notes.x>=row.dates.right:row.notes.right<=row.dates.x,'Notes occupy the former invoice position');
+        assert.ok(language==='ar'?row.invoice.right<=row.status.x:row.invoice.x>=row.status.right,'Invoice and tick occupy the former notes position');
+      }
+      for(const price of geometry.prices)assert.ok(Math.abs(price.contentWidth-price.digitsWidth)<2,'Price inputs fit five digits');
+      for(const status of geometry.statuses){
+        assert.ok(status.width>=44&&status.height>=44,'Status touch targets');
+        assert.ok(status.width>=status.longestLabel+status.padding+14,'Status words fit beside the native dropdown arrow');
+        assert.ok(status.width<=status.longestLabel+status.padding+30,'Dropdowns avoid unused horizontal space');
+      }
+      assert.equal((await paid.locator('.finding-note-button').textContent()).trim(),'','Notes show only an icon');
+      assert.match(await paid.locator('.finding-note-button').getAttribute('aria-label'),language==='ar'?/ملاحظات \(1\)/:/1 note/);
       assert.equal(overlaps(geometry.badge,geometry.button),false,'Badge is beside the tick');
       assert.ok(geometry.amount.y>=geometry.badge.bottom,'Paid fraction is beneath the badge');
       assert.ok(Math.abs(geometry.amount.x+geometry.amount.width/2-geometry.badge.x-geometry.badge.width/2)<2,'Paid fraction aligns directly beneath the badge');

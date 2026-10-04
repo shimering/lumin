@@ -1025,11 +1025,11 @@
         --finding-mobile-price: 7rem;
         --finding-mobile-status: 4.5rem;
         --finding-mobile-separate: 6rem;
-        --finding-mobile-notes: 3rem;
+        --finding-mobile-notes: 2.75rem;
         --finding-mobile-delete: 2.75rem;
         --finding-mobile-gap: 0.5rem;
         --finding-mobile-invoice: 11.5rem;
-        --finding-mobile-row-width: 82rem;
+        --finding-mobile-row-width: 81.75rem;
         overflow-x: auto !important;
         overscroll-behavior-inline: contain;
         -webkit-overflow-scrolling: touch;
@@ -1096,13 +1096,13 @@
         grid-column: 2;
         display: grid !important;
         grid-template-columns:
-          var(--finding-mobile-invoice)
+          var(--finding-mobile-notes)
           var(--finding-mobile-dates)
           var(--finding-mobile-doctor)
           var(--finding-mobile-price)
           var(--finding-mobile-status)
           var(--finding-mobile-separate)
-          var(--finding-mobile-notes)
+          var(--finding-mobile-invoice)
           var(--finding-mobile-delete);
         width: auto !important;
         min-width: 0 !important;
@@ -1174,21 +1174,20 @@
         display: inline-flex !important;
         flex-direction: row !important;
         align-items: center !important;
-        width: 100% !important;
+        width: max-content !important;
         min-width: 0 !important;
         max-width: var(--finding-mobile-price) !important;
         height: 2.75rem !important;
         min-height: 2.75rem !important;
         max-height: 2.75rem !important;
-        flex: 0 0 2.75rem !important;
+        flex: 0 0 auto !important;
       }
-      #findings-container .finding-row.is-batch-finding .finding-pricing-group,
-      #findings-container .finding-row.is-batch-finding .finding-price-control {
+      #findings-container .finding-row.is-batch-finding .finding-pricing-group {
         width: 100% !important;
         min-width: 0 !important;
         max-width: var(--finding-mobile-price) !important;
       }
-      #findings-container .finding-pricing-group > :first-child {
+      #findings-container .finding-pricing-group > :first-child:not(.finding-price-control) {
         width: 100% !important;
         min-width: 0 !important;
       }
@@ -1198,11 +1197,9 @@
         align-items: center !important;
       }
       #findings-container .finding-price-control input {
-        width: auto !important;
         min-width: 0 !important;
         height: 100% !important;
         min-height: 0 !important;
-        flex: 1 1 auto !important;
         padding-block: 0.25rem !important;
         font-size: 10px !important;
       }
@@ -1230,23 +1227,22 @@
       }
       #findings-container .finding-status-control {
         grid-column: 5;
-        width: 100% !important;
+        width: fit-content !important;
         min-width: 0 !important;
         max-width: var(--finding-mobile-status) !important;
-        flex: 0 0 var(--finding-mobile-status) !important;
+        flex: 0 0 auto !important;
         justify-content: center !important;
       }
       #findings-container .finding-status-select-mobile {
-        width: 2.6rem !important;
-        min-width: 2.6rem !important;
-        max-width: 2.6rem !important;
-        padding-left: 0.2rem !important;
-        padding-right: 0.2rem !important;
+        width: 2.75rem !important;
+        min-width: 2.75rem !important;
+        max-width: 2.75rem !important;
+        padding-inline: 0.2rem !important;
         text-align: center !important;
         text-align-last: center !important;
       }
       #findings-container .finding-note-button {
-        grid-column: 7;
+        grid-column: 1;
         width: 100% !important;
         min-width: 2.75rem !important;
         max-width: var(--finding-mobile-notes) !important;
@@ -1409,13 +1405,13 @@
         grid-column: 2;
         display: grid !important;
         grid-template-columns:
-          var(--finding-mobile-invoice)
+          var(--finding-mobile-notes)
           var(--finding-mobile-dates)
           var(--finding-mobile-doctor)
           var(--finding-mobile-price)
           var(--finding-mobile-status)
           var(--finding-mobile-separate)
-          var(--finding-mobile-notes)
+          var(--finding-mobile-invoice)
           var(--finding-mobile-delete);
         align-items: center !important;
         gap: var(--finding-mobile-gap) !important;
@@ -1440,10 +1436,9 @@
     @media (min-width: 640px) and (max-width: 899px) {
       #findings-container {
         --finding-mobile-doctor: 9.5rem;
-        --finding-mobile-price: 10.5rem;
-        --finding-mobile-status: 11.5rem;
-        --finding-mobile-notes: 4.75rem;
-        --finding-mobile-row-width: 95rem;
+        --finding-mobile-price: 7rem;
+        --finding-mobile-status: 9.5rem;
+        --finding-mobile-row-width: 87.5rem;
       }
     }
 
@@ -1454,13 +1449,13 @@
         --finding-column-invoice: 11.5rem;
         --finding-column-dates: 13.5rem;
         --finding-column-doctor: 12.5rem;
-        --finding-column-price: 10.5rem;
-        --finding-column-status: 11.5rem;
+        --finding-column-price: 7rem;
+        --finding-column-status: 9.5rem;
         --finding-column-separate: 6rem;
-        --finding-column-notes: 4.75rem;
-        --finding-column-delete: 2rem;
+        --finding-column-notes: 2.75rem;
+        --finding-column-delete: 2.75rem;
         --finding-column-gap: 0.5rem;
-        --finding-row-min-width: 98.5rem;
+        --finding-row-min-width: 89.25rem;
       }
       #findings-container .finding-row:not(.has-ortho-visits) {
         display: grid !important;
@@ -1484,13 +1479,13 @@
         grid-column: 2;
         display: grid !important;
         grid-template-columns:
-          var(--finding-column-invoice)
+          var(--finding-column-notes)
           var(--finding-column-dates)
           var(--finding-column-doctor)
           var(--finding-column-price)
           var(--finding-column-status)
           var(--finding-column-separate)
-          var(--finding-column-notes)
+          var(--finding-column-invoice)
           var(--finding-column-delete);
         align-items: center !important;
         gap: var(--finding-column-gap) !important;
@@ -1527,23 +1522,19 @@
         min-width: 0;
         align-items: stretch !important;
       }
-      #findings-container .finding-pricing-group > :first-child,
-      #findings-container .finding-pricing-group > .finding-price-control {
+      #findings-container .finding-pricing-group > :first-child:not(.finding-price-control) {
         width: 100%;
         min-width: 0;
       }
       #findings-container .finding-pricing-group > :first-child .finding-price-control {
         min-width: 0;
-        flex: 1 1 auto;
-      }
-      #findings-container .finding-price-control input {
-        min-width: 0;
-        flex: 1 1 auto;
+        flex: 0 0 auto;
       }
       #findings-container .finding-status-control {
         grid-column: 5;
-        width: 100% !important;
+        width: fit-content !important;
         min-width: 0;
+        max-width: 100%;
       }
       #findings-container .finding-separate-button {
         grid-column: 6;
@@ -1551,8 +1542,7 @@
         justify-content: center;
       }
       #findings-container .finding-note-button {
-        grid-column: 7;
-        width: 100% !important;
+        grid-column: 1;
         justify-content: center;
       }
       #findings-container .finding-delete-button {
@@ -1589,7 +1579,7 @@
     }
 
     #findings-container .finding-invoice-control {
-      grid-column: 1;
+      grid-column: 7;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -1599,6 +1589,59 @@
       width: 100%;
       padding-inline: 4px;
     }
+    #findings-container .finding-note-button {
+      width: 44px !important;
+      height: 44px !important;
+      padding: 0 !important;
+      border: 0;
+      transition: background 150ms ease-out, color 150ms ease-out, transform 150ms ease-out;
+    }
+    #findings-container .finding-note-button:hover { background: #ede9fe; color: #6d28d9; }
+    #findings-container .finding-note-button:active { transform: scale(0.98); }
+    #findings-container .finding-note-button:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+    }
+    #findings-container .finding-note-button:disabled { opacity: 0.5; pointer-events: none; }
+    #findings-container .finding-price-control {
+      width: max-content !important;
+      min-height: 44px;
+      max-width: 100%;
+      align-self: flex-start;
+      transition: background 150ms ease-out, border-color 150ms ease-out;
+    }
+    #findings-container .finding-price-control input {
+      box-sizing: border-box;
+      width: calc(5ch + 1rem) !important;
+      min-width: calc(5ch + 1rem) !important;
+      max-width: calc(5ch + 1rem) !important;
+      min-height: 44px;
+      flex: 0 0 auto !important;
+      padding-inline: 0.5rem !important;
+      font-size: var(--lumin-type-micro, 11px) !important;
+      font-variant-numeric: tabular-nums;
+      direction: ltr;
+      appearance: textfield;
+    }
+    #findings-container .finding-price-control input::-webkit-inner-spin-button,
+    #findings-container .finding-price-control input::-webkit-outer-spin-button { margin: 0; -webkit-appearance: none; }
+    #findings-container .finding-status-control select {
+      width: auto !important;
+      min-width: 44px;
+      max-width: 100%;
+      min-height: 44px;
+      flex: 0 0 auto !important;
+      font-size: var(--lumin-type-micro, 11px) !important;
+      transition: background 150ms ease-out, border-color 150ms ease-out, transform 150ms ease-out;
+    }
+    #findings-container :is(.finding-price-control, .finding-status-control select):hover { background: #f8fafc; border-color: #cbd5e1; }
+    #findings-container .finding-status-control select:active { transform: scale(0.98); }
+    #findings-container :is(.finding-price-control input, .finding-status-control select):focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+    }
+    #findings-container :is(.finding-price-control input, .finding-status-control select):disabled { opacity: 0.5; pointer-events: none; }
+    #findings-container .finding-delete-button { min-width: 44px; min-height: 44px; }
     #findings-container .finding-invoice-status {
       display: flex;
       align-items: center;
@@ -31888,6 +31931,9 @@
         const isWhole = finding.kind === 'whole';
         const isMouth = finding.kind === 'mouth';
         const findingNotes = normaliseChartOperationNotes(finding.notes);
+        const findingNotesLabel = currentUiLanguage === 'ar'
+          ? `ملاحظات${findingNotes.length ? ` (${findingNotes.length})` : ''}`
+          : findingNotes.length ? `${findingNotes.length} note${findingNotes.length === 1 ? '' : 's'}` : 'Notes';
         const memberFindings = finding.memberFindings || [finding];
         const findingIds = memberFindings.map(member => member.id).filter(Boolean);
         const procedureSteps = normaliseChartFindingSteps(finding.steps);
@@ -32172,7 +32218,9 @@
               </div>
             </div>
             <div class="finding-row-actions flex flex-nowrap items-center gap-2 shrink-0 ml-auto">
-              <div class="finding-invoice-control" aria-label="${currentUiLanguage === 'ar' ? 'حالة الفاتورة والمدفوعات' : 'Invoice and payment status'}">${invoiceColumnMarkup}</div>
+              <button type="button" data-finding-note-trigger aria-haspopup="dialog" aria-expanded="false" aria-controls="chart-finding-note-popover" onpointerenter="showChartFindingNotePreviewFromPointer(event, this)" onpointerleave="scheduleChartFindingNotePreviewClose(event)" onclick="toggleChartFindingNotePreview(event, this)" class="finding-note-button inline-flex shrink-0 items-center justify-center rounded-xl ${findingNotes.length ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'}" aria-label="${escapeHtml(findingNotesLabel)} · ${escapeHtml(dentalOperationLabel(finding.code))}" title="${escapeHtml(findingNotesLabel)} · ${escapeHtml(dentalOperationLabel(finding.code))}">
+                <i data-lucide="sticky-note" class="h-4 w-4 shrink-0" aria-hidden="true"></i>
+              </button>
               <div class="finding-dates-group ${isOrthoPackage ? '' : 'ml-auto'} flex flex-col items-end justify-center gap-1 shrink-0">
                 ${createdAtMarkup}
                 ${beginDateMarkup}
@@ -32183,7 +32231,7 @@
               </label>
               ${isOrthoPackage ? `
                 <div class="finding-pricing-group flex flex-col items-end justify-center shrink-0">
-                  <div class="flex items-center gap-1.5">
+                  <div class="flex flex-col items-start gap-1">
                     <span class="text-[9px] font-bold text-slate-400 uppercase tracking-tight hidden sm:inline">${currentUiLanguage === 'ar' ? 'سعر الباقة:' : 'Package:'}</span>
                     <label class="finding-price-control inline-flex items-center overflow-hidden rounded-lg border border-indigo-200 bg-white/85 focus-within:ring-2 focus-within:ring-indigo-500/20 shadow-2xs" title="${currentUiLanguage === 'ar' ? 'إجمالي سعر الباقة التعاقدي' : 'Total package contract fee'}">
                       <span class="border-r border-indigo-100 bg-indigo-50 px-2 py-1.5 text-[9px] font-black text-indigo-600">EGP</span>
@@ -32217,27 +32265,23 @@
                     </div>` : ''}
                 </div>
               `}
-              ${procedureSteps.length ? `<div class="finding-status-control flex shrink-0 items-center gap-1.5 rounded-lg border bg-white/80 px-2 py-1.5 sm:w-48" style="border-color:${statusBorder};color:${displayColor}" title="The procedure status is calculated from its steps">
+              ${procedureSteps.length ? `<div class="finding-status-control flex shrink-0 items-center gap-1.5 rounded-lg border bg-white/80 px-2 py-1.5" style="border-color:${statusBorder};color:${displayColor}" title="The procedure status is calculated from its steps">
                 <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${displayColor}"></span>
                 <span class="finding-status-select-mobile sm:hidden text-center font-black text-xs">${escapeHtml(status.key)}</span>
                 <span class="finding-status-select-desktop hidden sm:inline min-w-0 flex-1 truncate text-[11px] font-black">${completedProcedureSteps}/${procedureSteps.length} steps · ${escapeHtml(status.label)}</span>
-              </div>` : `<label class="finding-status-control flex shrink-0 items-center gap-1.5 sm:w-48">
+              </div>` : `<label class="finding-status-control flex shrink-0 items-center gap-1.5">
                 <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${displayColor}" title="${status.key} · ${status.label}"></span>
                 <span class="sr-only">Operation status</span>
                 <select ${dataAttributes} class="finding-status-select-mobile sm:hidden rounded-lg border bg-white/80 px-1 py-1.5 text-xs font-black outline-none transition focus:ring-2 focus:ring-blue-500/20 text-center" style="border-color:${statusBorder};color:${displayColor}" aria-label="Status: ${status.key} · ${status.label}">
                   ${operationStatusSelectOptions(finding.status, true)}
                 </select>
-                <select ${dataAttributes} class="finding-status-select-desktop hidden sm:block min-w-0 flex-1 rounded-lg border bg-white/80 px-2.5 py-1.5 text-[11px] font-bold outline-none transition focus:ring-2 focus:ring-blue-500/20" style="border-color:${statusBorder};color:${displayColor}">
+                <select ${dataAttributes} class="finding-status-select-desktop hidden sm:block min-w-0 rounded-lg border bg-white/80 px-2.5 py-1.5 text-[11px] font-bold outline-none transition focus:ring-2 focus:ring-blue-500/20" style="border-color:${statusBorder};color:${displayColor}" aria-label="${currentUiLanguage === 'ar' ? 'حالة الإجراء' : 'Operation status'}">
                   ${operationStatusSelectOptions(finding.status, false)}
                 </select>
               </label>`}
               ${doctorSalaryActionMarkup}
               ${isBatch ? '<button type="button" onclick="separateFindingBatch(this)" class="finding-separate-button inline-flex shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[10px] font-black text-violet-700 transition hover:border-violet-300 hover:bg-violet-100" aria-label="Separate this batch into one row per tooth" title="Create one independent documented row for each tooth"><i data-lucide="split" class="h-3 w-3"></i>Separate</button>' : ''}
-              <button type="button" data-finding-note-trigger aria-haspopup="dialog" aria-expanded="false" aria-controls="chart-finding-note-popover" onpointerenter="showChartFindingNotePreviewFromPointer(event, this)" onpointerleave="scheduleChartFindingNotePreviewClose(event)" onclick="toggleChartFindingNotePreview(event, this)" class="finding-note-button inline-flex h-8 ${findingNotes.length ? 'px-2' : 'w-8'} sm:h-auto sm:w-auto sm:px-2.5 sm:py-1.5 shrink-0 items-center justify-center gap-1 rounded-lg border text-[10px] font-black transition ${findingNotes.length ? 'border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-100' : 'border-slate-200 bg-white text-slate-500 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700'}" aria-label="${findingNotes.length ? `${findingNotes.length} note${findingNotes.length === 1 ? '' : 's'}` : 'Notes'} for ${escapeHtml(dentalOperationLabel(finding.code))}" title="${findingNotes.length ? `${findingNotes.length} note${findingNotes.length === 1 ? '' : 's'}` : 'Notes'} · ${escapeHtml(dentalOperationLabel(finding.code))}">
-                <i data-lucide="sticky-note" class="h-3.5 w-3.5 shrink-0"></i>
-                <span class="finding-note-text hidden sm:inline">Notes</span>
-                ${findingNotes.length ? `<span class="finding-note-count text-[9px] font-black">${findingNotes.length}</span>` : ''}
-              </button>
+              <div class="finding-invoice-control" aria-label="${currentUiLanguage === 'ar' ? 'حالة الفاتورة والمدفوعات' : 'Invoice and payment status'}">${invoiceColumnMarkup}</div>
               ${isOrthoPackage && isOrthoLocked ? `
                 <button type="button" disabled class="finding-delete-button inline-flex h-7 w-7 shrink-0 cursor-not-allowed items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-slate-400 opacity-60" title="${currentUiLanguage === 'ar' ? 'لا يمكن حذف هذه الباقة لأن بعض زياراتها مفوترة بالفعل. يرجى حذف بنود الفاتورة أولاً.' : 'Cannot delete this package because one or more visits are invoiced. Remove invoice items first.'}" aria-label="Delete locked"><i data-lucide="lock" class="h-3.5 w-3.5"></i></button>
               ` : `
