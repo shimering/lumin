@@ -22483,6 +22483,8 @@
 
       let data;
       let error;
+      const existingPatient = isEditing ? patients.find(p => p.id === patientId) : null;
+      const oldPatientName = existingPatient ? (existingPatient.name || '') : '';
       try {
         if (isEditing) {
           const result = await db
@@ -22493,6 +22495,9 @@
             .single();
           data = result.data;
           error = result.error;
+          if (data?.id && oldPatientName && data.name && oldPatientName !== data.name) {
+            void syncPatientRenameToStorage(patientId, oldPatientName, data.name);
+          }
         } else {
           const maximumAutomaticNumberAttempts = Math.max(5, patients.length + 2);
           for (let attempt = 0; attempt < maximumAutomaticNumberAttempts; attempt += 1) {
@@ -27306,6 +27311,68 @@
       return data;
     }
 
+    function sanitizeStorageFolderName(name) {
+      return String(name || 'Unknown')
+        .replace(/[<>:"/\\|?*]+/g, '_')
+        .replace(/[\s_]+/g, '_')
+        .replace(/^[ ._]+|[ ._]+$/g, '') || 'Unnamed';
+    }
+
+    async function syncPatientRenameToStorage(patientId, oldName, newName) {
+      if (!patientId || !oldName || !newName || oldName === newName) return;
+      const oldFolder = sanitizeStorageFolderName(oldName);
+      const newFolder = sanitizeStorageFolderName(newName);
+      if (oldFolder === newFolder) return;
+
+      // 1. Notify storage server
+      const config = getStorageServerConfig();
+      if (config.url) {
+        try {
+          await fetch(`${config.url}/api/patient/${encodeURIComponent(patientId)}/rename`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-lumin-key': config.key
+            },
+            body: JSON.stringify({ oldName, newName, oldFolder, newFolder })
+          });
+        } catch (serverErr) {
+          console.warn('Storage server rename notification failed:', serverErr);
+        }
+      }
+
+      // 2. Update Supabase patient_media_details directly
+      try {
+        const { data: mediaRows } = await db.from('patient_media_details')
+          .select('relative_path')
+          .eq('patient_id', patientId);
+
+        if (mediaRows && mediaRows.length > 0) {
+          const oldPrefix = oldFolder + '/';
+          const newPrefix = newFolder + '/';
+          for (const row of mediaRows) {
+            if (row.relative_path && row.relative_path.startsWith(oldPrefix)) {
+              const newRelPath = newPrefix + row.relative_path.slice(oldPrefix.length);
+              await db.from('patient_media_details')
+                .update({ relative_path: newRelPath })
+                .eq('patient_id', patientId)
+                .eq('relative_path', row.relative_path);
+            }
+          }
+        }
+      } catch (dbErr) {
+        console.warn('Failed to update patient_media_details during rename:', dbErr);
+      }
+
+      // 3. Refresh media cache if active
+      if (typeof chartPatientMedia !== 'undefined' && chartPatientMedia.patientId === patientId) {
+        void loadChartPatientMedia(patientId);
+      }
+      if (typeof activePatientMediaPatientId !== 'undefined' && activePatientMediaPatientId === patientId) {
+        void renderPatientMedia();
+      }
+    }
+
     function patientMediaDisplayName(file) {
       return file.mediaDetails?.display_name || file.originalName || file.filename;
     }
@@ -27450,8 +27517,19 @@
         if (renderToken !== patientMediaRenderToken) return;
         patientMediaDetailsError = Boolean(detailsResult.error);
         if (detailsResult.error) console.warn('Patient photo details could not be loaded:', detailsResult.error);
-        const detailsByPath = new Map((detailsResult.data || []).map(item => [item.relative_path, item]));
-        currentPatientMediaFiles = (data.files || []).map(file => ({ ...file, mediaDetails: detailsByPath.get(file.relativePath) || null }));
+        const detailsList = detailsResult.error ? [] : detailsResult.data || [];
+        const detailsByPath = new Map(detailsList.map(item => [item.relative_path, item]));
+        const detailsBySubpath = new Map(detailsList.map(item => [String(item.relative_path || '').split('/').slice(-2).join('/'), item]));
+        currentPatientMediaFiles = (data.files || []).map(file => {
+          const subpath = [file.category, file.filename].join('/');
+          const match = detailsByPath.get(file.relativePath) || detailsBySubpath.get(subpath) || null;
+          if (match && match.relative_path !== file.relativePath) {
+            void db.from('patient_media_details').update({ relative_path: file.relativePath })
+              .eq('patient_id', patient.id).eq('relative_path', match.relative_path);
+            match.relative_path = file.relativePath;
+          }
+          return { ...file, mediaDetails: match };
+        });
         activePatientMediaPatientId = patient.id;
         renderPatientMediaGrid();
       } catch (err) {

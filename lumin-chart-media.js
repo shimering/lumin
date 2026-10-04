@@ -206,8 +206,19 @@ async function loadChartPatientMedia(patientId = activePatientId) {
     } finally { clearTimeout(timeout); }
     const details = await db.from('patient_media_details').select('relative_path,display_name,note,tooth_id,tooth_ids').eq('patient_id', patient.id);
     if (request !== chartPatientMedia.request || activePatientId !== patient.id) return;
-    const byPath = new Map((details.error ? [] : details.data || []).map(item => [item.relative_path, item]));
-    chartPatientMedia.files = (response.files || []).map(file => ({ ...file, mediaDetails: byPath.get(file.relativePath) || null }));
+    const detailsList = details.error ? [] : details.data || [];
+    const byPath = new Map(detailsList.map(item => [item.relative_path, item]));
+    const bySubpath = new Map(detailsList.map(item => [String(item.relative_path || '').split('/').slice(-2).join('/'), item]));
+    chartPatientMedia.files = (response.files || []).map(file => {
+      const subpath = [file.category, file.filename].join('/');
+      const mediaDetails = byPath.get(file.relativePath) || bySubpath.get(subpath) || null;
+      if (mediaDetails && mediaDetails.relative_path !== file.relativePath) {
+        void db.from('patient_media_details').update({ relative_path: file.relativePath })
+          .eq('patient_id', patient.id).eq('relative_path', mediaDetails.relative_path);
+        mediaDetails.relative_path = file.relativePath;
+      }
+      return { ...file, mediaDetails };
+    });
     chartPatientMedia.detailsError = Boolean(details.error);
     chartPatientMedia.status = 'ready';
     renderChartMediaPanel();

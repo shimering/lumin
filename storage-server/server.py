@@ -28,11 +28,14 @@ PATIENT_NAME_CACHE = {}
 
 def sanitize_name(name: str) -> str:
     """Sanitize names for safe Windows folder/file naming."""
+    raw = str(name or '').strip()
+    if not raw or raw.lower() in ('none', 'null', 'undefined'):
+        return ""
     # Replace illegal Windows filesystem chars: <>:"/\|?*
-    cleaned = re.sub(r'[<>:"/\\|?*]+', '_', str(name or 'Unknown').strip())
+    cleaned = re.sub(r'[<>:"/\\|?*]+', '_', raw)
     # Collapse multiple spaces or underscores
     cleaned = re.sub(r'[\s_]+', '_', cleaned).strip(' ._')
-    return cleaned or "Unnamed"
+    return cleaned
 
 def resolve_patient_name(patient_id: str, supplied_name: str = "") -> str:
     """Resolve clean patient name from argument, local cache, or Supabase RPC."""
@@ -145,6 +148,193 @@ def generate_thumbnail(original_file_path: Path):
     except Exception as e:
         logger.warning(f"Failed to generate thumbnail for {original_file_path}: {e}")
         return None
+
+def get_folder_patient_id(folder_path: Path) -> str:
+    """Read patient_id from .patient_id metadata file in folder."""
+    try:
+        meta_file = folder_path / ".patient_id"
+        if meta_file.is_file():
+            content = meta_file.read_text(encoding="utf-8").strip()
+            if content.startswith("{"):
+                data = json.loads(content)
+                return str(data.get("patient_id") or "").strip()
+            return content.strip()
+    except Exception:
+        pass
+    return ""
+
+
+def set_folder_patient_id(folder_path: Path, patient_id: str, patient_name: str = ""):
+    """Write .patient_id metadata file into patient folder."""
+    if not patient_id or patient_id == "General" or not folder_path.is_dir():
+        return
+    try:
+        meta_file = folder_path / ".patient_id"
+        data = {
+            "patient_id": patient_id,
+            "patient_name": patient_name or folder_path.name.replace("_", " "),
+            "updated_at": datetime.now().isoformat()
+        }
+        meta_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception as e:
+        logger.warning(f"Could not write .patient_id in {folder_path}: {e}")
+
+
+def get_patient_folder_from_supabase(patient_id: str) -> str:
+    """Query Supabase RPC to find the recorded folder prefix for this patient's media."""
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/rpc/get_patient_media_folder"
+        headers = {
+            "apikey": SUPABASE_ANON_KEY,
+            "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = json.dumps({
+            "p_patient_uuid": patient_id,
+            "clinic_key": config.get("clinic_secret_key", "LuminClinicKey_2026")
+        }).encode("utf-8")
+        req = urllib.request.Request(url, data=payload, headers=headers)
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            raw = resp.read().decode("utf-8").strip()
+            folder = json.loads(raw)
+            if folder:
+                return sanitize_name(folder)
+    except Exception as e:
+        logger.debug(f"Could not get patient media folder via Supabase RPC for {patient_id}: {e}")
+    return ""
+
+
+def update_supabase_media_paths(patient_id: str, old_folder: str, new_folder: str) -> int:
+    """Update relative_path in Supabase patient_media_details using secure RPC."""
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/rpc/update_patient_media_folder"
+        headers = {
+            "apikey": SUPABASE_ANON_KEY,
+            "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = json.dumps({
+            "p_patient_uuid": patient_id,
+            "p_old_prefix": f"{old_folder}/",
+            "p_new_prefix": f"{new_folder}/",
+            "clinic_key": config.get("clinic_secret_key", "LuminClinicKey_2026")
+        }).encode("utf-8")
+        req = urllib.request.Request(url, data=payload, headers=headers)
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            updated_count = json.loads(resp.read().decode("utf-8").strip())
+            logger.info(f"Updated {updated_count} media detail rows in Supabase for patient {patient_id}")
+            return updated_count or 0
+    except Exception as e:
+        logger.warning(f"Could not update Supabase media folder for {patient_id}: {e}")
+        return 0
+
+
+def rename_patient_storage_folder(patient_id: str, old_folder_name: str, new_folder_name: str) -> bool:
+    """Safely rename a patient's directory on disk, thumbnails, sync records, and Supabase."""
+    clean_old = sanitize_name(old_folder_name)
+    clean_new = sanitize_name(new_folder_name)
+    if not clean_old or not clean_new or clean_old == clean_new:
+        return False
+
+    old_dir = STORAGE_ROOT / clean_old
+    new_dir = STORAGE_ROOT / clean_new
+
+    if not old_dir.is_dir():
+        return False
+
+    try:
+        if not new_dir.exists():
+            old_dir.rename(new_dir)
+        else:
+            for root, dirs, files in os.walk(old_dir):
+                rel_dir = Path(root).relative_to(old_dir)
+                target_sub = new_dir / rel_dir
+                target_sub.mkdir(parents=True, exist_ok=True)
+                for f in files:
+                    src_file = Path(root) / f
+                    dst_file = target_sub / f
+                    if not dst_file.exists():
+                        shutil.move(str(src_file), str(dst_file))
+            shutil.rmtree(str(old_dir), ignore_errors=True)
+
+        # Rename thumbnails
+        old_thumb = THUMBNAIL_ROOT / clean_old
+        new_thumb = THUMBNAIL_ROOT / clean_new
+        if old_thumb.is_dir():
+            if not new_thumb.exists():
+                old_thumb.rename(new_thumb)
+            else:
+                for root, dirs, files in os.walk(old_thumb):
+                    rel_dir = Path(root).relative_to(old_thumb)
+                    target_sub = new_thumb / rel_dir
+                    target_sub.mkdir(parents=True, exist_ok=True)
+                    for f in files:
+                        src_file = Path(root) / f
+                        dst_file = target_sub / f
+                        if not dst_file.exists():
+                            shutil.move(str(src_file), str(dst_file))
+                shutil.rmtree(str(old_thumb), ignore_errors=True)
+
+        # Write .patient_id metadata in target folder
+        set_folder_patient_id(new_dir, patient_id, clean_new)
+
+        # Update sync records in SQLite if sync database exists
+        try:
+            sync_db_path = config.get('sync_state_path') or (Path(__file__).parent / '.lumin-sync' / 'sync.sqlite3')
+            if Path(sync_db_path).is_file():
+                import sqlite3
+                with sqlite3.connect(str(sync_db_path)) as con:
+                    cur = con.cursor()
+                    rows = cur.execute("SELECT path, value FROM records WHERE path LIKE ?", (f"{clean_old}/%",)).fetchall()
+                    for p, val_str in rows:
+                        new_p = f"{clean_new}/{p[len(clean_old) + 1:]}"
+                        val = json.loads(val_str)
+                        val["path"] = new_p
+                        cur.execute("DELETE FROM records WHERE path = ?", (p,))
+                        cur.execute("INSERT OR REPLACE INTO records (path, value) VALUES (?, ?)", (new_p, json.dumps(val)))
+                    con.commit()
+        except Exception as sync_e:
+            logger.warning(f"Could not update local sync records during rename: {sync_e}")
+
+        # Update Supabase records
+        update_supabase_media_paths(patient_id, clean_old, clean_new)
+
+        # Update PATIENT_NAME_CACHE
+        PATIENT_NAME_CACHE[patient_id] = clean_new
+
+        logger.info(f"Successfully migrated patient folder {clean_old} -> {clean_new} for patient {patient_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to rename patient folder {clean_old} -> {clean_new}: {e}")
+        return False
+
+
+def tag_existing_patient_folders():
+    """Scan all patient directories in STORAGE_ROOT and ensure each has a .patient_id file."""
+    try:
+        if not STORAGE_ROOT.is_dir():
+            return
+        for d in STORAGE_ROOT.iterdir():
+            if not d.is_dir() or d.name.startswith('.'):
+                continue
+            meta = d / ".patient_id"
+            if meta.is_file():
+                continue
+            clean_name = d.name.replace("_", " ")
+            try:
+                url = f"{SUPABASE_URL}/rest/v1/patients?select=id,name&name=eq.{urllib.parse.quote(clean_name)}&limit=1"
+                headers = {"apikey": SUPABASE_ANON_KEY, "Authorization": f"Bearer {SUPABASE_ANON_KEY}"}
+                req = urllib.request.Request(url, headers=headers)
+                with urllib.request.urlopen(req, timeout=3) as resp:
+                    rows = json.loads(resp.read().decode("utf-8"))
+                    if rows and len(rows) > 0:
+                        pid = rows[0]["id"]
+                        set_folder_patient_id(d, pid, d.name)
+                        logger.info(f"Tagged existing folder {d.name} with patient_id {pid}")
+            except Exception as err:
+                logger.debug(f"Could not tag folder {d.name}: {err}")
+    except Exception as e:
+        logger.warning(f"Error in tag_existing_patient_folders: {e}")
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -268,15 +458,34 @@ def upload_file():
     if not uploaded_file or uploaded_file.filename == "":
         return jsonify({"error": "Uploaded file is empty."}), 400
 
-    patient_id = sanitize_name(request.form.get("patientId") or request.form.get("patient_id") or "General")
+    patient_id = sanitize_name(request.form.get("patientId") or request.form.get("patient_id") or "General") or "General"
     raw_name = request.form.get("patientName") or request.form.get("patient_name") or ""
     patient_name = resolve_patient_name(patient_id, raw_name)
-    category = sanitize_name(request.form.get("category") or "General")
+    category = sanitize_name(request.form.get("category") or "General") or "General"
 
     # Folder format: Use clean patient name only (e.g. يحيى_سيد_أبو_غالي)
     patient_folder_name = patient_name if patient_name else patient_id
+
+    # Auto-migrate if previous folder existed under an older name
+    if patient_id and patient_id != "General":
+        existing_folder = None
+        for d in STORAGE_ROOT.iterdir():
+            if d.is_dir() and not d.name.startswith('.'):
+                if get_folder_patient_id(d) == patient_id:
+                    existing_folder = d.name
+                    break
+        if not existing_folder:
+            supa_folder = get_patient_folder_from_supabase(patient_id)
+            if supa_folder and (STORAGE_ROOT / supa_folder).is_dir():
+                existing_folder = supa_folder
+
+        if existing_folder and existing_folder != patient_folder_name:
+            if rename_patient_storage_folder(patient_id, existing_folder, patient_folder_name):
+                logger.info(f"Auto-migrated folder {existing_folder} to {patient_folder_name} prior to upload")
+
     target_dir = STORAGE_ROOT / patient_folder_name / category
     target_dir.mkdir(parents=True, exist_ok=True)
+    set_folder_patient_id(target_dir.parent, patient_id, patient_folder_name)
 
     # Clean file name and attach date
     original_filename = sanitize_name(Path(uploaded_file.filename).name)
@@ -310,7 +519,7 @@ def upload_file():
 
 @app.route("/api/patient/<patient_id>/files", methods=["GET"])
 def list_patient_files(patient_id):
-    """List all media files for a specific patient by ID or name."""
+    """List all media files for a specific patient by ID or name with automatic rename migration."""
     safe_patient_id = sanitize_name(patient_id)
     raw_name = request.args.get("name") or request.args.get("patientName") or ""
     safe_patient_name = resolve_patient_name(patient_id, raw_name)
@@ -322,13 +531,44 @@ def list_patient_files(patient_id):
         name_dir = STORAGE_ROOT / safe_patient_name
         if name_dir.is_dir():
             matched_dirs.append(name_dir)
+            set_folder_patient_id(name_dir, patient_id, safe_patient_name)
 
     # 2. Match exact patient_id folder
     id_dir = STORAGE_ROOT / safe_patient_id
     if id_dir.is_dir() and id_dir not in matched_dirs:
         matched_dirs.append(id_dir)
 
-    # 3. Match legacy folders starting with patient_id_ or ending with _patient_name
+    # 3. Match by .patient_id metadata across existing folders
+    if not matched_dirs and safe_patient_id and safe_patient_id != "General":
+        for d in STORAGE_ROOT.iterdir():
+            if d.is_dir() and not d.name.startswith('.'):
+                folder_pid = get_folder_patient_id(d)
+                if folder_pid == patient_id:
+                    if safe_patient_name and d.name != safe_patient_name:
+                        if rename_patient_storage_folder(patient_id, d.name, safe_patient_name):
+                            new_dir = STORAGE_ROOT / safe_patient_name
+                            if new_dir.is_dir():
+                                matched_dirs.append(new_dir)
+                                break
+                    matched_dirs.append(d)
+                    break
+
+    # 4. Check Supabase patient_media_details for previous folder if still not found
+    if not matched_dirs and safe_patient_id and safe_patient_id != "General":
+        supa_folder = get_patient_folder_from_supabase(patient_id)
+        if supa_folder:
+            candidate = STORAGE_ROOT / supa_folder
+            if candidate.is_dir():
+                if safe_patient_name and supa_folder != safe_patient_name:
+                    if rename_patient_storage_folder(patient_id, supa_folder, safe_patient_name):
+                        new_dir = STORAGE_ROOT / safe_patient_name
+                        if new_dir.is_dir():
+                            matched_dirs.append(new_dir)
+                if not matched_dirs:
+                    matched_dirs.append(candidate)
+                    set_folder_patient_id(candidate, patient_id, safe_patient_name or supa_folder)
+
+    # 5. Match legacy folders starting with patient_id_ or ending with _patient_name
     for d in STORAGE_ROOT.iterdir():
         if d.is_dir() and not d.name.startswith('.') and d not in matched_dirs:
             if d.name.startswith(f"{safe_patient_id}_"):
@@ -338,6 +578,7 @@ def list_patient_files(patient_id):
 
     files_list = []
     for patient_dir in matched_dirs:
+        set_folder_patient_id(patient_dir, patient_id, safe_patient_name or patient_dir.name)
         for root, directories, files in os.walk(patient_dir):
             directories[:] = [name for name in directories if not name.startswith('.')]
             for filename in files:
@@ -359,6 +600,46 @@ def list_patient_files(patient_id):
     # Sort newest first
     files_list.sort(key=lambda x: x["modifiedAt"], reverse=True)
     return jsonify({"patientId": patient_id, "total": len(files_list), "files": files_list})
+
+
+@app.route("/api/patient/<patient_id>/rename", methods=["POST"])
+def rename_patient(patient_id):
+    """Explicitly rename a patient folder and migrate its thumbnails and sync records."""
+    data = request.get_json(silent=True) or {}
+    old_name = data.get("oldName") or data.get("old_name") or ""
+    new_name = data.get("newName") or data.get("new_name") or ""
+
+    safe_old = sanitize_name(old_name)
+    safe_new = sanitize_name(new_name)
+
+    if not safe_new or safe_new == "Unnamed":
+        return jsonify({"error": "Valid newName is required."}), 400
+
+    current_dir = None
+    if safe_old and (STORAGE_ROOT / safe_old).is_dir():
+        current_dir = STORAGE_ROOT / safe_old
+    if not current_dir:
+        for d in STORAGE_ROOT.iterdir():
+            if d.is_dir() and not d.name.startswith('.'):
+                if get_folder_patient_id(d) == patient_id:
+                    current_dir = d
+                    break
+    if not current_dir:
+        supa_folder = get_patient_folder_from_supabase(patient_id)
+        if supa_folder and (STORAGE_ROOT / supa_folder).is_dir():
+            current_dir = STORAGE_ROOT / supa_folder
+
+    if not current_dir:
+        return jsonify({"success": True, "message": "No existing storage folder to rename."})
+
+    if current_dir.name == safe_new:
+        set_folder_patient_id(current_dir, patient_id, safe_new)
+        return jsonify({"success": True, "message": "Folder already matches target name.", "folder": safe_new})
+
+    ok = rename_patient_storage_folder(patient_id, current_dir.name, safe_new)
+    if ok:
+        return jsonify({"success": True, "oldFolder": current_dir.name, "newFolder": safe_new})
+    return jsonify({"error": "Failed to rename patient folder."}), 500
 
 @app.route("/api/file", methods=["DELETE"])
 def delete_file():
@@ -525,4 +806,5 @@ if __name__ == "__main__":
         print(f"  Clinic LAN Access: http://{local_ip}:{port}")
     print(f"  Secret Clinic Key: {config.get('clinic_secret_key')}")
     print("=" * 60)
+    threading.Thread(target=tag_existing_patient_folders, daemon=True, name="lumin-tag-folders").start()
     app.run(host="0.0.0.0", port=port, debug=False)
