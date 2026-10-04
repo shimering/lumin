@@ -86,6 +86,7 @@
   <script src="lumin-media-teeth.js?v=1"></script>
   <script src="lumin-mobile-nav.js?v=1"></script>
   <script src="lumin-appointment-status.js?v=2"></script>
+  <script src="lumin-dashboard-motion.js?v=1"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   
   <style>
@@ -5445,6 +5446,7 @@
     }
   </style>
   <link rel="stylesheet" href="lumin-theme.css?v=21" />
+  <link rel="stylesheet" href="lumin-dashboard-motion.css?v=1" />
   <link rel="stylesheet" href="lumin-appointment-status.css?v=2" />
   <link rel="stylesheet" href="lumin-patients.css?v=3" />
   <link rel="stylesheet" href="lumin-finance-sync.css?v=2" />
@@ -9466,10 +9468,10 @@
     <div role="dialog" aria-modal="true" aria-labelledby="payment-modal-title" class="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
       <div class="border-b border-slate-100 bg-gradient-to-br from-emerald-50 to-white p-5">
         <div class="flex items-start justify-between gap-4"><div><span class="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">Record payment</span><h3 id="payment-modal-title" class="mt-1 text-lg font-black text-slate-900">Pay invoice</h3><p id="payment-modal-invoice-summary" class="mt-1 text-xs font-bold text-slate-500"></p></div><button type="button" onclick="closePaymentModal()" aria-label="Close payment form" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-white hover:text-slate-700"><i data-lucide="x" class="h-5 w-5"></i></button></div>
-        <div class="mt-4 grid grid-cols-3 gap-2 rounded-2xl border border-emerald-100 bg-white/90 p-3"><div><span class="text-[9px] font-black uppercase text-slate-400">Total</span><p id="payment-modal-total" class="mt-1 text-xs font-black text-slate-800">EGP 0</p></div><div><span class="text-[9px] font-black uppercase text-emerald-600">Paid</span><p id="payment-modal-paid" class="mt-1 text-xs font-black text-emerald-700">EGP 0</p></div><div><span class="text-[9px] font-black uppercase text-amber-600">Remaining</span><p id="payment-modal-remaining" class="mt-1 text-xs font-black text-amber-700">EGP 0</p></div></div>
+        <div class="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-white/90 p-3"><div><span class="text-[9px] font-black uppercase text-slate-400">Total</span><p id="payment-modal-total" class="mt-1 text-xs font-black text-slate-800">EGP 0</p></div><div><span class="text-[9px] font-black uppercase text-emerald-600">Paid</span><p id="payment-modal-paid" class="mt-1 text-xs font-black text-emerald-700">EGP 0</p></div><div><span class="text-[9px] font-black uppercase text-amber-600">Remaining</span><p id="payment-modal-remaining" class="mt-1 text-xs font-black text-amber-700">EGP 0</p></div></div>
       </div>
       <form id="payment-form" onsubmit="saveInvoicePayment(event)" class="space-y-4 p-5">
-        <label class="block"><span class="mb-1.5 block text-xs font-black text-slate-700">Amount being paid</span><div class="relative"><span class="pointer-events-none absolute left-3.5 top-2.5 text-sm font-black text-slate-400">EGP</span><input id="payment-amount" type="number" inputmode="decimal" min="0.01" step="0.01" required class="w-full rounded-xl border border-slate-200 py-2.5 pl-14 pr-3.5 text-sm font-black text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" /></div><p id="payment-amount-hint" class="mt-1.5 text-[10px] font-bold text-slate-400"></p></label>
+        <label class="block"><span class="mb-1.5 block text-xs font-black text-slate-700">Amount being paid</span><div class="relative"><span id="payment-amount-currency" class="pointer-events-none absolute top-2.5 text-sm font-black text-slate-400">EGP</span><input id="payment-amount" type="number" inputmode="decimal" min="0.01" step="0.01" required class="w-full rounded-xl border border-slate-200 py-2.5 text-sm font-black text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" /></div><p id="payment-amount-hint" class="mt-1.5 text-[10px] font-bold text-slate-400"></p></label>
         <label class="block"><span class="mb-1.5 block text-xs font-black text-slate-700">Payment method</span><select id="payment-method" required class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"><option value="">Loading methods...</option></select></label>
         <label class="block"><span class="mb-1.5 block text-xs font-black text-slate-700">Payment date</span><input id="payment-date" type="date" required class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" /></label>
         <p id="payment-form-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="alert"></p>
@@ -10067,6 +10069,7 @@
     let activePaymentInvoiceId = null;
     let activePaymentInvoiceItemId = null;
     let activePaymentInvoice = null;
+    let invoicePaymentSaving = false;
     let activeDiscountInvoice = null;
     let activeInvoiceDateEditId = null;
     let selectedFindingIds = new Set();
@@ -25712,7 +25715,8 @@
       const center = complete && completeAsTick
         ? '<i data-lucide="check" class="h-3.5 w-3.5 text-emerald-600"></i>'
         : '<span class="text-[9px] font-black ' + (complete ? 'text-emerald-700' : 'text-slate-600') + '">' + percent + '%</span>';
-      return '<span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full p-[3px]" style="background:conic-gradient(' + color + ' ' + percent + '%,#e2e8f0 ' + percent + '%)"><span class="flex h-full w-full items-center justify-center rounded-full bg-white">' + center + '</span></span>';
+      const paymentLabel = currentUiLanguage === 'ar' ? percent + '٪ مدفوع' : percent + '% paid';
+      return '<span data-invoice-payment-indicator data-payment-percent="' + percent + '" aria-label="' + escapeHtml(paymentLabel) + '" class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full p-[3px]" style="background:conic-gradient(' + color + ' ' + percent + '%,#e2e8f0 ' + percent + '%)"><span class="flex h-full w-full items-center justify-center rounded-full bg-white">' + center + '</span></span>';
     }
 
     function invoiceItemPaymentIndicatorMarkup(invoice, item) {
@@ -25726,15 +25730,19 @@
       return '<span title="' + escapeHtml(paymentLabel) + '" aria-label="' + escapeHtml(paymentLabel) + '" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full p-[2px]" style="background:conic-gradient(' + color + ' ' + percent + '%,#e2e8f0 ' + percent + '%)"><span class="flex h-full w-full items-center justify-center rounded-full bg-white">' + center + '</span></span>';
     }
 
-    async function openInvoicePaymentModal(invoiceId, invoiceItemId = null) {
+    async function openInvoicePaymentModal(invoiceId, invoiceItemId = null, triggerButton = null) {
       if (!canRecordInvoicePayment() && !hasPageAccess('chart')) return;
+      if (invoicePaymentSaving) return;
       const modal = document.getElementById('modal-payment');
       modal.classList.remove('hidden');
       modal.classList.add('flex');
+      window.LuminDashboardMotion?.open(modal, triggerButton, invoiceId);
       activePaymentInvoiceId = Number(invoiceId);
       activePaymentInvoiceItemId = invoiceItemId === null ? null : Number(invoiceItemId);
       activePaymentInvoice = null;
       setAdminMessage('payment-form-message', '');
+      document.getElementById('payment-save-button').disabled = true;
+      document.getElementById('payment-save-button').innerHTML = '<i data-lucide="badge-dollar-sign" class="h-4 w-4"></i> Add payment';
       document.getElementById('payment-modal-invoice-summary').textContent = 'Loading invoice...';
       document.getElementById('payment-method').innerHTML = '<option value="">Loading methods...</option>';
       lucide.createIcons();
@@ -25776,18 +25784,23 @@
         if (remaining <= 0 || !canRecordInvoicePayment()) setAdminMessage('payment-form-message', remaining <= 0 ? (currentUiLanguage === 'ar' ? 'لا يوجد رصيد متبقٍ للدفع.' : 'There is no remaining balance to pay.') : (currentUiLanguage === 'ar' ? 'يمكنك عرض حالة الدفع فقط.' : 'You can view payment status only.'), 'success');
         translateUiTree(modal, currentUiLanguage);
         lucide.createIcons();
-        amountInput.focus();
+        await window.LuminDashboardMotion?.waitForOpen();
+        if (activePaymentInvoice !== invoice) return;
+        amountInput.focus({ preventScroll: true });
         amountInput.select();
       } catch (error) {
+        if (activePaymentInvoiceId !== Number(invoiceId) || activePaymentInvoiceItemId !== (invoiceItemId === null ? null : Number(invoiceItemId))) return;
         setAdminMessage('payment-form-message', error.message || 'Could not load this invoice.', 'error');
         document.getElementById('payment-save-button').disabled = true;
       }
     }
 
     function closePaymentModal() {
+      if (invoicePaymentSaving) return;
       const modal = document.getElementById('modal-payment');
       modal.classList.add('hidden');
       modal.classList.remove('flex');
+      window.LuminDashboardMotion?.reset(modal, true);
       activePaymentInvoiceId = null;
       activePaymentInvoiceItemId = null;
       activePaymentInvoice = null;
@@ -25797,7 +25810,8 @@
 
     async function saveInvoicePayment(event) {
       event.preventDefault();
-      if (!activePaymentInvoice || !canRecordInvoicePayment()) return;
+      if (!activePaymentInvoice || !canRecordInvoicePayment() || invoicePaymentSaving) return;
+      const invoice = activePaymentInvoice;
       const invoiceItem = activePaymentInvoiceItemId === null
         ? null
         : activePaymentInvoice.items.find(item => Number(item.id) === activePaymentInvoiceItemId);
@@ -25813,6 +25827,8 @@
         return;
       }
       const button = document.getElementById('payment-save-button');
+      invoicePaymentSaving = true;
+      window.LuminDashboardMotion?.holdInvoices();
       button.disabled = true;
       button.innerHTML = '<i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Saving...';
       lucide.createIcons();
@@ -25827,7 +25843,12 @@
           payment_date: paymentDate
         });
         if (error) throw error;
-        const patientId = activePaymentInvoice.patientId;
+        const patientId = invoice.patientId;
+        const updatedInvoice = { ...invoice, paidAmount: invoice.paidAmount + amount };
+        await window.LuminDashboardMotion?.complete(document.getElementById('modal-payment'), invoice.id,
+          invoicePaymentPercent(updatedInvoice), invoiceTotal(updatedInvoice) > 0 && updatedInvoice.paidAmount >= invoiceTotal(updatedInvoice) - 0.001,
+          invoiceRemaining(updatedInvoice) <= 0.001);
+        invoicePaymentSaving = false;
         closePaymentModal();
         dashboardInvoiceCache.clear();
         financeInvoicesLoaded = false;
@@ -25841,11 +25862,15 @@
         if (hasPageAccess('finances') && !document.getElementById('view-finances').classList.contains('hidden')) await refreshActiveFinanceTab();
         showAppointmentNotificationToast('Payment recorded', formatInvoiceMoney(amount) + ' added to ' + (invoiceItem?.operationName || 'the invoice') + '.');
       } catch (error) {
+        window.LuminDashboardMotion?.releaseInvoices();
         setAdminMessage('payment-form-message', error.message || 'Could not add the payment.', 'error');
+        if (!document.getElementById('view-dashboard').classList.contains('hidden')) renderDashboard();
       } finally {
-        if (!document.getElementById('modal-payment').classList.contains('hidden')) {
+        if (activePaymentInvoice === invoice || !activePaymentInvoice) invoicePaymentSaving = false;
+        if (activePaymentInvoice === invoice && !document.getElementById('modal-payment').classList.contains('hidden')) {
           button.disabled = false;
           button.innerHTML = '<i data-lucide="badge-dollar-sign" class="h-4 w-4"></i> Add payment';
+          translateUiTree(button, currentUiLanguage);
           lucide.createIcons();
         }
       }
@@ -34068,11 +34093,11 @@
       const procedureNames = [...new Set(invoice.items.map(item => item.operationName))];
       return '<article data-refresh-key="' + escapeHtml(String(invoice.id)) + '" class="p-4 transition hover:bg-slate-50/70 sm:p-5">'
         + '<div class="flex items-start justify-between gap-3"><div class="min-w-0"><button type="button" onclick="openPatientInvoices(\'' + invoice.patientId + '\')" class="truncate text-left text-sm font-black text-blue-700 transition hover:text-blue-900">' + escapeHtml(patientName) + '</button><p class="mt-1 text-[10px] font-bold text-slate-400">' + escapeHtml(invoiceNumber(invoice.id)) + ' · ' + invoice.items.length + ' item' + (invoice.items.length === 1 ? '' : 's') + '</p></div>'
-        + '<div class="flex flex-wrap items-center justify-end gap-2">' + invoicePaymentIndicatorMarkup(invoice) + '<span class="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-700">' + percent + '% paid</span>' + (invoice.releasedAmount > 0 ? '<span class="rounded-lg border px-2.5 py-1 text-[10px] font-black ' + status.className + '">' + escapeHtml(status.label) + '</span>' : '') + '</div></div>'
+        + '<div class="flex flex-wrap items-center justify-end gap-2">' + invoicePaymentIndicatorMarkup(invoice, true) + '<span class="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-700">' + percent + '% paid</span>' + (invoice.releasedAmount > 0 ? '<span class="rounded-full px-2.5 py-1 text-[10px] font-black ' + status.className + '">' + escapeHtml(status.label) + '</span>' : '') + '</div></div>'
         + invoiceLoyaltyBadge(invoice)
         + '<p class="mt-3 truncate text-xs font-bold text-slate-500">' + escapeHtml(procedureNames.join(' · ') || 'No procedures') + '</p>'
         + '<div class="dashboard-invoice-metrics mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4"><div><span class="text-[9px] font-black uppercase text-slate-400">Total</span><p class="mt-1 text-xs font-black text-slate-800">' + escapeHtml(formatInvoiceMoney(total)) + '</p></div><div><span class="text-[9px] font-black uppercase text-emerald-600">Paid</span><p class="mt-1 text-xs font-black text-emerald-700">' + escapeHtml(formatInvoiceMoney(invoice.paidAmount)) + '</p></div><div><span class="text-[9px] font-black uppercase text-rose-600">Released</span><p class="mt-1 text-xs font-black text-rose-700">' + escapeHtml(formatInvoiceMoney(invoice.releasedAmount)) + '</p></div><div><span class="text-[9px] font-black uppercase text-amber-600">Remaining</span><p class="mt-1 text-xs font-black text-amber-700">' + escapeHtml(formatInvoiceMoney(remaining)) + '</p></div></div>'
-        + '<div class="dashboard-invoice-actions mt-4 flex flex-wrap gap-2">' + (remaining > 0 && canRecordInvoicePayment() ? '<button type="button" onclick="openInvoicePaymentModal(' + invoice.id + ')" class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-black text-white transition hover:bg-emerald-700"><i data-lucide="badge-dollar-sign" class="h-3.5 w-3.5"></i> Pay</button>' : '') + (remaining > 0 && canReleaseInvoice() ? '<button type="button" onclick="releaseInvoiceBalance(' + invoice.id + ', this)" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-700 transition hover:bg-rose-100"><i data-lucide="badge-minus" class="h-3.5 w-3.5"></i> Release</button>' : '') + '<button type="button" onclick="openPatientInvoices(\'' + invoice.patientId + '\')" class="inline-flex items-center gap-1.5 rounded-lg bg-violet-50 px-3 py-2 text-xs font-black text-violet-700 transition hover:bg-violet-100"><i data-lucide="receipt-text" class="h-3.5 w-3.5"></i> View invoice</button></div></article>';
+        + '<div class="dashboard-invoice-actions mt-4 flex flex-wrap gap-2">' + (remaining > 0 && canRecordInvoicePayment() ? '<button type="button" onclick="openInvoicePaymentModal(' + invoice.id + ', null, this)" class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-black text-white transition hover:bg-emerald-700"><i data-lucide="badge-dollar-sign" class="h-3.5 w-3.5"></i> Pay</button>' : '') + (remaining > 0 && canReleaseInvoice() ? '<button type="button" onclick="releaseInvoiceBalance(' + invoice.id + ', this)" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-700 transition hover:bg-rose-100"><i data-lucide="badge-minus" class="h-3.5 w-3.5"></i> Release</button>' : '') + '<button type="button" onclick="openPatientInvoices(\'' + invoice.patientId + '\')" class="inline-flex items-center gap-1.5 rounded-lg bg-violet-50 px-3 py-2 text-xs font-black text-violet-700 transition hover:bg-violet-100"><i data-lucide="receipt-text" class="h-3.5 w-3.5"></i> View invoice</button></div></article>';
     }
 
     function dashboardInvoiceCacheKey(dateKey, patientIds) {
@@ -34103,6 +34128,8 @@
 
     async function renderDashboardInvoices(entries) {
       if (!canViewDashboardInvoices()) return;
+      // Realtime updates must keep the destination circle in place until payment feedback finishes.
+      if (window.LuminDashboardMotion?.isHoldingInvoices()) return;
       const renderToken = ++dashboardInvoiceRenderToken;
       const userId = currentSession?.user?.id;
       const list = document.getElementById('dashboard-invoices-list');
@@ -34127,6 +34154,7 @@
       try {
         const invoices = await loadDashboardInvoiceRecords(dateKey, patientIds);
         if (renderToken !== dashboardInvoiceRenderToken || dateKey !== appointmentDateKey(dashboardSelectedDate) || currentSession?.user?.id !== userId || !canViewDashboardInvoices()) return;
+        if (window.LuminDashboardMotion?.isHoldingInvoices()) return;
         invoiceCount.textContent = invoices.length + ' invoice' + (invoices.length === 1 ? '' : 's');
         finishContentRefresh(list, context, invoices.length
           ? invoices.map(invoice => dashboardInvoiceCardMarkup(invoice, scheduledPatientNames)).join('')

@@ -1,0 +1,96 @@
+#view-dashboard:not(.hidden) {
+  animation: lumin-dashboard-enter 200ms ease-out both;
+}
+
+@keyframes lumin-dashboard-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+#modal-payment.has-dashboard-motion {
+  isolation: isolate;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+#modal-payment.has-dashboard-motion::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: rgb(15 23 42 / 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  opacity: 1;
+  transition: opacity 200ms ease-out;
+  animation: lumin-dashboard-enter 200ms ease-out both;
+}
+
+#modal-payment.is-payment-closing::before {
+  animation: none;
+  opacity: 0;
+}
+
+#modal-payment.has-dashboard-motion > [role="dialog"] {
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+
+#modal-payment > [role="dialog"] {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(var(--lumin-app-viewport-height, 100dvh) - 2rem - env(safe-area-inset-top));
+}
+
+#payment-form {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+#modal-payment > [role="dialog"] > div:first-child { flex-shrink: 0; }
+#payment-modal-invoice-summary, #payment-amount-hint { min-height: 1rem; }
+
+#payment-form > div:last-child {
+  position: sticky;
+  bottom: -1.25rem;
+  margin-inline: -1.25rem;
+  padding: 1rem 1.25rem max(1rem, env(safe-area-inset-bottom));
+  background: var(--lumin-face, #fff);
+}
+
+#modal-payment :is(button, input, select),
+#modal-payment #payment-form > div:last-child button {
+  min-height: calc(44px / var(--lumin-app-scale, 1));
+  transition: background-color 150ms ease-out, border-color 150ms ease-out;
+}
+
+#modal-payment button { min-width: calc(44px / var(--lumin-app-scale, 1)); }
+#modal-payment button:active:not(:disabled) { transform: scale(0.98); }
+#modal-payment :is(button, input, select):focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
+}
+#modal-payment button:disabled { pointer-events: none; opacity: 0.5; }
+#modal-payment :is(input, select):hover { border-color: #cbd5e1; }
+#payment-amount { padding-inline-start: 3.5rem; padding-inline-end: 0.875rem; }
+#payment-amount-currency { inset-inline-start: 0.875rem; }
+
+@media (max-width: 767px) {
+  #modal-payment > [role="dialog"] {
+    max-height: calc(var(--lumin-app-viewport-height, 100dvh) * 0.9 - env(safe-area-inset-top));
+    overflow: hidden;
+    padding-bottom: 0;
+  }
+  #payment-form > div:last-child {
+    bottom: -1rem;
+    margin-inline: -1rem;
+    padding-inline: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #view-dashboard:not(.hidden),
+  #modal-payment.has-dashboard-motion::before { animation: none; transition: none; }
+}
