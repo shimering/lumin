@@ -2615,6 +2615,11 @@
     html[dir="rtl"] #appointment-notification-toasts { right: auto; left: 1rem; }
     html[dir="rtl"] #appointment-patient-picker > svg { right: 0.875rem; left: auto; }
     html[dir="rtl"] #appointment-patient-search { padding-right: 2.5rem; padding-left: 5rem; }
+    #appointment-patient-results button { min-height: 44px; min-width: 44px; border: 0; text-align: start; transition: background 150ms ease-out, transform 150ms ease-out; }
+    #appointment-patient-results button:hover { background: #f1f5f9; }
+    #appointment-patient-results button:active { transform: scale(0.98); }
+    #appointment-patient-results button:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
+    #appointment-patient-results button:disabled { opacity: 0.5; pointer-events: none; }
     html[dir="rtl"] #appointment-patient-add-button { right: auto; left: 0.375rem; }
     html[dir="rtl"] #implant-search-icon { right: 0.875rem; left: auto; }
     html[dir="rtl"] #implant-search-input { padding-right: 2.5rem; padding-left: 0.75rem; }
@@ -9362,12 +9367,12 @@
         <div id="appointment-form-body" class="flex-1 overflow-y-auto px-4 py-3.5 sm:px-5 sm:py-4 space-y-3 sm:space-y-4 overscroll-contain">
           <div class="block">
             <label id="appointment-entry-label" for="appointment-patient-search" class="block text-xs font-bold text-slate-600 mb-1.5">Patient</label>
-            <div id="appointment-patient-picker" class="relative">
+            <div id="appointment-patient-picker" class="relative" onfocusout="handleAppointmentPatientSearchBlur()">
               <span class="pointer-events-none absolute left-3.5 top-3 text-slate-400">
                 <i id="appointment-entry-patient-icon" data-lucide="search" class="h-4 w-4"></i>
                 <i id="appointment-entry-note-icon" data-lucide="notebook-pen" class="hidden h-4 w-4"></i>
               </span>
-              <input id="appointment-patient-search" type="text" role="combobox" aria-autocomplete="list" aria-controls="appointment-patient-results" aria-expanded="false" autocomplete="off" required maxlength="120" oninput="filterAppointmentPatients()" onfocus="filterAppointmentPatients()" onblur="setTimeout(closeAppointmentPatientResults, 120)" onkeydown="handleAppointmentPatientSearchKeydown(event)" placeholder="Search patients by number, name, or phone" class="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-20 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
+              <input id="appointment-patient-search" type="text" role="combobox" aria-autocomplete="list" aria-controls="appointment-patient-results" aria-expanded="false" autocomplete="off" required maxlength="120" oninput="filterAppointmentPatients(event)" oncompositionend="filterAppointmentPatients(event)" onfocus="showAppointmentPatientResults()" onkeydown="handleAppointmentPatientSearchKeydown(event)" placeholder="Search patients by number, name, or phone" class="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-20 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
               <span class="absolute right-1.5 top-1.5 z-20 inline-flex gap-1">
                 <button id="appointment-patient-add-button" type="button" onclick="openNewPatientFromAppointment()" aria-label="Register a new patient" title="Register a new patient" class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none">
                   <i data-lucide="plus" class="h-4 w-4"></i>
@@ -9381,7 +9386,7 @@
           </div>
           <label class="block">
             <span class="block text-xs font-bold text-slate-600 mb-1.5">Assigned doctor</span>
-            <select id="appointment-assigned-user-id" required class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+            <select id="appointment-assigned-user-id" required onchange="syncAppointmentSaveButton()" class="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
               <option value="">Loading doctors...</option>
             </select>
           </label>
@@ -10202,6 +10207,13 @@
     let appointmentModalEntryMode = 'patient';
     let appointmentPatientMatches = [];
     let appointmentPatientHighlightedIndex = -1;
+    const appointmentPatientSearchRecords = new Map();
+    let appointmentPatientSearchTimer = null;
+    let appointmentPatientSearchController = null;
+    let appointmentPatientSearchSequence = 0;
+    let appointmentPatientSearchQuery = '';
+    let appointmentPatientSearchStatus = 'idle';
+    let appointmentModalOpenSequence = 0;
     const recentLocalAppointmentChanges = new Map();
     const appointmentMoveStates = new Map();
     let appointmentMoveSequence = 0;
@@ -22474,19 +22486,27 @@
         && patientModalReturnToAppointment
         && !document.getElementById('modal-appointment').classList.contains('hidden');
       closeNewPatientModal({ restoreAppointmentFocus: false });
+      if (returnCreatedPatientToAppointment && data?.id) {
+        const patient = normalisePatientRecord(data);
+        const existingIndex = patients.findIndex(item => item.id === patient.id);
+        if (existingIndex < 0) patients.unshift(patient);
+        else patients[existingIndex] = patient;
+        if (!patientsLoaded) patientDirectoryLoaded = false;
+        else {
+          patientDirectoryRows = patients.slice(0, PATIENT_QUERY_PAGE_SIZE);
+          patientDirectoryTotal = patients.length;
+        }
+        appointmentPatientSearchRecords.set(patient.id, patient);
+        selectAppointmentPatient(patient.id);
+        const hasDoctors = appointmentStaff.some(staff => staff.canReceiveAppointments);
+        document.getElementById('appointment-date-note').textContent = hasDoctors
+          ? (currentUiLanguage === 'ar' ? 'تم اختيار المريض الجديد. أكمل تفاصيل الموعد ثم احفظه.' : 'New patient selected. Complete the appointment details, then save.')
+          : (currentUiLanguage === 'ar' ? 'عيّن مستخدمًا نشطًا كطبيب في صفحة الإدارة قبل الحجز.' : 'Mark at least one active login as a doctor in Admin before scheduling.');
+        document.getElementById('appointment-assigned-user-id')?.focus();
+        return;
+      }
       await fetchPatientsFromDB();
       if (!isEditing && data?.id) {
-        if (returnCreatedPatientToAppointment) {
-          selectAppointmentPatient(data.id);
-          const hasDoctors = appointmentStaff.some(staff => staff.canReceiveAppointments);
-          const saveAppointmentButton = document.getElementById('btn-save-appointment');
-          if (saveAppointmentButton) saveAppointmentButton.disabled = !hasDoctors;
-          document.getElementById('appointment-date-note').textContent = hasDoctors
-            ? (currentUiLanguage === 'ar' ? 'تم اختيار المريض الجديد. أكمل تفاصيل الموعد ثم احفظه.' : 'New patient selected. Complete the appointment details, then save.')
-            : (currentUiLanguage === 'ar' ? 'عيّن مستخدمًا نشطًا كطبيب في صفحة الإدارة قبل الحجز.' : 'Mark at least one active login as a doctor in Admin before scheduling.');
-          document.getElementById('appointment-assigned-user-id')?.focus();
-          return;
-        }
         openPatientChart(data.id);
       }
     }
@@ -26462,6 +26482,8 @@
 
     function resetTargetedLoading() {
       workspaceNavigationToken += 1;
+      appointmentModalOpenSequence += 1;
+      resetAppointmentPatientSearch(true);
       patientDetailFreshness.clear();
       patientDetailReads.clear();
       dashboardDayCache.clear();
@@ -34288,6 +34310,7 @@
     }
 
     function setAppointmentModalEntryMode(mode, options = {}) {
+      resetAppointmentPatientSearch();
       const isNote = mode === 'note';
       const clearValue = options.clearValue !== false;
       const input = document.getElementById('appointment-patient-search');
@@ -34312,10 +34335,8 @@
         : (currentUiLanguage === 'ar' ? 'ابحث برقم المريض أو الاسم أو الهاتف، ثم اختر نتيجة.' : 'Search by patient number, name, or phone number, then choose a result.');
       input.placeholder = isNote
         ? (currentUiLanguage === 'ar' ? 'مثال: عطلة أو إجازة' : 'For example: Holiday or Vacation')
-        : patients.length
-          ? (currentUiLanguage === 'ar' ? 'ابحث برقم المريض أو الاسم أو الهاتف' : 'Search patients by number, name, or phone')
-          : (currentUiLanguage === 'ar' ? 'لا يوجد مرضى متاحون' : 'No patients available');
-      input.disabled = isNote ? false : !patients.length;
+        : (currentUiLanguage === 'ar' ? 'ابحث برقم المريض أو الاسم أو الهاتف' : 'Search patients by number, name, or phone');
+      input.disabled = false;
       input.setAttribute('aria-autocomplete', isNote ? 'none' : 'list');
       input.setCustomValidity(isNote
         ? (input.value.trim() ? '' : (currentUiLanguage === 'ar' ? 'أدخل عنوانًا للملاحظة.' : 'Enter a title for the calendar note.'))
@@ -34336,7 +34357,6 @@
       clinicalFields.classList.toggle('hidden', isNote);
       visitType.required = !isNote;
       closeAppointmentPatientResults();
-      const doctorSelect = document.getElementById('appointment-assigned-user-id');
       const saveButton = document.getElementById('btn-save-appointment');
       const eyebrow = document.getElementById('appointment-modal-eyebrow');
       const title = document.getElementById('appointment-modal-title');
@@ -34361,12 +34381,10 @@
           ? 'اختر الطبيب والتاريخ والوقت والمدة التي ستظهر فيها الملاحظة.'
           : 'Choose the doctor, date, time, and duration for this calendar note.';
       } else if (guidance && !editingEntry) {
-        guidance.textContent = patients.length
-          ? (currentUiLanguage === 'ar' ? 'اختر مريضًا، ثم أكمل تفاصيل الموعد.' : 'Choose a patient, then complete the appointment details.')
-          : (currentUiLanguage === 'ar' ? 'أنشئ مريضًا أولاً، ثم عد لجدولة الموعد.' : 'Create a patient first, then return here to schedule the appointment.');
+        guidance.textContent = currentUiLanguage === 'ar' ? 'اختر مريضًا، ثم أكمل تفاصيل الموعد.' : 'Choose a patient, then complete the appointment details.';
       }
-      if (saveButton) saveButton.disabled = Boolean(doctorSelect?.disabled || (!isNote && !patients.length));
-      lucide.createIcons();
+      syncAppointmentSaveButton();
+      if (window.lucide) lucide.createIcons();
     }
 
     function toggleAppointmentNoteMode() {
@@ -34375,7 +34393,33 @@
       document.getElementById('appointment-patient-search')?.focus();
     }
 
+    function appointmentPatientRecord(patientId) {
+      return getKnownPatient(patientId) || appointmentPatientSearchRecords.get(patientId) || null;
+    }
+
+    function syncAppointmentSaveButton() {
+      const button = document.getElementById('btn-save-appointment');
+      const doctor = document.getElementById('appointment-assigned-user-id');
+      const patientId = document.getElementById('appointment-patient-id')?.value;
+      if (!button || !doctor) return;
+      const hasEntry = appointmentModalUsesNote()
+        ? Boolean(document.getElementById('appointment-patient-search')?.value.trim())
+        : Boolean(appointmentPatientRecord(patientId));
+      button.disabled = !canModifyAppointments() || button.dataset.saving === 'true' || doctor.disabled || !doctor.value || !hasEntry;
+    }
+
+    function invalidateAppointmentPatientSearch() {
+      window.clearTimeout(appointmentPatientSearchTimer);
+      appointmentPatientSearchTimer = null;
+      appointmentPatientSearchController?.abort();
+      appointmentPatientSearchController = null;
+      appointmentPatientSearchSequence += 1;
+      document.getElementById('appointment-patient-search')?.removeAttribute('aria-busy');
+    }
+
     function closeAppointmentPatientResults() {
+      invalidateAppointmentPatientSearch();
+      if (appointmentPatientSearchStatus === 'loading') appointmentPatientSearchStatus = 'idle';
       const input = document.getElementById('appointment-patient-search');
       const results = document.getElementById('appointment-patient-results');
       if (!input || !results) return;
@@ -34384,69 +34428,134 @@
       input.removeAttribute('aria-activedescendant');
     }
 
+    function resetAppointmentPatientSearch(clearRecords = false) {
+      closeAppointmentPatientResults();
+      appointmentPatientSearchQuery = '';
+      appointmentPatientSearchStatus = 'idle';
+      appointmentPatientMatches = [];
+      appointmentPatientHighlightedIndex = -1;
+      if (clearRecords) appointmentPatientSearchRecords.clear();
+    }
+
+    function showAppointmentPatientResults() {
+      const input = document.getElementById('appointment-patient-search');
+      if (appointmentModalUsesNote() || !input?.value.trim() || document.getElementById('appointment-patient-id')?.value) return;
+      if (appointmentPatientSearchQuery === input.value.trim() && appointmentPatientSearchStatus !== 'idle') renderAppointmentPatientMatches();
+    }
+
+    function handleAppointmentPatientSearchBlur() {
+      const modalSequence = appointmentModalOpenSequence;
+      window.setTimeout(() => {
+        if (modalSequence === appointmentModalOpenSequence
+          && !document.getElementById('appointment-patient-picker')?.contains(document.activeElement)) closeAppointmentPatientResults();
+      }, 120);
+    }
+
+    function retryAppointmentPatientSearch() {
+      document.getElementById('appointment-patient-search')?.focus();
+      filterAppointmentPatients();
+    }
+
     function renderAppointmentPatientMatches(ensureHighlightedVisible = false) {
       const input = document.getElementById('appointment-patient-search');
       const results = document.getElementById('appointment-patient-results');
       if (!input || !results) return;
-
-      if (!patients.length) {
-        results.innerHTML = `<p class="px-3 py-3 text-xs font-bold text-slate-400">${currentUiLanguage === 'ar' ? 'لا يوجد مرضى متاحون' : 'No patients available'}</p>`;
+      const isAr = currentUiLanguage === 'ar';
+      const loading = appointmentPatientSearchStatus === 'loading';
+      input.setAttribute('aria-busy', String(loading));
+      if (loading) {
+        results.innerHTML = `<div role="status" class="px-3 py-3"><p class="text-xs font-medium text-slate-500">${isAr ? 'جارٍ البحث عن المرضى...' : 'Searching patients...'}</p><div class="mt-2 h-4 w-full animate-pulse rounded-lg bg-slate-100"></div><div class="mt-2 h-4 w-2/3 animate-pulse rounded-lg bg-slate-100"></div></div>`;
+      } else if (appointmentPatientSearchStatus === 'error') {
+        results.innerHTML = `<div role="status" class="px-3 py-3"><p class="text-xs font-medium text-slate-500">${isAr ? 'تعذر البحث عن المرضى. حاول مرة أخرى.' : 'Could not search patients. Please try again.'}</p><button type="button" onclick="retryAppointmentPatientSearch()" class="appointment-patient-search-retry mt-2 rounded-lg bg-blue-50 px-3 text-xs font-semibold text-blue-700">${isAr ? 'إعادة المحاولة' : 'Retry'}</button></div>`;
       } else if (!appointmentPatientMatches.length) {
-        results.innerHTML = `<p class="px-3 py-3 text-xs font-bold text-slate-400">${currentUiLanguage === 'ar' ? 'لا يوجد مرضى مطابقون لبحثك.' : 'No patients match your search.'}</p>`;
+        results.innerHTML = `<p role="status" class="px-3 py-3 text-xs font-medium text-slate-500">${isAr ? 'لا يوجد مرضى مطابقون لبحثك.' : 'No patients match your search.'}</p>`;
       } else {
         results.innerHTML = appointmentPatientMatches.map((patient, index) => `
-          <button id="appointment-patient-option-${index}" type="button" role="option" aria-selected="${index === appointmentPatientHighlightedIndex}" data-appointment-patient-option="${patient.id}" onpointerdown="handleAppointmentPatientOptionPointerDown(event, this)" onclick="selectAppointmentPatient('${patient.id}')" class="block w-full truncate rounded-lg px-3 py-2.5 text-left text-xs font-black transition ${index === appointmentPatientHighlightedIndex ? 'bg-blue-50 text-blue-800' : 'text-slate-700 hover:bg-slate-50'}">
-            ${escapeAppointmentText(patient.name)}
+          <button id="appointment-patient-option-${index}" type="button" role="option" aria-selected="${index === appointmentPatientHighlightedIndex}" data-appointment-patient-option="${escapeAppointmentText(patient.id)}" onpointerdown="handleAppointmentPatientOptionPointerDown(event, this)" onclick="selectAppointmentPatient(this.dataset.appointmentPatientOption)" class="appointment-patient-search-option block w-full min-w-0 rounded-lg px-3 py-2.5 text-xs transition ${index === appointmentPatientHighlightedIndex ? 'bg-blue-50 text-blue-800' : 'text-slate-700 hover:bg-slate-50'}">
+            <span class="block truncate font-semibold" dir="auto">${escapeAppointmentText(patient.name)}</span>
+            <span class="mt-0.5 block truncate text-slate-400" dir="auto">${escapeAppointmentText([patient.patientNumber ? formatPatientNumber(patient) : '', patient.phone].filter(Boolean).join(' · '))}</span>
           </button>
         `).join('');
       }
-
       results.classList.remove('hidden');
       input.setAttribute('aria-expanded', 'true');
       if (appointmentPatientHighlightedIndex >= 0 && appointmentPatientMatches.length) {
         const activeId = `appointment-patient-option-${appointmentPatientHighlightedIndex}`;
         input.setAttribute('aria-activedescendant', activeId);
         if (ensureHighlightedVisible) document.getElementById(activeId)?.scrollIntoView({ block: 'nearest' });
-      } else {
-        input.removeAttribute('aria-activedescendant');
+      } else input.removeAttribute('aria-activedescendant');
+    }
+
+    async function searchAppointmentPatients(query, sequence, userId, generation, modalSequence) {
+      const input = document.getElementById('appointment-patient-search');
+      const isCurrent = () => sequence === appointmentPatientSearchSequence
+        && modalSequence === appointmentModalOpenSequence
+        && generation === targetedLoadingGeneration && currentSession?.user?.id === userId
+        && canModifyAppointments() && !appointmentModalUsesNote()
+        && !document.getElementById('modal-appointment').classList.contains('hidden')
+        && input.value.trim() === query && !document.getElementById('appointment-patient-id').value;
+      if (!isCurrent()) return;
+      const controller = new AbortController();
+      appointmentPatientSearchController = controller;
+      try {
+        const { data, error } = await db.rpc('search_appointment_patients', { p_query: query }).abortSignal(controller.signal);
+        if (!isCurrent()) return;
+        if (error) throw error;
+        if (!Array.isArray(data)) throw new Error('Invalid patient search response');
+        appointmentPatientMatches = data.slice(0, 5).map(normalisePatientRecord);
+        appointmentPatientMatches.forEach(patient => appointmentPatientSearchRecords.set(patient.id, patient));
+        appointmentPatientHighlightedIndex = appointmentPatientMatches.length ? 0 : -1;
+        appointmentPatientSearchStatus = 'ready';
+        renderAppointmentPatientMatches();
+      } catch (error) {
+        if (!isCurrent()) return;
+        appointmentPatientMatches = [];
+        appointmentPatientHighlightedIndex = -1;
+        appointmentPatientSearchStatus = 'error';
+        renderAppointmentPatientMatches();
+      } finally {
+        if (appointmentPatientSearchController === controller) appointmentPatientSearchController = null;
       }
     }
 
-    function filterAppointmentPatients() {
+    function filterAppointmentPatients(event = null) {
       const input = document.getElementById('appointment-patient-search');
       const selectedInput = document.getElementById('appointment-patient-id');
       if (!input || !selectedInput) return;
-
       if (appointmentModalUsesNote()) {
+        resetAppointmentPatientSearch();
         selectedInput.value = '';
-        input.setCustomValidity(input.value.trim()
-          ? ''
-          : (currentUiLanguage === 'ar' ? 'أدخل عنوانًا للملاحظة.' : 'Enter a title for the calendar note.'));
-        closeAppointmentPatientResults();
+        input.setCustomValidity(input.value.trim() ? '' : (currentUiLanguage === 'ar' ? 'أدخل عنوانًا للملاحظة.' : 'Enter a title for the calendar note.'));
+        syncAppointmentSaveButton();
         return;
       }
-
-      const selectedPatient = patients.find(patient => patient.id === selectedInput.value);
-      const selectionUnchanged = Boolean(selectedPatient && input.value === appointmentPatientDisplayValue(selectedPatient));
-      if (selectedPatient && !selectionUnchanged) selectedInput.value = '';
-      if (!selectedInput.value) input.setCustomValidity(currentUiLanguage === 'ar' ? 'اختر مريضًا من نتائج البحث.' : 'Select a patient from the search results.');
-
-      const query = selectionUnchanged ? '' : input.value.trim().toLocaleLowerCase();
-      const compactQuery = query.replace(/[\s()+\-–—]/g, '');
-      appointmentPatientMatches = patients
-        .filter(patient => {
-          if (!query) return true;
-          const text = `${patient.patientNumber || ''} ${formatPatientNumber(patient)} ${patient.name} ${patient.phone || ''}`.toLocaleLowerCase();
-          const compactPhone = String(patient.phone || '').toLocaleLowerCase().replace(/[\s()+\-–—]/g, '');
-          return patientSearchTermsMatch(text, query) || Boolean(compactQuery && compactPhone.includes(compactQuery));
-        })
-        .slice(0, 10);
-      appointmentPatientHighlightedIndex = appointmentPatientMatches.length ? 0 : -1;
+      const selected = appointmentPatientRecord(selectedInput.value);
+      if (selected && input.value === appointmentPatientDisplayValue(selected) && !event?.isComposing) {
+        closeAppointmentPatientResults();
+        syncAppointmentSaveButton();
+        return;
+      }
+      selectedInput.value = '';
+      resetAppointmentPatientSearch();
+      input.setCustomValidity(currentUiLanguage === 'ar' ? 'اختر مريضًا من نتائج البحث.' : 'Select a patient from the search results.');
+      syncAppointmentSaveButton();
+      const query = input.value.trim();
+      if (!query || event?.isComposing || !currentSession || !canModifyAppointments()) return;
+      appointmentPatientSearchQuery = query;
+      appointmentPatientSearchStatus = 'loading';
       renderAppointmentPatientMatches();
+      const sequence = appointmentPatientSearchSequence;
+      const userId = currentSession.user.id;
+      const generation = targetedLoadingGeneration;
+      const modalSequence = appointmentModalOpenSequence;
+      appointmentPatientSearchTimer = window.setTimeout(() => {
+        appointmentPatientSearchTimer = null;
+        void searchAppointmentPatients(query, sequence, userId, generation, modalSequence);
+      }, 250);
     }
 
     function selectAppointmentPatient(patientId) {
-      const patient = patients.find(item => item.id === patientId);
+      const patient = appointmentPatientRecord(patientId);
       const input = document.getElementById('appointment-patient-search');
       const selectedInput = document.getElementById('appointment-patient-id');
       if (!patient || !input || !selectedInput) return;
@@ -34455,6 +34564,7 @@
       input.value = appointmentPatientDisplayValue(patient);
       input.setCustomValidity('');
       closeAppointmentPatientResults();
+      syncAppointmentSaveButton();
     }
 
     function handleAppointmentPatientOptionPointerDown(event, option) {
@@ -34464,75 +34574,51 @@
     }
 
     function handleAppointmentPatientSearchKeydown(event) {
-      if (appointmentModalUsesNote()) return;
+      if (appointmentModalUsesNote() || event.isComposing) return;
       if (event.key === 'Escape') {
         closeAppointmentPatientResults();
         return;
       }
-      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Enter') return;
-
-      if (document.getElementById('appointment-patient-results').classList.contains('hidden')) filterAppointmentPatients();
-      if (!appointmentPatientMatches.length) {
-        if (event.key === 'Enter') event.preventDefault();
+      if (!['ArrowDown', 'ArrowUp', 'Enter'].includes(event.key)) return;
+      const results = document.getElementById('appointment-patient-results');
+      if (results.classList.contains('hidden')) {
+        if (event.key === 'Enter') return;
+        showAppointmentPatientResults();
+        event.preventDefault();
         return;
       }
-
-      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      if (!appointmentPatientMatches.length) {
         event.preventDefault();
+        return;
+      }
+      event.preventDefault();
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         const direction = event.key === 'ArrowDown' ? 1 : -1;
         appointmentPatientHighlightedIndex = (appointmentPatientHighlightedIndex + direction + appointmentPatientMatches.length) % appointmentPatientMatches.length;
         renderAppointmentPatientMatches(true);
-        return;
+      } else {
+        const patient = appointmentPatientMatches[appointmentPatientHighlightedIndex];
+        if (patient) selectAppointmentPatient(patient.id);
       }
-
-      event.preventDefault();
-      const highlightedPatient = appointmentPatientMatches[appointmentPatientHighlightedIndex];
-      if (highlightedPatient) selectAppointmentPatient(highlightedPatient.id);
     }
 
     function renderAppointmentPatientOptions() {
       const input = document.getElementById('appointment-patient-search');
       const selectedInput = document.getElementById('appointment-patient-id');
       if (!input || !selectedInput) return false;
-      if (appointmentModalUsesNote()) {
-        input.disabled = false;
-        closeAppointmentPatientResults();
-        return true;
-      }
-
-      const selectedPatient = patients.find(patient => patient.id === selectedInput.value);
-      const pendingSearch = input.value;
-      const appointmentModalOpen = !document.getElementById('modal-appointment').classList.contains('hidden');
-      const preserveSearch = appointmentModalOpen && document.activeElement === input
-        && !document.getElementById('appointment-patient-results').classList.contains('hidden');
-      const highlightedPatientId = appointmentPatientMatches[appointmentPatientHighlightedIndex]?.id;
-      appointmentPatientMatches = [];
-      appointmentPatientHighlightedIndex = -1;
-      input.disabled = !patients.length;
-      input.placeholder = patients.length
-        ? (currentUiLanguage === 'ar' ? 'ابحث برقم المريض أو الاسم أو الهاتف' : 'Search patients by number, name, or phone')
-        : (currentUiLanguage === 'ar' ? 'لا يوجد مرضى متاحون' : 'No patients available');
-      if (selectedPatient) {
-        selectedInput.value = selectedPatient.id;
-        input.value = appointmentPatientDisplayValue(selectedPatient);
+      input.disabled = false;
+      if (appointmentModalUsesNote()) return true;
+      input.placeholder = currentUiLanguage === 'ar' ? 'ابحث برقم المريض أو الاسم أو الهاتف' : 'Search patients by number, name, or phone';
+      const patient = appointmentPatientRecord(selectedInput.value);
+      if (patient) {
+        input.value = appointmentPatientDisplayValue(patient);
         input.setCustomValidity('');
       } else {
         selectedInput.value = '';
-        input.value = appointmentModalOpen ? pendingSearch : '';
-        input.setCustomValidity(patients.length
-          ? (currentUiLanguage === 'ar' ? 'اختر مريضًا من نتائج البحث.' : 'Select a patient from the search results.')
-          : '');
+        input.setCustomValidity(currentUiLanguage === 'ar' ? 'اختر مريضًا من نتائج البحث.' : 'Select a patient from the search results.');
       }
-      if (preserveSearch && patients.length) {
-        input.value = pendingSearch;
-        filterAppointmentPatients();
-        const highlightedIndex = appointmentPatientMatches.findIndex(patient => patient.id === highlightedPatientId);
-        if (highlightedIndex >= 0) {
-          appointmentPatientHighlightedIndex = highlightedIndex;
-          renderAppointmentPatientMatches();
-        }
-      } else closeAppointmentPatientResults();
-      return Boolean(patients.length);
+      syncAppointmentSaveButton();
+      return true;
     }
 
     function renderAppointmentDoctorOptions(preferredUserId = null) {
@@ -34544,6 +34630,7 @@
       if (!eligibleStaff.length) {
         setStableHtml(select, '<option value="">No appointment-enabled users available</option>');
         select.disabled = true;
+        syncAppointmentSaveButton();
         return false;
       }
 
@@ -34558,6 +34645,7 @@
           ? currentUserAccess.userId
           : eligibleStaff[0].userId;
       select.value = defaultUserId;
+      syncAppointmentSaveButton();
       return true;
     }
 
@@ -37118,7 +37206,14 @@
 
     async function openAppointmentModal(appointmentId = null, preferredStartMinutes = null, preferredDurationMinutes = null) {
       if (!canModifyAppointments()) return;
-      await Promise.all([ensureAppointmentsLoaded(), ensurePatientsLoaded(), ensureAppointmentVisitTypesLoaded()]);
+      const openSequence = ++appointmentModalOpenSequence;
+      const userId = currentSession?.user?.id;
+      const generation = targetedLoadingGeneration;
+      const selectedDate = new Date(appointmentSelectedDate);
+      resetAppointmentPatientSearch(true);
+      await Promise.all([ensureAppointmentsLoaded(), ensureAppointmentVisitTypesLoaded()]);
+      if (openSequence !== appointmentModalOpenSequence || generation !== targetedLoadingGeneration
+        || currentSession?.user?.id !== userId || !canModifyAppointments()) return;
       const modal = document.getElementById('modal-appointment');
       const form = document.getElementById('appointment-form');
       const saveButton = document.getElementById('btn-save-appointment');
@@ -37126,10 +37221,14 @@
       const eyebrow = document.getElementById('appointment-modal-eyebrow');
       const title = document.getElementById('appointment-modal-title');
       form.reset();
+      delete saveButton.dataset.saving;
       editingAppointmentId = appointmentId;
       appointmentModalEntryMode = 'patient';
-      const hasPatients = renderAppointmentPatientOptions();
+      renderAppointmentPatientOptions();
       const entry = appointmentId ? appointments.find(appointment => appointment.id === appointmentId) : null;
+      if (entry?.patientId) appointmentPatientSearchRecords.set(entry.patientId, {
+        id: entry.patientId, name: entry.patient, phone: entry.patientPhone, recordComplete: false
+      });
       setAppointmentModalEntryMode(entry?.isNote ? 'note' : 'patient');
       const addPatientButton = document.getElementById('appointment-patient-add-button');
       const canCreatePatients = hasPageAccess('patients');
@@ -37179,7 +37278,7 @@
         const startMinutes = Number.isFinite(preferredStartMinutes)
           ? Math.max(0, Math.min(1440 - APPOINTMENT_TIME_STEP, Math.round(preferredStartMinutes / APPOINTMENT_TIME_STEP) * APPOINTMENT_TIME_STEP))
           : 9 * 60;
-        document.getElementById('appointment-date').value = appointmentDateKey(appointmentSelectedDate);
+        document.getElementById('appointment-date').value = appointmentDateKey(selectedDate);
         updateAppointmentModalDateLabel();
         document.getElementById('appointment-time').value = appointmentTimeInputFromMinutes(startMinutes);
         const selectedDuration = Number.isFinite(preferredDurationMinutes) ? preferredDurationMinutes : 30;
@@ -37189,14 +37288,12 @@
         eyebrow.textContent = currentUiLanguage === 'ar' ? 'موعد جديد' : 'New appointment';
         title.textContent = currentUiLanguage === 'ar' ? 'حجز موعد' : 'Schedule a visit';
         saveButton.textContent = currentUiLanguage === 'ar' ? 'حفظ الموعد' : 'Save appointment';
-        saveButton.disabled = !hasPatients || !hasDoctors;
+        saveButton.disabled = !hasDoctors;
         deleteButton.classList.add('hidden');
         deleteButton.disabled = false;
-        document.getElementById('appointment-date-note').textContent = !hasPatients
-          ? 'Create a patient first, then return here to schedule the appointment.'
-          : !hasDoctors
+        document.getElementById('appointment-date-note').textContent = !hasDoctors
             ? 'Mark at least one active login as a doctor in Admin before scheduling.'
-            : `Scheduling for ${appointmentDayFormatter.format(appointmentSelectedDate)} at ${appointmentTimeFromMinutes(startMinutes)} for ${appointmentDurationLabel(selectedDuration)}.`;
+            : `Scheduling for ${appointmentDayFormatter.format(selectedDate)} at ${appointmentTimeFromMinutes(startMinutes)} for ${appointmentDurationLabel(selectedDuration)}.`;
       }
 
       const cancelButton = document.getElementById('appointment-modal-cancel-button');
@@ -37204,12 +37301,15 @@
 
       modal.classList.remove('hidden');
       modal.classList.add('flex');
+      syncAppointmentSaveButton();
       if (window.lucide) lucide.createIcons();
       closeAppointmentPatientResults();
       document.getElementById('appointment-modal-close-button')?.focus();
     }
 
     function closeAppointmentModal() {
+      appointmentModalOpenSequence += 1;
+      resetAppointmentPatientSearch(true);
       if (patientModalReturnToAppointment) closeNewPatientModal({ restoreAppointmentFocus: false });
       document.getElementById('modal-appointment').classList.add('hidden');
       document.getElementById('modal-appointment').classList.remove('flex');
@@ -37224,6 +37324,7 @@
     async function saveAppointment(event) {
       event.preventDefault();
       if (!canModifyAppointments()) return;
+      if (document.getElementById('btn-save-appointment').dataset.saving === 'true') return;
       const appointmentId = editingAppointmentId;
       const previousAppointment = appointmentId ? appointments.find(appointment => appointment.id === appointmentId) || null : null;
       const isNote = appointmentModalUsesNote();
@@ -37237,7 +37338,7 @@
       const status = document.getElementById('appointment-status').value;
       const notes = document.getElementById('appointment-notes').value.trim();
       const duration = Number(document.getElementById('appointment-duration').value);
-      const patient = patients.find(item => item.id === patientId);
+      const patient = appointmentPatientRecord(patientId);
       const assignedUser = appointmentStaff.find(staff => staff.userId === assignedUserId && staff.canReceiveAppointments);
       if (isNote && !noteTitle) {
         const noteInput = document.getElementById('appointment-patient-search');
@@ -37275,6 +37376,7 @@
         duration_minutes: duration
       };
       const saveButton = document.getElementById('btn-save-appointment');
+      saveButton.dataset.saving = 'true';
       saveButton.disabled = true;
       saveButton.textContent = 'Saving...';
 
@@ -37328,7 +37430,8 @@
           ? `تعذر ${appointmentId ? 'تحديث' : 'حفظ'} الموعد: ${error.message}`
           : `Failed to ${appointmentId ? 'update' : 'save'} appointment: ${error.message}`);
       } finally {
-        saveButton.disabled = false;
+        delete saveButton.dataset.saving;
+        syncAppointmentSaveButton();
         saveButton.textContent = isNote ? 'Save note' : appointmentId ? 'Save changes' : 'Save appointment';
       }
     }
