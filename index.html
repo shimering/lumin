@@ -80,10 +80,10 @@
   <script src="lumin-patient-swipe.js?v=1"></script>
   <script src="lumin-patients.js?v=4"></script>
   <script src="lumin-chart-sync.js?v=1"></script>
-  <script src="lumin-chart-media.js?v=7"></script>
+  <script src="lumin-chart-media.js?v=8"></script>
   <script src="lumin-chart-dates.js?v=1"></script>
   <link rel="stylesheet" href="lumin-chart-dates.css?v=1" />
-  <script src="lumin-media-teeth.js?v=1"></script>
+  <script src="lumin-media-teeth.js?v=2"></script>
   <script src="lumin-mobile-nav.js?v=1"></script>
   <script src="lumin-appointment-status.js?v=2"></script>
   <script src="lumin-dashboard-motion.js?v=3"></script>
@@ -5499,7 +5499,7 @@
   <link rel="stylesheet" href="lumin-patients.css?v=3" />
   <link rel="stylesheet" href="lumin-finance-sync.css?v=2" />
   <link rel="stylesheet" href="lumin-mobile-nav.css?v=2" />
-  <link rel="stylesheet" href="lumin-chart-media.css?v=4" />
+  <link rel="stylesheet" href="lumin-chart-media.css?v=5" />
   <link rel="stylesheet" href="lumin-media-teeth.css?v=1" />
   <style id="finance-ledger-styles">
     #finance-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -8889,18 +8889,18 @@
 
   <!-- ================= PATIENT MEDIA MODALS ================= -->
   <!-- Upload Modal -->
-  <div id="patient-media-upload-modal" class="appointment-card-popover-layer fixed inset-0 z-50 hidden items-end justify-center bg-slate-950/55 backdrop-blur-sm sm:items-center">
-    <div role="dialog" aria-modal="true" aria-label="Upload Patient Media" class="w-full max-w-lg overflow-y-auto border border-slate-200 bg-white shadow-xl" style="box-shadow: 0 34px 90px -24px rgba(15, 23, 42, 0.62), 0 18px 44px -22px rgba(15, 23, 42, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.72); animation: appointment-card-popover-in 160ms cubic-bezier(0.22, 1, 0.36, 1);">
+  <div id="patient-media-upload-modal" onclick="if (event.target === this) closePatientMediaUploadModal()" class="appointment-card-popover-layer fixed inset-0 z-50 hidden items-end justify-center bg-slate-950/55 backdrop-blur-sm sm:items-center">
+    <div role="dialog" aria-modal="true" aria-labelledby="media-upload-title" class="w-full max-w-lg overflow-y-auto border border-slate-200 bg-white shadow-xl" style="box-shadow: 0 34px 90px -24px rgba(15, 23, 42, 0.62), 0 18px 44px -22px rgba(15, 23, 42, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.72); animation: appointment-card-popover-in 160ms cubic-bezier(0.22, 1, 0.36, 1);">
       <div id="media-upload-header" class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
         <div class="flex items-center gap-2.5">
           <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><i data-lucide="upload-cloud" class="h-4 w-4"></i></span>
-          <h3 class="text-sm font-black text-slate-800">Upload Patient Media / X-Ray</h3>
+          <h3 id="media-upload-title" class="text-lg font-semibold tracking-tight text-slate-900">Upload Patient Media / X-Ray</h3>
         </div>
-        <button type="button" onclick="closePatientMediaUploadModal()" class="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 active:scale-[0.98]"><i data-lucide="x" class="h-5 w-5"></i></button>
+        <button type="button" onclick="closePatientMediaUploadModal()" aria-label="Close" class="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 active:scale-[0.98]"><i data-lucide="x" class="h-5 w-5"></i></button>
       </div>
       <form id="patient-media-upload-form" onsubmit="handlePatientMediaUploadSubmit(event)" class="p-6 space-y-4">
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1.5">Category *</label>
+          <label id="media-upload-category-label" for="upload-media-category" class="block text-xs font-bold text-slate-700 mb-1.5">Category *</label>
           <select id="upload-media-category" required class="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
             <option value="Panoramic">Panoramic X-Ray</option>
             <option value="Periapical">Periapical / Bitewings</option>
@@ -8927,7 +8927,7 @@
           <input id="upload-media-file-input" type="file" class="sr-only" onchange="handleMediaFileSelected(this)" />
           <div id="media-dropzone" role="button" tabindex="0" onclick="document.getElementById('upload-media-file-input').click()" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); document.getElementById('upload-media-file-input').click(); }" class="relative flex min-h-11 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-6 text-center transition hover:border-slate-300 hover:bg-blue-50/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 active:scale-[0.98] cursor-pointer">
             <div id="dropzone-empty" class="space-y-2">
-              <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600"><i data-lucide="cloud-arrow-up" class="h-6 w-6"></i></span>
+              <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600"><i data-lucide="cloud-upload" class="h-6 w-6"></i></span>
               <p class="text-xs font-bold text-slate-700">Tap to choose or drag a file here</p>
               <p class="text-[11px] text-slate-400">Images, PDFs, documents, and other files up to 50MB</p>
             </div>
@@ -10883,6 +10883,15 @@
       'Lab Documents': 'تقارير المعمل',
       'No media uploaded for this patient yet.': 'لم يتم رفع أي أشعة أو صور لهذا المريض بعد.',
       'Upload Patient Media / X-Ray': 'رفع أشعة / وسائط المريض',
+      'Add X-ray': 'إضافة أشعة',
+      'X-ray type *': 'نوع الأشعة *',
+      'Category *': 'التصنيف *',
+      'Panoramic X-Ray': 'أشعة بانوراما',
+      'Upload to Local Storage': 'رفع الملف',
+      'Intraoral Clinical Photo': 'صورة طبية داخل الفم',
+      'Extraoral / Facial Photo': 'صورة خارج الفم / الوجه',
+      'Lab Document / Report': 'مستند / تقرير معمل',
+      'General Record': 'سجل عام',
       'Photo name (optional)': 'اسم الصورة (اختياري)',
       'Select File (Image, PDF, DICOM, or other files) *': 'اختر ملفًا (صورة أو PDF أو DICOM أو ملفات أخرى) *',
       'Images, PDFs, documents, and other files up to 50MB': 'صور وملفات PDF ومستندات وملفات أخرى حتى 50 ميجابايت',
@@ -27639,6 +27648,7 @@
 
     let selectedPatientMediaUploadFile = null;
     let patientMediaPreviewUrl = '';
+    let patientMediaUploadContext = null;
     const patientMediaClipboardExtensions = {
       'image/png': 'png',
       'image/jpeg': 'jpg',
@@ -27655,24 +27665,38 @@
       error.classList.remove('hidden');
     }
 
-    function openPatientMediaUploadModal() {
+    function openPatientMediaUploadModal(options = {}) {
       const modal = document.getElementById('patient-media-upload-modal');
       const form = document.getElementById('patient-media-upload-form');
       const error = document.getElementById('upload-media-error');
       const progress = document.getElementById('upload-progress-container');
-      if (!modal) return;
+      if (!modal || document.getElementById('btn-submit-media-upload')?.disabled) return;
+      closePatientMediaToothPicker(false);
+      const patientId = options.patientId || activeWorkspacePatientId || patientWorkspaceId();
+      if (!patientId || !hasPageAccess('patients')) return;
+      const parent = options.fromChart ? document.getElementById('chart-media-panel') : null;
+      patientMediaUploadContext = { patientId, fromChart: Boolean(options.fromChart), previousFocus: document.activeElement, parent, parentWasInert: parent?.inert };
+      activePatientMediaPatientId = patientId;
       if (form) form.reset();
+      const xrayUpload = options.fromChart && options.category !== 'General';
+      document.getElementById('media-upload-title').textContent = xrayUpload ? 'Add X-ray' : 'Upload Patient Media / X-Ray';
+      document.getElementById('media-upload-category-label').textContent = xrayUpload ? 'X-ray type *' : 'Category *';
+      document.querySelector('#btn-submit-media-upload span').textContent = xrayUpload ? 'Add X-ray' : 'Upload to Local Storage';
       pendingPatientMediaUpload = null;
-      setPatientMediaTeeth('upload', []);
+      setPatientMediaTeeth('upload', options.toothIds || []);
+      if (options.category) document.getElementById('upload-media-category').value = options.category;
       if (error) error.classList.add('hidden');
       if (progress) progress.classList.add('hidden');
       selectedPatientMediaUploadFile = null;
       resetMediaDropzonePreview();
       modal.classList.remove('hidden');
       modal.classList.add('flex');
+      document.body.classList.add('patient-media-upload-open');
+      if (parent) parent.inert = true;
       setupMediaDropzoneEvents();
       translateUiTree(modal, currentUiLanguage);
       if (window.lucide) lucide.createIcons();
+      document.getElementById('upload-media-category')?.focus({ preventScroll: true });
     }
 
     function closePatientMediaUploadModal() {
@@ -27683,6 +27707,11 @@
         modal.classList.add('hidden');
         modal.classList.remove('flex');
       }
+      const context = patientMediaUploadContext;
+      patientMediaUploadContext = null;
+      document.body.classList.remove('patient-media-upload-open');
+      if (context?.parent) context.parent.inert = context.parentWasInert;
+      if (context?.previousFocus?.isConnected && context.patientId === (context.fromChart ? activePatientId : activeWorkspacePatientId)) context.previousFocus.focus({ preventScroll: true });
       selectedPatientMediaUploadFile = null;
       resetMediaDropzonePreview();
     }
@@ -27825,6 +27854,8 @@
 
     async function handlePatientMediaUploadSubmit(event) {
       event.preventDefault();
+      if (document.getElementById('btn-submit-media-upload')?.disabled) return;
+      const uploadContext = patientMediaUploadContext;
       const fileInput = document.getElementById('upload-media-file-input');
       const categorySelect = document.getElementById('upload-media-category');
       const noteInput = document.getElementById('upload-media-note');
@@ -27851,7 +27882,7 @@
         return;
       }
 
-      const patientId = activeWorkspacePatientId || patientWorkspaceId();
+      const patientId = uploadContext?.patientId || activeWorkspacePatientId || patientWorkspaceId();
       let patient = getKnownPatient(patientId);
       if (!patient && patientId) {
         patient = await ensureKnownPatient(patientId);
@@ -27912,7 +27943,14 @@
         pendingPatientMediaUpload = null;
         if (submitBtn) submitBtn.disabled = false;
         closePatientMediaUploadModal();
-        await renderPatientMedia();
+        if (uploadContext?.fromChart) {
+          if (activePatientId === patient.id && chartPatientMedia.patientId === patient.id) {
+            chartPatientMedia.selectedPath = uploadResult.relativePath || '';
+            await loadChartPatientMedia(patient.id);
+          }
+        } else {
+          await renderPatientMedia();
+        }
       } catch (err) {
         console.error('Upload failed:', err);
         if (errorEl) {

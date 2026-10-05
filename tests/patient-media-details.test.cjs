@@ -39,7 +39,7 @@ function createHarness() {
     currentUiLanguage: 'en', currentPatientMediaFiles: [], activePatientMediaPatientId: 'patient-1',
     activeWorkspacePatientId: 'patient-1', patientMediaRenderToken: 0, patientMediaDetailsError: false,
     activePatientMediaFilter: 'ALL', editingPatientMediaDetails: null, pendingPatientMediaUpload: null,
-    selectedPatientMediaUploadFile: photo, currentLightboxRelativePath: '',
+    selectedPatientMediaUploadFile: photo, patientMediaUploadContext: null, currentLightboxRelativePath: '',
     PRIMARY_TOOTH_BY_SLOT: primary, SLOT_BY_PRIMARY_TOOTH: Object.fromEntries(Object.entries(primary).map(([slot, id]) => [id, Number(slot)])),
     FormData, window: { lucide: {} }, lucide: { createIcons() {} },
     document: { getElementById: node, querySelector() { return null; }, addEventListener() {} },

@@ -3,7 +3,8 @@
 A modern, high-performance Progressive Web Application (PWA) for comprehensive dental clinic management, featuring:
 - Clinical interactive odontograms & charting
 - Tooth-linked X-ray gallery with a visual selector for multiple permanent/deciduous teeth, saved clinical notes, and editable photo names
-- Collapsible X-ray viewer beside the dental chart in landscape, with a patient attachments viewer for PDFs and other files
+- Collapsible X-ray viewer with multiple-tooth filters and direct uploads from the chart; new X-rays prefill the selected teeth and default to Periapical
+- Patient attachments viewer for PDFs and other files
 - Patient directory and records management
 - Appointment scheduling & calendar synchronization
 - Invoice, payment, and financial ledger tracking

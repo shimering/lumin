@@ -36,14 +36,16 @@ function patientMediaToothChoices(primary) {
 }
 
 function openPatientMediaToothPicker(prefix) {
-  if (!['upload', 'edit'].includes(prefix)) return;
-  const parent = document.getElementById(prefix === 'upload' ? 'patient-media-upload-modal' : 'patient-media-details-modal');
+  if (!['upload', 'edit', 'chart-filter'].includes(prefix)) return;
+  const chartFilter = prefix === 'chart-filter';
+  if (chartFilter && (chartPatientMedia.patientId !== activePatientId || chartPatientMedia.collapsed || !hasPageAccess('patients'))) return;
+  const parent = document.getElementById(chartFilter ? 'chart-media-panel' : prefix === 'upload' ? 'patient-media-upload-modal' : 'patient-media-details-modal');
   if (!parent || parent.classList.contains('hidden')) return;
   closePatientMediaToothPicker(false);
-  const ids = normalizePatientMediaTeeth(JSON.parse(document.getElementById(`${prefix}-media-tooth-ids`).value || '[]'));
+  const ids = normalizePatientMediaTeeth(chartFilter ? chartPatientMedia.filterToothIds : JSON.parse(document.getElementById(`${prefix}-media-tooth-ids`).value || '[]'));
   patientMediaToothPicker = {
     prefix, parent, parentWasInert: parent.inert, returnFocus: document.activeElement,
-    patientId: activePatientMediaPatientId, draft: new Set(ids), dentition: ids.length && ids.every(isPrimaryToothId) ? 'primary' : 'permanent',
+    patientId: chartFilter ? activePatientId : activePatientMediaPatientId, draft: new Set(ids), dentition: ids.length && ids.every(isPrimaryToothId) ? 'primary' : 'permanent',
   };
   let modal = document.getElementById('patient-media-tooth-picker');
   if (!modal) {
@@ -63,6 +65,7 @@ function renderPatientMediaToothPicker() {
   const state = patientMediaToothPicker;
   if (!state) return;
   const primary = state.dentition === 'primary';
+  const chartFilter = state.prefix === 'chart-filter';
   const selected = [...state.draft];
   const counts = { primary: selected.filter(isPrimaryToothId).length, permanent: selected.filter(id => !isPrimaryToothId(id)).length };
   const quadrants = patientMediaToothChoices(primary);
@@ -72,7 +75,7 @@ function renderPatientMediaToothPicker() {
   }).join('')}</div>`;
   document.getElementById('patient-media-tooth-picker').innerHTML = `
     <section class="media-tooth-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="media-tooth-picker-title" aria-describedby="media-tooth-picker-description">
-      <header class="media-tooth-picker-header"><div><h3 id="media-tooth-picker-title">${mediaTeethText('Assign teeth', 'تحديد الأسنان')}</h3><p id="media-tooth-picker-description">${mediaTeethText('Tap one or more teeth, then save.', 'اضغط على سن أو أكثر، ثم احفظ.')}</p></div><button type="button" class="media-teeth-action" aria-label="${mediaTeethText('Close', 'إغلاق')}" onclick="closePatientMediaToothPicker()"><i data-lucide="x"></i></button></header>
+      <header class="media-tooth-picker-header"><div><h3 id="media-tooth-picker-title">${chartFilter ? mediaTeethText('Filter X-rays by teeth', 'تصفية الأشعة حسب الأسنان') : mediaTeethText('Assign teeth', 'تحديد الأسنان')}</h3><p id="media-tooth-picker-description">${chartFilter ? mediaTeethText('Show X-rays assigned to any selected tooth. New X-rays will use this selection.', 'عرض الأشعة المرتبطة بأي سن محدد. ستُستخدم هذه الأسنان عند إضافة أشعة جديدة.') : mediaTeethText('Tap one or more teeth, then save.', 'اضغط على سن أو أكثر، ثم احفظ.')}</p></div><button type="button" class="media-teeth-action" aria-label="${mediaTeethText('Close', 'إغلاق')}" onclick="closePatientMediaToothPicker()"><i data-lucide="x"></i></button></header>
       <div class="media-tooth-picker-body">
         <div class="media-teeth-tabs" role="group" aria-label="${mediaTeethText('Dentition', 'نوع الأسنان')}">
           ${[['permanent', mediaTeethText('Permanent', 'دائمة')], ['primary', mediaTeethText('Deciduous', 'لبنية')]].map(([type, label]) => `<button type="button" class="media-teeth-action" data-media-dentition="${type}" aria-pressed="${state.dentition === type}" onclick="switchPatientMediaToothDentition('${type}')">${label}<span class="media-teeth-tab-count">${counts[type]}</span></button>`).join('')}
@@ -81,7 +84,7 @@ function renderPatientMediaToothPicker() {
         <fieldset class="media-teeth-arch"><legend>${mediaTeethText('Lower arch', 'الفك السفلي')}</legend>${row(quadrants[2])}${row(quadrants[3])}</fieldset>
         <button type="button" class="media-teeth-action media-teeth-clear" onclick="clearPatientMediaToothDraft()" ${selected.length ? '' : 'disabled'}><i data-lucide="eraser"></i>${mediaTeethText('Clear selection', 'مسح التحديد')}</button>
       </div>
-      <footer class="media-tooth-picker-footer"><span role="status" aria-live="polite">${mediaTeethText(`${selected.length} ${selected.length === 1 ? 'tooth' : 'teeth'} selected`, `الأسنان المحددة: ${selected.length}`)}</span><div><button type="button" class="media-teeth-action" onclick="closePatientMediaToothPicker()">${mediaTeethText('Cancel', 'إلغاء')}</button><button type="button" class="media-teeth-action media-teeth-save" onclick="savePatientMediaToothPicker()"><i data-lucide="check"></i>${mediaTeethText('Save teeth', 'حفظ الأسنان')}</button></div></footer>
+      <footer class="media-tooth-picker-footer"><span role="status" aria-live="polite">${mediaTeethText(`${selected.length} ${selected.length === 1 ? 'tooth' : 'teeth'} selected`, `الأسنان المحددة: ${selected.length}`)}</span><div><button type="button" class="media-teeth-action" onclick="closePatientMediaToothPicker()">${mediaTeethText('Cancel', 'إلغاء')}</button><button type="button" class="media-teeth-action media-teeth-save" onclick="savePatientMediaToothPicker()"><i data-lucide="check"></i>${chartFilter ? mediaTeethText('Apply filter', 'تطبيق الفلتر') : mediaTeethText('Save teeth', 'حفظ الأسنان')}</button></div></footer>
     </section>`;
   if (window.lucide) lucide.createIcons();
 }
@@ -111,6 +114,16 @@ function clearPatientMediaToothDraft() {
 function savePatientMediaToothPicker() {
   const state = patientMediaToothPicker;
   if (!state) return;
+  if (state.prefix === 'chart-filter') {
+    const canApply = state.patientId === activePatientId && chartPatientMedia.patientId === state.patientId && hasPageAccess('patients');
+    closePatientMediaToothPicker(false);
+    if (canApply) {
+      chartPatientMedia.filterToothIds = normalizePatientMediaTeeth([...state.draft]);
+      renderChartMediaPanel();
+      document.getElementById('chart-media-filter-teeth')?.focus({ preventScroll: true });
+    }
+    return;
+  }
   if (state.patientId === activePatientMediaPatientId && !state.parent.classList.contains('hidden')) setPatientMediaTeeth(state.prefix, [...state.draft]);
   closePatientMediaToothPicker();
 }

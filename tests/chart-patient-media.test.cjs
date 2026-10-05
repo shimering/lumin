@@ -139,10 +139,11 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
     await page.setViewportSize(viewport);
     const landscape = viewport.width >= 768 && viewport.width > viewport.height;
     for (const language of ['en','ar']) {
-      await page.evaluate(async language => { currentUiLanguage = language; document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr'; chartPatientMedia.collapsed = true; chartPatientMedia.filterToothId = ''; window.scrollTo(0,0); await loadChartPatientMedia(); }, language);
+      await page.evaluate(async language => { currentUiLanguage = language; document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr'; chartPatientMedia.collapsed = true; chartPatientMedia.filterToothIds = []; window.scrollTo(0,0); await loadChartPatientMedia(); }, language);
       assert.equal(await page.locator('#chart-media-panel').isVisible(), landscape);
       assert.ok(!(await page.locator('#chart-media-panel-body').isVisible()), 'Viewer starts collapsed');
-      assert.equal(await page.locator('.chart-tooth-xray-indicator').count(), 2, 'Both teeth assigned to one image have indicators');
+      assert.equal(await page.locator('.chart-tooth-xray-indicator').count(), 32, 'Every tooth has a selectable X-ray indicator');
+      assert.equal(await page.locator('.chart-tooth-xray-indicator:not(.is-unassigned)').count(), 2, 'Only teeth with X-rays have active indicators');
       const toothIndicator = page.locator('[data-tooth-xray-slot="3"] button');
       assert.equal(await toothIndicator.locator('small').textContent(), '1');
       const target = await toothIndicator.boundingBox();
@@ -156,7 +157,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
       assert.match(await page.locator('.chart-media-upload-date').textContent(),language==='ar'?/تاريخ الرفع/:/Uploaded 12 Sept 2026/);
       assert.equal(await page.evaluate(() => [window.toothSelections, window.dentitionSwitches].join(',')), '0,0', 'Indicators do not select teeth or switch dentition');
       assert.ok(await page.locator('.chart-media-filter').isVisible());
-      await page.locator('.chart-media-filter button').click();
+      await page.locator('[data-chart-clear-filter]').click();
       assert.equal(await page.locator('.chart-media-thumbnail').count(), 2, 'Clear filter restores all X-rays');
       if (!landscape) {
         assert.equal(await page.locator('#chart-media-panel').getAttribute('aria-modal'), 'true');
@@ -229,7 +230,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
   await page.emulateMedia({reducedMotion:'no-preference'});
   for(const language of ['en','ar']) {
     await page.setViewportSize({width:1280,height:820});
-    await page.evaluate(language=>{currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';chartPatientMedia.collapsed=true;renderChartMediaPanel();window.scrollTo(0,0);},language);
+    await page.evaluate(language=>{currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';chartPatientMedia.collapsed=true;chartPatientMedia.filterToothIds=[];renderChartMediaPanel();window.scrollTo(0,0);},language);
     await settleChartMediaMotion(page);
     const rail=await page.locator('#chart-media-panel').boundingBox();
     assert.ok(rail.width<=57);
@@ -267,6 +268,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
     await page.locator('#chart-media-collapse').click();await settleChartMediaMotion(page);
   }
   await page.setViewportSize({width:390,height:844});
+  await page.evaluate(() => { chartPatientMedia.filterToothIds=[]; });
   await page.locator('[data-tooth-xray-slot="3"] button').click();
   assert.ok(await page.evaluate(()=>chartMediaSheetAnimation?.playState==='running'),'Phone sheet slides in');
   await settleChartMediaMotion(page);
@@ -283,7 +285,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
   });
   await settleChartMediaMotion(page);
   assert.ok(await page.locator('.chart-media-preview').isVisible(),'Reversing a mobile close preserves the reopened sheet');
-  assert.equal(await page.evaluate(()=>chartPatientMedia.filterToothId),'4');
+  assert.deepEqual(await page.evaluate(()=>chartPatientMedia.filterToothIds),['4']);
   await page.emulateMedia({reducedMotion:'reduce'});
   await page.keyboard.press('Escape');
   assert.ok(!(await page.locator('#chart-media-panel').isVisible()),'Reduced motion closes immediately');
@@ -311,7 +313,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
     await loadChartPatientMedia();
   });
   assert.equal(await page.locator('[data-tooth-xray-slot="3"] small').textContent(),'2');
-  assert.equal(await page.locator('[data-tooth-xray-slot="5"] button, [data-tooth-xray-slot="6"] button').count(),0, 'Assigned photos and PDFs are not X-ray indicators');
+  assert.equal(await page.locator('[data-tooth-xray-slot="5"] button.is-unassigned, [data-tooth-xray-slot="6"] button.is-unassigned').count(),2, 'Assigned photos and PDFs do not activate X-ray indicators');
   await page.locator('[data-tooth-xray-slot="3"] button').click();
   assert.equal(await page.locator('.chart-media-thumbnail').count(),2);
   await page.locator('.chart-media-nav button').last().click();
@@ -320,14 +322,14 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
   assert.equal(await page.locator('.chart-media-caption h4').textContent(),'UR6 after treatment', 'Selection cannot escape the active tooth filter');
   await page.evaluate(() => loadChartPatientMedia());
   assert.equal(await page.locator('.chart-media-caption h4').textContent(),'UR6 after treatment', 'Refresh preserves the selected assigned image');
-  assert.equal(await page.evaluate(() => chartPatientMedia.filterToothId),'3');
+  assert.deepEqual(await page.evaluate(() => chartPatientMedia.filterToothIds),['3']);
   await page.locator('.chart-media-nav button').last().click();
   assert.equal(await page.locator('.chart-media-caption h4').textContent(),'UR6 before treatment', 'Navigation wraps only inside the filter');
   await page.locator('#chart-media-collapse').click();
   await page.locator('#chart-media-collapse').click();
   assert.equal(await page.locator('.chart-media-thumbnail').count(),2, 'Collapsing and reopening retains the filter');
   await page.screenshot({path:path.join(screenshots,'chart-xray-tooth-filter.png')});
-  await page.locator('.chart-media-filter button').click();
+  await page.locator('[data-chart-clear-filter]').click();
   assert.equal(await page.locator('.chart-media-thumbnail').count(),4);
   await page.locator('[data-tooth-xray-slot="4"] button').click();
   assert.equal(await page.locator('.chart-media-thumbnail').count(),1);
@@ -336,10 +338,13 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
     renderChartToothXrayIndicators();
   });
   assert.equal(await page.locator('[data-tooth-xray-slot="A"] small').textContent(),'1');
+  await page.locator('[data-chart-clear-filter]').click();
   await page.locator('[data-tooth-xray-slot="A"] button').click();
   assert.equal(await page.locator('.chart-media-caption h4').textContent(),'Deciduous follow-up', 'Primary tooth is distinct from the permanent tooth at the same position');
-  assert.equal(await page.evaluate(() => chartPatientMedia.filterToothId),'A');
+  assert.deepEqual(await page.evaluate(() => chartPatientMedia.filterToothIds),['A']);
   await page.locator('[data-tooth-xray-slot="A"] button').focus();
+  await page.keyboard.press('Space');
+  assert.deepEqual(await page.evaluate(() => chartPatientMedia.filterToothIds),[], 'Activating a selected icon removes that tooth from the filter');
   await page.keyboard.press('Space');
   assert.equal(await page.evaluate(() => window.toothSelections),0, 'Keyboard indicator activation does not select a tooth');
   await page.locator('[data-tooth-xray-slot="A"] button').dispatchEvent('pointerdown',{button:0,isPrimary:true,clientX:100,clientY:100,pointerId:1});
@@ -347,10 +352,10 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
   assert.equal(await page.evaluate(() => window.dentitionSwitches),0, 'Holding an indicator does not change dentition');
   assert.equal(await page.evaluate(() => toothDentitionLongPressTarget(document.querySelector('[data-tooth-xray-slot="A"] button'))),null);
   await page.evaluate(async () => { details[1].tooth_ids=[]; await loadChartPatientMedia(); });
-  assert.equal(await page.locator('[data-tooth-xray-slot="A"] button').count(),0, 'Assignment removal removes the indicator');
-  assert.match(await page.locator('#chart-media-panel-body').textContent(),/No X-rays assigned to this tooth/);
-  assert.equal(await page.evaluate(() => chartPatientMedia.filterToothId),'A', 'Empty filters remain until explicitly cleared');
-  await page.locator('.chart-media-filter button').click();
+  assert.equal(await page.locator('[data-tooth-xray-slot="A"] button.is-unassigned').count(),1, 'Assignment removal leaves a grey selectable indicator');
+  assert.match(await page.locator('#chart-media-panel-body').textContent(),/No X-rays assigned to the selected teeth/);
+  assert.deepEqual(await page.evaluate(() => chartPatientMedia.filterToothIds),['A'], 'Empty filters remain until explicitly cleared');
+  await page.locator('[data-chart-clear-filter]').click();
   assert.equal(await page.locator('.chart-media-thumbnail').count(),4);
   await page.evaluate(() => { document.getElementById('tooth-card-A').outerHTML=renderToothHTML({slot:4,toothId:'4',dentition:'permanent'}); renderChartToothXrayIndicators(); });
   await page.locator('#chart-media-collapse').click();
@@ -396,12 +401,12 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
   await page.evaluate(async () => { releasePatientOne(); await window.staleLoad; holdPatientOne=false; });
   assert.equal(await page.evaluate(() => chartPatientMedia.files[0].relativePath), 'Sara/Periapical/second.png');
   assert.equal(await page.evaluate(() => chartPatientMedia.patientId), 'patient-2');
-  assert.equal(await page.evaluate(() => chartPatientMedia.filterToothId),'');
+  assert.deepEqual(await page.evaluate(() => chartPatientMedia.filterToothIds),[]);
   assert.equal(await page.evaluate(() => chartPatientMedia.collapsed),true, 'Changing patient restores the default collapsed viewer');
-  assert.equal(await page.locator('.chart-tooth-xray-indicator').count(),0, 'Another patient cannot retain the previous indicators');
+  assert.equal(await page.locator('.chart-tooth-xray-indicator:not(.is-unassigned)').count(),0, 'Another patient cannot retain the previous active indicators');
   await page.evaluate(() => { activePatientId='patient-1'; metadataError=true; return loadChartPatientMedia(); });
   assert.match(await page.locator('#chart-media-panel-body').textContent(), /could not be loaded/);
-  assert.equal(await page.locator('.chart-tooth-xray-indicator').count(),0, 'Unavailable metadata cannot create misleading indicators');
+  assert.equal(await page.locator('.chart-tooth-xray-indicator:not(.is-unassigned)').count(),0, 'Unavailable metadata cannot create misleading active indicators');
   await page.evaluate(() => { canReadPatients=false; return loadChartPatientMedia(); });
   assert.equal(await page.evaluate(() => chartPatientMedia.files.length),0);
   assert.equal(await page.locator('.chart-tooth-xray-indicator').count(),0);
@@ -443,7 +448,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
       await page.evaluate(({language,zoom}) => {
         currentUiLanguage=language; document.documentElement.dir=language === 'ar' ? 'rtl' : 'ltr';
         document.documentElement.style.zoom=zoom; updateAppViewportDimensions();
-        chartPatientMedia.collapsed=true; chartPatientMedia.filterToothId=''; renderChartMediaPanel(); window.scrollTo(0,0);
+        chartPatientMedia.collapsed=true; chartPatientMedia.filterToothIds=[]; renderChartMediaPanel(); window.scrollTo(0,0);
       },{language,zoom});
       const collapsed = await page.locator('#chart-media-panel').boundingBox();
       assert.ok(collapsed.y >= 0 && collapsed.y+collapsed.height <= viewport.height+1, `Collapsed viewer is on screen with the real navigation rail: ${JSON.stringify({viewport,language,zoom,collapsed})}`);
