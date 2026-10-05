@@ -30,6 +30,7 @@
     missingTexture: ['A texture is missing. The affected surface uses a neutral material.', 'توجد صورة مفقودة. يُعرض السطح المتأثر بلون محايد.'], missingMaterial: ['A material file is missing. The affected surface uses a neutral material.', 'يوجد ملف مواد مفقود. يُعرض السطح المتأثر بلون محايد.'],
     webglUnavailable: ['This device does not support WebGL2. Use a compatible browser or device to view scans. Original ZIP downloads remain available.', 'هذا الجهاز لا يدعم WebGL2. استخدم متصفحًا أو جهازًا متوافقًا للعرض. يظل تنزيل ZIP الأصلي متاحًا.'],
     contextLost: ['Graphics paused. Waiting for the browser to restore the viewer…', 'توقف العرض مؤقتًا. في انتظار استعادة المتصفح للعارض…'],
+    fullscreen: ['Full screen', 'ملء الشاشة'], exitFullscreen: ['Exit full screen', 'الخروج من ملء الشاشة'],
     fileLimit: ['This ZIP exceeds the storage server upload limit.', 'يتجاوز ملف ZIP حد الرفع الخاص بالخادم.'], zipOnly: ['Choose a .zip file.', 'اختر ملفًا بامتداد .zip.'],
     metadataRetry: ['The ZIP is already uploaded. Retry Save to finish its details without uploading another copy.', 'تم رفع ZIP بالفعل. أعد محاولة الحفظ لإكمال التفاصيل دون رفع نسخة أخرى.'],
     failed: ['Could not complete this action. Check the storage connection and retry.', 'تعذر إكمال العملية. تحقق من الاتصال بخادم التخزين وأعد المحاولة.'], selected: ['Select for comparison', 'تحديد للمقارنة'],
@@ -194,7 +195,7 @@
         const selection = { upper: this.field('upper'), lower: this.field('lower'), orientation: this.field('orientation') };
         const data = await target.job.call({ type: 'parse', upper: selection.upper, lower: selection.lower });
         if (!this.alive() || epoch !== this.epoch) return;
-        const { ScanViewer } = await import('./lumin-scan-viewer.js?v=2'); if (!this.alive() || epoch !== this.epoch) return;
+        const { ScanViewer } = await import('./lumin-scan-viewer.js?v=3'); if (!this.alive() || epoch !== this.epoch) return;
         this.viewer = new ScanViewer(this.host.querySelector('.scan-stage'), key => this.t(key));
         await this.viewer.setScans([{ data, name: this.field('name'), orientation: selection.orientation }]);
         if (!this.alive() || epoch !== this.epoch) return;
@@ -237,7 +238,7 @@
         if (!this.alive() || epoch !== this.epoch) return;
         const area = this.host.querySelector('.scan-workspace'); this.settings = defaults();
         area.innerHTML = `<div class="scan-workspace-heading"><h4>${this.t('compare')}</h4>${this.button('close', 'close', 'x')}</div><div class="scan-stage"></div><p class="scan-gestures">${this.t('gestureHint')}</p>${this.controls()}`;
-        const { ScanViewer } = await import('./lumin-scan-viewer.js?v=2'); if (!this.alive() || epoch !== this.epoch) return;
+        const { ScanViewer } = await import('./lumin-scan-viewer.js?v=3'); if (!this.alive() || epoch !== this.epoch) return;
         this.viewer = new ScanViewer(area.querySelector('.scan-stage'), key => this.t(key)); await this.viewer.setScans(scans); this.icons();
       } finally { if (this.alive() && epoch === this.epoch) this.setBusy(false); }
     }

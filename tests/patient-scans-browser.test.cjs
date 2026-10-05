@@ -65,6 +65,16 @@ test('scan viewer: original ZIP, comparison, controls, retries, safety, and resp
   assert.equal(await page.evaluate(()=>scans.previewReady),true);
   assert.equal(await page.locator('[data-scan-setting="background"]').inputValue(),'dark');
   assert.equal(await page.evaluate(()=>scans.viewer.panes[0].scene.background.getHex()),0x1e293b);
+  // Native fullscreen resizes the existing renderer without changing the camera.
+  const fullscreen = page.locator('.scan-fullscreen-toggle');
+  const initialPose = await page.evaluate(()=>scans.viewer.panes[0].camera.position.toArray());
+  await fullscreen.click(); await page.waitForFunction(()=>document.fullscreenElement === scans.viewer.host);
+  await page.waitForFunction(()=>scans.viewer.renderer.domElement.clientHeight === innerHeight);
+  assert.equal(await fullscreen.getAttribute('aria-label'),'Exit full screen');
+  assert.equal(await fullscreen.getAttribute('aria-pressed'),'true');
+  assert.deepEqual(await page.evaluate(()=>scans.viewer.panes[0].camera.position.toArray()),initialPose);
+  await fullscreen.click(); await page.waitForFunction(()=>!document.fullscreenElement);
+  assert.equal(await fullscreen.getAttribute('aria-label'),'Full screen');
   if(fs.existsSync(sample)) {
     const stats=await page.evaluate(()=>scans.viewer.panes[0].arches.upper.children.map(m=>({vertices:m.geometry.attributes.position.count,texture:!!m.material.map,normal:m.geometry.attributes.normal.count})));
     assert.equal(stats[0].vertices,147555*3);assert.equal(stats[0].normal,stats[0].vertices);assert.ok(stats[0].texture);
@@ -91,6 +101,10 @@ test('scan viewer: original ZIP, comparison, controls, retries, safety, and resp
   await page.locator('[data-scan-select="0"]').check();await page.locator('[data-scan-select="1"]').check();await page.locator('[data-scan-action="compare"]').click();await page.waitForFunction(()=>scans.viewer?.panes.length===2,{},{timeout:60000});
   assert.equal(await page.locator('.scan-stage canvas').count(),1);
   await page.waitForFunction(()=>!scans.busy);
+  await fullscreen.click(); await page.waitForFunction(()=>document.fullscreenElement === scans.viewer.host);
+  assert.equal(await page.locator('.scan-pane').count(),2);
+  await page.evaluate(()=>document.exitFullscreen());
+  await page.waitForFunction(()=>document.querySelector('.scan-fullscreen-toggle').getAttribute('aria-pressed')==='false');
   await page.locator('.scan-pane').first().scrollIntoViewIfNeeded();
   const box=await page.locator('.scan-pane').first().boundingBox(),x=box.x+box.width/2,y=box.y+box.height/2;
   const pose=()=>page.evaluate(()=>{
@@ -141,11 +155,31 @@ test('scan viewer: original ZIP, comparison, controls, retries, safety, and resp
     const size=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,width:innerWidth,short:[...document.querySelectorAll('#view-patient-scans button')].filter(b=>b.getBoundingClientRect().height&&b.getBoundingClientRect().height<44).length}));
     assert.ok(size.scroll<=size.width,JSON.stringify(size));assert.equal(size.short,0);
     if(width===390) assert.ok(await page.evaluate(()=>document.querySelectorAll('.scan-pane')[1].getBoundingClientRect().top>document.querySelectorAll('.scan-pane')[0].getBoundingClientRect().top));
+    if (!raised) {
+      const overflow = await page.evaluate(()=>document.body.style.overflow);
+      await page.evaluate(()=>{scans.viewer.host.requestFullscreen = undefined;});
+      await fullscreen.click(); await page.waitForFunction(()=>!!document.querySelector('body > .scan-expanded'));
+      assert.equal(await fullscreen.getAttribute('aria-label'),language==='ar'?'الخروج من ملء الشاشة':'Exit full screen');
+      const bounds = await page.locator('.scan-stage').boundingBox();
+      assert.equal(bounds.width,width); assert.equal(bounds.height,1000);
+      const target = await fullscreen.boundingBox(); assert.ok(target.width>=44 && target.height>=44);
+      assert.ok(target.x>=0 && target.x+target.width<=width);
+      assert.equal(await page.locator('.scan-fullscreen-toggle svg').count(),1);
+      await page.keyboard.press('Tab'); assert.equal(await page.evaluate(()=>document.activeElement.className),'scan-pane');
+      await page.keyboard.press('Escape'); await page.waitForFunction(()=>!document.querySelector('.scan-expanded'));
+      assert.equal(await page.evaluate(()=>document.body.style.overflow),overflow);
+      assert.equal(await page.locator('#view-patient-scans .scan-stage').count(),1);
+    }
     const artifacts=process.env.LUMIN_SCAN_SCREENSHOTS;
     if(artifacts && !raised && ((language==='en'&&width===1280)||(language==='ar'&&width===390))) {fs.mkdirSync(artifacts,{recursive:true});await page.screenshot({path:path.join(artifacts,language==='en'?'comparison.png':'arabic-mobile.png'),fullPage:true});}
     }
   }
   await page.setViewportSize({width:1280,height:1000});await page.evaluate(()=>{document.documentElement.lang='en';document.documentElement.dir='ltr';scans.options.language='en';});
+  // Changing patients while expanded removes the overlay and restores page scrolling.
+  await fullscreen.click(); await page.waitForFunction(()=>!!document.querySelector('.scan-expanded'));
+  await page.evaluate(()=>mount()); await page.waitForFunction(()=>document.querySelectorAll('.scan-card').length===2);
+  assert.equal(await page.locator('.scan-expanded').count(),0); assert.equal(await page.evaluate(()=>document.body.style.overflow),'');
+  await page.locator('[data-scan-action="open"]').first().click(); await page.waitForFunction(()=>scans.previewReady);
   await page.locator('[data-scan-action="close"]').click();assert.equal(await page.evaluate(()=>scans.workers.size),0);
   // Missing textures and ambiguous file identification stay reviewable.
   const missing=Buffer.from(zipSync({'a.obj':strToU8(obj),'b.obj':strToU8(obj),'arch.mtl':strToU8('newmtl _texture\nmap_Kd missing.jpg')}));

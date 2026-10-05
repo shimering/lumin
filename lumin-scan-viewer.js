@@ -52,6 +52,66 @@ export class ScanViewer {
     canvas.addEventListener('webglcontextlost', this.contextLost);
     canvas.addEventListener('webglcontextrestored', this.contextRestored);
     this.observer = new ResizeObserver(() => this.request()); this.observer.observe(host);
+    this.fullscreenButton = document.createElement('button');
+    this.fullscreenButton.type = 'button'; this.fullscreenButton.className = 'scan-fullscreen-toggle';
+    this.fullscreenButton.dir = document.documentElement.dir === 'rtl' ? 'rtl' : 'ltr';
+    this.fullscreenButton.addEventListener('click', () => this.toggleFullscreen()); host.append(this.fullscreenButton);
+    this.fullscreenChanged = () => { if (!this.disposed) this.updateFullscreenButton(); };
+    this.fullscreenKey = event => {
+      if (!this.expanded) return;
+      if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); this.exitExpanded(); }
+      if (event.key === 'Tab') {
+        const targets = [this.fullscreenButton, ...this.panes.map(pane => pane.element)];
+        const index = targets.indexOf(document.activeElement);
+        event.preventDefault(); targets[(index + (event.shiftKey ? targets.length - 1 : 1)) % targets.length].focus();
+      }
+    };
+    document.addEventListener('fullscreenchange', this.fullscreenChanged); host.addEventListener('keydown', this.fullscreenKey);
+    this.updateFullscreenButton();
+  }
+  updateFullscreenButton() {
+    const active = this.expanded || document.fullscreenElement === this.host;
+    const label = this.labels(active ? 'exitFullscreen' : 'fullscreen');
+    this.fullscreenButton.title = label; this.fullscreenButton.setAttribute('aria-label', label);
+    this.fullscreenButton.setAttribute('aria-pressed', String(!!active));
+    this.fullscreenButton.innerHTML = `<i data-lucide="${active ? 'minimize' : 'maximize'}" aria-hidden="true"></i>`;
+    if (window.lucide) lucide.createIcons();
+    this.request();
+  }
+  async toggleFullscreen() {
+    if (this.disposed || this.fullscreenButton.disabled) return;
+    this.fullscreenButton.disabled = true;
+    try {
+      if (this.expanded) this.exitExpanded();
+      else if (document.fullscreenElement === this.host) await document.exitFullscreen();
+      else {
+        if (this.host.requestFullscreen && document.fullscreenEnabled !== false) {
+          try {
+            await this.host.requestFullscreen();
+            if (this.disposed && document.fullscreenElement === this.host) await document.exitFullscreen();
+            return;
+          } catch { if (this.disposed) return; }
+        }
+        // Browsers without element fullscreen still get a viewport-sized viewer.
+        this.placeholder = document.createComment('scan-viewer'); this.host.before(this.placeholder);
+        this.bodyOverflow = document.body.style.overflow; document.body.style.overflow = 'hidden';
+        document.body.append(this.host); this.host.classList.add('scan-expanded'); this.expanded = true;
+        this.host.setAttribute('role', 'dialog'); this.host.setAttribute('aria-modal', 'true');
+        this.host.setAttribute('aria-label', this.labels('title')); this.fullscreenButton.focus({ preventScroll: true });
+      }
+    } catch { /* Keep the exit control available if the browser declines to exit. */ }
+    finally {
+      this.fullscreenButton.disabled = false;
+      if (!this.disposed) { this.updateFullscreenButton(); this.fullscreenButton.focus({ preventScroll: true }); }
+    }
+  }
+  exitExpanded() {
+    if (!this.expanded) return;
+    this.expanded = false; this.host.classList.remove('scan-expanded');
+    this.placeholder.replaceWith(this.host); this.placeholder = null;
+    document.body.style.overflow = this.bodyOverflow;
+    this.host.removeAttribute('role'); this.host.removeAttribute('aria-modal'); this.host.removeAttribute('aria-label');
+    if (!this.disposed) { this.updateFullscreenButton(); this.fullscreenButton.focus({ preventScroll: true }); }
   }
   showStatus(message) {
     this.status?.remove();
@@ -69,7 +129,8 @@ export class ScanViewer {
         const element = document.createElement('div'); element.className = 'scan-pane'; element.style.touchAction = 'none';
         element.dataset.swipeBackIgnore = '';
         element.tabIndex = 0; element.setAttribute('aria-label', `${scan.name}. ${this.labels('gestureHint')}`);
-        const label = document.createElement('span'); label.className = 'scan-pane-name'; label.textContent = scan.name; element.append(label);
+        const label = document.createElement('span'); label.className = 'scan-pane-name'; label.textContent = scan.name;
+        label.dir = document.documentElement.dir === 'rtl' ? 'rtl' : 'ltr'; element.append(label);
         this.host.append(element);
         const controls = new OrbitControls(camera, element); controls.enableDamping = false;
         controls.minDistance = 0.2; controls.maxDistance = 15;
@@ -218,7 +279,11 @@ export class ScanViewer {
     this.urls = []; this.panes = [];
   }
   dispose() {
-    this.disposed = true; cancelAnimationFrame(this.frame); this.observer.disconnect(); this.clearPanes();
+    this.disposed = true; this.exitExpanded();
+    if (document.fullscreenElement === this.host) document.exitFullscreen().catch(() => {});
+    document.removeEventListener('fullscreenchange', this.fullscreenChanged); this.host.removeEventListener('keydown', this.fullscreenKey);
+    this.fullscreenButton.remove();
+    cancelAnimationFrame(this.frame); this.observer.disconnect(); this.clearPanes();
     const canvas = this.renderer.domElement;
     canvas.removeEventListener('webglcontextlost', this.contextLost); canvas.removeEventListener('webglcontextrestored', this.contextRestored);
     this.renderer.dispose(); this.renderer.forceContextLoss(); canvas.remove(); this.status?.remove();
