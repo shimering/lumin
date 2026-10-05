@@ -3,15 +3,16 @@
 .chart-clinical-column .arch-scroll { overflow-x: auto; overscroll-behavior-inline: contain; }
 #view-chart .chart-clinical-column .arch-scroll > div { min-width: calc(var(--arch-columns, 16) * 48px) !important; }
 .chart-tooth-xray-slot { display: flex; justify-content: center; width: 100%; height: 44px; flex: 0 0 44px; }
-.chart-tooth-xray-indicator { display: grid; place-items: center; width: 44px; height: 44px; flex: 0 0 44px; padding: 4px; border: 0; border-radius: 12px; background: transparent; color: #2563eb; cursor: pointer; transition: background 150ms ease-out, transform 150ms ease-out; }
-.chart-tooth-xray-indicator > span { display: inline-flex; align-items: center; justify-content: center; gap: 3px; min-height: 28px; padding: 4px 5px; border-radius: 999px; background: #eff6ff; }
+.chart-tooth-xray-indicator { display: grid; place-items: center; width: 44px; height: 44px; flex: 0 0 44px; padding: 4px; border: 0; border-radius: 12px; background: transparent; color: #047857; cursor: pointer; transition: background 150ms ease-out, transform 150ms ease-out; }
+.chart-tooth-xray-indicator > span { display: inline-flex; align-items: center; justify-content: center; gap: 3px; min-height: 28px; padding: 4px 5px; border-radius: 999px; background: #ecfdf5; }
 .chart-tooth-xray-indicator svg { width: 16px; height: 16px; }
 .chart-tooth-xray-indicator small { font-size: 10px; font-weight: 600; }
-.chart-tooth-xray-indicator:hover { background: #eff6ff; }
+.chart-tooth-xray-indicator:hover { background: #ecfdf5; }
 .chart-tooth-xray-indicator.is-unassigned { color: #94a3b8; }
 .chart-tooth-xray-indicator.is-unassigned > span { background: #f1f5f9; }
 .chart-tooth-xray-indicator.is-unassigned:hover { background: #f1f5f9; color: #64748b; }
 .chart-tooth-xray-indicator[aria-pressed="true"] > span { background: #dbeafe; color: #1d4ed8; }
+.chart-tooth-xray-indicator:not(.is-unassigned)[aria-pressed="true"] > span { background: #d1fae5; color: #065f46; }
 .chart-tooth-xray-indicator:active { transform: scale(.98); }
 .chart-tooth-xray-indicator:focus-visible { outline: 2px solid #93c5fd; outline-offset: -2px; }
 .chart-tooth-xray-indicator:disabled { opacity: .5; pointer-events: none; }
