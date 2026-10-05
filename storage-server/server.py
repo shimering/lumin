@@ -748,6 +748,7 @@ app.config['MAX_CONTENT_LENGTH'] = config["max_file_size_mb"] * 1024 * 1024
 
 _sync_engine = None
 _sync_engine_lock = threading.Lock()
+_scan_upload_lock = threading.Lock()
 
 
 def _tailscale_keepalive_worker():
@@ -908,12 +909,21 @@ def upload_file():
     # A unique name protects repeated imports within the same second. Save bytes without extraction.
     if category == '3D-Scans':
         import uuid
-        saved_filename = f"{date_str}_{uuid.uuid4().hex}.zip"
+        try:
+            scan_upload_id = uuid.UUID(request.form['scanUploadId']) if request.form.get('scanUploadId') else uuid.uuid4()
+        except (ValueError, AttributeError):
+            return jsonify({"error": "Invalid scan upload identifier."}), 400
+        saved_filename = f"{scan_upload_id.hex}.zip"
     else:
         saved_filename = f"{date_str}_{timestamp_unique}_{original_filename}"
 
     file_path = target_dir / saved_filename
-    get_sync_engine().save_upload(uploaded_file, file_path.relative_to(STORAGE_ROOT).as_posix())
+    if category == '3D-Scans':
+        with _scan_upload_lock:
+            if not file_path.is_file():
+                get_sync_engine().save_upload(uploaded_file, file_path.relative_to(STORAGE_ROOT).as_posix())
+    else:
+        get_sync_engine().save_upload(uploaded_file, file_path.relative_to(STORAGE_ROOT).as_posix())
 
     relative_path = str(file_path.relative_to(STORAGE_ROOT)).replace("\\", "/")
     file_size = file_path.stat().st_size
@@ -1205,7 +1215,11 @@ def serve_file(filename):
     """Stream or serve the raw full-resolution image / file to the browser."""
     clean_filename = safe_path(STORAGE_ROOT, filename).relative_to(STORAGE_ROOT).as_posix()
     resp = send_from_directory(STORAGE_ROOT, clean_filename)
-    resp.headers["Cache-Control"] = "public, max-age=86400"
+    if Path(clean_filename).suffix.lower() == '.zip':
+        resp.headers["Cache-Control"] = "private, no-store"
+        resp.headers["Vary"] = "x-lumin-key"
+    else:
+        resp.headers["Cache-Control"] = "public, max-age=86400"
     return resp
 
 @app.route("/api/mapping/status", methods=["GET"])

@@ -38,3 +38,23 @@ Run `node --test tests/targeted-loading.test.cjs` for the request-scoping checks
 Appointment forms fetch patients only after typing, with a 250 ms debounce and a maximum of five lightweight matches. Apply the `appointment_patient_search` migration before publishing this frontend. Run `node --test tests/appointment-patient-search.test.cjs` with Playwright and `supabase/tests/appointment_patient_search.test.sql` for rolled-back search, result-limit, and permission checks.
 
 Dashboard appointment saves update the selected-day caches immediately. Reads started before a save preserve that change, while later reads accept updates from other staff. Run `node --test tests/dashboard-appointment-sync.test.cjs tests/appointment-status-picker.test.cjs` for cache races, failed saves, and visible status continuity.
+
+## Patient 3D scans
+
+Patients have a **3D Scans** tab beside **X-Rays & Media**, with multiple original
+ZIP archives, import previews, textured OBJ arches, synchronized two-scan comparison,
+rendering controls, and movable section cuts. Originals stay unchanged on local
+storage and can be downloaded with their imported filename. Names, notes, scan dates,
+and arch selections use the existing patient media metadata and permissions.
+
+The `patient_3d_scans` metadata migration must precede frontend rollout. Update each
+storage server with [the update ZIP](storage-server/lumin-storage-sync-update.zip);
+installation instructions are in [the storage README](storage-server/README.md#patient-3d-scans).
+Pinned Three.js 0.180.0 and fflate 0.8.2 browser modules and their licenses are under
+`vendor/`; `scripts/bundle-3d-vendors.py` reproduces that bundle without running package scripts.
+The supplied patient archive is used locally for verification and is not included in Git.
+
+Run `node --test tests/patient-scans-parser.test.cjs tests/patient-scans-browser.test.cjs`
+with Playwright available. `LUMIN_SCAN_SAMPLE` selects a local sample ZIP; otherwise
+the browser test uses synthetic OBJ arches. Run `python tests/storage-file-sync.test.py`
+for original-byte downloads, retry identifiers, and paired-server synchronization.

@@ -35,6 +35,8 @@ class SyncTests(unittest.TestCase):
             module = importlib.util.module_from_spec(spec)
             with patch.dict(os.environ, {'LUMIN_STORAGE_CONFIG': str(config)}):
                 spec.loader.exec_module(module)
+            # Endpoint tests exercise file/sync behavior without racing background SQL exports.
+            module.update_storage_mapping_files = lambda: {}
 
             def auth_json(url, method='GET', headers=None, data=None):
                 if (headers or {}).get('Authorization') != 'Bearer admin':
@@ -275,6 +277,53 @@ class SyncTests(unittest.TestCase):
                 normalise_url(value)
         self.write(0, '.thumbnails/P/General/a.pdf', b'thumbnail')
         self.assertEqual(self.engines[0].scan(), {})
+
+    def test_original_scan_zip_upload_download_and_two_server_sync(self):
+        import zipfile
+        original = io.BytesIO()
+        with zipfile.ZipFile(original, 'w', zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr('upper.obj', 'v 0 0 1\nv 1 0 1\nv 0 1 1\nf 1 2 3\n')
+            archive.writestr('lower.obj', 'v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n')
+            archive.writestr('original.stl', b'preserved original extra file')
+        payload = original.getvalue()
+        client = self.modules[0].app.test_client()
+        health = client.get('/api/health').get_json()
+        self.assertTrue(health['capabilities']['patient3dScans'])
+        self.assertIn('zip', self.engines[0].extensions)
+        paths = []
+        for _ in range(2):
+            response = client.post('/api/upload', headers={'x-lumin-key': self.keys[0]}, data={
+                'file': (io.BytesIO(payload), 'Original patient scan.zip'),
+                'patientId': 'scan-test', 'patientName': 'Scan Test', 'category': '3D-Scans'})
+            self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+            paths.append(response.get_json()['relativePath'])
+        self.assertNotEqual(paths[0], paths[1])
+        import uuid
+        upload_id = str(uuid.uuid4())
+        retries = []
+        for _ in range(2):
+            response = client.post('/api/upload', headers={'x-lumin-key': self.keys[0]}, data={
+                'file': (io.BytesIO(payload), 'Retry.zip'), 'scanUploadId': upload_id,
+                'patientId': 'scan-test', 'patientName': 'Scan Test', 'category': '3D-Scans'})
+            retries.append(response.get_json()['relativePath'])
+        self.assertEqual(retries[0], retries[1])
+        paths.append(retries[0])
+        for rel in paths:
+            response = client.get('/files/' + rel, headers={'x-lumin-key': self.keys[0]})
+            self.assertEqual(response.data, payload)
+            self.assertEqual(response.headers['Cache-Control'], 'private, no-store')
+            response.close()
+            self.assertEqual(client.get('/files/' + rel).status_code, 401)
+        listing = client.get('/api/patient/scan-test/files?name=Scan%20Test', headers={'x-lumin-key': self.keys[0]}).get_json()
+        self.assertEqual(len(listing['files']), 3)
+        self.pair()
+        self.run_sync()
+        for rel in paths:
+            self.assertEqual((self.engines[1].root / rel).read_bytes(), payload)
+        removed = client.delete('/api/file', headers={'x-lumin-key': self.keys[0]}, json={'relativePath': paths[0]})
+        self.assertEqual(removed.status_code, 200)
+        self.run_sync()
+        self.assertFalse((self.engines[1].root / paths[0]).exists())
 
 
 if __name__ == '__main__':

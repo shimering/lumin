@@ -164,3 +164,39 @@ Administrator verification uses Supabase Auth and the existing active
 `user_profiles → access_roles.is_admin` relationship. No service-role key is used.
 If administrator verification is unavailable, starting or pairing a job fails
 closed; an already authorized background job uses its server pairing credentials.
+
+## Patient 3D scans
+
+The **3D Scans** patient tab accepts ZIP archives containing upper and lower OBJ
+models with their MTL materials and JPEG, PNG, or WebP textures. Preview the pair,
+confirm the arch selections, then save it. The ZIP is stored byte for byte under
+the patient's **3D-Scans** folder. The server never extracts or converts it.
+**Download original ZIP** restores the imported filename. The extra STL and all
+other original archive entries remain inside that download.
+
+Scan names, notes, optional scan dates, selected OBJ paths, and display orientation
+are shared through `patient_media_details` in Supabase. Patient permissions remain
+the same. Rendering modes, opacity, lights, camera movement, and section cuts only
+affect the viewer. Comparison links two cameras without registering the scans or
+calculating contacts. Cuts show existing surfaces without generating interior geometry.
+
+Update **both paired servers** before synchronizing scans. On the other computer:
+
+1. Stop the running storage server.
+2. Extract `lumin-storage-sync-update.zip` into its existing server installation
+   folder, replacing `server.py`, `file_sync.py`, and `README.md`.
+3. Keep that computer's `config.json`, patient files, and `.lumin-sync` directory.
+4. Restart with its existing `start-storage.bat` or server launcher.
+5. Verify `/api/health` includes `capabilities.patient3dScans: true`, then sync.
+
+Existing installations support ZIPs without editing `allowed_extensions`. Other
+file restrictions and the configured upload limit still apply. Each new scan uses
+a unique identifier; retrying an interrupted upload reuses that identifier without
+replacing its archive. ZIP downloads require the storage key and are not publicly cached.
+Older servers show an update message before import.
+
+The browser rejects traversal paths, external material/texture URLs, encrypted or
+damaged ZIPs, and expansion beyond 128 entries, 128 MB per entry, or 256 MB total.
+Each arch is limited to 750,000 triangles and 1,000,000 vertices. Textures are limited
+to 8192 pixels per side, 16 megapixels each, and 32 megapixels per scan. WebGL2 is
+required for the viewer; downloads remain available without it.

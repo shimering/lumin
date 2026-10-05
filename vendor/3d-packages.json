@@ -1,0 +1,24 @@
+[
+  {
+    "package": "three",
+    "version": "0.180.0",
+    "tarballSha256": "ad66d724565ee29a2467277fa84daa5ed0211d6b8d446e9ef29f6bae0cd14144",
+    "files": [
+      "build/three.module.js",
+      "build/three.core.js",
+      "examples/jsm/loaders/OBJLoader.js",
+      "examples/jsm/loaders/MTLLoader.js",
+      "examples/jsm/controls/OrbitControls.js",
+      "LICENSE"
+    ]
+  },
+  {
+    "package": "fflate",
+    "version": "0.8.2",
+    "tarballSha256": "61fd5061e2fc8e5e3e3129f7f2fec7bd78a313e1bf4becbf1cc1cc9998d141dc",
+    "files": [
+      "esm/browser.js",
+      "LICENSE"
+    ]
+  }
+]

@@ -1,0 +1,58 @@
+#view-patient-scans { min-width: 0; overflow: hidden; }
+.scan-header,.scan-workspace-heading,.scan-card-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.scan-header { flex-wrap:wrap; padding:8px 0 24px; }
+.scan-header h3 { font-size:20px; font-weight:600; letter-spacing:-.02em; color:#0f172a; }
+.scan-header p,.scan-card p,.scan-original,.scan-gestures,.scan-tools p { font-size:12px; color:#64748b; line-height:1.6; margin-top:8px; }
+.scan-actions,.scan-presets { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+#view-patient-scans button,.scan-check,.scan-tools summary { min-height:44px; min-width:44px; }
+#view-patient-scans button { border:0; border-radius:12px; background:#f1f5f9; color:#334155; padding:10px 14px; font-size:12px; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; transition:background .15s,transform .15s; }
+#view-patient-scans button:hover { background:#e2e8f0; }
+#view-patient-scans button:active { transform:scale(.98); }
+#view-patient-scans :is(button,input,select,textarea,summary,.scan-pane):focus-visible { outline:2px solid #3b82f6; outline-offset:3px; }
+#view-patient-scans :disabled { opacity:.5; pointer-events:none; }
+#view-patient-scans button.scan-primary { background:#dbeafe; color:#1d4ed8; }
+#view-patient-scans button.scan-primary:hover { background:#bfdbfe; }
+#view-patient-scans button.scan-danger { color:#be123c; background:#fff1f2; }
+#view-patient-scans i,#view-patient-scans svg { width:18px; height:18px; flex-shrink:0; }
+.scan-card-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr)); gap:16px; }
+.scan-card,.scan-empty,.scan-workspace { padding:24px; border-radius:20px; background:var(--lumin-face,#fff); box-shadow:0 2px 12px #0f172a06; min-width:0; }
+.scan-card-heading { justify-content:flex-start; align-items:flex-start; }
+.scan-card-heading>div { min-width:0; }
+.scan-card h4,.scan-workspace h4 { font-size:14px; color:#0f172a; font-weight:600; overflow-wrap:anywhere; }
+.scan-symbol { background:#e0f2fe; color:#0369a1; display:flex; align-items:center; justify-content:center; width:48px; height:48px; border-radius:16px; flex-shrink:0; }
+.scan-note { overflow-wrap:anywhere; white-space:pre-wrap; }
+.scan-card .scan-actions { margin-top:8px; }
+.scan-empty { display:flex; flex-direction:column; align-items:center; gap:12px; padding-block:48px; text-align:center; }
+.scan-empty h4 { font-size:16px; color:#0f172a; font-weight:600; }
+.scan-empty p { max-width:440px; color:#64748b; font-size:13px; }
+.scan-check { display:flex; align-items:center; gap:12px; font-size:13px; padding:8px 0; cursor:pointer; }
+.scan-check input { width:20px; height:20px; accent-color:#2563eb; }
+.scan-message,.scan-warning,.scan-preview-warning { padding:16px; border-radius:12px; font-size:13px; margin-bottom:16px; line-height:1.6; background:#f1f5f9; color:#475569; }
+.scan-warning,.scan-preview-warning { background:#fffbeb; color:#92400e; }
+.scan-workspace { margin-top:24px; }
+.scan-workspace-heading { margin-bottom:24px; }
+.scan-form-grid,.scan-tools-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr)); gap:16px; margin-bottom:16px; }
+.scan-form-grid label,.scan-tools-grid>label:not(.scan-check) { display:flex; flex-direction:column; gap:8px; color:#475569; font-size:12px; font-weight:500; min-width:0; }
+#view-patient-scans :is(select,input:not([type=checkbox]):not([type=range]),textarea) { width:100%; min-width:0; min-height:44px; padding:10px 12px; border:1px solid #e2e8f0; border-radius:12px; background:var(--lumin-face,#f8fafc); color:#334155; font-size:13px; }
+#view-patient-scans input[type=range] { min-height:44px; width:100%; accent-color:#2563eb; cursor:pointer; }
+.scan-stage { position:relative; height:460px; overflow:hidden; border-radius:16px; background:#f1f5f9; margin-top:16px; direction:ltr; display:grid; grid-template-columns:1fr; }
+.scan-stage.scan-compare { grid-template-columns:1fr 1fr; gap:2px; }
+.scan-canvas { position:absolute; inset:0; width:100%; height:100%; }
+.scan-pane { position:relative; z-index:1; touch-action:none; min-width:0; cursor:grab; }
+.scan-pane:active { cursor:grabbing; }
+.scan-pane-name { position:absolute; top:12px; inset-inline-start:12px; max-width:calc(100% - 24px); pointer-events:none; background:#ffffffdc; color:#334155; padding:8px 12px; border-radius:10px; font-size:12px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.scan-graphics-status { position:absolute; inset:0; z-index:3; display:grid; place-content:center; padding:24px; background:#f1f5f9ed; color:#475569; text-align:center; }
+.scan-presets { margin-block:16px; }
+.scan-tools { background:#f8fafc; border-radius:16px; padding:12px 16px; margin-top:12px; }
+.scan-tools summary { cursor:pointer; font-weight:600; color:#475569; font-size:13px; padding-block:12px; }
+.scan-tools summary:hover { color:#2563eb; }
+.scan-tools summary:active { opacity:.8; }
+.scan-tools-grid { margin-top:8px; align-items:center; }
+.scan-skeleton { padding:48px; min-height:180px; border-radius:20px; background:#e2e8f0; color:#64748b; animation:scan-pulse 1.5s ease-in-out infinite; }
+.scan-dragging { outline:2px dashed #60a5fa; outline-offset:-4px; border-radius:20px; }
+.lumin-raised .scan-card,.lumin-raised .scan-empty,.lumin-raised .scan-workspace { background:var(--lumin-face); box-shadow:var(--lumin-raised); }
+.lumin-raised #view-patient-scans button,.lumin-raised .scan-tools { background:var(--lumin-face); box-shadow:var(--lumin-small-raised); }
+.lumin-raised #view-patient-scans button:hover { filter:brightness(.98); }
+@keyframes scan-pulse { 50% { opacity:.55; } }
+@media(max-width:767px) { .scan-card,.scan-empty,.scan-workspace { padding:16px; } .scan-header { align-items:flex-start; } .scan-stage { height:360px; } .scan-stage.scan-compare { height:660px; grid-template-columns:1fr; grid-template-rows:1fr 1fr; } .scan-workspace-heading { align-items:flex-start; } .scan-actions { padding-bottom:max(0px,env(safe-area-inset-bottom)); } }
+@media(prefers-reduced-motion:reduce) { .scan-skeleton { animation:none; } #view-patient-scans button { transition:none; } }
