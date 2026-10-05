@@ -4487,8 +4487,8 @@
     .storage-server-card { min-width: 0; display: flex; flex-direction: column; gap: 16px; padding: 16px; border: 1px solid #e2e8f0; border-radius: 16px; background: #fff; }
     .storage-server-card[data-active="true"] { background: #f8fbff; border-color: #cbd5e1; }
     .storage-server-card-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; }
-    #modal-storage-server { position: fixed; inset: 0; z-index: 120; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px); }
-    #modal-storage-server.hidden { display: none; }
+    #modal-storage-server, #modal-change-storage-location { position: fixed; inset: 0; z-index: 120; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px); }
+    #modal-storage-server.hidden, #modal-change-storage-location.hidden { display: none; }
     .storage-server-dialog-card { display: flex; flex-direction: column; width: 100%; max-width: 480px; max-height: 90dvh; overflow: hidden; border: 1px solid #e2e8f0; border-radius: 24px; background: #fff; box-shadow: 0 24px 64px #0f172a33; }
     .storage-server-dialog-card form { display: flex; min-height: 0; flex-direction: column; }
     .storage-server-dialog-body { display: grid; gap: 16px; overflow-y: auto; padding: 24px; }
@@ -4500,8 +4500,9 @@
     #modal-storage-server :is(button, input):focus-visible { outline: 2px solid #3b82f6; outline-offset: 3px; }
     #modal-storage-server button:disabled { opacity: 0.5; pointer-events: none; }
     @media (max-width: 639px) {
-      #modal-storage-server { align-items: flex-end; padding: env(safe-area-inset-top) 0 0; }
+      #modal-storage-server, #modal-change-storage-location { align-items: flex-end; padding: env(safe-area-inset-top) 0 0; }
       .storage-server-dialog-card { max-width: none; border-radius: 24px 24px 0 0; }
+      #modal-change-storage-location > div { max-width: none; border-radius: 24px 24px 0 0; }
     }
     .app-page-icon {
       display: flex;
@@ -7166,6 +7167,106 @@
             </div>
           </div>
         </div>
+
+        <!-- Storage Location & Local Drive Card -->
+        <div id="storage-location-card" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+          <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-5">
+            <div class="flex items-center gap-3">
+              <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+                <i data-lucide="folder-cog" class="h-5 w-5"></i>
+              </span>
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2.5">
+                  <h3 id="storage-location-heading" class="text-base font-semibold tracking-tight text-slate-800">Storage Location &amp; Local Drive</h3>
+                  <span id="storage-location-drive-badge" class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600">Drive --</span>
+                </div>
+                <p id="storage-location-subheading" class="mt-0.5 text-xs text-slate-400">Folder where patient records, X-rays, photos, and database mappings are stored on the host PC.</p>
+              </div>
+            </div>
+            <button type="button" id="btn-open-change-location" onclick="openChangeStorageLocationModal()" class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-indigo-50 px-4 py-2.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/20 disabled:pointer-events-none disabled:opacity-50">
+              <i data-lucide="folder-sync" class="h-4 w-4"></i>
+              <span id="storage-location-btn-change">Change Location / Move</span>
+            </button>
+          </div>
+
+          <!-- Loading state skeleton -->
+          <div id="storage-location-loading" class="hidden py-6">
+            <div class="animate-pulse space-y-3">
+              <div class="h-4 bg-slate-100 rounded w-1/3"></div>
+              <div class="h-11 bg-slate-100 rounded-xl w-full"></div>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="h-20 bg-slate-100 rounded-xl"></div>
+                <div class="h-20 bg-slate-100 rounded-xl"></div>
+                <div class="h-20 bg-slate-100 rounded-xl"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Offline / Disconnected state -->
+          <div id="storage-location-offline" class="py-6 text-center">
+            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
+              <i data-lucide="hard-drive-download" class="h-6 w-6"></i>
+            </div>
+            <p id="storage-location-offline-title" class="mt-3 text-sm font-semibold text-slate-800">Storage Server Not Connected</p>
+            <p id="storage-location-offline-desc" class="mt-1 text-xs text-slate-400 max-w-md mx-auto">Connect and save your Storage Server above to view host drives, change folder locations, or transfer patient files.</p>
+          </div>
+
+          <!-- Active details view -->
+          <div id="storage-location-details" class="hidden mt-6 space-y-5">
+            <!-- Current folder display -->
+            <div>
+              <span id="storage-location-current-label" class="block text-xs font-semibold text-slate-700 mb-1.5">Current Storage Directory on Host</span>
+              <div class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <i data-lucide="folder" class="h-4 w-4 shrink-0 text-amber-500"></i>
+                <code id="storage-location-current-path" class="min-w-0 flex-1 truncate font-mono text-xs font-semibold text-slate-800" dir="ltr">Loading...</code>
+                <button type="button" id="btn-copy-storage-path" onclick="copyCurrentStoragePath()" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 active:scale-[0.98]">
+                  <i data-lucide="copy" class="h-3.5 w-3.5" id="copy-storage-path-icon"></i>
+                  <span id="storage-location-copy-label">Copy</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Drive & Storage Usage Cards Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                <span id="storage-stat-drive-label" class="block text-xs font-medium text-slate-400">Host Drive Free Space</span>
+                <div class="mt-1.5 flex items-baseline gap-1.5">
+                  <span id="storage-stat-drive-free" class="text-base font-bold text-slate-800">--</span>
+                  <span id="storage-stat-drive-total" class="text-xs text-slate-400">/ --</span>
+                </div>
+                <div class="mt-3 h-1.5 w-full rounded-full bg-slate-200 overflow-hidden">
+                  <div id="storage-stat-drive-bar" class="h-full bg-indigo-600 rounded-full transition-all duration-300" style="width: 0%;"></div>
+                </div>
+              </div>
+
+              <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                <span id="storage-stat-patients-label" class="block text-xs font-medium text-slate-400">Patient Folders</span>
+                <div class="mt-1.5 flex items-baseline gap-1.5">
+                  <span id="storage-stat-patients-count" class="text-base font-bold text-slate-800">--</span>
+                  <span id="storage-stat-patients-unit" class="text-xs text-slate-500">folders</span>
+                </div>
+                <p id="storage-stat-patients-sub" class="mt-2 text-[11px] text-slate-400">Indexed &amp; mapped to SQL</p>
+              </div>
+
+              <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                <span id="storage-stat-media-label" class="block text-xs font-medium text-slate-400">Media Files &amp; Size</span>
+                <div class="mt-1.5 flex items-baseline gap-1.5">
+                  <span id="storage-stat-media-count" class="text-base font-bold text-slate-800">--</span>
+                  <span id="storage-stat-media-size" class="text-xs text-slate-500">(--)</span>
+                </div>
+                <p id="storage-stat-media-sub" class="mt-2 text-[11px] text-slate-400">X-Rays, CBCT &amp; documents</p>
+              </div>
+            </div>
+
+            <!-- System Detected Drives Summary -->
+            <div>
+              <span id="storage-location-drives-title" class="block text-xs font-semibold text-slate-700 mb-2">Detected Host Drives</span>
+              <div id="storage-location-drives-list" class="flex flex-wrap gap-2">
+                <!-- Dynamically populated drive chips -->
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div id="admin-panel-access" role="tabpanel" aria-labelledby="admin-tab-access" class="space-y-6">
@@ -8911,6 +9012,107 @@
           <button type="submit" class="inline-flex items-center gap-2 bg-blue-50 px-4 text-sm font-semibold text-blue-700"><i data-lucide="check" class="h-4 w-4"></i><span id="storage-preset-dialog-save-label">Save server</span></button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: CHANGE STORAGE LOCATION ================= -->
+  <div id="modal-change-storage-location" class="hidden" onclick="if (event.target === this) closeChangeStorageLocationModal()" onkeydown="handleChangeStorageLocationKeydown(event)">
+    <div class="flex flex-col w-full max-w-xl max-h-[90dvh] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="change-storage-dialog-title">
+      <!-- Header -->
+      <div class="flex items-start justify-between gap-4 border-b border-slate-100 p-6">
+        <div class="flex items-center gap-3">
+          <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+            <i data-lucide="folder-cog" class="h-5 w-5"></i>
+          </span>
+          <div class="min-w-0">
+            <h3 id="change-storage-dialog-title" class="text-lg font-semibold tracking-tight text-slate-900">Change Storage Location</h3>
+            <p id="change-storage-dialog-desc" class="mt-0.5 text-xs text-slate-500">Select a local drive and folder on the storage server host PC.</p>
+          </div>
+        </div>
+        <button id="change-storage-dialog-close" type="button" onclick="closeChangeStorageLocationModal()" aria-label="Close" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition">
+          <i data-lucide="x" class="h-5 w-5"></i>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="flex-1 overflow-y-auto p-6 space-y-5">
+        <!-- Drive Selector Pills -->
+        <div>
+          <label id="change-storage-drive-label" class="block text-xs font-semibold text-slate-700 mb-2">Host Physical / Logical Drives</label>
+          <div id="change-storage-drives-container" class="flex flex-wrap gap-2">
+            <!-- Dynamically populated drive buttons -->
+          </div>
+        </div>
+
+        <!-- Target Path Input -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label for="change-storage-path-input" id="change-storage-path-label" class="block text-xs font-semibold text-slate-700">Target Folder Path on Host PC</label>
+            <span class="text-[11px] text-slate-400 font-mono" id="change-storage-path-hint">e.g. D:\LuminStorage\Patients</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <input id="change-storage-path-input" type="text" dir="ltr" class="w-full min-h-11 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 font-mono text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="D:\LuminStorage\Patients" oninput="onStoragePathInputChange()" />
+            <button type="button" onclick="refreshStorageFolderBrowser()" class="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition" title="Browse this folder">
+              <i data-lucide="folder-search" class="h-4 w-4 text-indigo-600"></i>
+              <span id="change-storage-browse-btn-text">Browse</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Folder Browser Box -->
+        <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="text-xs font-semibold text-slate-700 shrink-0" id="change-storage-browser-title">Folder Browser:</span>
+              <span id="change-storage-browser-current" class="text-xs font-mono text-slate-500 truncate" dir="ltr">--</span>
+            </div>
+            <button type="button" id="btn-storage-browser-up" onclick="storageBrowserNavigateUp()" class="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition disabled:opacity-40 disabled:pointer-events-none">
+              <i data-lucide="arrow-up" class="h-3.5 w-3.5"></i>
+              <span id="change-storage-browser-up-text">Up</span>
+            </button>
+          </div>
+
+          <div id="change-storage-subfolders-list" class="max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 divide-y divide-slate-100">
+            <!-- Dynamically populated subfolders list -->
+          </div>
+
+          <!-- Quick subfolder creator -->
+          <div class="flex items-center gap-2 pt-1">
+            <input id="change-storage-new-folder-input" type="text" placeholder="New subfolder name..." class="flex-1 min-h-9 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+            <button type="button" onclick="createStorageSubfolderFromInput()" class="inline-flex min-h-9 items-center gap-1 rounded-lg bg-indigo-50 px-3 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition">
+              <i data-lucide="folder-plus" class="h-3.5 w-3.5"></i>
+              <span id="change-storage-create-folder-text">Add Subfolder</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Migration Option Checkbox -->
+        <div class="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+          <label class="flex items-start gap-3 cursor-pointer">
+            <input id="change-storage-migrate-checkbox" type="checkbox" checked class="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+            <div class="min-w-0 flex-1">
+              <span id="change-storage-migrate-title" class="block text-xs font-bold text-slate-800">Migrate &amp; Copy Existing Patient Files</span>
+              <p id="change-storage-migrate-desc" class="mt-0.5 text-xs text-slate-500 leading-relaxed">
+                Safely copy all existing patient folders, X-rays, and database files into the new location. The original folder will remain intact as a backup.
+              </p>
+            </div>
+          </label>
+        </div>
+
+        <!-- Alert / Feedback Message -->
+        <div id="change-storage-dialog-message" class="hidden rounded-xl p-3 text-xs font-semibold" role="alert"></div>
+      </div>
+
+      <!-- Footer -->
+      <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+        <button id="change-storage-cancel-btn" type="button" onclick="closeChangeStorageLocationModal()" class="min-h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition">
+          Cancel
+        </button>
+        <button id="btn-apply-storage-location" type="button" onclick="applyStorageLocationChange()" class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-indigo-600 px-5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition disabled:opacity-50 disabled:pointer-events-none">
+          <i data-lucide="check" class="h-4 w-4" id="apply-storage-icon"></i>
+          <span id="change-storage-apply-btn">Apply Location</span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -16921,6 +17123,7 @@
       if (showStorage) {
         populateStorageServerSettingsInputs();
         window.LuminStorageSync?.open();
+        void loadStorageLocationInfo();
       } else {
         window.LuminStorageSync?.close();
       }
@@ -27317,6 +27520,7 @@
           msg.classList.remove('hidden');
           setTimeout(() => msg.classList.add('hidden'), 5000);
         }
+        void loadStorageLocationInfo();
         return true;
       } catch (err) {
         console.error('Storage health check error:', err);
@@ -27331,7 +27535,548 @@
             : `Could not connect to storage server: ${err.message}`;
           msg.classList.remove('hidden');
         }
+        const locCardOffline = document.getElementById('storage-location-offline');
+        const locCardDetails = document.getElementById('storage-location-details');
+        const locCardLoading = document.getElementById('storage-location-loading');
+        if (locCardOffline) locCardOffline.classList.remove('hidden');
+        if (locCardDetails) locCardDetails.classList.add('hidden');
+        if (locCardLoading) locCardLoading.classList.add('hidden');
         return false;
+      }
+    }
+
+    // ================= STORAGE SERVER LOCATION & DRIVE MANAGEMENT =================
+    let storageLocationData = null;
+    let storageLocationLoading = false;
+    let storageBrowserCurrentPath = '';
+    let storageBrowserParentPath = null;
+    let storagePathInputTimer = null;
+
+    async function loadStorageLocationInfo() {
+      if (storageLocationLoading) return;
+      const config = getStorageServerConfig();
+      const loadingEl = document.getElementById('storage-location-loading');
+      const detailsEl = document.getElementById('storage-location-details');
+      const offlineEl = document.getElementById('storage-location-offline');
+      const changeBtn = document.getElementById('btn-open-change-location');
+
+      if (!config.url) {
+        storageLocationData = null;
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (detailsEl) detailsEl.classList.add('hidden');
+        if (offlineEl) offlineEl.classList.remove('hidden');
+        if (changeBtn) changeBtn.disabled = true;
+        return;
+      }
+
+      storageLocationLoading = true;
+      if (loadingEl) loadingEl.classList.remove('hidden');
+      if (detailsEl) detailsEl.classList.add('hidden');
+      if (offlineEl) offlineEl.classList.add('hidden');
+
+      try {
+        const separator = config.url.includes('?') ? '&' : '?';
+        const url = `${config.url}/api/storage/location${separator}key=${encodeURIComponent(config.key || '')}`;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+        const res = await fetch(url, {
+          signal: controller.signal,
+          headers: { 'x-lumin-key': config.key || '' }
+        });
+        clearTimeout(timeout);
+
+        if (!res.ok) {
+          throw new Error(`Server returned HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        if (!data.success && data.status !== 'online') {
+          throw new Error(data.error || 'Invalid storage status');
+        }
+
+        storageLocationData = data;
+        renderStorageLocationCard(data);
+
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (detailsEl) detailsEl.classList.remove('hidden');
+        if (offlineEl) offlineEl.classList.add('hidden');
+        if (changeBtn) changeBtn.disabled = false;
+      } catch (err) {
+        console.warn('Could not load storage location info:', err);
+        storageLocationData = null;
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (detailsEl) detailsEl.classList.add('hidden');
+        if (offlineEl) offlineEl.classList.remove('hidden');
+        if (changeBtn) changeBtn.disabled = true;
+      } finally {
+        storageLocationLoading = false;
+      }
+    }
+
+    function renderStorageLocationCard(data) {
+      if (!data) return;
+      const isArabic = currentUiLanguage === 'ar';
+      const t = (en, ar) => isArabic ? ar : en;
+
+      const textMap = {
+        'storage-location-heading': t('Storage Location & Local Drive', 'مجلد التخزين والقرص المحلي'),
+        'storage-location-subheading': t(
+          'Folder where patient records, X-rays, photos, and database mappings are stored on the host PC.',
+          'المجلد الذي تُحفظ فيه ملفات وسجلات المرضى والأشعة وقواعد البيانات على جهاز الخادم.'
+        ),
+        'storage-location-btn-change': t('Change Location / Move', 'تغيير المجلد أو النقل'),
+        'storage-location-current-label': t('Current Storage Directory on Host', 'مسار مجلد التخزين الحالي على الجهاز'),
+        'storage-location-copy-label': t('Copy', 'نسخ'),
+        'storage-stat-drive-label': t('Host Drive Free Space', 'المساحة المتوفرة بالقرص'),
+        'storage-stat-patients-label': t('Patient Folders', 'مجلدات المرضى'),
+        'storage-stat-patients-unit': t('folders', 'مجلد'),
+        'storage-stat-patients-sub': t('Indexed & mapped to SQL', 'مفهرسة ومربوطة بقاعدة البيانات'),
+        'storage-stat-media-label': t('Media Files & Size', 'الملفات والحجم'),
+        'storage-stat-media-sub': t('X-Rays, CBCT & documents', 'صور أشعة ومستندات'),
+        'storage-location-drives-title': t('Detected Host Drives', 'الأقراص المتوفرة بالجهاز')
+      };
+
+      for (const [id, val] of Object.entries(textMap)) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+      }
+
+      const badge = document.getElementById('storage-location-drive-badge');
+      const currentDriveName = data.driveLetter || data.driveInfo?.letter || data.driveInfo?.drive?.replace(/[:\\/]+$/, '') || '';
+      if (badge && currentDriveName) {
+        badge.textContent = t(`Drive ${currentDriveName}:`, `القرص ${currentDriveName}:`);
+      }
+
+      const pathEl = document.getElementById('storage-location-current-path');
+      if (pathEl) {
+        pathEl.textContent = data.currentStoragePath || '--';
+        pathEl.title = data.currentStoragePath || '';
+      }
+
+      const driveFreeEl = document.getElementById('storage-stat-drive-free');
+      const driveTotalEl = document.getElementById('storage-stat-drive-total');
+      const driveBarEl = document.getElementById('storage-stat-drive-bar');
+      const freeGb = data.driveInfo?.free_gb ?? data.driveInfo?.freeGb;
+      const totalGb = data.driveInfo?.total_gb ?? data.driveInfo?.totalGb;
+      if (typeof freeGb === 'number' && typeof totalGb === 'number') {
+        if (driveFreeEl) driveFreeEl.textContent = `${freeGb.toFixed(1)} GB`;
+        if (driveTotalEl) driveTotalEl.textContent = `/ ${totalGb.toFixed(1)} GB`;
+        if (driveBarEl && totalGb > 0) {
+          const usedGb = totalGb - freeGb;
+          const usedPct = Math.max(0, Math.min(100, Math.round((usedGb / totalGb) * 100)));
+          driveBarEl.style.width = `${usedPct}%`;
+          driveBarEl.className = `h-full rounded-full transition-all duration-300 ${usedPct > 90 ? 'bg-rose-500' : usedPct > 75 ? 'bg-amber-500' : 'bg-indigo-600'}`;
+        }
+      }
+
+      const patientCountEl = document.getElementById('storage-stat-patients-count');
+      if (patientCountEl) {
+        patientCountEl.textContent = String(data.totalPatientFolders ?? data.stats?.totalPatientFolders ?? 0);
+      }
+
+      const mediaCountEl = document.getElementById('storage-stat-media-count');
+      const mediaSizeEl = document.getElementById('storage-stat-media-size');
+      if (mediaCountEl) {
+        const fileCount = data.totalFiles ?? data.stats?.totalMediaFiles ?? 0;
+        mediaCountEl.textContent = `${fileCount} ${t('files', 'ملف')}`;
+      }
+      if (mediaSizeEl) {
+        const bytes = data.totalSizeBytes ?? data.stats?.totalMediaSizeBytes ?? 0;
+        const mb = bytes / (1024 * 1024);
+        const sizeText = mb >= 1024 ? `${(mb / 1024).toFixed(2)} GB` : `${mb.toFixed(1)} MB`;
+        mediaSizeEl.textContent = `(${sizeText})`;
+      }
+
+      const drivesListEl = document.getElementById('storage-location-drives-list');
+      if (drivesListEl && Array.isArray(data.availableDrives)) {
+        drivesListEl.innerHTML = data.availableDrives.map(drive => {
+          const driveLetter = drive.letter || drive.drive?.replace(/[:\\/]+$/, '') || '';
+          const driveDisplay = driveLetter ? `${driveLetter}:\\` : (drive.drive || '');
+          const dFree = drive.free_gb ?? drive.freeGb ?? 0;
+          const isCurrent = drive.isCurrent || (driveLetter && currentDriveName && driveLetter.toUpperCase() === currentDriveName.toUpperCase());
+          return `
+            <div class="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold ${isCurrent ? 'bg-indigo-50 text-indigo-700 font-bold' : 'bg-slate-100 text-slate-700'}">
+              <i data-lucide="hard-drive" class="h-3.5 w-3.5 ${isCurrent ? 'text-indigo-600' : 'text-slate-500'}"></i>
+              <span dir="ltr">${escapeHtml(driveDisplay)}</span>
+              <span class="${isCurrent ? 'text-indigo-600' : 'text-slate-500'}">(${dFree.toFixed(1)} GB ${t('free', 'متاح')})</span>
+              ${isCurrent ? `<span class="rounded-full bg-indigo-200 px-1.5 py-0.5 text-[10px] text-indigo-800 font-bold uppercase tracking-wider">${t('Active', 'النشط')}</span>` : ''}
+            </div>
+          `;
+        }).join('');
+      }
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    async function copyCurrentStoragePath() {
+      const path = storageLocationData?.currentStoragePath;
+      if (!path) return;
+      const isArabic = currentUiLanguage === 'ar';
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(path);
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = path;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+        const label = document.getElementById('storage-location-copy-label');
+        if (label) {
+          const original = label.textContent;
+          label.textContent = isArabic ? 'تم النسخ!' : 'Copied!';
+          setTimeout(() => { label.textContent = original; }, 2000);
+        }
+      } catch (err) {
+        console.warn('Could not copy path:', err);
+      }
+    }
+
+    // ================= CHANGE STORAGE LOCATION MODAL & BROWSER =================
+    async function openChangeStorageLocationModal() {
+      if (!currentUserAccess?.isAdmin) return;
+      if (!storageLocationData) {
+        await loadStorageLocationInfo();
+      }
+      if (!storageLocationData) {
+        alert(currentUiLanguage === 'ar' ? 'تعذر جلب بيانات خادم التخزين. تأكد من اتصاله أولاً.' : 'Could not reach storage server. Please verify the connection first.');
+        return;
+      }
+
+      const modal = document.getElementById('modal-change-storage-location');
+      if (!modal) return;
+      const isArabic = currentUiLanguage === 'ar';
+      const t = (en, ar) => isArabic ? ar : en;
+      modal.dir = isArabic ? 'rtl' : 'ltr';
+
+      const modalTextMap = {
+        'change-storage-dialog-title': t('Change Storage Location', 'تغيير مجلد التخزين'),
+        'change-storage-dialog-desc': t('Select a local drive and folder on the storage server host PC.', 'اختر القرص والمجلد المحلي على جهاز خادم التخزين.'),
+        'change-storage-drive-label': t('Host Physical / Logical Drives', 'الأقراص المتوفرة بالجهاز'),
+        'change-storage-path-label': t('Target Folder Path on Host PC', 'مسار المجلد الجديد على الجهاز'),
+        'change-storage-browse-btn-text': t('Browse', 'استعراض'),
+        'change-storage-browser-title': t('Folder Browser:', 'متصفح المجلدات:'),
+        'change-storage-browser-up-text': t('Up', 'للأعلى'),
+        'change-storage-create-folder-text': t('Add Subfolder', 'إضافة مجلد فرعي'),
+        'change-storage-migrate-title': t('Migrate & Copy Existing Patient Files', 'نسخ ونقل ملفات المرضى الحالية إلى المجلد الجديد'),
+        'change-storage-migrate-desc': t(
+          'Safely copy all existing patient folders, X-rays, and database files into the new location. The original folder will remain intact as a backup.',
+          'نسخ جميع ملفات ومجلدات المرضى والأشعة وقاعدة البيانات بأمان للمجلد الجديد مع الاحتفاظ بالمجلد السابق كنسخة احتياطية.'
+        ),
+        'change-storage-cancel-btn': t('Cancel', 'إلغاء'),
+        'change-storage-apply-btn': t('Apply Location', 'تطبيق وتغيير المسار')
+      };
+
+      for (const [id, val] of Object.entries(modalTextMap)) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+      }
+
+      const input = document.getElementById('change-storage-path-input');
+      if (input) {
+        input.value = storageLocationData.currentStoragePath || '';
+      }
+
+      const migrateCheckbox = document.getElementById('change-storage-migrate-checkbox');
+      if (migrateCheckbox) migrateCheckbox.checked = true;
+
+      const messageEl = document.getElementById('change-storage-dialog-message');
+      if (messageEl) messageEl.classList.add('hidden');
+
+      renderModalDrivePills();
+
+      const initialPath = storageLocationData.currentStoragePath || 'D:\\';
+      void browseStorageFolder(initialPath);
+
+      modal.classList.remove('hidden');
+      if (window.lucide) lucide.createIcons();
+      requestAnimationFrame(() => input?.focus());
+    }
+
+    function renderModalDrivePills() {
+      const container = document.getElementById('change-storage-drives-container');
+      if (!container || !storageLocationData?.availableDrives) return;
+      const isArabic = currentUiLanguage === 'ar';
+      const inputVal = document.getElementById('change-storage-path-input')?.value || '';
+      const activeDriveLetter = inputVal.match(/^([a-zA-Z]:)/)?.[1]?.toUpperCase();
+
+      container.innerHTML = storageLocationData.availableDrives.map(drive => {
+        const driveLetter = drive.letter || drive.drive?.replace(/[:\\/]+$/, '') || '';
+        const driveClean = driveLetter ? `${driveLetter}:` : drive.drive;
+        const freeGb = drive.free_gb ?? drive.freeGb ?? 0;
+        const isSelected = activeDriveLetter ? driveClean.toUpperCase() === activeDriveLetter : (drive.isCurrent || (driveLetter && storageLocationData.driveLetter && driveLetter.toUpperCase() === storageLocationData.driveLetter.toUpperCase()));
+        return `
+          <button type="button" onclick="selectStorageDrive('${escapeHtml(driveClean)}')" class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] ${isSelected ? 'border-indigo-400 bg-indigo-50 text-indigo-800' : ''}">
+            <i data-lucide="hard-drive" class="h-4 w-4 ${isSelected ? 'text-indigo-600' : 'text-slate-400'}"></i>
+            <span class="font-bold" dir="ltr">${escapeHtml(driveClean)}</span>
+            <span class="text-slate-500 font-normal">(${freeGb.toFixed(1)} GB ${isArabic ? 'متاح' : 'free'})</span>
+          </button>
+        `;
+      }).join('');
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function closeChangeStorageLocationModal() {
+      const modal = document.getElementById('modal-change-storage-location');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function handleChangeStorageLocationKeydown(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeChangeStorageLocationModal();
+      }
+    }
+
+    function selectStorageDrive(driveLetter) {
+      const input = document.getElementById('change-storage-path-input');
+      if (!input) return;
+      let path = input.value.trim();
+      if (/^[a-zA-Z]:/.test(path)) {
+        path = path.replace(/^[a-zA-Z]:/, driveLetter);
+      } else {
+        path = `${driveLetter}\\LuminStorage\\Patients`;
+      }
+      input.value = path;
+      renderModalDrivePills();
+      void browseStorageFolder(path);
+    }
+
+    function onStoragePathInputChange() {
+      clearTimeout(storagePathInputTimer);
+      storagePathInputTimer = setTimeout(() => {
+        renderModalDrivePills();
+      }, 300);
+    }
+
+    function refreshStorageFolderBrowser() {
+      const input = document.getElementById('change-storage-path-input');
+      const path = input?.value.trim();
+      if (path) void browseStorageFolder(path);
+    }
+
+    function storageBrowserNavigateUp() {
+      if (storageBrowserParentPath) {
+        void browseStorageFolder(storageBrowserParentPath);
+      }
+    }
+
+    async function browseStorageFolder(targetPath) {
+      const config = getStorageServerConfig();
+      if (!config.url || !targetPath) return;
+      const currentLabel = document.getElementById('change-storage-browser-current');
+      const listContainer = document.getElementById('change-storage-subfolders-list');
+      const upBtn = document.getElementById('btn-storage-browser-up');
+      const isArabic = currentUiLanguage === 'ar';
+      const t = (en, ar) => isArabic ? ar : en;
+
+      if (currentLabel) currentLabel.textContent = targetPath;
+      if (listContainer) {
+        listContainer.innerHTML = `<div class="p-4 text-center text-xs text-slate-400 flex items-center justify-center gap-2"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin text-indigo-600"></i> ${t('Inspecting directory…', 'جارٍ فحص المجلد…')}</div>`;
+        if (window.lucide) lucide.createIcons();
+      }
+
+      try {
+        const separator = config.url.includes('?') ? '&' : '?';
+        const url = `${config.url}/api/storage/browse${separator}key=${encodeURIComponent(config.key || '')}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-lumin-key': config.key || ''
+          },
+          body: JSON.stringify({ path: targetPath })
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        storageBrowserCurrentPath = data.currentPath || data.path || targetPath;
+        storageBrowserParentPath = data.parentPath || data.parent;
+
+        if (currentLabel) currentLabel.textContent = storageBrowserCurrentPath;
+        if (upBtn) {
+          upBtn.disabled = !storageBrowserParentPath;
+        }
+
+        if (!listContainer) return;
+
+        if (!data.subfolders || data.subfolders.length === 0) {
+          listContainer.innerHTML = `
+            <div class="py-4 px-3 text-center text-xs text-slate-400">
+              ${t('No subfolders in this directory. You can use it as is or add a subfolder.', 'لا توجد مجلدات فرعية في هذا المسار. يمكنك اعتماده أو إضافة مجلد فرعي.')}
+            </div>
+          `;
+        } else {
+          listContainer.innerHTML = data.subfolders.map(item => {
+            const folderName = typeof item === 'string' ? item : (item.name || '');
+            const separatorChar = storageBrowserCurrentPath.includes('/') ? '/' : '\\';
+            const fullSubPath = (typeof item === 'object' && item.path)
+              ? item.path
+              : (storageBrowserCurrentPath.endsWith(separatorChar)
+                ? `${storageBrowserCurrentPath}${folderName}`
+                : `${storageBrowserCurrentPath}${separatorChar}${folderName}`);
+            const escapedSubPath = escapeHtml(fullSubPath);
+            return `
+              <div class="flex items-center justify-between py-2 px-2 hover:bg-slate-50 transition rounded-lg">
+                <button type="button" onclick="browseStorageFolder('${escapedSubPath}')" class="flex items-center gap-2 min-w-0 text-left flex-1 text-xs font-semibold text-slate-700 hover:text-indigo-600 transition truncate">
+                  <i data-lucide="folder" class="h-4 w-4 shrink-0 text-amber-500"></i>
+                  <span class="truncate" dir="ltr">${escapeHtml(folderName)}</span>
+                </button>
+                <button type="button" onclick="selectBrowserPath('${escapedSubPath}')" class="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2 py-1 rounded-md transition shrink-0 ml-2">
+                  <i data-lucide="check" class="h-3 w-3"></i>
+                  <span>${t('Select', 'اختيار')}</span>
+                </button>
+              </div>
+            `;
+          }).join('');
+        }
+        if (window.lucide) lucide.createIcons();
+      } catch (err) {
+        console.warn('Folder browse error:', err);
+        if (listContainer) {
+          listContainer.innerHTML = `
+            <div class="py-3 px-3 text-center text-xs text-rose-600">
+              ${t('Could not browse path:', 'تعذر استعراض المسار:')} ${escapeHtml(err.message)}
+            </div>
+          `;
+        }
+        if (upBtn) upBtn.disabled = true;
+      }
+    }
+
+    function selectBrowserPath(path) {
+      const input = document.getElementById('change-storage-path-input');
+      if (input) input.value = path;
+      renderModalDrivePills();
+      void browseStorageFolder(path);
+    }
+
+    function createStorageSubfolderFromInput() {
+      const inputEl = document.getElementById('change-storage-new-folder-input');
+      const newName = inputEl?.value.trim();
+      const isArabic = currentUiLanguage === 'ar';
+      if (!newName) {
+        alert(isArabic ? 'يرجى كتابة اسم المجلد الفرعي.' : 'Please enter a subfolder name.');
+        return;
+      }
+      const safeName = newName.replace(/[<>:"/\\|?*]+/g, '_').trim();
+      if (!safeName) return;
+
+      const separatorChar = storageBrowserCurrentPath.includes('/') ? '/' : '\\';
+      const newPath = storageBrowserCurrentPath.endsWith(separatorChar)
+        ? `${storageBrowserCurrentPath}${safeName}`
+        : `${storageBrowserCurrentPath}${separatorChar}${safeName}`;
+
+      const pathInput = document.getElementById('change-storage-path-input');
+      if (pathInput) pathInput.value = newPath;
+      if (inputEl) inputEl.value = '';
+      renderModalDrivePills();
+      void browseStorageFolder(newPath);
+    }
+
+    async function applyStorageLocationChange() {
+      if (!currentUserAccess?.isAdmin) return;
+      const input = document.getElementById('change-storage-path-input');
+      const migrateCheckbox = document.getElementById('change-storage-migrate-checkbox');
+      const applyBtn = document.getElementById('btn-apply-storage-location');
+      const applyIcon = document.getElementById('apply-storage-icon');
+      const applyText = document.getElementById('change-storage-apply-btn');
+      const msgEl = document.getElementById('change-storage-dialog-message');
+      const config = getStorageServerConfig();
+
+      const newPath = input?.value.trim();
+      const migrateFiles = !!migrateCheckbox?.checked;
+      const isArabic = currentUiLanguage === 'ar';
+      const t = (en, ar) => isArabic ? ar : en;
+
+      if (!newPath) {
+        if (msgEl) {
+          msgEl.className = 'rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700';
+          msgEl.textContent = t('Please enter a target storage path.', 'يرجى إدخال مسار التخزين المستهدف.');
+          msgEl.classList.remove('hidden');
+        }
+        return;
+      }
+
+      if (/^[a-zA-Z]:[\\/]*$/.test(newPath)) {
+        if (msgEl) {
+          msgEl.className = 'rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700';
+          msgEl.textContent = t(
+            'Cannot use root drive as storage directory. Please specify a folder (e.g. D:\\LuminStorage\\Patients).',
+            'لا يمكن استخدام جذر القرص مباشرة. يرجى تحديد مجلد (مثال: D:\\LuminStorage\\Patients).'
+          );
+          msgEl.classList.remove('hidden');
+        }
+        return;
+      }
+
+      const confirmPrompt = migrateFiles
+        ? t(
+            `Are you sure you want to change the storage location to:\n${newPath}\n\nAll existing patient files and X-rays will be copied safely to the new location.`,
+            `هل أنت متأكد من تغيير مجلد التخزين إلى:\n${newPath}\n\nسيتم نسخ جميع ملفات وسجلات المرضى والأشعة بأمان إلى المجلد الجديد.`
+          )
+        : t(
+            `Are you sure you want to change the storage location to:\n${newPath}\n\nExisting files will NOT be migrated (only future files will be saved here).`,
+            `هل أنت متأكد من تغيير مجلد التخزين إلى:\n${newPath}\n\nلن يتم نقل الملفات القديمة (سيتم حفظ الملفات الجديدة فقط هنا).`
+          );
+
+      if (!confirm(confirmPrompt)) return;
+
+      if (applyBtn) applyBtn.disabled = true;
+      if (applyIcon) applyIcon.className = 'h-4 w-4 animate-spin';
+      if (applyText) applyText.textContent = t('Applying & Moving…', 'جارٍ النقل والتطبيق…');
+      if (msgEl) msgEl.classList.add('hidden');
+
+      try {
+        const separator = config.url.includes('?') ? '&' : '?';
+        const url = `${config.url}/api/storage/location${separator}key=${encodeURIComponent(config.key || '')}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-lumin-key': config.key || ''
+          },
+          body: JSON.stringify({ newPath, migrateFiles })
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok || data.status !== 'success') {
+          throw new Error(data.error || `Server returned error (${res.status})`);
+        }
+
+        if (msgEl) {
+          msgEl.className = 'rounded-xl bg-emerald-50 p-3 text-xs font-semibold text-emerald-700';
+          msgEl.textContent = isArabic
+            ? `تم تغيير مجلد التخزين بنجاح إلى: ${data.newPath}`
+            : `Storage location updated successfully to: ${data.newPath}`;
+          msgEl.classList.remove('hidden');
+        }
+
+        await loadStorageLocationInfo();
+
+        setTimeout(() => {
+          closeChangeStorageLocationModal();
+        }, 1200);
+
+      } catch (err) {
+        console.error('Failed to change storage location:', err);
+        if (msgEl) {
+          msgEl.className = 'rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700';
+          msgEl.textContent = t(`Failed to change storage location: ${err.message}`, `فشل تغيير مجلد التخزين: ${err.message}`);
+          msgEl.classList.remove('hidden');
+        }
+      } finally {
+        if (applyBtn) applyBtn.disabled = false;
+        if (applyIcon) applyIcon.className = 'h-4 w-4';
+        if (applyText) applyText.textContent = t('Apply Location', 'تطبيق وتغيير المسار');
+        if (window.lucide) lucide.createIcons();
       }
     }
 

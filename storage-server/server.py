@@ -1227,6 +1227,292 @@ def get_mapping_sql():
         mimetype="text/plain; charset=utf-8"
     )
 
+def get_system_drives() -> list:
+    """Detect available drives on the host system with total and free capacity in GB."""
+    drives = []
+    if os.name == 'nt':
+        import ctypes, string
+        try:
+            bitmask = ctypes.windll.kernel32.GetLogicalDrives()
+            for letter in string.ascii_uppercase:
+                if bitmask & 1:
+                    drive_path = f"{letter}:\\"
+                    try:
+                        usage = shutil.disk_usage(drive_path)
+                        drives.append({
+                            "drive": drive_path,
+                            "letter": letter,
+                            "total_gb": round(usage.total / (1024**3), 1),
+                            "free_gb": round(usage.free / (1024**3), 1),
+                            "used_gb": round(usage.used / (1024**3), 1),
+                            "percent_free": round((usage.free / usage.total) * 100, 1) if usage.total else 0
+                        })
+                    except Exception:
+                        pass
+                bitmask >>= 1
+        except Exception as e:
+            logger.warning(f"Could not inspect Windows drives: {e}")
+    else:
+        try:
+            usage = shutil.disk_usage("/")
+            drives.append({
+                "drive": "/",
+                "letter": "/",
+                "total_gb": round(usage.total / (1024**3), 1),
+                "free_gb": round(usage.free / (1024**3), 1),
+                "used_gb": round(usage.used / (1024**3), 1),
+                "percent_free": round((usage.free / usage.total) * 100, 1) if usage.total else 0
+            })
+        except Exception:
+            pass
+    return drives
+
+def calculate_storage_stats(storage_path: Path) -> dict:
+    """Calculate folder count, file count, and total disk size of a storage path."""
+    total_folders = 0
+    total_files = 0
+    total_bytes = 0
+    try:
+        if storage_path.is_dir():
+            for d in storage_path.iterdir():
+                if d.is_dir() and not d.name.startswith('.'):
+                    total_folders += 1
+                    for root, dirs, files in os.walk(d):
+                        dirs[:] = [x for x in dirs if not x.startswith('.')]
+                        for f in files:
+                            if not f.startswith('.') and not f.endswith(('.sql', '.json', '.sqlite', '.db')):
+                                total_files += 1
+                                try:
+                                    total_bytes += (Path(root) / f).stat().st_size
+                                except Exception:
+                                    pass
+    except Exception as e:
+        logger.warning(f"Error calculating storage stats: {e}")
+    return {
+        "totalPatientFolders": total_folders,
+        "totalFiles": total_files,
+        "totalSizeBytes": total_bytes
+    }
+
+@app.route("/api/storage/location", methods=["GET"])
+def get_storage_location():
+    """Return current storage path, drive space info, and detected drives."""
+    drives = get_system_drives()
+    stats = calculate_storage_stats(STORAGE_ROOT)
+    
+    current_drive_letter = ""
+    current_drive_info = None
+    try:
+        drive_name = str(STORAGE_ROOT.drive).upper().rstrip(":")
+        current_drive_letter = drive_name
+        for d in drives:
+            if d.get("letter", "").upper() == drive_name:
+                current_drive_info = d
+                break
+    except Exception:
+        pass
+
+    return jsonify({
+        "success": True,
+        "currentStoragePath": str(STORAGE_ROOT.resolve()),
+        "driveLetter": current_drive_letter,
+        "driveInfo": current_drive_info,
+        "configFile": str(CONFIG_FILE.resolve()) if CONFIG_FILE.exists() else None,
+        "totalPatientFolders": stats["totalPatientFolders"],
+        "totalFiles": stats["totalFiles"],
+        "totalSizeBytes": stats["totalSizeBytes"],
+        "availableDrives": drives
+    })
+
+@app.route("/api/storage/browse", methods=["GET", "POST"])
+def browse_storage_directory():
+    """List subdirectories on the host system to help the admin choose a folder."""
+    data = request.get_json(silent=True) or {}
+    requested_path_str = data.get("path") or request.args.get("path") or ""
+
+    drives = get_system_drives()
+    if not requested_path_str:
+        default_drive = drives[0]["drive"] if drives else "/"
+        requested_path_str = str(STORAGE_ROOT.parent) if STORAGE_ROOT.parent.exists() else default_drive
+
+    try:
+        cand_path = Path(requested_path_str).resolve()
+        if not cand_path.exists():
+            return jsonify({
+                "error": f"Path '{requested_path_str}' does not exist on the server.",
+                "availableDrives": drives
+            }), 404
+        if not cand_path.is_dir():
+            cand_path = cand_path.parent
+
+        subfolders = []
+        ignored_names = {
+            '$recycle.bin', 'system volume information', 'recovery',
+            'windows', 'program files', 'program files (x86)', 'programdata',
+            'msocache', 'perflogs', '$winreagent', '.thumbnails', '.lumin-sync'
+        }
+
+        try:
+            for item in sorted(cand_path.iterdir(), key=lambda x: x.name.lower()):
+                if item.is_dir() and not item.name.startswith('.'):
+                    if item.name.lower() not in ignored_names:
+                        subfolders.append({
+                            "name": item.name,
+                            "path": str(item.resolve())
+                        })
+        except PermissionError:
+            pass
+
+        is_writable = False
+        try:
+            test_file = cand_path / ".lumin_write_test"
+            test_file.write_text("test", encoding="utf-8")
+            test_file.unlink(missing_ok=True)
+            is_writable = True
+        except Exception:
+            is_writable = False
+
+        parent_path = str(cand_path.parent.resolve()) if cand_path.parent != cand_path else None
+
+        return jsonify({
+            "success": True,
+            "currentPath": str(cand_path),
+            "parentPath": parent_path,
+            "subfolders": subfolders,
+            "isWritable": is_writable,
+            "availableDrives": drives
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/storage/location", methods=["POST"])
+def change_storage_location():
+    """
+    Safely change the active storage directory, optionally migrating existing patient folders,
+    updating config.json, and generating mapping files in the new location.
+    """
+    global STORAGE_ROOT, THUMBNAIL_ROOT, _sync_engine
+
+    data = request.get_json(silent=True) or {}
+    new_path_str = (data.get("newPath") or data.get("path") or "").strip()
+    migrate_existing = data.get("migrateExisting", True)
+    keep_backup = data.get("keepBackup", True)
+
+    if not new_path_str:
+        return jsonify({"error": "newPath parameter is required."}), 400
+
+    try:
+        new_target = Path(os.path.expandvars(new_path_str)).resolve()
+    except Exception as e:
+        return jsonify({"error": f"Invalid path syntax: {e}"}), 400
+
+    if os.name == 'nt':
+        if str(new_target).rstrip("\\/").endswith(":") or len(str(new_target).strip("\\/")) <= 2:
+            return jsonify({"error": "Cannot use the root drive directly. Please specify a folder, e.g. D:\\LuminStorage\\Patients"}), 400
+        lower_str = str(new_target).lower()
+        if any(lower_str.startswith(bad) for bad in [r"c:\windows", r"c:\program files", r"c:\programdata"]):
+            return jsonify({"error": "Selected path is a protected Windows system directory."}), 400
+
+    try:
+        new_target.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        return jsonify({"error": f"Could not create directory '{new_target}': {e}"}), 500
+
+    try:
+        test_file = new_target / ".lumin_write_test"
+        test_file.write_text("lumin_permission_check", encoding="utf-8")
+        test_file.unlink(missing_ok=True)
+    except Exception as e:
+        return jsonify({"error": f"Directory '{new_target}' is not writable: {e}"}), 403
+
+    old_root = STORAGE_ROOT.resolve()
+    new_root = new_target.resolve()
+
+    if old_root == new_root:
+        return jsonify({
+            "success": True,
+            "message": "Target directory is already the active storage path.",
+            "currentStoragePath": str(new_root)
+        })
+
+    migrated_patients = 0
+    migrated_files = 0
+
+    if migrate_existing and old_root.is_dir():
+        logger.info(f"Starting patient files migration: {old_root} -> {new_root}")
+        try:
+            for item in old_root.iterdir():
+                if not item.is_dir() or item.name.startswith('.'):
+                    continue
+                target_patient_dir = new_root / item.name
+                target_patient_dir.mkdir(parents=True, exist_ok=True)
+                migrated_patients += 1
+
+                for root, dirs, files in os.walk(item):
+                    rel = Path(root).relative_to(item)
+                    dest_sub = target_patient_dir / rel
+                    dest_sub.mkdir(parents=True, exist_ok=True)
+                    for f in files:
+                        src_f = Path(root) / f
+                        dst_f = dest_sub / f
+                        if not dst_f.exists() or dst_f.stat().st_size != src_f.stat().st_size:
+                            shutil.copy2(str(src_f), str(dst_f))
+                            migrated_files += 1
+
+            old_thumbs = old_root / ".thumbnails"
+            new_thumbs = new_root / ".thumbnails"
+            if old_thumbs.is_dir():
+                new_thumbs.mkdir(parents=True, exist_ok=True)
+                for root, dirs, files in os.walk(old_thumbs):
+                    rel = Path(root).relative_to(old_thumbs)
+                    dest_sub = new_thumbs / rel
+                    dest_sub.mkdir(parents=True, exist_ok=True)
+                    for f in files:
+                        src_f = Path(root) / f
+                        dst_f = dest_sub / f
+                        if not dst_f.exists():
+                            shutil.copy2(str(src_f), str(dst_f))
+
+            logger.info(f"Migration completed: {migrated_patients} patient folders, {migrated_files} files copied.")
+        except Exception as mig_err:
+            logger.error(f"Error during migration to {new_root}: {mig_err}")
+            return jsonify({"error": f"Failed while copying patient files: {mig_err}"}), 500
+
+    STORAGE_ROOT = new_root
+    THUMBNAIL_ROOT = STORAGE_ROOT / ".thumbnails"
+    THUMBNAIL_ROOT.mkdir(parents=True, exist_ok=True)
+    with _sync_engine_lock:
+        _sync_engine = None
+
+    config["storage_path"] = str(STORAGE_ROOT)
+    try:
+        CONFIG_FILE.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+        logger.info(f"Updated config.json with new storage_path: {STORAGE_ROOT}")
+    except Exception as cfg_err:
+        logger.warning(f"Could not persist new storage_path to config.json: {cfg_err}")
+
+    try:
+        tag_existing_patient_folders()
+        mapping_res = update_storage_mapping_files()
+    except Exception as map_err:
+        logger.warning(f"Error updating mapping files in new storage root: {map_err}")
+        mapping_res = {}
+
+    stats = calculate_storage_stats(STORAGE_ROOT)
+
+    return jsonify({
+        "success": True,
+        "message": "Storage location updated successfully.",
+        "previousPath": str(old_root),
+        "currentStoragePath": str(STORAGE_ROOT),
+        "migratedPatients": migrated_patients,
+        "migratedFiles": migrated_files,
+        "totalPatientFolders": stats["totalPatientFolders"],
+        "totalFiles": stats["totalFiles"],
+        "totalSizeBytes": stats["totalSizeBytes"],
+        "mapping": mapping_res
+    })
+
 def get_local_ip() -> str:
     """Detect the local machine IP on the clinic LAN."""
     try:

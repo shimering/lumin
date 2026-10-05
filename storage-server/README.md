@@ -73,13 +73,21 @@ All tunnel launchers use the port from `config.json` and monitor the connection 
 
 ---
 
-## ⚙️ Configuration (`config.json`)
+## ⚙️ Configuration (`config.json`) & Changing Drive Location from Lumin
 
-You can edit `config.json` in Notepad to customize:
+You can change your storage folder anytime **directly from inside the Lumin web app (Admin &rarr; Storage Server tab)** or by editing `config.json` in Notepad:
 * `"storage_path"`: Change the drive or folder (e.g. `E:\DentalRecords` or `D:\LuminStorage\Patients`).
 * `"clinic_secret_key"`: Your private clinic authentication password.
 * `"port"`: Default is 5000.
 * `"max_file_size_mb"`: Default 50 MB per file.
+
+### 💽 Changing Drive / Folder from Inside Lumin Web App
+1. Open **Lumin Dental Clinic** &rarr; **Admin** &rarr; **Storage Server** tab.
+2. Under **Storage Location & Local Drive**, inspect the active directory (e.g. `D:\LuminStorage\Patients`), free space on host drives (C:, D:, etc.), and total patient folders and media files.
+3. Click **Change Location / Move**.
+4. Choose any detected host drive pill, browse subfolders, or create a new subfolder.
+5. Keep **Migrate & Copy Existing Patient Files** checked to automatically copy all existing patient records and X-rays to the new location without losing data.
+6. Click **Apply Location**. The storage server will immediately update `config.json`, migrate the files, and regenerate the MySQL and SQLite mappings.
 
 ## Troubleshooting tunnel errors
 
