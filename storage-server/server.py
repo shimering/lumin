@@ -777,7 +777,7 @@ def get_sync_engine():
             _sync_engine = SyncEngine(
                 STORAGE_ROOT,
                 config.get('sync_state_path') or Path(__file__).parent / '.lumin-sync',
-                config['allowed_extensions'], generate_thumbnail)
+                list(set(config['allowed_extensions']) | {'zip'}), generate_thumbnail)
     return _sync_engine
 
 
@@ -847,7 +847,8 @@ def health_check():
         "storageRoot": str(STORAGE_ROOT),
         "totalPatientFolders": total_folders,
         "maxFileSizeMB": config["max_file_size_mb"],
-        "syncProtocol": 1
+        "syncProtocol": 1,
+        "capabilities": {"patient3dScans": True}
     })
 
 @app.route("/api/upload", methods=["POST"])
@@ -895,12 +896,21 @@ def upload_file():
     # Clean file name and attach date
     original_filename = sanitize_name(Path(uploaded_file.filename).name)
     ext = Path(original_filename).suffix.lower().lstrip(".")
-    if ext and ext not in config["allowed_extensions"]:
+    if ext == 'zip' and category != '3D-Scans':
+        return jsonify({"error": "ZIP archives must use the 3D-Scans category."}), 400
+    if category == '3D-Scans' and ext != 'zip':
+        return jsonify({"error": "3D scans must be original ZIP archives."}), 400
+    if ext and ext not in config["allowed_extensions"] and ext != 'zip':
         return jsonify({"error": f"File extension '.{ext}' is not permitted."}), 400
 
     date_str = datetime.now().strftime("%Y-%m-%d")
     timestamp_unique = int(datetime.now().timestamp())
-    saved_filename = f"{date_str}_{timestamp_unique}_{original_filename}"
+    # A unique name protects repeated imports within the same second. Save bytes without extraction.
+    if category == '3D-Scans':
+        import uuid
+        saved_filename = f"{date_str}_{uuid.uuid4().hex}.zip"
+    else:
+        saved_filename = f"{date_str}_{timestamp_unique}_{original_filename}"
 
     file_path = target_dir / saved_filename
     get_sync_engine().save_upload(uploaded_file, file_path.relative_to(STORAGE_ROOT).as_posix())
@@ -1336,14 +1346,24 @@ def browse_storage_directory():
         requested_path_str = str(STORAGE_ROOT.parent) if STORAGE_ROOT.parent.exists() else default_drive
 
     try:
-        cand_path = Path(requested_path_str).resolve()
-        if not cand_path.exists():
-            return jsonify({
-                "error": f"Path '{requested_path_str}' does not exist on the server.",
-                "availableDrives": drives
-            }), 404
-        if not cand_path.is_dir():
-            cand_path = cand_path.parent
+        requested_path_str = str(requested_path_str).strip()
+        if re.match(r'^[a-zA-Z]:$', requested_path_str):
+            requested_path_str += '\\'
+
+        cand_path = Path(requested_path_str)
+        target_exists = cand_path.exists()
+        nearest_existing = cand_path
+        
+        while not nearest_existing.exists() and nearest_existing.parent != nearest_existing:
+            nearest_existing = nearest_existing.parent
+
+        if not nearest_existing.exists():
+            nearest_existing = STORAGE_ROOT if STORAGE_ROOT.exists() else Path(drives[0]["drive"] if drives else "/")
+
+        if not nearest_existing.is_dir():
+            nearest_existing = nearest_existing.parent
+
+        cand_path = nearest_existing.resolve()
 
         subfolders = []
         ignored_names = {
@@ -1378,6 +1398,8 @@ def browse_storage_directory():
             "success": True,
             "currentPath": str(cand_path),
             "parentPath": parent_path,
+            "targetExists": target_exists,
+            "requestedPath": requested_path_str,
             "subfolders": subfolders,
             "isWritable": is_writable,
             "availableDrives": drives

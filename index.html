@@ -60,7 +60,7 @@
       // Mousewheel zoom inside the X-Ray/photo lightbox viewer (#lightbox-viewport) is preserved.
       window.addEventListener('wheel', (e) => {
         if (e.ctrlKey) {
-          if (e.target && e.target.closest && e.target.closest('#lightbox-viewport')) {
+          if (e.target && e.target.closest && e.target.closest('#lightbox-viewport, .scan-pane')) {
             return;
           }
           e.preventDefault();
@@ -76,6 +76,8 @@
   <script src="lumin-loyalty.js?v=5"></script>
   <script src="lumin-finance-sync.js?v=2"></script>
   <script src="lumin-cash-flow.js?v=1"></script>
+  <script src="lumin-patient-scans.js?v=1"></script>
+  <link rel="stylesheet" href="lumin-patient-scans.css?v=1" />
   <link rel="stylesheet" href="lumin-cash-flow.css?v=1" />
   <script src="lumin-storage-sync.js?v=2"></script>
   <link rel="stylesheet" href="lumin-storage-sync.css?v=1" />
@@ -6610,6 +6612,7 @@
           <button type="button" role="tab" aria-controls="view-patient-profile" data-patient-workspace-tab="profile" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('profile')"><span class="patient-workspace-identity"><span class="patient-workspace-name" dir="auto">Patient</span><span id="patient-workspace-meta" class="patient-workspace-meta">—</span></span></button>
           <button type="button" role="tab" aria-controls="view-chart" data-patient-workspace-tab="chart" data-workspace-requires="chart" onclick="openPatientWorkspaceTab('chart')" aria-label="Dental chart" title="Dental chart"><img src="icons/dental-chart-icon.webp" alt="" aria-hidden="true" class="dental-chart-button-icon h-5 w-5 shrink-0 object-contain" /><span>Dental chart</span></button>
           <button type="button" role="tab" aria-controls="view-patient-media" data-patient-workspace-tab="media" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('media')" aria-label="X-Rays & Media" title="X-Rays & Media"><i data-lucide="images" class="h-4 w-4"></i><span>X-Rays & Media</span></button>
+          <button type="button" role="tab" aria-controls="view-patient-scans" data-patient-workspace-tab="scans" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('scans')" aria-label="3D Scans" title="3D Scans"><i data-lucide="box" class="h-4 w-4"></i><span>3D Scans</span></button>
           <button type="button" role="tab" aria-controls="view-patient-appointments" data-patient-workspace-tab="appointments" data-workspace-requires="appointments" onclick="openPatientWorkspaceTab('appointments')" aria-label="Appointments" title="Appointments"><i data-lucide="calendar-days" class="h-4 w-4"></i><span>Appointments</span></button>
           <button type="button" role="tab" aria-controls="view-prescriptions" data-patient-workspace-tab="prescriptions" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('prescriptions')" aria-label="Prescriptions" title="Prescriptions"><i data-lucide="notebook-tabs" class="h-4 w-4"></i><span>Prescriptions</span></button>
           <button type="button" role="tab" aria-controls="view-invoices" data-patient-workspace-tab="invoices" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('invoices')" aria-label="Invoices" title="Invoices"><i data-lucide="receipt-text" class="h-4 w-4"></i><span>Invoices</span></button>
@@ -6625,6 +6628,8 @@
     </section>
 
     <!-- ================= PATIENT X-RAYS & CLINICAL MEDIA ================= -->
+    <section id="view-patient-scans" role="tabpanel" class="hidden" aria-live="polite"></section>
+
     <section id="view-patient-media" role="tabpanel" class="hidden space-y-4">
       <div class="app-page-bar">
         <div class="app-page-heading">
@@ -11093,6 +11098,7 @@
       'My Settings': 'إعداداتي',
       'Open my settings': 'فتح إعداداتي',
       'X-Rays & Media': 'الأشعة والوسائط',
+      '3D Scans': 'المسح ثلاثي الأبعاد',
       'Upload Photo / X-Ray': 'رفع صورة / أشعة',
       'Storage & X-Ray Server': 'خادم تخزين الأشعة والملفات',
       'Storage & X-Rays': 'تخزين الأشعة والملفات',
@@ -11557,7 +11563,7 @@
 
     function isUiTranslationExcluded(node) {
       const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
-      return Boolean(element?.closest('#view-chart, #view-admin, #view-prices, #patient-media-tooth-picker, .patient-workspace-name, [data-storage-connection-badge], [data-storage-server-dialog], [data-media-user-content]'));
+      return Boolean(element?.closest('#view-chart, #view-admin, #view-prices, #view-patient-scans, #patient-media-tooth-picker, .patient-workspace-name, [data-storage-connection-badge], [data-storage-server-dialog], [data-media-user-content]'));
     }
 
     function arabicUiPhrase(source) {
@@ -19461,7 +19467,7 @@
               await ensurePatientDirectoryPageLoaded();
             }
           }
-          if (activeWorkspacePatientId && ['patient-profile','chart','invoices','payments','loyalty','patient-appointments','patient-media','patient-prescriptions'].some(realtimeViewIsVisible)) {
+          if (activeWorkspacePatientId && ['patient-profile','chart','invoices','payments','loyalty','patient-appointments','patient-media','patient-scans','patient-prescriptions'].some(realtimeViewIsVisible)) {
             const patientId = activeWorkspacePatientId;
             const token = workspaceNavigationToken;
             const patient = await ensureKnownPatient(patientId, { force: true, throwOnError: true });
@@ -26867,6 +26873,10 @@
         if (canViewPatientLoyalty()) await switchView('loyalty');
         return;
       }
+      if (tabName === 'scans') {
+        await switchView('patient-scans');
+        return;
+      }
       if (tabName === 'media' || tabName === 'xrays') {
         await switchView('patient-media');
         return;
@@ -27833,15 +27843,16 @@
     function selectStorageDrive(driveLetter) {
       const input = document.getElementById('change-storage-path-input');
       if (!input) return;
+      const cleanLetter = driveLetter.replace(/[:\\/]+$/, '').toUpperCase();
       let path = input.value.trim();
       if (/^[a-zA-Z]:/.test(path)) {
-        path = path.replace(/^[a-zA-Z]:/, driveLetter);
+        path = path.replace(/^[a-zA-Z]:/, `${cleanLetter}:`);
       } else {
-        path = `${driveLetter}\\LuminStorage\\Patients`;
+        path = `${cleanLetter}:\\LuminStorage\\Patients`;
       }
       input.value = path;
       renderModalDrivePills();
-      void browseStorageFolder(path);
+      void browseStorageFolder(`${cleanLetter}:\\`);
     }
 
     function onStoragePathInputChange() {
@@ -27906,14 +27917,24 @@
 
         if (!listContainer) return;
 
+        let noticeHtml = '';
+        if (data.targetExists === false) {
+          noticeHtml = `
+            <div class="py-2 px-3 mb-2 rounded-lg bg-amber-50 text-[11px] font-semibold text-amber-800 flex items-center gap-1.5">
+              <i data-lucide="info" class="h-3.5 w-3.5 shrink-0 text-amber-600"></i>
+              <span>${t('Folder does not exist yet — it will be created automatically upon applying.', 'هذا المجلد غير موجود حالياً، وسيتم إنشاؤه تلقائياً عند التطبيق.')}</span>
+            </div>
+          `;
+        }
+
         if (!data.subfolders || data.subfolders.length === 0) {
-          listContainer.innerHTML = `
+          listContainer.innerHTML = noticeHtml + `
             <div class="py-4 px-3 text-center text-xs text-slate-400">
               ${t('No subfolders in this directory. You can use it as is or add a subfolder.', 'لا توجد مجلدات فرعية في هذا المسار. يمكنك اعتماده أو إضافة مجلد فرعي.')}
             </div>
           `;
         } else {
-          listContainer.innerHTML = data.subfolders.map(item => {
+          listContainer.innerHTML = noticeHtml + data.subfolders.map(item => {
             const folderName = typeof item === 'string' ? item : (item.name || '');
             const separatorChar = storageBrowserCurrentPath.includes('/') ? '/' : '\\';
             const fullSubPath = (typeof item === 'object' && item.path)
@@ -27949,6 +27970,7 @@
         if (upBtn) upBtn.disabled = true;
       }
     }
+
 
     function selectBrowserPath(path) {
       const input = document.getElementById('change-storage-path-input');
@@ -28266,6 +28288,22 @@
       } finally { button.disabled = false; }
     }
 
+    let activePatientScans = null;
+    async function renderPatientScans() {
+      const patientId = patientWorkspaceId();
+      const patient = getKnownPatient(patientId) || await ensureKnownPatient(patientId);
+      const host = document.getElementById('view-patient-scans');
+      if (!patient || host.classList.contains('hidden') || patientWorkspaceId() !== patientId) return;
+      updatePatientWorkspaceNavigation(patient, 'scans');
+      activePatientScans?.dispose();
+      activePatientScans = window.LuminPatientScans.mount(host, {
+        patient, storage: getStorageServerConfig(), db, language: currentUiLanguage,
+        isCurrent: () => patientWorkspaceId() === patientId && !host.classList.contains('hidden'),
+        openSettings: () => openStorageSettings()
+      });
+      await activePatientScans.ready;
+    }
+
     async function renderPatientMedia() {
       const renderToken = ++patientMediaRenderToken;
       const patientId = activeWorkspacePatientId || patientWorkspaceId();
@@ -28316,7 +28354,7 @@
         const detailsList = detailsResult.error ? [] : detailsResult.data || [];
         const detailsByPath = new Map(detailsList.map(item => [item.relative_path, item]));
         const detailsBySubpath = new Map(detailsList.map(item => [String(item.relative_path || '').split('/').slice(-2).join('/'), item]));
-        currentPatientMediaFiles = (data.files || []).map(file => {
+        currentPatientMediaFiles = (data.files || []).filter(file => file.category !== '3D-Scans' && !/\.zip$/i.test(file.filename || '')).map(file => {
           const subpath = [file.category, file.filename].join('/');
           const match = detailsByPath.get(file.relativePath) || detailsBySubpath.get(subpath) || null;
           if (match && match.relative_path !== file.relativePath) {
@@ -30065,7 +30103,7 @@
         : viewName === 'patient-appointments' ? canViewPatientAppointments()
         : viewName === 'patient-prescriptions' ? canViewPatientPrescriptions()
         : viewName === 'loyalty' ? canViewPatientLoyalty()
-        : hasPageAccess(['payments', 'patient-profile', 'patient-media'].includes(viewName) ? 'patients' : viewName);
+        : hasPageAccess(['payments', 'patient-profile', 'patient-media', 'patient-scans'].includes(viewName) ? 'patients' : viewName);
       if (!canOpenRequestedView) {
         const fallbackView = firstAuthorizedView();
         if (fallbackView && fallbackView !== viewName) await switchView(fallbackView);
@@ -30074,7 +30112,7 @@
 
       const navigationToken = ++workspaceNavigationToken;
       const navigationUserId = currentSession?.user?.id;
-      const workspaceView = ['patient-profile', 'chart', 'invoices', 'payments', 'loyalty', 'patient-appointments', 'patient-prescriptions', 'patient-media'].includes(viewName);
+      const workspaceView = ['patient-profile', 'chart', 'invoices', 'payments', 'loyalty', 'patient-appointments', 'patient-prescriptions', 'patient-media', 'patient-scans'].includes(viewName);
       const requestedPatientId = workspaceView ? patientWorkspaceId() : null;
       const navigationIsCurrent = () => navigationToken === workspaceNavigationToken && currentSession?.user?.id === navigationUserId
         && (!workspaceView || patientWorkspaceId() === requestedPatientId);
@@ -30085,7 +30123,7 @@
       }
 
       // Synchronously update navigation rail & mobile bottom bar highlights immediately (zero delay)
-      const primaryNavTarget = ['invoices', 'patient-profile', 'payments', 'loyalty', 'patient-appointments', 'patient-prescriptions', 'patient-media'].includes(viewName)
+      const primaryNavTarget = ['invoices', 'patient-profile', 'payments', 'loyalty', 'patient-appointments', 'patient-prescriptions', 'patient-media', 'patient-scans'].includes(viewName)
         ? 'patients'
         : viewName;
       const activeNavClass = 'flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition bg-white text-blue-700 shadow-xs';
@@ -30142,13 +30180,16 @@
       viewAnalytics.classList.add('hidden');
       viewHr.classList.add('hidden');
       viewImplants?.classList.add('hidden');
-      patientWorkspaceHeader.classList.toggle('hidden', !['patient-profile', 'chart', 'invoices', 'payments', 'loyalty', 'patient-appointments', 'patient-prescriptions', 'patient-media'].includes(viewName));
+      patientWorkspaceHeader.classList.toggle('hidden', !['patient-profile', 'chart', 'invoices', 'payments', 'loyalty', 'patient-appointments', 'patient-prescriptions', 'patient-media', 'patient-scans'].includes(viewName));
       document.getElementById('patient-workspace-sheet').classList.toggle('hidden', patientWorkspaceHeader.classList.contains('hidden'));
       document.getElementById('view-patient-appointments').classList.add('hidden');
       if (viewName !== 'patient-appointments') resetPatientAppointmentsState();
       viewPrescriptions.classList.add('hidden');
       if (viewName !== 'patient-prescriptions') resetPatientPrescriptionsState();
       document.getElementById('view-loyalty').classList.add('hidden');
+      activePatientScans?.dispose();
+      activePatientScans = null;
+      document.getElementById('view-patient-scans')?.classList.add('hidden');
       document.getElementById('view-patient-media')?.classList.add('hidden');
       viewPatientProfile.classList.add('hidden');
       viewInvoices.classList.add('hidden');
@@ -30254,6 +30295,9 @@
       } else if (viewName === 'patient-prescriptions') {
         viewPrescriptions.classList.remove('hidden');
         await renderPatientPrescriptions();
+      } else if (viewName === 'patient-scans') {
+        document.getElementById('view-patient-scans').classList.remove('hidden');
+        await renderPatientScans();
       } else if (viewName === 'patient-media') {
         const viewMedia = document.getElementById('view-patient-media');
         if (viewMedia) {
