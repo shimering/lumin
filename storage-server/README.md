@@ -170,7 +170,9 @@ closed; an already authorized background job uses its server pairing credentials
 The **3D Scans** patient tab accepts ZIP archives containing upper and lower OBJ
 models with their MTL materials and JPEG, PNG, or WebP textures. Preview the pair,
 confirm the arch selections, then save it. The ZIP is stored byte for byte under
-the patient's **3D-Scans** folder. The server never extracts or converts it.
+the patient's **3D-Scans** folder. Each import has its own subfolder, with the ZIP
+filename exactly as uploaded, including spaces, Arabic characters, and letter case.
+Repeated filenames remain separate scans. The server never extracts or converts it.
 **Download original ZIP** restores the imported filename. The extra STL and all
 other original archive entries remain inside that download.
 
@@ -179,6 +181,8 @@ are shared through `patient_media_details` in Supabase. Patient permissions rema
 the same. Rendering modes, opacity, lights, camera movement, and section cuts only
 affect the viewer. Comparison links two cameras without registering the scans or
 calculating contacts. Cuts show existing surfaces without generating interior geometry.
+The viewer starts with a dark background. Drag with the left mouse button to rotate;
+hold the left and right buttons together to pan. Touch panning still uses two fingers.
 
 Update **both paired servers** before synchronizing scans. On the other computer:
 
@@ -187,7 +191,8 @@ Update **both paired servers** before synchronizing scans. On the other computer
    folder, replacing `server.py`, `file_sync.py`, and `README.md`.
 3. Keep that computer's `config.json`, patient files, and `.lumin-sync` directory.
 4. Restart with its existing `start-storage.bat` or server launcher.
-5. Verify `/api/health` includes `capabilities.patient3dScans: true`, then sync.
+5. Verify `/api/health` includes `capabilities.patient3dScans: true` and
+   `capabilities.scanOriginalFilenames: true`, then sync.
 
 Existing installations support ZIPs without editing `allowed_extensions`. Other
 file restrictions and the configured upload limit still apply. Each new scan uses

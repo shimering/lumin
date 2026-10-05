@@ -289,6 +289,7 @@ class SyncTests(unittest.TestCase):
         client = self.modules[0].app.test_client()
         health = client.get('/api/health').get_json()
         self.assertTrue(health['capabilities']['patient3dScans'])
+        self.assertTrue(health['capabilities']['scanOriginalFilenames'])
         self.assertIn('zip', self.engines[0].extensions)
         paths = []
         for _ in range(2):
@@ -296,17 +297,21 @@ class SyncTests(unittest.TestCase):
                 'file': (io.BytesIO(payload), 'Original patient scan.zip'),
                 'patientId': 'scan-test', 'patientName': 'Scan Test', 'category': '3D-Scans'})
             self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+            self.assertEqual(response.get_json()['filename'], 'Original patient scan.zip')
             paths.append(response.get_json()['relativePath'])
         self.assertNotEqual(paths[0], paths[1])
+        self.assertEqual(Path(paths[0]).name, 'Original patient scan.zip')
+        self.assertNotEqual(Path(paths[0]).parent, Path(paths[1]).parent)
         import uuid
         upload_id = str(uuid.uuid4())
         retries = []
         for _ in range(2):
             response = client.post('/api/upload', headers={'x-lumin-key': self.keys[0]}, data={
-                'file': (io.BytesIO(payload), 'Retry.zip'), 'scanUploadId': upload_id,
+                'file': (io.BytesIO(payload), 'مسح للفكين - زيارة ١.ZIP'), 'scanUploadId': upload_id,
                 'patientId': 'scan-test', 'patientName': 'Scan Test', 'category': '3D-Scans'})
             retries.append(response.get_json()['relativePath'])
         self.assertEqual(retries[0], retries[1])
+        self.assertEqual(Path(retries[0]).name, 'مسح للفكين - زيارة ١.ZIP')
         paths.append(retries[0])
         for rel in paths:
             response = client.get('/files/' + rel, headers={'x-lumin-key': self.keys[0]})
@@ -316,6 +321,7 @@ class SyncTests(unittest.TestCase):
             self.assertEqual(client.get('/files/' + rel).status_code, 401)
         listing = client.get('/api/patient/scan-test/files?name=Scan%20Test', headers={'x-lumin-key': self.keys[0]}).get_json()
         self.assertEqual(len(listing['files']), 3)
+        self.assertTrue(all(file['category'] == '3D-Scans' for file in listing['files']))
         self.pair()
         self.run_sync()
         for rel in paths:

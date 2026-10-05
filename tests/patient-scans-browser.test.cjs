@@ -31,14 +31,15 @@ test('scan viewer: original ZIP, comparison, controls, retries, safety, and resp
     const url = new URL(req.url, 'http://localhost'); requests.push(url.pathname);
     if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/files/')) {
       if(url.pathname!=='/api/health' && req.headers['x-lumin-key']!=='test-key') {res.statusCode=401;res.end();return;}
-      if (url.pathname==='/api/health') {res.setHeader('Content-Type','application/json');res.end(JSON.stringify({maxFileSizeMB:50,capabilities:{patient3dScans:true}}));return;}
+      if (url.pathname==='/api/health') {res.setHeader('Content-Type','application/json');res.end(JSON.stringify({maxFileSizeMB:50,capabilities:{patient3dScans:true,scanOriginalFilenames:true}}));return;}
       if (url.pathname.startsWith('/api/patient/')) {res.end(JSON.stringify({files:url.pathname.includes('/test-patient/')?files:[]}));return;}
       if (url.pathname==='/api/upload') {
         const parts=[]; for await(const part of req)parts.push(part);
         const data=Buffer.concat(parts), boundary=Buffer.from('--'+req.headers['content-type'].split('boundary=')[1]);
         const start=data.indexOf(Buffer.from('\r\n\r\n'))+4, end=data.indexOf(Buffer.concat([Buffer.from('\r\n'),boundary]),start);
         const uploadId=data.toString().match(/name="scanUploadId"\r\n\r\n([^\r]+)/)?.[1];
-        const content=data.subarray(start,end), filename=`${uploadId}.zip`, relativePath='Test/3D-Scans/'+filename;
+        const filename=data.subarray(0,start).toString().match(/filename="([^"]*)"/)?.[1];
+        const content=data.subarray(start,end), relativePath=`Test/3D-Scans/${uploadId}/${filename}`;
         if(!archives.has(relativePath)){uploads++;archives.set(relativePath,content); files.unshift({filename,relativePath,category:'3D-Scans',sizeBytes:content.length,modifiedAt:'2026-10-05T12:00:00'});}
         res.end(JSON.stringify({success:true,relativePath}));return;
       }
@@ -62,6 +63,8 @@ test('scan viewer: original ZIP, comparison, controls, retries, safety, and resp
   };
   await importZip(bytes,'Original scan.zip');
   assert.equal(await page.evaluate(()=>scans.previewReady),true);
+  assert.equal(await page.locator('[data-scan-setting="background"]').inputValue(),'dark');
+  assert.equal(await page.evaluate(()=>scans.viewer.panes[0].scene.background.getHex()),0x1e293b);
   if(fs.existsSync(sample)) {
     const stats=await page.evaluate(()=>scans.viewer.panes[0].arches.upper.children.map(m=>({vertices:m.geometry.attributes.position.count,texture:!!m.material.map,normal:m.geometry.attributes.normal.count})));
     assert.equal(stats[0].vertices,147555*3);assert.equal(stats[0].normal,stats[0].vertices);assert.ok(stats[0].texture);
@@ -87,6 +90,25 @@ test('scan viewer: original ZIP, comparison, controls, retries, safety, and resp
   await importZip(bytes,'Second scan.zip');await page.locator('[data-scan-field="name"]').fill('Follow-up');await page.locator('[data-scan-action="save"]').click();await page.waitForFunction(()=>document.querySelectorAll('.scan-card').length===2);
   await page.locator('[data-scan-select="0"]').check();await page.locator('[data-scan-select="1"]').check();await page.locator('[data-scan-action="compare"]').click();await page.waitForFunction(()=>scans.viewer?.panes.length===2,{},{timeout:60000});
   assert.equal(await page.locator('.scan-stage canvas').count(),1);
+  await page.waitForFunction(()=>!scans.busy);
+  await page.locator('.scan-pane').first().scrollIntoViewIfNeeded();
+  const box=await page.locator('.scan-pane').first().boundingBox(),x=box.x+box.width/2,y=box.y+box.height/2;
+  const pose=()=>page.evaluate(()=>{
+    const pane=scans.viewer.panes[0];return {target:pane.controls.target.toArray(),offset:pane.camera.position.clone().sub(pane.controls.target).toArray()};
+  });
+  const difference=(a,b)=>Math.hypot(...a.map((value,index)=>value-b[index]));
+  // Left + right pans; releasing right resumes left-button rotation without a jump.
+  await page.mouse.move(x,y);await page.mouse.down({button:'left'});await page.mouse.move(x+15,y+5);
+  let before=await pose();await page.mouse.down({button:'right'});await page.mouse.move(x+60,y+25,{steps:4});let after=await pose();
+  assert.ok(difference(before.target,after.target)>.01);assert.ok(difference(before.offset,after.offset)<1e-6);
+  assert.ok(await page.evaluate(()=>scans.viewer.panes[0].controls.target.distanceTo(scans.viewer.panes[1].controls.target)<1e-8));
+  before=await pose();await page.mouse.up({button:'right'});after=await pose();assert.ok(difference(before.offset,after.offset)<1e-6);
+  await page.mouse.move(x+85,y+30,{steps:3});after=await pose();assert.ok(difference(before.target,after.target)<1e-6);assert.ok(difference(before.offset,after.offset)>.01);await page.mouse.up({button:'left'});
+  // Right alone stays still; pressing left second starts the same pan gesture.
+  await page.mouse.move(x,y);before=await pose();await page.mouse.down({button:'right'});await page.mouse.move(x+20,y+10);after=await pose();assert.ok(difference(before.target,after.target)<1e-6);assert.ok(difference(before.offset,after.offset)<1e-6);
+  await page.mouse.down({button:'left'});await page.mouse.move(x+55,y+30,{steps:3});after=await pose();assert.ok(difference(before.target,after.target)>.01);assert.ok(difference(before.offset,after.offset)<1e-6);
+  before=await pose();await page.mouse.up({button:'left'});await page.mouse.move(x+75,y+40);after=await pose();assert.ok(difference(before.target,after.target)<1e-6);assert.ok(difference(before.offset,after.offset)<1e-6);await page.mouse.up({button:'right'});
+  await page.locator('[data-scan-action="view"][data-index="reset"]').click();
   await page.evaluate(()=>{scans.viewer.panes[0].camera.position.x+=1;scans.viewer.panes[0].controls.update();});
   assert.ok(await page.evaluate(()=>scans.viewer.panes[0].camera.position.distanceTo(scans.viewer.panes[1].camera.position)<1e-8));
   await page.locator('[data-scan-setting="linked"]').uncheck();await page.evaluate(()=>{scans.viewer.panes[0].camera.position.x+=1;scans.viewer.panes[0].controls.update();});
@@ -98,14 +120,16 @@ test('scan viewer: original ZIP, comparison, controls, retries, safety, and resp
   await page.locator('[data-scan-setting="lowerOpacity"]').fill('0.5');
   await page.locator('.scan-tools').nth(1).locator('summary').click();await page.locator('[data-scan-setting="cut"]').check();await page.locator('[data-scan-setting="axis"]').selectOption('x');await page.locator('[data-scan-setting="reverse"]').check();
   assert.equal(await page.evaluate(()=>scans.viewer.panes.every(p=>p.arches.lower.children.every(m=>m.material.opacity===.5 && m.material.clippingPlanes[0].normal.x===-1))),true);
-  await page.locator('[data-scan-action="view"][data-index="reset"]').click();assert.equal(await page.evaluate(()=>scans.settings.cut===false&&scans.settings.upper&&scans.settings.lowerOpacity===1),true);
+  await page.locator('[data-scan-setting="background"]').selectOption('light');
+  await page.locator('[data-scan-action="view"][data-index="reset"]').click();assert.equal(await page.evaluate(()=>scans.settings.cut===false&&scans.settings.upper&&scans.settings.lowerOpacity===1&&scans.settings.background==='dark'),true);
+  assert.equal(await page.locator('[data-scan-setting="background"]').inputValue(),'dark');
   // Browser graphics-context restoration should resume rendering without reimporting.
   await page.evaluate(()=>{window.lossExtension=scans.viewer.renderer.getContext().getExtension('WEBGL_lose_context');lossExtension?.loseContext();});
   await page.waitForFunction(()=>document.querySelector('[data-graphics-lost]'));await page.evaluate(()=>lossExtension.restoreContext());await page.waitForFunction(()=>!document.querySelector('[data-graphics-lost]'));
   const pixels=await page.evaluate(()=>{
     const viewer=scans.viewer;viewer.render();const gl=viewer.renderer.getContext(),w=gl.drawingBufferWidth,h=gl.drawingBufferHeight,colors=new Uint8Array(w*h*4);
     gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,colors);const counts=[0,0];
-    for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=(y*w+x)*4;if(Math.abs(colors[i]-241)+Math.abs(colors[i+1]-245)+Math.abs(colors[i+2]-249)>50)counts[x<w/2?0:1]++;}
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=(y*w+x)*4;if(Math.abs(colors[i]-30)+Math.abs(colors[i+1]-41)+Math.abs(colors[i+2]-59)>50)counts[x<w/2?0:1]++;}
     return counts;
   });assert.ok(pixels.every(count=>count>1000),JSON.stringify(pixels));
   for(const language of ['en','ar']) {
@@ -144,7 +168,7 @@ test('scan viewer: original ZIP, comparison, controls, retries, safety, and resp
   await page.locator('[data-scan-action="open"]').first().click();await page.waitForFunction(()=>!scans.busy && document.querySelector('.scan-message').textContent.includes('WebGL2'));
   await page.evaluate(()=>HTMLCanvasElement.prototype.getContext=realGetContext);
   await page.locator('[data-scan-action="close"]').click();page.once('dialog',dialog=>dialog.accept());await page.locator('[data-scan-action="delete"]').first().click();await page.waitForFunction(()=>document.querySelectorAll('.scan-card').length===2);
-  await page.evaluate(()=>{window.realFetch=window.fetch;window.fetch=async(...args)=>String(args[0]).endsWith('/api/health')?new Response(JSON.stringify({maxFileSizeMB:50,capabilities:{}})):realFetch(...args);return mount();});
+  await page.evaluate(()=>{window.realFetch=window.fetch;window.fetch=async(...args)=>String(args[0]).endsWith('/api/health')?new Response(JSON.stringify({maxFileSizeMB:50,capabilities:{patient3dScans:true}})):realFetch(...args);return mount();});
   assert.equal(await page.locator('[data-scan-action="import"]').first().isDisabled(),true);assert.match(await page.locator('.scan-warning').textContent(),/Update this storage server/);
   await page.evaluate(()=>window.fetch=realFetch);
   await page.evaluate(()=>scans.dispose());assert.equal(await page.evaluate(()=>scans.workers.size),0);assert.equal(await page.locator('canvas').count(),0);

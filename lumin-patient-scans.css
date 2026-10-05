@@ -35,7 +35,7 @@
 .scan-form-grid label,.scan-tools-grid>label:not(.scan-check) { display:flex; flex-direction:column; gap:8px; color:#475569; font-size:12px; font-weight:500; min-width:0; }
 #view-patient-scans :is(select,input:not([type=checkbox]):not([type=range]),textarea) { width:100%; min-width:0; min-height:44px; padding:10px 12px; border:1px solid #e2e8f0; border-radius:12px; background:var(--lumin-face,#f8fafc); color:#334155; font-size:13px; }
 #view-patient-scans input[type=range] { min-height:44px; width:100%; accent-color:#2563eb; cursor:pointer; }
-.scan-stage { position:relative; height:460px; overflow:hidden; border-radius:16px; background:#f1f5f9; margin-top:16px; direction:ltr; display:grid; grid-template-columns:1fr; }
+.scan-stage { position:relative; height:460px; overflow:hidden; border-radius:16px; background:#1e293b; margin-top:16px; direction:ltr; display:grid; grid-template-columns:1fr; }
 .scan-stage.scan-compare { grid-template-columns:1fr 1fr; gap:2px; }
 .scan-canvas { position:absolute; inset:0; width:100%; height:100%; }
 .scan-pane { position:relative; z-index:1; touch-action:none; min-width:0; cursor:grab; }

@@ -2,6 +2,37 @@ import * as THREE from './vendor/three/build/three.module.js';
 import { MTLLoader } from './vendor/three/examples/jsm/loaders/MTLLoader.js';
 import { OrbitControls } from './vendor/three/examples/jsm/controls/OrbitControls.js';
 
+function installTwoButtonPan(controls, element) {
+  controls.mouseButtons.RIGHT = -1;
+  let panning = false;
+  const transition = event => {
+    if (event.pointerType && event.pointerType !== 'mouse') return;
+    const next = (event.buttons & 3) === 3;
+    if (next === panning) return;
+    panning = next;
+    controls.mouseButtons.LEFT = next ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE;
+    // A second mouse button produces mousedown, not another pointerdown.
+    // Restart the pinned OrbitControls gesture at the current cursor to avoid jumps.
+    controls._onMouseDown({
+      button: next || (event.buttons & 1) ? 0 : event.buttons & 2 ? 2 : -1,
+      clientX: event.clientX, clientY: event.clientY,
+      ctrlKey: next ? false : event.ctrlKey, metaKey: next ? false : event.metaKey,
+      shiftKey: next ? false : event.shiftKey
+    });
+  };
+  const cancel = () => { panning = false; controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE; };
+  element.addEventListener('mousedown', transition);
+  element.addEventListener('mouseup', transition);
+  element.addEventListener('pointermove', transition, true);
+  element.addEventListener('pointercancel', cancel);
+  return () => {
+    element.removeEventListener('mousedown', transition);
+    element.removeEventListener('mouseup', transition);
+    element.removeEventListener('pointermove', transition, true);
+    element.removeEventListener('pointercancel', cancel);
+  };
+}
+
 export class ScanViewer {
   constructor(host, labels) {
     this.host = host; this.labels = labels; this.panes = []; this.urls = [];
@@ -42,7 +73,8 @@ export class ScanViewer {
         this.host.append(element);
         const controls = new OrbitControls(camera, element); controls.enableDamping = false;
         controls.minDistance = 0.2; controls.maxDistance = 15;
-        const pane = { scene, pair, camera, controls, element, hemi, light, arches: {}, resources: new Set() }; this.panes.push(pane);
+        const detachMousePan = installTwoButtonPan(controls, element);
+        const pane = { scene, pair, camera, controls, element, hemi, light, arches: {}, resources: new Set(), detachMousePan }; this.panes.push(pane);
         controls.addEventListener('change', () => {
           if (this.linked && !this.syncing) {
             this.syncing = true;
@@ -120,7 +152,7 @@ export class ScanViewer {
       this.syncing = false;
     }
     for (const pane of this.panes) {
-      pane.scene.background = new THREE.Color(settings.background === 'dark' ? 0x1e293b : 0xf1f5f9);
+      pane.scene.background = new THREE.Color(settings.background === 'light' ? 0xf1f5f9 : 0x1e293b);
       pane.hemi.intensity = (settings.light ?? 1) * 2; pane.light.intensity = (settings.light ?? 1) * 2.5;
       const normal = new THREE.Vector3(settings.axis === 'x' ? 1 : 0, settings.axis === 'y' ? 1 : 0, !['x', 'y'].includes(settings.axis) ? 1 : 0);
       if (settings.reverse) normal.negate();
@@ -171,7 +203,7 @@ export class ScanViewer {
     const materials = new Set(), textures = new Set();
     for (const pane of this.panes) {
       pane.resources.forEach(mat => materials.add(mat));
-      pane.controls.dispose(); pane.element.remove();
+      pane.detachMousePan(); pane.controls.dispose(); pane.element.remove();
       pane.scene.traverse(mesh => {
         mesh.geometry?.dispose();
         if (mesh.material) for (const mat of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) materials.add(mat);

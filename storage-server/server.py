@@ -429,7 +429,7 @@ def update_storage_mapping_files() -> dict:
                     fp = Path(r) / f
                     stat = fp.stat()
                     rel = fp.relative_to(STORAGE_ROOT).as_posix()
-                    cat = fp.parent.name
+                    cat = '3D-Scans' if fp.relative_to(d).parts[0] == '3D-Scans' else fp.parent.name
                     folder_size += stat.st_size
                     mod_dt = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
                     ext = fp.suffix.lower().lstrip(".")
@@ -849,7 +849,7 @@ def health_check():
         "totalPatientFolders": total_folders,
         "maxFileSizeMB": config["max_file_size_mb"],
         "syncProtocol": 1,
-        "capabilities": {"patient3dScans": True}
+        "capabilities": {"patient3dScans": True, "scanOriginalFilenames": True}
     })
 
 @app.route("/api/upload", methods=["POST"])
@@ -906,14 +906,19 @@ def upload_file():
 
     date_str = datetime.now().strftime("%Y-%m-%d")
     timestamp_unique = int(datetime.now().timestamp())
-    # A unique name protects repeated imports within the same second. Save bytes without extraction.
+    # Scan identifiers live in a subfolder so the ZIP keeps its exact original filename.
     if category == '3D-Scans':
         import uuid
         try:
             scan_upload_id = uuid.UUID(request.form['scanUploadId']) if request.form.get('scanUploadId') else uuid.uuid4()
         except (ValueError, AttributeError):
             return jsonify({"error": "Invalid scan upload identifier."}), 400
-        saved_filename = f"{scan_upload_id.hex}.zip"
+        saved_filename = uploaded_file.filename
+        if '/' in saved_filename or '\\' in saved_filename:
+            return jsonify({"error": "The original ZIP filename must not contain a path."}), 400
+        target_dir = target_dir / scan_upload_id.hex
+        file_path = safe_path(STORAGE_ROOT, (target_dir / saved_filename).relative_to(STORAGE_ROOT).as_posix())
+        target_dir.mkdir(parents=True, exist_ok=True)
     else:
         saved_filename = f"{date_str}_{timestamp_unique}_{original_filename}"
 
@@ -1016,7 +1021,7 @@ def list_patient_files(patient_id):
                     continue
                 full_path = Path(root) / filename
                 rel_path = full_path.relative_to(STORAGE_ROOT)
-                category = full_path.parent.name
+                category = '3D-Scans' if full_path.relative_to(patient_dir).parts[0] == '3D-Scans' else full_path.parent.name
                 stat = full_path.stat()
                 files_list.append({
                     "filename": filename,

@@ -19,7 +19,7 @@
     front: ['Front', 'أمامي'], left: ['Left', 'يسار'], right: ['Right', 'يمين'], upperView: ['Upper occlusal', 'إطباق علوي'], lowerView: ['Lower occlusal', 'إطباق سفلي'], reset: ['Fit / reset', 'ملاءمة / إعادة ضبط'],
     cut: ['Section cut', 'مقطع'], axis: ['Cut axis', 'محور المقطع'], cutPosition: ['Cut position', 'موضع المقطع'], reverse: ['Reverse cut', 'عكس المقطع'], resetCut: ['Reset cut', 'إعادة ضبط المقطع'],
     cutHint: ['Cuts display existing surfaces; they do not create interior anatomy.', 'تعرض المقاطع الأسطح الموجودة ولا تُنشئ تفاصيل داخلية.'],
-    gestureHint: ['Drag to rotate; pinch or scroll to zoom; two fingers or right drag to pan. Arrow keys rotate, +/− zoom, Home resets.', 'اسحب للدوران، وقرب بإصبعين أو عجلة التمرير، وحرك بإصبعين أو زر الفأرة الأيمن. الأسهم للدوران و +/− للتقريب و Home لإعادة الضبط.'],
+    gestureHint: ['Left drag to rotate; hold left and right mouse buttons together to pan. Pinch or scroll to zoom; two fingers to pan. Arrow keys rotate, +/− zoom, Home resets.', 'اسحب بالزر الأيسر للدوران، واضغط زري الفأرة الأيسر والأيمن معًا للتحريك. قرّب بإصبعين أو عجلة التمرير، وحرّك بإصبعين. الأسهم للدوران و +/− للتقريب و Home لإعادة الضبط.'],
     unsafePath: ['The ZIP contains unsafe file paths.', 'يحتوي الملف على مسارات غير آمنة.'], externalAsset: ['External material or texture links are not allowed.', 'روابط المواد أو الصور الخارجية غير مسموح بها.'],
     damagedZip: ['This ZIP is damaged, encrypted, or unsupported.', 'ملف ZIP تالف أو مشفر أو غير مدعوم.'], damagedObj: ['The OBJ contains invalid coordinates.', 'يحتوي نموذج OBJ على إحداثيات غير صالحة.'],
     archiveLimit: ['Archive limit: 128 entries, 128 MB per entry, and 256 MB expanded.', 'حدود الأرشيف: ١٢٨ ملفًا، و١٢٨ ميجابايت لكل ملف، و٢٥٦ ميجابايت بعد الفك.'],
@@ -37,7 +37,7 @@
   };
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const pendingUploads = new Map();
-  const defaults = () => ({ mode: 'textured', upper: true, lower: true, upperOpacity: 1, lowerOpacity: 1, light: 1, background: 'light', linked: true, cut: false, axis: 'z', cutPosition: 0, reverse: false });
+  const defaults = () => ({ mode: 'textured', upper: true, lower: true, upperOpacity: 1, lowerOpacity: 1, light: 1, background: 'dark', linked: true, cut: false, axis: 'z', cutPosition: 0, reverse: false });
   class PatientScans {
     constructor(host, options) {
       this.host = host; this.options = options; this.patient = options.patient; this.storage = options.storage;
@@ -53,6 +53,7 @@
     }
     t(key) { return words[key]?.[this.options.language === 'ar' ? 1 : 0] || key; }
     alive() { return !this.disposed && this.options.isCurrent(); }
+    canImport() { return this.health?.capabilities?.patient3dScans && this.health?.capabilities?.scanOriginalFilenames; }
     icon(name) { return `<i data-lucide="${name}" aria-hidden="true"></i>`; }
     button(action, key, icon, extra = '') { return `<button type="button" data-scan-action="${action}" ${extra}>${this.icon(icon)}<span>${this.t(key)}</span></button>`; }
     icons() { if (window.lucide) lucide.createIcons(); }
@@ -83,7 +84,7 @@
         this.health = health;
         const byPath = new Map((metadata.data || []).map(row => [row.relative_path, row]));
         const bySubpath = new Map((metadata.data || []).map(row => [row.relative_path.split('/').slice(-2).join('/'), row]));
-        this.files = (listing.files || []).filter(file => file.category === '3D-Scans' && /\.zip$/i.test(file.filename)).map(file => ({ ...file,
+        this.files = (listing.files || []).filter(file => (file.category === '3D-Scans' || file.relativePath?.split('/')[1] === '3D-Scans') && /\.zip$/i.test(file.filename)).map(file => ({ ...file,
           details: byPath.get(file.relativePath) || bySubpath.get(file.relativePath.split('/').slice(-2).join('/')) || {} }));
         this.shell(); this.library();
         if (pendingUploads.has(this.patient.id)) {
@@ -96,9 +97,9 @@
       }
     }
     shell() {
-      this.host.innerHTML = `<header class="scan-header"><div><h3>${this.t('title')}</h3><p>${this.t('subtitle')}</p></div><div class="scan-actions">${this.button('compare', 'compare', 'columns-2', 'disabled')}${this.button('import', 'import', 'upload', `class="scan-primary" ${!this.health?.capabilities?.patient3dScans ? 'disabled' : ''}`)}${this.button('settings', 'settings', 'settings')}</div></header>
+      this.host.innerHTML = `<header class="scan-header"><div><h3>${this.t('title')}</h3><p>${this.t('subtitle')}</p></div><div class="scan-actions">${this.button('compare', 'compare', 'columns-2', 'disabled')}${this.button('import', 'import', 'upload', `class="scan-primary" ${!this.canImport() ? 'disabled' : ''}`)}${this.button('settings', 'settings', 'settings')}</div></header>
         <p class="scan-message" role="status" hidden></p>
-        ${this.health && !this.health.capabilities?.patient3dScans ? `<p class="scan-warning">${this.t('serverUpdate')}</p>` : ''}
+        ${this.health && !this.canImport() ? `<p class="scan-warning">${this.t('serverUpdate')}</p>` : ''}
         <input type="file" class="scan-file" accept=".zip,application/zip" hidden><div class="scan-library"></div><div class="scan-workspace" hidden></div>`;
       this.icons();
     }
@@ -110,7 +111,7 @@
         return `<article class="scan-card"><div class="scan-card-heading"><span class="scan-symbol">${this.icon('box')}</span><div><h4>${esc(name)}</h4><p>${date}${this.t('uploaded')} ${esc(String(file.modifiedAt || '').slice(0, 10))} · ${(file.sizeBytes / 1048576).toFixed(1)} MB</p></div></div>
           ${details.note ? `<p class="scan-note">${esc(details.note)}</p>` : ''}<label class="scan-check"><input type="checkbox" data-scan-select="${index}" ${this.selected.has(index) ? 'checked' : ''}>${this.t('selected')}</label>
           <div class="scan-actions">${this.button('open', 'open', 'box', `data-index="${index}"`)}${this.button('download', 'download', 'download', `data-index="${index}"`)}${this.button('delete', 'delete', 'trash-2', `data-index="${index}" class="scan-danger"`)}</div></article>`;
-      }).join('')}</div>` : `<div class="scan-empty"><span class="scan-symbol">${this.icon('box')}</span><h4>${this.t('empty')}</h4><p>${this.t('emptyHint')}</p>${this.button('import', 'import', 'upload', !this.health?.capabilities?.patient3dScans ? 'disabled' : '')}<p class="scan-drop-hint">${this.t('choose')}</p></div>`;
+      }).join('')}</div>` : `<div class="scan-empty"><span class="scan-symbol">${this.icon('box')}</span><h4>${this.t('empty')}</h4><p>${this.t('emptyHint')}</p>${this.button('import', 'import', 'upload', !this.canImport() ? 'disabled' : '')}<p class="scan-drop-hint">${this.t('choose')}</p></div>`;
       this.host.querySelector('[data-scan-action="compare"]').disabled = this.selected.size !== 2; this.icons();
     }
     worker() {
@@ -152,7 +153,7 @@
         <label>${this.t('note')}<textarea data-scan-field="note" maxlength="4000" rows="2">${esc(details.note || '')}</textarea></label></div>`;
     }
     controls() {
-      const select = (key, values) => `<label>${this.t(key)}<select data-scan-setting="${key}">${values.map(([value, label]) => `<option value="${value}">${this.t(label)}</option>`).join('')}</select></label>`;
+      const select = (key, values) => `<label>${this.t(key)}<select data-scan-setting="${key}">${values.map(([value, label]) => `<option value="${value}" ${this.settings[key] === value ? 'selected' : ''}>${this.t(label)}</option>`).join('')}</select></label>`;
       const check = key => `<label class="scan-check"><input type="checkbox" data-scan-setting="${key}" ${this.settings[key] ? 'checked' : ''}>${this.t(key)}</label>`;
       const range = (key, min, max, step) => `<label>${this.t(key)}<input type="range" min="${min}" max="${max}" step="${step}" value="${this.settings[key]}" data-scan-setting="${key}"></label>`;
       return `<div class="scan-presets">${[['front', 'front'], ['left', 'left'], ['right', 'right'], ['upper', 'upperView'], ['lower', 'lowerView'], ['reset', 'reset']].map(([view, label]) => this.button('view', label, label === 'reset' ? 'rotate-ccw' : 'scan', `data-index="${view}"`)).join('')}</div>
@@ -160,7 +161,7 @@
         <details class="scan-tools"><summary>${this.t('cut')}</summary><div class="scan-tools-grid">${check('cut')}<label>${this.t('axis')}<select data-scan-setting="axis"><option value="z">Z</option><option value="x">X</option><option value="y">Y</option></select></label>${range('cutPosition', -1.5, 1.5, 0.01)}${check('reverse')}${this.button('resetCut', 'resetCut', 'rotate-ccw')}</div><p>${this.t('cutHint')}</p></details>`;
     }
     async importFile(file) {
-      if (!this.health?.capabilities?.patient3dScans) throw new Error('serverUpdate');
+      if (!this.canImport()) throw new Error('serverUpdate');
       if (!/\.zip$/i.test(file.name)) throw new Error('zipOnly');
       if (file.size > this.health.maxFileSizeMB * 1048576) throw new Error('fileLimit');
       this.close(); const epoch = this.epoch; this.workspace(); this.setBusy(true);
@@ -193,7 +194,7 @@
         const selection = { upper: this.field('upper'), lower: this.field('lower'), orientation: this.field('orientation') };
         const data = await target.job.call({ type: 'parse', upper: selection.upper, lower: selection.lower });
         if (!this.alive() || epoch !== this.epoch) return;
-        const { ScanViewer } = await import('./lumin-scan-viewer.js'); if (!this.alive() || epoch !== this.epoch) return;
+        const { ScanViewer } = await import('./lumin-scan-viewer.js?v=2'); if (!this.alive() || epoch !== this.epoch) return;
         this.viewer = new ScanViewer(this.host.querySelector('.scan-stage'), key => this.t(key));
         await this.viewer.setScans([{ data, name: this.field('name'), orientation: selection.orientation }]);
         if (!this.alive() || epoch !== this.epoch) return;
@@ -236,7 +237,7 @@
         if (!this.alive() || epoch !== this.epoch) return;
         const area = this.host.querySelector('.scan-workspace'); this.settings = defaults();
         area.innerHTML = `<div class="scan-workspace-heading"><h4>${this.t('compare')}</h4>${this.button('close', 'close', 'x')}</div><div class="scan-stage"></div><p class="scan-gestures">${this.t('gestureHint')}</p>${this.controls()}`;
-        const { ScanViewer } = await import('./lumin-scan-viewer.js'); if (!this.alive() || epoch !== this.epoch) return;
+        const { ScanViewer } = await import('./lumin-scan-viewer.js?v=2'); if (!this.alive() || epoch !== this.epoch) return;
         this.viewer = new ScanViewer(area.querySelector('.scan-stage'), key => this.t(key)); await this.viewer.setScans(scans); this.icons();
       } finally { if (this.alive() && epoch === this.epoch) this.setBusy(false); }
     }

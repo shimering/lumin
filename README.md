@@ -46,6 +46,8 @@ ZIP archives, import previews, textured OBJ arches, synchronized two-scan compar
 rendering controls, and movable section cuts. Originals stay unchanged on local
 storage and can be downloaded with their imported filename. Names, notes, scan dates,
 and arch selections use the existing patient media metadata and permissions.
+New imports keep their uploaded ZIP filename inside a separate folder per scan.
+The viewer defaults to a dark background and pans when both mouse buttons are held.
 
 The `patient_3d_scans` metadata migration must precede frontend rollout. Update each
 storage server with [the update ZIP](storage-server/lumin-storage-sync-update.zip);
