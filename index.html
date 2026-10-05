@@ -75,6 +75,8 @@
   <script src="vendor/supabase.js"></script>
   <script src="lumin-loyalty.js?v=5"></script>
   <script src="lumin-finance-sync.js?v=2"></script>
+  <script src="lumin-cash-flow.js?v=1"></script>
+  <link rel="stylesheet" href="lumin-cash-flow.css?v=1" />
   <script src="lumin-storage-sync.js?v=2"></script>
   <link rel="stylesheet" href="lumin-storage-sync.css?v=1" />
   <script src="lumin-patient-swipe.js?v=1"></script>
@@ -6284,20 +6286,26 @@
       <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
         <div class="app-page-bar app-page-bar-embedded">
           <div class="app-page-heading"><span class="app-page-icon" aria-hidden="true"><i data-lucide="chart-no-axes-combined"></i></span><h2 class="app-page-title">Analytics</h2></div>
-          <button type="button" onclick="refreshIncomeStatement({ refresh: true })" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-600 shadow-xs transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700">
+          <button type="button" onclick="refreshActiveAnalyticsTab({ refresh: true })" class="cash-button">
             <i data-lucide="refresh-cw" class="h-4 w-4"></i> Refresh
           </button>
         </div>
 
-        <div class="border-b border-slate-100 px-4 pt-3 sm:px-5">
-          <div role="tablist" aria-label="Analytics sections" class="flex items-end gap-1">
-            <button id="analytics-tab-income-statement" type="button" role="tab" aria-selected="true" aria-controls="analytics-panel-income-statement" class="inline-flex min-h-11 items-center gap-2 rounded-t-xl border border-b-0 border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-black text-indigo-800">
+        <div class="px-4 py-3 sm:px-5">
+          <div role="tablist" aria-label="Analytics sections" class="analytics-tabs" onkeydown="analyticsTabKeydown(event)">
+            <button id="analytics-tab-income-statement" data-analytics-tab="income-statement" type="button" role="tab" aria-selected="true" aria-controls="analytics-panel-income-statement" onclick="switchAnalyticsTab('income-statement')" class="analytics-tab">
               <i data-lucide="git-branch" class="h-4 w-4"></i> Income statement
+            </button>
+            <button id="analytics-tab-cash-flow" data-analytics-tab="cash-flow" type="button" role="tab" aria-selected="false" tabindex="-1" aria-controls="analytics-panel-cash-flow" onclick="switchAnalyticsTab('cash-flow')" class="analytics-tab">
+              <i data-lucide="chart-no-axes-combined" class="h-4 w-4"></i> Cash flow
             </button>
           </div>
         </div>
+      </div>
 
-        <div id="analytics-panel-income-statement" role="tabpanel" aria-labelledby="analytics-tab-income-statement" class="p-4 sm:p-5">
+      <div id="analytics-panel-income-statement" role="tabpanel" aria-labelledby="analytics-tab-income-statement" class="space-y-5">
+      <div class="cash-card">
+        <div>
           <div class="grid gap-3 lg:grid-cols-[auto_minmax(150px,0.7fr)_minmax(150px,0.7fr)_auto] lg:items-end">
             <div class="inline-flex min-h-[42px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
               <button type="button" onclick="shiftIncomeStatementMonth(-1)" class="inline-flex w-11 items-center justify-center border-r border-slate-200 text-slate-500 transition hover:bg-indigo-50 hover:text-indigo-700" aria-label="Previous month"><i data-lucide="chevron-left" class="h-4 w-4"></i></button>
@@ -6327,6 +6335,25 @@
         <div id="analytics-income-flow" class="min-h-[420px] overflow-x-auto p-3 sm:p-5" aria-live="polite">
           <div class="flex min-h-[380px] items-center justify-center text-sm font-bold text-slate-400">Loading income statement...</div>
         </div>
+      </div>
+      </div>
+
+      <div id="analytics-panel-cash-flow" role="tabpanel" aria-labelledby="analytics-tab-cash-flow" class="hidden space-y-5" hidden>
+        <div class="cash-card">
+          <div class="cash-heading"><div><h3>Cash flow</h3><p class="cash-caption">Compare money received and paid, month by month.</p></div></div>
+          <div class="cash-toolbar">
+            <label><span>From month</span><input id="analytics-cash-start-month" type="month" min="1900-01" max="9999-12" class="cash-input" onchange="cashFlowRangeChanged()" /></label>
+            <label><span>To month</span><input id="analytics-cash-end-month" type="month" min="1900-01" max="9999-12" class="cash-input" onchange="cashFlowRangeChanged()" /></label>
+            <button type="button" class="cash-button cash-button-primary" onclick="refreshCashFlow({ refresh: true })"><i data-lucide="check" class="h-4 w-4"></i><span>Apply range</span></button>
+            <div class="cash-presets">
+              <button type="button" class="cash-button" onclick="setCashFlowPreset('6')">Last 6 months</button>
+              <button type="button" class="cash-button" onclick="setCashFlowPreset('12')">Last 12 months</button>
+              <button type="button" class="cash-button" onclick="setCashFlowPreset('year')">This year</button>
+            </div>
+          </div>
+          <p id="analytics-cash-range-error" class="cash-error hidden" role="alert"></p>
+        </div>
+        <div id="analytics-cash-content" class="space-y-5" aria-busy="false"></div>
       </div>
     </section>
 
@@ -10710,6 +10737,13 @@
       'Understand collected income by procedure category, paid expenses, and the net result.': 'افهم الدخل المحصل حسب فئة الإجراء والمصروفات المدفوعة والنتيجة الصافية.',
       'Analytics sections': 'أقسام التحليلات',
       'Income statement': 'قائمة الدخل',
+      'Cash flow': 'التدفق النقدي',
+      'Compare money received and paid, month by month.': 'قارن المبالغ المستلمة والمدفوعة شهراً بشهر.',
+      'From month': 'من شهر',
+      'To month': 'إلى شهر',
+      'Last 6 months': 'آخر ٦ أشهر',
+      'Last 12 months': 'آخر ١٢ شهراً',
+      'This year': 'هذا العام',
       'Apply range': 'تطبيق الفترة',
       'Collected income': 'الدخل المحصل',
       'Payments allocated to procedure categories': 'المدفوعات الموزعة على فئات الإجراءات',
@@ -11511,7 +11545,7 @@
         if (hasPageAccess('implants') && !document.getElementById('view-implants')?.classList.contains('hidden')) renderImplantProgressTable();
         if (hasPageAccess('finances') && !document.getElementById('view-finances')?.classList.contains('hidden')) void switchFinanceTab(activeFinanceTab);
         if (hasPageAccess('hr') && !document.getElementById('view-hr')?.classList.contains('hidden')) void refreshHrDirectory();
-        if (hasPageAccess('analytics') && !document.getElementById('view-analytics')?.classList.contains('hidden')) void refreshIncomeStatement();
+        if (hasPageAccess('analytics') && !document.getElementById('view-analytics')?.classList.contains('hidden')) void refreshActiveAnalyticsTab();
         if (canViewPatientPrescriptions() && !document.getElementById('view-prescriptions')?.classList.contains('hidden')) void renderPatientPrescriptions();
       }
       lucide.createIcons();
@@ -12916,6 +12950,7 @@
         incomeStatementReport = null;
         incomeStatementLoadedRange = '';
         incomeStatementRenderToken += 1;
+        if (typeof resetCashFlowAnalytics === 'function') resetCashFlowAnalytics();
         activeFinanceTab = 'invoices';
         activeClinicManagementTab = 'finances';
         hrDirectoryUsers = [];
@@ -13087,6 +13122,7 @@
         incomeStatementReport = null;
         incomeStatementLoadedRange = '';
         incomeStatementRenderToken += 1;
+        if (typeof resetCashFlowAnalytics === 'function') resetCashFlowAnalytics();
         activeFinanceTab = 'invoices';
         activeClinicManagementTab = 'finances';
         hrDirectoryUsers = [];
@@ -19289,6 +19325,7 @@
           else if (activeFinanceTab === 'invoices') await renderFinanceInvoices({ refresh: true });
         }
         const expensesChanged = [...changedTables].some(table => REALTIME_EXPENSE_TABLES.has(table));
+        if ((invoicesChanged || expensesChanged) && typeof invalidateCashFlowReport === 'function') invalidateCashFlowReport();
         if (expensesChanged) {
           financeExpensesLoaded = false;
           financeOverviewLoaded = false;
@@ -19302,7 +19339,7 @@
         }
         if ((invoicesChanged || expensesChanged || dentalCustomizationChanged) && hasPageAccess('analytics') && !document.getElementById('view-analytics').classList.contains('hidden')) {
           incomeStatementLoadedRange = '';
-          await refreshIncomeStatement({ refresh: true });
+          await refreshActiveAnalyticsTab({ refresh: true });
         }
         if (invoicesChanged && hasPageAccess('chart') && !document.getElementById('view-chart').classList.contains('hidden') && activePatientId) {
           await refreshChartFindingInvoiceState(activePatientId);
@@ -22136,6 +22173,7 @@
       try {
         await state.pay(methodId);
         financeExpensesLoaded = false; financeOverviewLoaded = false; incomeStatementLoadedRange = ''; hrDirectoryLoaded = false;
+        if (typeof invalidateCashFlowReport === 'function') invalidateCashFlowReport();
         state.busy = false;
         closeHrSalaryPaymentDialog(true);
       } catch (error) {
@@ -24996,6 +25034,7 @@
         financeOverviewLoaded = false;
         incomeStatementLoadedRange = '';
         if (data?.salary_kind) hrDirectoryLoaded = false;
+        if (typeof invalidateCashFlowReport === 'function') invalidateCashFlowReport();
         await Promise.all([renderFinanceOverview({ refresh: true }), renderFinanceExpenses({ refresh: true })]);
         showAppointmentNotificationToast(isArabic ? 'تم حذف المصروف.' : 'Expense deleted.');
         return true;
@@ -25019,6 +25058,7 @@
         financeOverviewLoaded = false;
         incomeStatementLoadedRange = '';
         hrDirectoryLoaded = false;
+        if (typeof invalidateCashFlowReport === 'function') invalidateCashFlowReport();
         await Promise.all([renderFinanceOverview({ refresh: true }), renderFinanceExpenses({ refresh: true })]);
         showAppointmentNotificationToast('Doctor salary reopened', `${Number(result?.released_case_count || caseCount)} case${Number(result?.released_case_count || caseCount) === 1 ? '' : 's'} released for review.`);
         return true;
@@ -25490,6 +25530,7 @@
         financeExpensesLoaded = false;
         financeOverviewLoaded = false;
         closeExpenseModal();
+        if (typeof invalidateCashFlowReport === 'function') invalidateCashFlowReport();
         await Promise.all([renderFinanceOverview({ refresh: true }), renderFinanceExpenses({ refresh: true })]);
         showAppointmentNotificationToast(wasEditing ? 'Expense updated.' : 'Expense created.');
       } catch (error) {
@@ -25565,6 +25606,7 @@
         financeExpensesLoaded = false;
         financeOverviewLoaded = false;
         closeExpensePaymentModal();
+        if (typeof invalidateCashFlowReport === 'function') invalidateCashFlowReport();
         await Promise.all([renderFinanceOverview({ refresh: true }), renderFinanceExpenses({ refresh: true })]);
         showAppointmentNotificationToast('Expense payment recorded.');
       } catch (error) {
@@ -28574,7 +28616,7 @@
       if (authorizedTab === 'finances') {
         await switchFinanceTab(activeFinanceTab);
       }
-      else if (authorizedTab === 'analytics') await refreshIncomeStatement();
+      else if (authorizedTab === 'analytics') await refreshActiveAnalyticsTab();
       else if (authorizedTab === 'hr') await Promise.allSettled([refreshHrDirectory(), ensureDentalCustomizationLoaded()]);
       if (updateHash) window.location.hash = 'clinic-management';
       lucide.createIcons();
