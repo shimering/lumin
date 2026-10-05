@@ -25,6 +25,23 @@ You can open these folders in **Windows File Explorer** anytime to view, copy, o
 
 ---
 
+## 🗄️ SQL & MySQL Mapping Files on Local Storage
+
+Lumin maintains full, human-readable and queryable database mapping files directly on your local storage drive (`D:\LuminStorage\Patients\`):
+
+1. **`patients_mapping.sql`** (Root folder `D:\LuminStorage\Patients\`):
+   A complete **MySQL / MariaDB dump file** mapping every patient (`patient_id` UUID, `patient_number`, `patient_name`, `phone`, `folder_name`, and absolute path) and all of their media files (`category`, `filename`, `relative_path`, `file_size_bytes`, `file_extension`, and timestamps) with standard `INSERT INTO ... ON DUPLICATE KEY UPDATE` syntax.
+2. **`patients_mapping.sqlite`** (Root folder `D:\LuminStorage\Patients\`):
+   A portable **SQLite database file** containing indexed tables `patient_folders_mapping` and `patient_files_mapping`. You can query this file directly with SQLite GUI tools (DB Browser for SQLite, DBeaver, or Python scripts) without needing any database server installed!
+3. **`patients_mapping.json`** (Root folder `D:\LuminStorage\Patients\`):
+   A clean JSON registry of all patient folders and their media files inventory.
+4. **`patient_mapping.sql` & `patient_mapping.json`** (Inside each patient's folder):
+   Each individual patient directory (e.g. `D:\LuminStorage\Patients\ميرفت_سعيد_عبد_الصادق\`) contains its own dedicated MySQL dump file (`patient_mapping.sql`) and JSON file (`patient_mapping.json`) for instant standalone import, audit, or verification.
+
+These mapping files are automatically synchronized whenever a file is uploaded, moved, deleted, or when a patient folder is renamed.
+
+---
+
 ## 🚀 How to Run
 
 ### Step 1: Start the Local Storage Server

@@ -164,15 +164,25 @@ def get_folder_patient_id(folder_path: Path) -> str:
     return ""
 
 
-def set_folder_patient_id(folder_path: Path, patient_id: str, patient_name: str = ""):
+def set_folder_patient_id(folder_path: Path, patient_id: str, patient_name: str = "", patient_number: str = "", phone: str = ""):
     """Write .patient_id metadata file into patient folder."""
     if not patient_id or patient_id == "General" or not folder_path.is_dir():
         return
     try:
         meta_file = folder_path / ".patient_id"
+        existing = {}
+        if meta_file.is_file():
+            try:
+                txt = meta_file.read_text(encoding="utf-8").strip()
+                if txt.startswith("{"):
+                    existing = json.loads(txt)
+            except Exception:
+                pass
         data = {
             "patient_id": patient_id,
-            "patient_name": patient_name or folder_path.name.replace("_", " "),
+            "patient_number": str(patient_number or existing.get("patient_number") or ""),
+            "patient_name": patient_name or existing.get("patient_name") or folder_path.name.replace("_", " "),
+            "phone": str(phone or existing.get("phone") or ""),
             "updated_at": datetime.now().isoformat()
         }
         meta_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -303,36 +313,431 @@ def rename_patient_storage_folder(patient_id: str, old_folder_name: str, new_fol
         PATIENT_NAME_CACHE[patient_id] = clean_new
 
         logger.info(f"Successfully migrated patient folder {clean_old} -> {clean_new} for patient {patient_id}")
+        try:
+            threading.Thread(target=update_storage_mapping_files, daemon=True, name="lumin-update-mappings").start()
+        except Exception:
+            pass
         return True
     except Exception as e:
         logger.error(f"Failed to rename patient folder {clean_old} -> {clean_new}: {e}")
         return False
 
 
+_mapping_lock = threading.Lock()
+_last_mapping_result = {
+    "status": "idle",
+    "updated_at": None,
+    "total_patients": 0,
+    "total_files": 0
+}
+
+def sql_quote(val) -> str:
+    """Safely quote and escape values for MySQL / MariaDB statements."""
+    if val is None:
+        return "NULL"
+    val_str = str(val)
+    escaped = val_str.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r")
+    return f"'{escaped}'"
+
+def fetch_all_patients_metadata_from_supabase() -> list:
+    """Fetch complete patient metadata (id, patient_number, name, phone) from Supabase RPC."""
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/rpc/get_all_patients_storage_metadata"
+        headers = {
+            "apikey": SUPABASE_ANON_KEY,
+            "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = json.dumps({
+            "clinic_key": config.get("clinic_secret_key", "LuminClinicKey_2026")
+        }).encode("utf-8")
+        req = urllib.request.Request(url, data=payload, headers=headers)
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            if isinstance(data, list):
+                return data
+    except Exception as e:
+        logger.warning(f"Could not fetch patients metadata via Supabase RPC: {e}")
+    return []
+
+def update_storage_mapping_files() -> dict:
+    """
+    Generate and synchronize:
+    1. Root MySQL dump: STORAGE_ROOT / patients_mapping.sql
+    2. Root SQLite database: STORAGE_ROOT / patients_mapping.sqlite
+    3. Root Master JSON: STORAGE_ROOT / patients_mapping.json
+    4. Per-patient MySQL dump: STORAGE_ROOT / <patient_folder> / patient_mapping.sql
+    5. Per-patient JSON: STORAGE_ROOT / <patient_folder> / patient_mapping.json
+    """
+    global _last_mapping_result
+    with _mapping_lock:
+        if not STORAGE_ROOT.is_dir():
+            return {"error": "STORAGE_ROOT not accessible"}
+
+        now_dt = datetime.now()
+        now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
+
+        all_metadata = fetch_all_patients_metadata_from_supabase()
+        patients_by_id = {p["id"]: p for p in all_metadata if p.get("id")}
+        patients_by_name = {p["name"].strip(): p for p in all_metadata if p.get("name")}
+
+        patient_records = []
+        file_records = []
+
+        for d in sorted(STORAGE_ROOT.iterdir()):
+            if not d.is_dir() or d.name.startswith('.'):
+                continue
+
+            meta_file = d / ".patient_id"
+            pid = ""
+            existing_meta = {}
+            if meta_file.is_file():
+                try:
+                    content = meta_file.read_text(encoding="utf-8").strip()
+                    if content.startswith("{"):
+                        existing_meta = json.loads(content)
+                        pid = existing_meta.get("patient_id") or ""
+                    else:
+                        pid = content
+                except Exception:
+                    pass
+
+            clean_folder_name = d.name.replace("_", " ")
+            pdata = patients_by_id.get(pid) or patients_by_name.get(clean_folder_name) or {}
+
+            resolved_id = pdata.get("id") or pid or d.name
+            resolved_num = str(pdata.get("patient_number") or existing_meta.get("patient_number") or "")
+            resolved_name = pdata.get("name") or existing_meta.get("patient_name") or clean_folder_name
+            resolved_phone = pdata.get("phone") or existing_meta.get("phone") or ""
+
+            if resolved_id:
+                PATIENT_NAME_CACHE[resolved_id] = d.name
+
+            try:
+                set_folder_patient_id(d, resolved_id, resolved_name, resolved_num, resolved_phone)
+            except Exception:
+                pass
+
+            patient_files = []
+            folder_size = 0
+
+            for r, dirs, files in os.walk(d):
+                dirs[:] = [x for x in dirs if not x.startswith('.')]
+                for f in files:
+                    if f.startswith('.') or f.endswith(('.sql', '.json', '.sqlite', '.db')):
+                        continue
+                    fp = Path(r) / f
+                    stat = fp.stat()
+                    rel = fp.relative_to(STORAGE_ROOT).as_posix()
+                    cat = fp.parent.name
+                    folder_size += stat.st_size
+                    mod_dt = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+                    ext = fp.suffix.lower().lstrip(".")
+
+                    f_rec = {
+                        "id": rel,
+                        "patient_id": resolved_id,
+                        "patient_name": resolved_name,
+                        "folder_name": d.name,
+                        "category": cat,
+                        "filename": f,
+                        "relative_path": rel,
+                        "file_size_bytes": stat.st_size,
+                        "file_extension": ext,
+                        "modified_at": mod_dt,
+                        "updated_at": now_str
+                    }
+                    patient_files.append(f_rec)
+                    file_records.append(f_rec)
+
+            p_rec = {
+                "patient_id": resolved_id,
+                "patient_number": resolved_num,
+                "patient_name": resolved_name,
+                "folder_name": d.name,
+                "folder_path": str(d.resolve()),
+                "phone": resolved_phone,
+                "total_files": len(patient_files),
+                "total_size_bytes": folder_size,
+                "updated_at": now_str
+            }
+            patient_records.append(p_rec)
+
+            # 1. Per-patient JSON
+            try:
+                (d / "patient_mapping.json").write_text(json.dumps({
+                    "patient": p_rec,
+                    "files": patient_files
+                }, ensure_ascii=False, indent=2), encoding="utf-8")
+            except Exception as e:
+                logger.warning(f"Could not write patient_mapping.json in {d.name}: {e}")
+
+            # 2. Per-patient SQL
+            try:
+                p_sql_lines = [
+                    "-- =====================================================================",
+                    f"-- Lumin Dental Clinic - Patient Storage Mapping (MySQL / MariaDB Dump)",
+                    f"-- Patient: {resolved_name} (Patient #: {resolved_num or 'N/A'})",
+                    f"-- Patient UUID: {resolved_id}",
+                    f"-- Folder Name:  {d.name}",
+                    f"-- Export Date:  {now_str}",
+                    "-- =====================================================================",
+                    "",
+                    "SET NAMES utf8mb4;",
+                    "SET FOREIGN_KEY_CHECKS = 0;",
+                    "",
+                    "CREATE TABLE IF NOT EXISTS `patient_folders_mapping` (",
+                    "  `patient_id` varchar(64) NOT NULL,",
+                    "  `patient_number` varchar(32) DEFAULT NULL,",
+                    "  `patient_name` varchar(255) NOT NULL,",
+                    "  `folder_name` varchar(255) NOT NULL,",
+                    "  `folder_path` text NOT NULL,",
+                    "  `phone` varchar(64) DEFAULT NULL,",
+                    "  `total_files` int NOT NULL DEFAULT '0',",
+                    "  `total_size_bytes` bigint NOT NULL DEFAULT '0',",
+                    "  `updated_at` datetime NOT NULL,",
+                    "  PRIMARY KEY (`patient_id`),",
+                    "  KEY `idx_pfm_folder` (`folder_name`),",
+                    "  KEY `idx_pfm_number` (`patient_number`)",
+                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+                    "",
+                    "CREATE TABLE IF NOT EXISTS `patient_files_mapping` (",
+                    "  `id` varchar(255) NOT NULL,",
+                    "  `patient_id` varchar(64) NOT NULL,",
+                    "  `patient_name` varchar(255) NOT NULL,",
+                    "  `folder_name` varchar(255) NOT NULL,",
+                    "  `category` varchar(64) NOT NULL,",
+                    "  `filename` varchar(255) NOT NULL,",
+                    "  `relative_path` varchar(500) NOT NULL,",
+                    "  `file_size_bytes` bigint NOT NULL DEFAULT '0',",
+                    "  `file_extension` varchar(16) NOT NULL,",
+                    "  `modified_at` datetime DEFAULT NULL,",
+                    "  `updated_at` datetime NOT NULL,",
+                    "  PRIMARY KEY (`id`),",
+                    "  KEY `idx_files_patient_id` (`patient_id`),",
+                    "  KEY `idx_files_folder` (`folder_name`),",
+                    "  KEY `idx_files_category` (`category`)",
+                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+                    "",
+                    "-- Patient Folder Mapping Record",
+                    f"INSERT INTO `patient_folders_mapping` (`patient_id`, `patient_number`, `patient_name`, `folder_name`, `folder_path`, `phone`, `total_files`, `total_size_bytes`, `updated_at`) "
+                    f"VALUES ({sql_quote(p_rec['patient_id'])}, {sql_quote(p_rec['patient_number'])}, {sql_quote(p_rec['patient_name'])}, {sql_quote(p_rec['folder_name'])}, {sql_quote(p_rec['folder_path'])}, {sql_quote(p_rec['phone'])}, {p_rec['total_files']}, {p_rec['total_size_bytes']}, {sql_quote(p_rec['updated_at'])}) "
+                    f"ON DUPLICATE KEY UPDATE `patient_number` = VALUES(`patient_number`), `patient_name` = VALUES(`patient_name`), `folder_name` = VALUES(`folder_name`), `folder_path` = VALUES(`folder_path`), `phone` = VALUES(`phone`), `total_files` = VALUES(`total_files`), `total_size_bytes` = VALUES(`total_size_bytes`), `updated_at` = VALUES(`updated_at`);",
+                    ""
+                ]
+                if patient_files:
+                    p_sql_lines.append(f"-- Patient Media Files ({len(patient_files)} files)")
+                    for pf in patient_files:
+                        p_sql_lines.append(
+                            f"INSERT INTO `patient_files_mapping` (`id`, `patient_id`, `patient_name`, `folder_name`, `category`, `filename`, `relative_path`, `file_size_bytes`, `file_extension`, `modified_at`, `updated_at`) "
+                            f"VALUES ({sql_quote(pf['id'])}, {sql_quote(pf['patient_id'])}, {sql_quote(pf['patient_name'])}, {sql_quote(pf['folder_name'])}, {sql_quote(pf['category'])}, {sql_quote(pf['filename'])}, {sql_quote(pf['relative_path'])}, {pf['file_size_bytes']}, {sql_quote(pf['file_extension'])}, {sql_quote(pf['modified_at'])}, {sql_quote(pf['updated_at'])}) "
+                            f"ON DUPLICATE KEY UPDATE `patient_name` = VALUES(`patient_name`), `folder_name` = VALUES(`folder_name`), `category` = VALUES(`category`), `filename` = VALUES(`filename`), `relative_path` = VALUES(`relative_path`), `file_size_bytes` = VALUES(`file_size_bytes`), `file_extension` = VALUES(`file_extension`), `modified_at` = VALUES(`modified_at`), `updated_at` = VALUES(`updated_at`);"
+                        )
+                    p_sql_lines.append("")
+                (d / "patient_mapping.sql").write_text("\n".join(p_sql_lines), encoding="utf-8")
+            except Exception as e:
+                logger.warning(f"Could not write patient_mapping.sql in {d.name}: {e}")
+
+        # Master Files in STORAGE_ROOT
+        master_sql_path = STORAGE_ROOT / "patients_mapping.sql"
+        master_sqlite_path = STORAGE_ROOT / "patients_mapping.sqlite"
+        master_json_path = STORAGE_ROOT / "patients_mapping.json"
+
+        # 3. Master JSON
+        try:
+            master_json_path.write_text(json.dumps({
+                "generated_at": now_str,
+                "total_patients": len(patient_records),
+                "total_files": len(file_records),
+                "patients": patient_records,
+                "files": file_records
+            }, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception as e:
+            logger.warning(f"Could not write master JSON: {e}")
+
+        # 4. Master MySQL Dump
+        try:
+            m_sql_lines = [
+                "-- =====================================================================",
+                "-- Lumin Dental Clinic - Master Patient Storage Mapping (MySQL Dump)",
+                f"-- Export Date:    {now_str}",
+                f"-- Total Patients: {len(patient_records)}",
+                f"-- Total Files:    {len(file_records)}",
+                f"-- Root Storage:   {str(STORAGE_ROOT.resolve())}",
+                "-- =====================================================================",
+                "",
+                "SET NAMES utf8mb4;",
+                "SET FOREIGN_KEY_CHECKS = 0;",
+                "",
+                "CREATE TABLE IF NOT EXISTS `patient_folders_mapping` (",
+                "  `patient_id` varchar(64) NOT NULL,",
+                "  `patient_number` varchar(32) DEFAULT NULL,",
+                "  `patient_name` varchar(255) NOT NULL,",
+                "  `folder_name` varchar(255) NOT NULL,",
+                "  `folder_path` text NOT NULL,",
+                "  `phone` varchar(64) DEFAULT NULL,",
+                "  `total_files` int NOT NULL DEFAULT '0',",
+                "  `total_size_bytes` bigint NOT NULL DEFAULT '0',",
+                "  `updated_at` datetime NOT NULL,",
+                "  PRIMARY KEY (`patient_id`),",
+                "  KEY `idx_pfm_folder` (`folder_name`),",
+                "  KEY `idx_pfm_number` (`patient_number`)",
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+                "",
+                "CREATE TABLE IF NOT EXISTS `patient_files_mapping` (",
+                "  `id` varchar(255) NOT NULL,",
+                "  `patient_id` varchar(64) NOT NULL,",
+                "  `patient_name` varchar(255) NOT NULL,",
+                "  `folder_name` varchar(255) NOT NULL,",
+                "  `category` varchar(64) NOT NULL,",
+                "  `filename` varchar(255) NOT NULL,",
+                "  `relative_path` varchar(500) NOT NULL,",
+                "  `file_size_bytes` bigint NOT NULL DEFAULT '0',",
+                "  `file_extension` varchar(16) NOT NULL,",
+                "  `modified_at` datetime DEFAULT NULL,",
+                "  `updated_at` datetime NOT NULL,",
+                "  PRIMARY KEY (`id`),",
+                "  KEY `idx_files_patient_id` (`patient_id`),",
+                "  KEY `idx_files_folder` (`folder_name`),",
+                "  KEY `idx_files_category` (`category`)",
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+                "",
+                "-- =====================================================================",
+                "-- 1. Patient Folders",
+                "-- =====================================================================",
+                ""
+            ]
+            for pr in patient_records:
+                m_sql_lines.append(
+                    f"INSERT INTO `patient_folders_mapping` (`patient_id`, `patient_number`, `patient_name`, `folder_name`, `folder_path`, `phone`, `total_files`, `total_size_bytes`, `updated_at`) "
+                    f"VALUES ({sql_quote(pr['patient_id'])}, {sql_quote(pr['patient_number'])}, {sql_quote(pr['patient_name'])}, {sql_quote(pr['folder_name'])}, {sql_quote(pr['folder_path'])}, {sql_quote(pr['phone'])}, {pr['total_files']}, {pr['total_size_bytes']}, {sql_quote(pr['updated_at'])}) "
+                    f"ON DUPLICATE KEY UPDATE `patient_number` = VALUES(`patient_number`), `patient_name` = VALUES(`patient_name`), `folder_name` = VALUES(`folder_name`), `folder_path` = VALUES(`folder_path`), `phone` = VALUES(`phone`), `total_files` = VALUES(`total_files`), `total_size_bytes` = VALUES(`total_size_bytes`), `updated_at` = VALUES(`updated_at`);"
+                )
+            m_sql_lines.extend([
+                "",
+                "-- =====================================================================",
+                "-- 2. Patient Media Files",
+                "-- =====================================================================",
+                ""
+            ])
+            for fr in file_records:
+                m_sql_lines.append(
+                    f"INSERT INTO `patient_files_mapping` (`id`, `patient_id`, `patient_name`, `folder_name`, `category`, `filename`, `relative_path`, `file_size_bytes`, `file_extension`, `modified_at`, `updated_at`) "
+                    f"VALUES ({sql_quote(fr['id'])}, {sql_quote(fr['patient_id'])}, {sql_quote(fr['patient_name'])}, {sql_quote(fr['folder_name'])}, {sql_quote(fr['category'])}, {sql_quote(fr['filename'])}, {sql_quote(fr['relative_path'])}, {fr['file_size_bytes']}, {sql_quote(fr['file_extension'])}, {sql_quote(fr['modified_at'])}, {sql_quote(fr['updated_at'])}) "
+                    f"ON DUPLICATE KEY UPDATE `patient_name` = VALUES(`patient_name`), `folder_name` = VALUES(`folder_name`), `category` = VALUES(`category`), `filename` = VALUES(`filename`), `relative_path` = VALUES(`relative_path`), `file_size_bytes` = VALUES(`file_size_bytes`), `file_extension` = VALUES(`file_extension`), `modified_at` = VALUES(`modified_at`), `updated_at` = VALUES(`updated_at`);"
+                )
+            master_sql_path.write_text("\n".join(m_sql_lines), encoding="utf-8")
+        except Exception as e:
+            logger.warning(f"Could not write master SQL: {e}")
+
+        # 5. Master SQLite DB
+        try:
+            import sqlite3
+            with sqlite3.connect(str(master_sqlite_path)) as con:
+                cur = con.cursor()
+                cur.execute("""
+                CREATE TABLE IF NOT EXISTS patient_folders_mapping (
+                    patient_id TEXT PRIMARY KEY,
+                    patient_number TEXT,
+                    patient_name TEXT NOT NULL,
+                    folder_name TEXT NOT NULL,
+                    folder_path TEXT NOT NULL,
+                    phone TEXT,
+                    total_files INTEGER NOT NULL DEFAULT 0,
+                    total_size_bytes INTEGER NOT NULL DEFAULT 0,
+                    updated_at TEXT NOT NULL
+                );
+                """)
+                cur.execute("""
+                CREATE TABLE IF NOT EXISTS patient_files_mapping (
+                    id TEXT PRIMARY KEY,
+                    patient_id TEXT NOT NULL,
+                    patient_name TEXT NOT NULL,
+                    folder_name TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    filename TEXT NOT NULL,
+                    relative_path TEXT NOT NULL,
+                    file_size_bytes INTEGER NOT NULL DEFAULT 0,
+                    file_extension TEXT NOT NULL,
+                    modified_at TEXT,
+                    updated_at TEXT NOT NULL
+                );
+                """)
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_pfm_folder ON patient_folders_mapping(folder_name);")
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_pfm_number ON patient_folders_mapping(patient_number);")
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_files_patient ON patient_files_mapping(patient_id);")
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_files_folder ON patient_files_mapping(folder_name);")
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_files_cat ON patient_files_mapping(category);")
+
+                for pr in patient_records:
+                    cur.execute("""
+                    INSERT OR REPLACE INTO patient_folders_mapping (
+                        patient_id, patient_number, patient_name, folder_name, folder_path, phone, total_files, total_size_bytes, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        pr["patient_id"], pr["patient_number"], pr["patient_name"], pr["folder_name"],
+                        pr["folder_path"], pr["phone"], pr["total_files"], pr["total_size_bytes"], pr["updated_at"]
+                    ))
+
+                for fr in file_records:
+                    cur.execute("""
+                    INSERT OR REPLACE INTO patient_files_mapping (
+                        id, patient_id, patient_name, folder_name, category, filename, relative_path, file_size_bytes, file_extension, modified_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        fr["id"], fr["patient_id"], fr["patient_name"], fr["folder_name"], fr["category"],
+                        fr["filename"], fr["relative_path"], fr["file_size_bytes"], fr["file_extension"],
+                        fr["modified_at"], fr["updated_at"]
+                    ))
+                con.commit()
+        except Exception as e:
+            logger.warning(f"Could not write master SQLite: {e}")
+
+        logger.info(f"Updated storage mapping files: {len(patient_records)} patients, {len(file_records)} media files")
+        _last_mapping_result = {
+            "status": "synced",
+            "updated_at": now_str,
+            "total_patients": len(patient_records),
+            "total_files": len(file_records),
+            "sql_path": str(master_sql_path.resolve()),
+            "sqlite_path": str(master_sqlite_path.resolve()),
+            "json_path": str(master_json_path.resolve())
+        }
+        return _last_mapping_result
+
+
 def tag_existing_patient_folders():
-    """Scan all patient directories in STORAGE_ROOT and ensure each has a .patient_id file."""
+    """Scan all patient directories in STORAGE_ROOT and ensure each has a .patient_id file, then update mappings."""
     try:
         if not STORAGE_ROOT.is_dir():
             return
+        all_metadata = fetch_all_patients_metadata_from_supabase()
+        patients_by_id = {p["id"]: p for p in all_metadata if p.get("id")}
+        patients_by_name = {p["name"].strip(): p for p in all_metadata if p.get("name")}
         for d in STORAGE_ROOT.iterdir():
             if not d.is_dir() or d.name.startswith('.'):
                 continue
             meta = d / ".patient_id"
+            pid = ""
+            existing_meta = {}
             if meta.is_file():
-                continue
+                try:
+                    txt = meta.read_text(encoding="utf-8").strip()
+                    if txt.startswith("{"):
+                        existing_meta = json.loads(txt)
+                        pid = existing_meta.get("patient_id") or ""
+                    else:
+                        pid = txt
+                except Exception:
+                    pass
             clean_name = d.name.replace("_", " ")
-            try:
-                url = f"{SUPABASE_URL}/rest/v1/patients?select=id,name&name=eq.{urllib.parse.quote(clean_name)}&limit=1"
-                headers = {"apikey": SUPABASE_ANON_KEY, "Authorization": f"Bearer {SUPABASE_ANON_KEY}"}
-                req = urllib.request.Request(url, headers=headers)
-                with urllib.request.urlopen(req, timeout=3) as resp:
-                    rows = json.loads(resp.read().decode("utf-8"))
-                    if rows and len(rows) > 0:
-                        pid = rows[0]["id"]
-                        set_folder_patient_id(d, pid, d.name)
-                        logger.info(f"Tagged existing folder {d.name} with patient_id {pid}")
-            except Exception as err:
-                logger.debug(f"Could not tag folder {d.name}: {err}")
+            pdata = patients_by_id.get(pid) or patients_by_name.get(clean_name) or {}
+            resolved_id = pdata.get("id") or pid
+            if resolved_id:
+                set_folder_patient_id(d, resolved_id, pdata.get("name") or clean_name, str(pdata.get("patient_number") or ""), str(pdata.get("phone") or ""))
+                logger.info(f"Tagged existing folder {d.name} with patient_id {resolved_id} (Patient #{pdata.get('patient_number') or 'N/A'})")
+        # Run storage mappings generation
+        update_storage_mapping_files()
     except Exception as e:
         logger.warning(f"Error in tag_existing_patient_folders: {e}")
 
@@ -505,6 +910,11 @@ def upload_file():
 
     logger.info(f"Saved: {relative_path} ({file_size / 1024:.1f} KB)")
 
+    try:
+        threading.Thread(target=update_storage_mapping_files, daemon=True, name="lumin-update-mappings").start()
+    except Exception:
+        pass
+
     return jsonify({
         "success": True,
         "message": "File uploaded successfully",
@@ -582,7 +992,7 @@ def list_patient_files(patient_id):
         for root, directories, files in os.walk(patient_dir):
             directories[:] = [name for name in directories if not name.startswith('.')]
             for filename in files:
-                if filename.startswith('.'):
+                if filename.startswith('.') or filename.endswith(('.sql', '.json', '.sqlite', '.db')):
                     continue
                 full_path = Path(root) / filename
                 rel_path = full_path.relative_to(STORAGE_ROOT)
@@ -665,6 +1075,10 @@ def delete_file():
             except Exception:
                 pass
         logger.info(f"Deleted: {clean_rel_path}")
+        try:
+            threading.Thread(target=update_storage_mapping_files, daemon=True, name="lumin-update-mappings").start()
+        except Exception:
+            pass
         return jsonify({"success": True, "message": "File deleted successfully", "deletedPath": clean_rel_path})
     except SyncError:
         raise
@@ -730,6 +1144,11 @@ def move_file():
 
         logger.info(f"Moved category: {clean_rel_path} -> {new_rel_path}")
 
+        try:
+            threading.Thread(target=update_storage_mapping_files, daemon=True, name="lumin-update-mappings").start()
+        except Exception:
+            pass
+
         return jsonify({
             "success": True,
             "message": "File moved successfully",
@@ -778,6 +1197,35 @@ def serve_file(filename):
     resp = send_from_directory(STORAGE_ROOT, clean_filename)
     resp.headers["Cache-Control"] = "public, max-age=86400"
     return resp
+
+@app.route("/api/mapping/status", methods=["GET"])
+def get_mapping_status():
+    """Return status of storage mapping files (SQL, SQLite, JSON)."""
+    return jsonify({
+        "success": True,
+        "mapping": _last_mapping_result,
+        "storageRoot": str(STORAGE_ROOT.resolve())
+    })
+
+@app.route("/api/mapping/sync", methods=["POST"])
+def sync_mappings():
+    """Trigger synchronous update of all storage mapping files."""
+    res = update_storage_mapping_files()
+    return jsonify({"success": True, "result": res})
+
+@app.route("/api/mapping/sql", methods=["GET"])
+def get_mapping_sql():
+    """Download or view the master MySQL dump file."""
+    master_sql_path = STORAGE_ROOT / "patients_mapping.sql"
+    if not master_sql_path.is_file():
+        update_storage_mapping_files()
+    as_dl = request.args.get("download") == "true"
+    return send_from_directory(
+        STORAGE_ROOT,
+        "patients_mapping.sql",
+        as_attachment=as_dl,
+        mimetype="text/plain; charset=utf-8"
+    )
 
 def get_local_ip() -> str:
     """Detect the local machine IP on the clinic LAN."""
