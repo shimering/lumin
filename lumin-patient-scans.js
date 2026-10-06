@@ -31,6 +31,7 @@
     webglUnavailable: ['This device does not support WebGL2. Use a compatible browser or device to view scans. Original ZIP downloads remain available.', 'هذا الجهاز لا يدعم WebGL2. استخدم متصفحًا أو جهازًا متوافقًا للعرض. يظل تنزيل ZIP الأصلي متاحًا.'],
     contextLost: ['Graphics paused. Waiting for the browser to restore the viewer…', 'توقف العرض مؤقتًا. في انتظار استعادة المتصفح للعارض…'],
     fullscreen: ['Full screen', 'ملء الشاشة'], exitFullscreen: ['Exit full screen', 'الخروج من ملء الشاشة'],
+    viewerSettings: ['Viewer settings', 'إعدادات العارض'], closeSettings: ['Close settings', 'إغلاق الإعدادات'], views: ['View presets', 'زوايا العرض'],
     fileLimit: ['This ZIP exceeds the storage server upload limit.', 'يتجاوز ملف ZIP حد الرفع الخاص بالخادم.'], zipOnly: ['Choose a .zip file.', 'اختر ملفًا بامتداد .zip.'],
     metadataRetry: ['The ZIP is already uploaded. Retry Save to finish its details without uploading another copy.', 'تم رفع ZIP بالفعل. أعد محاولة الحفظ لإكمال التفاصيل دون رفع نسخة أخرى.'],
     failed: ['Could not complete this action. Check the storage connection and retry.', 'تعذر إكمال العملية. تحقق من الاتصال بخادم التخزين وأعد المحاولة.'], selected: ['Select for comparison', 'تحديد للمقارنة'],
@@ -157,9 +158,19 @@
       const select = (key, values) => `<label>${this.t(key)}<select data-scan-setting="${key}">${values.map(([value, label]) => `<option value="${value}" ${this.settings[key] === value ? 'selected' : ''}>${this.t(label)}</option>`).join('')}</select></label>`;
       const check = key => `<label class="scan-check"><input type="checkbox" data-scan-setting="${key}" ${this.settings[key] ? 'checked' : ''}>${this.t(key)}</label>`;
       const range = (key, min, max, step) => `<label>${this.t(key)}<input type="range" min="${min}" max="${max}" step="${step}" value="${this.settings[key]}" data-scan-setting="${key}"></label>`;
-      return `<div class="scan-presets">${[['front', 'front'], ['left', 'left'], ['right', 'right'], ['upper', 'upperView'], ['lower', 'lowerView'], ['reset', 'reset']].map(([view, label]) => this.button('view', label, label === 'reset' ? 'rotate-ccw' : 'scan', `data-index="${view}"`)).join('')}</div>
-        <details class="scan-tools" open><summary>${this.t('mode')}</summary><div class="scan-tools-grid">${select('mode', [['textured', 'textured'], ['solid', 'solid'], ['wireframe', 'wireframe']])}${select('background', [['light', 'lightBg'], ['dark', 'darkBg']])}${check('upper')}${check('lower')}${range('upperOpacity', 0, 1, 0.05)}${range('lowerOpacity', 0, 1, 0.05)}${range('light', 0.2, 2, 0.1)}${check('linked')}</div></details>
-        <details class="scan-tools"><summary>${this.t('cut')}</summary><div class="scan-tools-grid">${check('cut')}<label>${this.t('axis')}<select data-scan-setting="axis"><option value="z">Z</option><option value="x">X</option><option value="y">Y</option></select></label>${range('cutPosition', -1.5, 1.5, 0.01)}${check('reverse')}${this.button('resetCut', 'resetCut', 'rotate-ccw')}</div><p>${this.t('cutHint')}</p></details>`;
+      const dir = this.options.language === 'ar' ? 'rtl' : 'ltr';
+      return `<aside class="scan-viewer-panel" dir="${dir}" aria-label="${this.t('viewerSettings')}" hidden>
+        <div class="scan-viewer-panel-heading"><h5>${this.icon('sliders-horizontal')}${this.t('viewerSettings')}</h5><button type="button" data-scan-viewer-action="closeSettings" aria-label="${this.t('closeSettings')}" title="${this.t('closeSettings')}">${this.icon('x')}</button></div>
+        <div class="scan-viewer-panel-body"><section class="scan-viewer-views"><h6>${this.t('views')}</h6><div class="scan-presets">${[['front', 'front'], ['left', 'left'], ['right', 'right'], ['upper', 'upperView'], ['lower', 'lowerView']].map(([view, label]) => this.button('view', label, 'scan', `data-index="${view}"`)).join('')}</div></section>
+        <details class="scan-tools" open><summary>${this.icon('palette')}<span>${this.t('mode')}</span>${this.icon('chevron-down')}</summary><div class="scan-tools-grid">${select('mode', [['textured', 'textured'], ['solid', 'solid'], ['wireframe', 'wireframe']])}${select('background', [['light', 'lightBg'], ['dark', 'darkBg']])}${check('upper')}${range('upperOpacity', 0, 1, 0.05)}${check('lower')}${range('lowerOpacity', 0, 1, 0.05)}${range('light', 0.2, 2, 0.1)}${check('linked')}</div></details>
+        <details class="scan-tools"><summary>${this.icon('scissors')}<span>${this.t('cut')}</span>${this.icon('chevron-down')}</summary><div class="scan-tools-grid">${check('cut')}<label>${this.t('axis')}<select data-scan-setting="axis"><option value="z">Z</option><option value="x">X</option><option value="y">Y</option></select></label>${range('cutPosition', -1.5, 1.5, 0.01)}${check('reverse')}${this.button('resetCut', 'resetCut', 'rotate-ccw')}</div><p>${this.t('cutHint')}</p></details></div></aside>
+        <div class="scan-viewer-toolbar" dir="${dir}">${this.button('view', 'reset', 'rotate-ccw', 'data-index="reset"')}<button type="button" class="scan-settings-toggle" data-scan-viewer-action="toggleSettings" aria-label="${this.t('viewerSettings')}" title="${this.t('viewerSettings')}" aria-expanded="false">${this.icon('settings')}</button></div>`;
+    }
+    createViewer(ScanViewer, stage) {
+      return new ScanViewer(stage, key => this.t(key), {
+        onAction: (action, index) => this.action(action, index).catch(error => this.error(error)),
+        onChange: event => this.change(event).catch(error => this.error(error))
+      });
     }
     async importFile(file) {
       if (!this.canImport()) throw new Error('serverUpdate');
@@ -183,7 +194,7 @@
       const area = this.host.querySelector('.scan-workspace'); area.hidden = false;
       area.innerHTML = `<div class="scan-workspace-heading"><h4>${esc(details.display_name || originalName)}</h4>${this.button('close', 'close', 'x')}</div>
         ${this.fields(paths, details, selection, originalName)}<div class="scan-actions">${this.button('preview', 'preview', 'box')}${this.button('save', saved ? 'saveDetails' : 'save', 'save', 'class="scan-primary" disabled')}</div>
-        <p class="scan-original">${this.t('original')}</p><p class="scan-preview-warning" role="status" hidden></p><div class="scan-stage"></div><p class="scan-gestures">${this.t('gestureHint')}</p>${this.controls()}`;
+        <p class="scan-original">${this.t('original')}</p><p class="scan-preview-warning" role="status" hidden></p><div class="scan-stage">${this.controls()}</div><p class="scan-gestures">${this.t('gestureHint')}</p>`;
       this.icons(); area.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
     field(key) { return this.host.querySelector(`[data-scan-field="${key}"]`)?.value || ''; }
@@ -195,10 +206,11 @@
         const selection = { upper: this.field('upper'), lower: this.field('lower'), orientation: this.field('orientation') };
         const data = await target.job.call({ type: 'parse', upper: selection.upper, lower: selection.lower });
         if (!this.alive() || epoch !== this.epoch) return;
-        const { ScanViewer } = await import('./lumin-scan-viewer.js?v=3'); if (!this.alive() || epoch !== this.epoch) return;
-        this.viewer = new ScanViewer(this.host.querySelector('.scan-stage'), key => this.t(key));
+        const { ScanViewer } = await import('./lumin-scan-viewer.js?v=4'); if (!this.alive() || epoch !== this.epoch) return;
+        this.viewer = this.createViewer(ScanViewer, this.host.querySelector('.scan-stage'));
         await this.viewer.setScans([{ data, name: this.field('name'), orientation: selection.orientation }]);
         if (!this.alive() || epoch !== this.epoch) return;
+        this.viewer.apply(this.settings);
         this.previewReady = true; this.previewSelection = selection;
         const warning = this.host.querySelector('.scan-preview-warning'); warning.textContent = data.warnings.map(key => this.t(key)).join(' '); warning.hidden = !data.warnings.length;
       } finally {
@@ -237,9 +249,9 @@
         }
         if (!this.alive() || epoch !== this.epoch) return;
         const area = this.host.querySelector('.scan-workspace'); this.settings = defaults();
-        area.innerHTML = `<div class="scan-workspace-heading"><h4>${this.t('compare')}</h4>${this.button('close', 'close', 'x')}</div><div class="scan-stage"></div><p class="scan-gestures">${this.t('gestureHint')}</p>${this.controls()}`;
-        const { ScanViewer } = await import('./lumin-scan-viewer.js?v=3'); if (!this.alive() || epoch !== this.epoch) return;
-        this.viewer = new ScanViewer(area.querySelector('.scan-stage'), key => this.t(key)); await this.viewer.setScans(scans); this.icons();
+        area.innerHTML = `<div class="scan-workspace-heading"><h4>${this.t('compare')}</h4>${this.button('close', 'close', 'x')}</div><div class="scan-stage">${this.controls()}</div><p class="scan-gestures">${this.t('gestureHint')}</p>`;
+        const { ScanViewer } = await import('./lumin-scan-viewer.js?v=4'); if (!this.alive() || epoch !== this.epoch) return;
+        this.viewer = this.createViewer(ScanViewer, area.querySelector('.scan-stage')); await this.viewer.setScans(scans); this.icons();
       } finally { if (this.alive() && epoch === this.epoch) this.setBusy(false); }
     }
     async save() {
@@ -297,7 +309,7 @@
       }
     }
     syncControls() {
-      this.host.querySelectorAll('[data-scan-setting]').forEach(el => { if (el.type === 'checkbox') el.checked = this.settings[el.dataset.scanSetting]; else el.value = this.settings[el.dataset.scanSetting]; });
+      (this.viewer?.host || this.host).querySelectorAll('[data-scan-setting]').forEach(el => { if (el.type === 'checkbox') el.checked = this.settings[el.dataset.scanSetting]; else el.value = this.settings[el.dataset.scanSetting]; });
     }
     async change(event) {
       const el = event.target;

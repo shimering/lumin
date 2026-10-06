@@ -2,6 +2,8 @@ import * as THREE from './vendor/three/build/three.module.js';
 import { MTLLoader } from './vendor/three/examples/jsm/loaders/MTLLoader.js';
 import { OrbitControls } from './vendor/three/examples/jsm/controls/OrbitControls.js';
 
+let nextViewerId = 0;
+
 function installTwoButtonPan(controls, element) {
   controls.mouseButtons.RIGHT = -1;
   let panning = false;
@@ -34,7 +36,7 @@ function installTwoButtonPan(controls, element) {
 }
 
 export class ScanViewer {
-  constructor(host, labels) {
+  constructor(host, labels, tools = {}) {
     this.host = host; this.labels = labels; this.panes = []; this.urls = [];
     this.linked = true; this.disposed = false; this.frame = 0;
     const canvas = document.createElement('canvas');
@@ -58,16 +60,48 @@ export class ScanViewer {
     this.fullscreenButton.addEventListener('click', () => this.toggleFullscreen()); host.append(this.fullscreenButton);
     this.fullscreenChanged = () => { if (!this.disposed) this.updateFullscreenButton(); };
     this.fullscreenKey = event => {
-      if (!this.expanded) return;
+      if (event.key === 'Escape' && this.panel && !this.panel.hidden) {
+        event.preventDefault(); event.stopPropagation(); this.setSettingsOpen(false); return;
+      }
+      if (!this.expanded && document.fullscreenElement !== this.host) return;
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); this.exitExpanded(); }
       if (event.key === 'Tab') {
-        const targets = [this.fullscreenButton, ...this.panes.map(pane => pane.element)];
+        const targets = [...host.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), summary, [tabindex="0"]')].filter(el => el.getClientRects().length);
+        if (!targets.length) return;
         const index = targets.indexOf(document.activeElement);
         event.preventDefault(); targets[(index + (event.shiftKey ? targets.length - 1 : 1)) % targets.length].focus();
       }
     };
+    this.panel = host.querySelector('.scan-viewer-panel');
+    this.settingsButton = host.querySelector('.scan-settings-toggle');
+    if (this.panel && this.settingsButton) {
+      this.panel.id = `scan-viewer-settings-${++nextViewerId}`;
+      this.panel.hidden = true; this.settingsButton.setAttribute('aria-expanded', 'false');
+      this.settingsButton.setAttribute('aria-controls', this.panel.id);
+    }
+    // Delegate on the stage so controls keep working when fallback fullscreen moves it to body.
+    this.toolsClick = event => {
+      const button = event.target.closest('button');
+      if (button?.dataset.scanViewerAction) {
+        event.stopPropagation();
+        if (!button.disabled) this.setSettingsOpen(button.dataset.scanViewerAction === 'toggleSettings' && this.panel?.hidden);
+      } else if (button?.dataset.scanAction) {
+        event.stopPropagation();
+        if (!button.disabled) tools.onAction?.(button.dataset.scanAction, button.dataset.index);
+      } else if (event.target.closest('.scan-pane') && this.panel && !this.panel.hidden) this.setSettingsOpen(false, false);
+    };
+    this.toolsChange = event => {
+      if (!event.target.dataset.scanSetting) return;
+      event.stopPropagation(); tools.onChange?.(event);
+    };
+    host.addEventListener('click', this.toolsClick); host.addEventListener('input', this.toolsChange); host.addEventListener('change', this.toolsChange);
     document.addEventListener('fullscreenchange', this.fullscreenChanged); host.addEventListener('keydown', this.fullscreenKey);
     this.updateFullscreenButton();
+  }
+  setSettingsOpen(open, focus = true) {
+    if (!this.panel || !this.settingsButton || this.disposed) return;
+    this.panel.hidden = !open; this.settingsButton.setAttribute('aria-expanded', String(!!open));
+    if (focus) (open ? this.panel.querySelector('[data-scan-viewer-action="closeSettings"]') : this.settingsButton)?.focus({ preventScroll: true });
   }
   updateFullscreenButton() {
     const active = this.expanded || document.fullscreenElement === this.host;
@@ -282,6 +316,7 @@ export class ScanViewer {
     this.disposed = true; this.exitExpanded();
     if (document.fullscreenElement === this.host) document.exitFullscreen().catch(() => {});
     document.removeEventListener('fullscreenchange', this.fullscreenChanged); this.host.removeEventListener('keydown', this.fullscreenKey);
+    this.host.removeEventListener('click', this.toolsClick); this.host.removeEventListener('input', this.toolsChange); this.host.removeEventListener('change', this.toolsChange);
     this.fullscreenButton.remove();
     cancelAnimationFrame(this.frame); this.observer.disconnect(); this.clearPanes();
     const canvas = this.renderer.domElement;

@@ -4,16 +4,16 @@
 .scan-header h3 { font-size:20px; font-weight:600; letter-spacing:-.02em; color:#0f172a; }
 .scan-header p,.scan-card p,.scan-original,.scan-gestures,.scan-tools p { font-size:12px; color:#64748b; line-height:1.6; margin-top:8px; }
 .scan-actions,.scan-presets { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
-#view-patient-scans button,.scan-check,.scan-tools summary { min-height:44px; min-width:44px; }
-#view-patient-scans button { border:0; border-radius:12px; background:#f1f5f9; color:#334155; padding:10px 14px; font-size:12px; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; transition:background .15s,transform .15s; }
-#view-patient-scans button:hover { background:#e2e8f0; }
-#view-patient-scans button:active { transform:scale(.98); }
-#view-patient-scans :is(button,input,select,textarea,summary,.scan-pane):focus-visible { outline:2px solid #3b82f6; outline-offset:3px; }
-#view-patient-scans :disabled { opacity:.5; pointer-events:none; }
+#view-patient-scans button,.scan-stage button,.scan-check,.scan-tools summary { min-height:44px; min-width:44px; }
+:where(#view-patient-scans,.scan-stage) button { border:0; border-radius:12px; background:#f1f5f9; color:#334155; padding:10px 14px; font-size:12px; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; transition:background .15s,transform .15s; }
+:where(#view-patient-scans,.scan-stage) button:hover { background:#e2e8f0; }
+:where(#view-patient-scans,.scan-stage) button:active { transform:scale(.98); }
+:is(#view-patient-scans,.scan-stage) :is(button,input,select,textarea,summary,.scan-pane):focus-visible { outline:2px solid #3b82f6; outline-offset:3px; }
+:is(#view-patient-scans,.scan-stage) :disabled { opacity:.5; pointer-events:none; }
 #view-patient-scans button.scan-primary { background:#dbeafe; color:#1d4ed8; }
 #view-patient-scans button.scan-primary:hover { background:#bfdbfe; }
 #view-patient-scans button.scan-danger { color:#be123c; background:#fff1f2; }
-#view-patient-scans i,#view-patient-scans svg { width:18px; height:18px; flex-shrink:0; }
+#view-patient-scans i,#view-patient-scans svg,.scan-stage i,.scan-stage svg { width:18px; height:18px; flex-shrink:0; }
 .scan-card-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr)); gap:16px; }
 .scan-card,.scan-empty,.scan-workspace { padding:24px; border-radius:20px; background:var(--lumin-face,#fff); box-shadow:0 2px 12px #0f172a06; min-width:0; }
 .scan-card-heading { justify-content:flex-start; align-items:flex-start; }
@@ -33,30 +33,56 @@
 .scan-workspace-heading { margin-bottom:24px; }
 .scan-form-grid,.scan-tools-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr)); gap:16px; margin-bottom:16px; }
 .scan-form-grid label,.scan-tools-grid>label:not(.scan-check) { display:flex; flex-direction:column; gap:8px; color:#475569; font-size:12px; font-weight:500; min-width:0; }
-#view-patient-scans :is(select,input:not([type=checkbox]):not([type=range]),textarea) { width:100%; min-width:0; min-height:44px; padding:10px 12px; border:1px solid #e2e8f0; border-radius:12px; background:var(--lumin-face,#f8fafc); color:#334155; font-size:13px; }
-#view-patient-scans input[type=range] { min-height:44px; width:100%; accent-color:#2563eb; cursor:pointer; }
-.scan-stage { position:relative; height:460px; overflow:hidden; border-radius:16px; background:#1e293b; margin-top:16px; direction:ltr; display:grid; grid-template-columns:1fr; }
-.scan-stage.scan-compare { grid-template-columns:1fr 1fr; gap:2px; }
+:is(#view-patient-scans,.scan-stage) :is(select,input:not([type=checkbox]):not([type=range]),textarea) { width:100%; min-width:0; min-height:44px; padding:10px 12px; border:1px solid #e2e8f0; border-radius:12px; background:var(--lumin-face,#f8fafc); color:#334155; font-size:13px; }
+:is(#view-patient-scans,.scan-stage) input[type=range] { min-height:44px; width:100%; accent-color:#2563eb; cursor:pointer; }
+.scan-stage { position:relative; width:100%; max-width:900px; aspect-ratio:1; overflow:hidden; border-radius:16px; background:#1e293b; margin:16px auto 0; direction:ltr; display:grid; grid-template-columns:minmax(0,1fr); }
+.scan-stage.scan-compare { max-width:1440px; aspect-ratio:2; grid-template-columns:repeat(2,minmax(0,1fr)); gap:2px; }
 .scan-canvas { position:absolute; inset:0; width:100%; height:100%; }
 .scan-pane { position:relative; z-index:1; touch-action:none; min-width:0; cursor:grab; }
 .scan-pane:active { cursor:grabbing; }
 .scan-pane-name { position:absolute; top:max(12px,env(safe-area-inset-top)); inset-inline-start:max(12px,env(safe-area-inset-left),env(safe-area-inset-right)); max-width:calc(100% - 84px); pointer-events:none; background:#ffffffdc; color:#334155; padding:8px 12px; border-radius:10px; font-size:12px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 .scan-graphics-status { position:absolute; inset:0; z-index:3; display:grid; place-content:center; padding:24px; background:#f1f5f9ed; color:#475569; text-align:center; }
-.scan-presets { margin-block:16px; }
-.scan-tools { background:#f8fafc; border-radius:16px; padding:12px 16px; margin-top:12px; }
-.scan-tools summary { cursor:pointer; font-weight:600; color:#475569; font-size:13px; padding-block:12px; }
+.scan-viewer-panel { position:absolute; z-index:5; top:max(12px,env(safe-area-inset-top)); left:max(12px,env(safe-area-inset-left)); bottom:max(76px,calc(64px + env(safe-area-inset-bottom))); width:300px; max-width:calc(100% - 24px); display:flex; flex-direction:column; overflow:hidden; border-radius:16px; background:#fffffff5; color:#334155; box-shadow:0 16px 48px #02061733; backdrop-filter:blur(16px); animation:scan-panel-in .16s ease-out; }
+.scan-viewer-panel[hidden] { display:none; }
+.scan-viewer-panel-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; padding-block:8px; padding-inline:20px 12px; border-bottom:1px solid #e2e8f0; flex-shrink:0; }
+.scan-viewer-panel-heading h5 { display:flex; align-items:center; gap:8px; margin:0; font-size:14px; font-weight:600; letter-spacing:-.02em; color:#0f172a; min-width:0; }
+.scan-viewer-panel-heading button { width:44px; height:44px; padding:0; background:transparent; flex-shrink:0; }
+.scan-viewer-panel-body { min-height:0; overflow-y:auto; overscroll-behavior:contain; touch-action:pan-y; padding:16px; scrollbar-width:thin; }
+.scan-viewer-views h6 { margin:0; color:#64748b; font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; }
+.scan-presets { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-block:12px 20px; }
+.scan-presets button:last-child { grid-column:1 / -1; }
+.scan-tools { border-top:1px solid #e2e8f0; padding-block:8px; }
+.scan-tools summary { cursor:pointer; font-weight:600; color:#475569; font-size:13px; padding-block:12px; display:flex; align-items:center; gap:8px; list-style:none; }
+.scan-tools summary::-webkit-details-marker { display:none; }
+.scan-tools summary>span { flex:1; }
+.scan-tools summary>svg:last-child { transition:transform .15s; }
+.scan-tools[open] summary>svg:last-child { transform:rotate(180deg); }
 .scan-tools summary:hover { color:#2563eb; }
 .scan-tools summary:active { opacity:.8; }
-.scan-tools-grid { margin-top:8px; align-items:center; }
+.scan-tools-grid { grid-template-columns:minmax(0,1fr); gap:12px; margin:8px 0 12px; align-items:center; }
+.scan-viewer-panel .scan-check { background:#f1f5f9; border-radius:12px; padding:8px 12px; }
+.scan-viewer-panel .scan-check:hover { background:#e2e8f0; }
+.scan-viewer-panel .scan-check:active { transform:scale(.98); }
+.scan-viewer-panel .scan-check:has(:focus-visible) { outline:2px solid #3b82f6; outline-offset:2px; }
+.scan-viewer-panel .scan-check:has(:disabled) { opacity:.5; pointer-events:none; }
+.scan-viewer-toolbar { position:absolute; z-index:4; inset-inline:max(12px,env(safe-area-inset-left),env(safe-area-inset-right)); bottom:max(12px,env(safe-area-inset-bottom)); display:flex; align-items:center; justify-content:space-between; gap:12px; direction:ltr; pointer-events:none; }
+.scan-viewer-toolbar>button { pointer-events:auto; background:#fffffff0; box-shadow:0 4px 16px #02061726; backdrop-filter:blur(12px); }
+.scan-viewer-toolbar>button:hover { background:#fff; }
+.scan-viewer-toolbar .scan-settings-toggle { padding:0; width:44px; height:44px; }
+.scan-viewer-toolbar .scan-settings-toggle[aria-expanded=true] { background:#dbeafe; color:#1d4ed8; }
 .scan-skeleton { padding:48px; min-height:180px; border-radius:20px; background:#e2e8f0; color:#64748b; animation:scan-pulse 1.5s ease-in-out infinite; }
 .scan-dragging { outline:2px dashed #60a5fa; outline-offset:-4px; border-radius:20px; }
 .lumin-raised .scan-card,.lumin-raised .scan-empty,.lumin-raised .scan-workspace { background:var(--lumin-face); box-shadow:var(--lumin-raised); }
-.lumin-raised #view-patient-scans button,.lumin-raised .scan-tools { background:var(--lumin-face); box-shadow:var(--lumin-small-raised); }
+.lumin-raised :where(#view-patient-scans,.scan-stage) button { background:var(--lumin-face); box-shadow:var(--lumin-small-raised); }
+.lumin-raised .scan-viewer-panel { background:var(--lumin-face); }
+.lumin-raised .scan-viewer-panel-heading button { background:transparent; box-shadow:none; }
+.lumin-raised .scan-viewer-toolbar .scan-settings-toggle[aria-expanded=true] { background:#dbeafe; color:#1d4ed8; }
 .lumin-raised #view-patient-scans button:hover { filter:brightness(.98); }
 @keyframes scan-pulse { 50% { opacity:.55; } }
-@media(max-width:767px) { .scan-card,.scan-empty,.scan-workspace { padding:16px; } .scan-header { align-items:flex-start; } .scan-stage { height:360px; } .scan-stage.scan-compare { height:660px; grid-template-columns:1fr; grid-template-rows:1fr 1fr; } .scan-workspace-heading { align-items:flex-start; } .scan-actions { padding-bottom:max(0px,env(safe-area-inset-bottom)); } }
-@media(prefers-reduced-motion:reduce) { .scan-skeleton { animation:none; } #view-patient-scans button { transition:none; } }
-.scan-stage:fullscreen,.scan-stage.scan-expanded { width:100%; height:100%; margin:0; border-radius:0; }
+@keyframes scan-panel-in { from { opacity:0; transform:translateX(-8px); } to { opacity:1; transform:translateX(0); } }
+@media(max-width:767px) { .scan-card,.scan-empty,.scan-workspace { padding:16px; } .scan-header { align-items:flex-start; } .scan-stage.scan-compare { aspect-ratio:.5; grid-template-columns:minmax(0,1fr); grid-template-rows:repeat(2,minmax(0,1fr)); } .scan-workspace-heading { align-items:flex-start; } .scan-actions { padding-bottom:max(0px,env(safe-area-inset-bottom)); } }
+@media(prefers-reduced-motion:reduce) { .scan-skeleton,.scan-viewer-panel { animation:none; } #view-patient-scans button,.scan-stage button,.scan-tools summary>svg:last-child { transition:none; } }
+.scan-stage:fullscreen,.scan-stage.scan-expanded { width:100%; max-width:none; height:100%; aspect-ratio:auto; margin:0; border-radius:0; }
 .scan-stage.scan-expanded { position:fixed; inset:0; z-index:100000; height:100vh; height:100dvh; }
 #view-patient-scans button.scan-fullscreen-toggle,.scan-stage button.scan-fullscreen-toggle { position:absolute; z-index:4; top:max(12px,env(safe-area-inset-top)); inset-inline-end:max(12px,env(safe-area-inset-left),env(safe-area-inset-right)); width:44px; height:44px; min-width:44px; min-height:44px; padding:0; display:grid; place-items:center; border:0; border-radius:12px; background:#ffffffdc; color:#334155; box-shadow:0 2px 12px #0f172a14; cursor:pointer; transition:background .15s,transform .15s; }
 .scan-stage button.scan-fullscreen-toggle:hover { background:#fff; }

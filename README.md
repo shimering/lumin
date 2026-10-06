@@ -49,6 +49,10 @@ and arch selections use the existing patient media metadata and permissions.
 New imports keep their uploaded ZIP filename inside a separate folder per scan.
 The viewer defaults to a dark background and pans when both mouse buttons are held.
 Use the fullscreen icon to expand a single scan or both comparison panes together.
+Single scans use a centered square viewer. The settings button at the lower right
+opens a panel on the left inside the viewer with view presets, rendering, arch
+visibility, opacity, lighting, and section cuts. The panel is hidden initially and
+also works in fullscreen; close it with its close button, the settings button, or Escape.
 
 The `patient_3d_scans` metadata migration must precede frontend rollout. Update each
 storage server with [the update ZIP](storage-server/lumin-storage-sync-update.zip);
