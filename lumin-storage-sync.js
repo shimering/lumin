@@ -102,6 +102,8 @@
         'تم تعديل نسخة محفوظة لتعارض سابق. راجع تلك النسخة قبل إعادة المزامنة.'),
       review_changed: t('A file changed after this comparison loaded. Reload the comparison before marking it reviewed.',
         'تغيّر ملف بعد تحميل المقارنة. أعد تحميل المقارنة قبل اعتماد المراجعة.'),
+      review_pending: t('A saved choice is waiting to finish on both servers. Open its review and resume saving.',
+        'يوجد اختيار محفوظ ينتظر الاكتمال على الخادمين. افتح المراجعة واستكمل الحفظ.'),
       patient_changed: t('A patient was renamed or deleted during sync. Click Retry to apply the latest patient folders.',
         'تغيّر اسم مريض أو حُذف أثناء المزامنة. اضغط إعادة المحاولة لتطبيق أحدث مجلدات المرضى.'),
       patient_rules_unavailable: t('Could not load the patient folder rules. Check the database connection on both computers, then retry.',
@@ -269,7 +271,7 @@
     set('storage-sync-description', t('Sync patient files and their local tooth assignments, notes, and scan settings between both computers.', 'مزامنة ملفات المرضى وبياناتها المحلية، بما فيها الأسنان المحددة والملاحظات وإعدادات المسح، بين الجهازين.'));
     set('storage-sync-coordinator-label', t('Dedicated PC', 'جهاز العيادة المخصص'));
     set('storage-sync-laptop-label', t('Laptop', 'اللابتوب'));
-    set('storage-sync-safety', t('Sync includes deletions. Removed and replaced files are kept in a recovery archive.', 'تشمل المزامنة الحذف. تُحفظ الملفات المحذوفة والمستبدلة في أرشيف للاستعادة.'));
+    set('storage-sync-safety', t('Deleted copies wait for your review: delete on both or restore on both. Removed and replaced files are kept in a recovery archive.', 'تنتظر النسخ المحذوفة مراجعتك: الحذف من الجهازين أو الاستعادة عليهما. تُحفظ الملفات المحذوفة والمستبدلة في أرشيف للاستعادة.'));
     const saved = selection(), list = presets();
     const options = `<option value="">${t('Choose a saved server', 'اختر خادماً محفوظاً')}</option>` + list.map(p =>
       `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}${!p.url?.trim() ? t(' — URL not set', ' — الرابط غير مُدخل') : ''}</option>`).join('');
@@ -300,7 +302,7 @@
         `${job.completedFiles} / ${job.totalFiles} ملفات · ${mb(job.transferredBytes)} / ${mb(job.totalBytes)} ميجابايت`));
       const conflicts = document.getElementById('storage-sync-conflicts');
       conflicts.classList.toggle('hidden', !job.conflicts?.length);
-      const conflictHtml = (job.conflicts || []).map((c, index) => `<li data-reviewed="${Boolean(c.reviewed)}"><div class="storage-sync-conflict-title"><strong>${c.reviewed ? t('Reviewed · both kept', 'تمت المراجعة · حُفظت النسختان') : t('Needs review', 'تحتاج إلى مراجعة')}</strong><button type="button" id="storage-sync-review-${index}" onclick="LuminStorageSync.review(${index})" ${activeJob() ? 'disabled' : ''}><i data-lucide="scan-eye" aria-hidden="true"></i>${t('Review', 'مراجعة')}</button></div><span dir="auto">${escapeHtml(c.path)}</span></li>`).join('');
+      const conflictHtml = (job.conflicts || []).map((c, index) => `<li data-reviewed="${Boolean(c.reviewed)}"><div class="storage-sync-conflict-title"><strong>${c.reviewed ? resolutionLabel(c.resolution) : c.pendingAction ? t('Resume saved choice', 'استكمال الاختيار المحفوظ') : t('Needs review', 'تحتاج إلى مراجعة')}</strong><button type="button" id="storage-sync-review-${index}" onclick="LuminStorageSync.review(${index})" ${activeJob() ? 'disabled' : ''}><i data-lucide="scan-eye" aria-hidden="true"></i>${t('Review', 'مراجعة')}</button></div><span dir="auto">${escapeHtml(c.path)}</span></li>`).join('');
       if (conflicts.dataset.markup !== conflictHtml) { conflicts.innerHTML = conflictHtml; conflicts.dataset.markup = conflictHtml; if (window.lucide) lucide.createIcons(); }
     }
     const failed = state.job?.status === 'failed';
@@ -383,13 +385,22 @@
 
   function reviewKind(kind) {
     return ({path_case: t('The filenames differ in letter case. Compare the contents below.', 'يختلف اسما الملفين في حالة الأحرف. قارن المحتوى أدناه.'),
-      both_modified: t('Both computers have different versions. Keeping both preserves the originals and saves both versions on each computer.', 'توجد نسختان مختلفتان على الجهازين. حفظ النسختين يحافظ على الأصلين ويحفظ كليهما على كل جهاز.'),
-      metadata: t('Both computers have different local annotations. Keeping both saves a copy with each set of teeth, notes, and scan settings on each computer.', 'توجد بيانات محلية مختلفة على الجهازين. حفظ النسختين يحفظ نسخة بكل مجموعة من الأسنان والملاحظات وإعدادات المسح على كل جهاز.'),
-      delete_modified: t('One copy was deleted while the other was modified. The modified file was preserved.', 'حُذفت نسخة بينما عُدّلت الأخرى. تم الاحتفاظ بالملف المعدّل.')})[kind] || t('Compare the copies stored on both computers.', 'قارن النسختين المحفوظتين على الجهازين.');
+      both_modified: t('Both computers have different versions. Choose one image for both servers, or keep both versions.', 'توجد نسختان مختلفتان على الجهازين. اختر صورة واحدة للخادمين أو احتفظ بالنسختين.'),
+      metadata: t('Both computers have different local annotations. Choose one set of teeth, notes, and scan settings for both servers, or keep a copy of each.', 'توجد بيانات محلية مختلفة على الجهازين. اختر مجموعة أسنان وملاحظات وإعدادات مسح للخادمين أو احتفظ بنسخة من كل مجموعة.'),
+      delete_modified: t('One copy was deleted. Choose to delete the remaining copy or restore it to both computers.', 'حُذفت نسخة. اختر حذف النسخة المتبقية أو استعادتها على الجهازين.')})[kind] || t('Compare the copies stored on both computers.', 'قارن النسختين المحفوظتين على الجهازين.');
+  }
+
+  function resolutionLabel(action) {
+    return action === 'delete_both' ? t('Reviewed · deleted on both', 'تمت المراجعة · حُذف من الجهازين')
+      : action === 'keep_local' || action === 'keep_remote' ? t('Reviewed · chosen copy on both', 'تمت المراجعة · النسخة المختارة على الجهازين')
+      : t('Reviewed · both kept', 'تمت المراجعة · حُفظت النسختان');
   }
 
   function reviewMarkup(review) {
     const data = review.data;
+    const actions = data?.actions || ['keep_both'];
+    const disabled = review.saving || !data?.revision || data.reviewed;
+    const oneMissing = data?.versions && ['local', 'remote'].some(side => !data.versions[side] || data.versions[side].deleted);
     const versions = ['local', 'remote'].map(side => {
       const record = data?.versions?.[side], file = review.files[side];
       const server = side === 'local' ? review.servers.coordinator : review.servers.laptop;
@@ -397,14 +408,21 @@
       const name = record?.path || file?.path || data?.path || review.conflict.path;
       const size = record?.size ?? file?.original?.size;
       const image = file?.url && !file.error;
-      const message = record?.deleted ? t('Deleted on this computer', 'محذوف على هذا الجهاز') : file?.error ||
+      const available = !data?.versions || Boolean(record && !record.deleted);
+      const message = record?.deleted ? t('Deleted on this computer', 'محذوف على هذا الجهاز') : !available ? t('Not found on this computer', 'غير موجود على هذا الجهاز') : file?.error ||
         (file?.loading ? t('Loading preview…', 'جارٍ تحميل المعاينة…') : t('Download this file to inspect it.', 'نزّل الملف لفحصه.'));
       return `<section class="storage-review-version" data-side="${side}"><h4>${label}</h4><p class="storage-review-server">${escapeHtml(server.name || label)}</p><p class="storage-review-path" dir="auto">${escapeHtml(name)}</p>
-        <div class="storage-review-preview" aria-busy="${Boolean(file?.loading)}">${image ? `<img src="${file.url}" alt="${escapeHtml(label)}" />` : `${file?.loading ? '<span class="storage-review-loading" aria-hidden="true"></span>' : `<i data-lucide="${/\.zip$/i.test(name) ? 'archive' : 'file'}" aria-hidden="true"></i>`}<p role="status">${escapeHtml(message)}</p>${file?.error && !record?.deleted ? `<button type="button" data-retry="${side}">${t('Retry preview', 'إعادة المعاينة')}</button>` : ''}`}</div>
+        <div class="storage-review-preview" aria-busy="${Boolean(file?.loading)}">${image && available ? `<img src="${file.url}" alt="${escapeHtml(label)}" />` : `${file?.loading ? '<span class="storage-review-loading" aria-hidden="true"></span>' : `<i data-lucide="${!available ? 'file-x' : /\.zip$/i.test(name) ? 'archive' : 'file'}" aria-hidden="true"></i>`}<p role="status">${escapeHtml(message)}</p>${file?.error && available ? `<button type="button" data-retry="${side}">${t('Retry preview', 'إعادة المعاينة')}</button>` : ''}`}</div>
         <p class="storage-review-server">${size !== undefined ? `${(size / 1048576).toFixed(2)} MB` : ''}</p>${record?.sha256 ? `<p class="storage-review-hash" dir="ltr">SHA-256: ${escapeHtml(record.sha256.slice(0, 16))}…</p>` : ''}
-        ${!record?.deleted ? `<button type="button" class="storage-review-download" data-download="${side}" ${file?.downloading ? 'disabled' : ''}><i data-lucide="download" aria-hidden="true"></i>${file?.downloading ? t('Downloading original…', 'جارٍ تنزيل الأصل…') : t('Download original', 'تنزيل الأصل')}</button>` : ''}${file?.downloadError ? `<p class="storage-review-message" role="status">${escapeHtml(file.downloadError)}</p>` : ''}${clinicalMarkup(data?.details?.[side])}</section>`;
+        ${available ? `<button type="button" class="storage-review-download" data-download="${side}" ${file?.downloading ? 'disabled' : ''}><i data-lucide="download" aria-hidden="true"></i>${file?.downloading ? t('Downloading original…', 'جارٍ تنزيل الأصل…') : t('Download original', 'تنزيل الأصل')}</button>` : ''}
+        ${actions.includes('keep_' + side) ? `<button type="button" class="storage-review-choice" data-choice="keep_${side}" aria-pressed="${review.choice === 'keep_' + side}" ${disabled ? 'disabled' : ''}><i data-lucide="${oneMissing ? 'rotate-ccw' : 'check'}" aria-hidden="true"></i>${oneMissing ? t('Restore this copy on both', 'استعادة هذه النسخة على الجهازين') : t('Keep this version on both', 'الاحتفاظ بهذه النسخة على الجهازين')}</button>` : ''}
+        ${file?.downloadError ? `<p class="storage-review-message" role="status">${escapeHtml(file.downloadError)}</p>` : ''}${clinicalMarkup(data?.details?.[side])}</section>`;
     }).join('');
-    return `<section role="dialog" aria-modal="true" aria-labelledby="storage-review-title" class="storage-review-dialog" dir="${t('ltr', 'rtl')}"><header><div><h3 id="storage-review-title">${t('Review file difference', 'مراجعة اختلاف الملف')}</h3><p>${escapeHtml(reviewKind(data?.kind || review.conflict.kind))}</p></div><button type="button" data-close aria-label="${t('Close review', 'إغلاق المراجعة')}" ${review.saving ? 'disabled' : ''}><i data-lucide="x" aria-hidden="true"></i></button></header><div class="storage-review-body"><div class="storage-review-versions">${versions}</div>${data?.versions?.local?.sha256 && data.versions.local.sha256 === data.versions.remote?.sha256 ? `<p class="storage-review-same">${t('The file contents are identical.', 'محتوى الملفين متطابق.')}</p>` : ''}<p class="storage-review-message" role="status">${escapeHtml(review.message || '')}</p></div><footer><button type="button" data-reload ${review.saving ? 'disabled' : ''}>${t('Reload comparison', 'إعادة تحميل المقارنة')}</button><button type="button" data-keep ${review.saving || !data?.revision || data.reviewed ? 'disabled' : ''}>${review.saving ? t('Saving review…', 'جارٍ حفظ المراجعة…') : data?.reviewed ? t('Reviewed · both kept', 'تمت المراجعة · حُفظت النسختان') : t('Keep both and mark reviewed', 'حفظ النسختين واعتماد المراجعة')}</button></footer></section>`;
+    const choiceText = data?.pendingAction ? t('Your saved choice is waiting to finish. Resume saving to complete it on both servers.', 'ينتظر اختيارك المحفوظ الاكتمال. استكمل الحفظ لتطبيقه على الخادمين.')
+      : review.choice === 'delete_both' ? t('This file will be removed from both servers. Its remaining copy will be archived for recovery.', 'سيُحذف هذا الملف من الخادمين. تُحفظ النسخة المتبقية في أرشيف للاستعادة.')
+      : review.choice ? (oneMissing ? t('The remaining image and its annotations will be restored to both servers.', 'ستُستعاد الصورة المتبقية وبياناتها على الخادمين.')
+        : t('Both servers will keep the selected image and its annotations. The other version and its conflict copies will be removed and archived.', 'سيحتفظ الخادمان بالصورة المختارة وبياناتها. تُحذف النسخة الأخرى ونسخ التعارض الخاصة بها وتُحفظ في الأرشيف.')) : '';
+    return `<section role="dialog" aria-modal="true" aria-labelledby="storage-review-title" class="storage-review-dialog" dir="${t('ltr', 'rtl')}"><header><div><h3 id="storage-review-title">${t('Review file difference', 'مراجعة اختلاف الملف')}</h3><p>${escapeHtml(reviewKind(data?.kind || review.conflict.kind))}</p></div><button type="button" data-close aria-label="${t('Close review', 'إغلاق المراجعة')}" ${review.saving ? 'disabled' : ''}><i data-lucide="x" aria-hidden="true"></i></button></header><div class="storage-review-body"><div class="storage-review-versions">${versions}</div>${data?.versions?.local?.sha256 && data.versions.local.sha256 === data.versions.remote?.sha256 ? `<p class="storage-review-same">${t('The file contents are identical.', 'محتوى الملفين متطابق.')}</p>` : ''}${actions.includes('delete_both') ? `<button type="button" class="storage-review-delete" data-choice="delete_both" aria-pressed="${review.choice === 'delete_both'}" ${disabled ? 'disabled' : ''}><i data-lucide="trash-2" aria-hidden="true"></i>${t('Delete on both servers', 'الحذف من الخادمين')}</button>` : ''}<p class="storage-review-choice-summary" role="status">${escapeHtml(choiceText)}</p><p class="storage-review-message" role="status">${escapeHtml(review.message || '')}</p></div><footer><button type="button" data-reload ${review.saving ? 'disabled' : ''}>${t('Reload comparison', 'إعادة تحميل المقارنة')}</button>${actions.includes('keep_both') ? `<button type="button" data-keep ${disabled ? 'disabled' : ''}>${review.saving ? t('Saving review…', 'جارٍ حفظ المراجعة…') : data?.reviewed ? resolutionLabel(data.resolution) : t('Keep both and mark reviewed', 'حفظ النسختين واعتماد المراجعة')}</button>` : ''}${actions.some(action => action !== 'keep_both') ? `<button type="button" data-apply ${disabled || !review.choice ? 'disabled' : ''}><i data-lucide="check-check" aria-hidden="true"></i>${review.saving ? t('Saving on both…', 'جارٍ الحفظ على الجهازين…') : data?.pendingAction ? t('Resume saving', 'استكمال الحفظ') : t('Save choice on both servers', 'حفظ الاختيار على الخادمين')}</button>` : ''}</footer></section>`;
   }
 
   function clinicalMarkup(details) {
@@ -430,12 +448,16 @@
   function renderReview(review) {
     if (state.review !== review) return;
     const active = review.overlay.contains(document.activeElement) ? document.activeElement : null;
-    const focusAttribute = ['data-close', 'data-reload', 'data-keep', 'data-retry', 'data-download'].find(attr => active?.hasAttribute(attr));
+    const focusAttribute = ['data-close', 'data-reload', 'data-keep', 'data-apply', 'data-choice', 'data-retry', 'data-download'].find(attr => active?.hasAttribute(attr));
     const focusValue = focusAttribute ? active.getAttribute(focusAttribute) : '';
     review.overlay.innerHTML = reviewMarkup(review);
     review.overlay.querySelector('[data-close]').onclick = closeReview;
     review.overlay.querySelector('[data-reload]').onclick = () => loadReview(review);
-    review.overlay.querySelector('[data-keep]').onclick = () => saveReview(review);
+    const keep = review.overlay.querySelector('[data-keep]');
+    if (keep) keep.onclick = () => saveReview(review, 'keep_both');
+    const apply = review.overlay.querySelector('[data-apply]');
+    if (apply) apply.onclick = () => saveReview(review, review.choice);
+    review.overlay.querySelectorAll('[data-choice]').forEach(button => { button.onclick = () => { review.choice = button.dataset.choice; renderReview(review); }; });
     review.overlay.querySelectorAll('[data-retry]').forEach(button => { button.onclick = () => loadPreview(review, button.dataset.retry); });
     review.overlay.querySelectorAll('[data-download]').forEach(button => { button.onclick = () => downloadOriginal(review, button.dataset.download); });
     review.overlay.querySelectorAll('.storage-review-preview img').forEach(img => {
@@ -516,7 +538,7 @@
     review.controller?.abort(); review.controller = new AbortController();
     review.urls.forEach(url => URL.revokeObjectURL(url)); review.urls = [];
     review.files = Object.fromEntries(['local', 'remote'].map(side => [side, {path: review.conflict.path, loading: previewable(review.conflict.path)}]));
-    review.data = null; review.message = t('Loading comparison…', 'جارٍ تحميل المقارنة…');
+    review.data = null; review.choice = null; review.message = t('Loading comparison…', 'جارٍ تحميل المقارنة…');
     renderReview(review);
     for (const side of ['local', 'remote']) void loadPreview(review, side);
     let legacy = false;
@@ -533,7 +555,7 @@
       data = {path: review.conflict.path, kind: review.conflict.kind};
     }
     if (!current()) return;
-    review.data = data;
+    review.data = data; review.choice = data.pendingAction || null;
     for (const side of ['local', 'remote']) {
       const record = data.versions?.[side];
       if (!legacy && (!record || record.deleted)) {
@@ -546,14 +568,16 @@
     }
     review.message = legacy ? t('Install the updated Lumin Storage Setup on the dedicated PC to save this review. You can preview and download the originals now.',
       'ثبّت إصدار إعداد خادم Lumin المحدّث على جهاز العيادة لحفظ المراجعة. يمكنك معاينة الأصلين وتنزيلهما الآن.') : '';
+    if (!legacy && data.actions?.length === 0) review.message = t('Install the updated Lumin Storage Setup on both computers to resolve this deletion.',
+      'ثبّت إصدار إعداد خادم Lumin المحدّث على الجهازين لاتخاذ قرار بشأن هذا الحذف.');
     renderReview(review);
   }
 
-  async function saveReview(review) {
-    if (state.review !== review || review.saving || !review.data?.revision) return;
+  async function saveReview(review, action) {
+    if (state.review !== review || review.saving || !review.data?.revision || !action || !(review.data.actions || ['keep_both']).includes(action)) return;
     review.saving = true; renderReview(review);
     try {
-      const result = await api(review.servers.coordinator, review.route, 'POST', {action: 'keep_both', revision: review.data.revision}, 120000);
+      const result = await api(review.servers.coordinator, review.route, 'POST', {action, revision: review.data.revision}, 120000);
       state.job = result.job; review.saving = false; render(); closeReview();
     } catch (error) { review.saving = false; review.message = errorText(error); renderReview(review); }
   }

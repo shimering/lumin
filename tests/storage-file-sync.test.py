@@ -87,6 +87,11 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(job['completedFiles'], job['totalFiles'])
         self.assertEqual(job['transferredBytes'], job['totalBytes'])
 
+    def resolve(self, job, action, index=0):
+        route = self.urls[0] + '/api/sync/jobs/%s/conflicts/%s' % (job['id'], index)
+        review = json_request(route, headers=self.headers)
+        return json_request(route, 'POST', self.headers, dict(action=action, revision=review['revision']))['job']
+
     def clinical_fixture(self):
         return dict(version=1, patients=[dict(id='12345678-1234-4234-8234-123456789abc',
                     name='مريض تجريبي', patient_number=1042, phone='01000000000')], files=[dict(
@@ -159,6 +164,7 @@ class SyncTests(unittest.TestCase):
         for index in range(2):
             self.write(index, rel, b'first image' if index == 0 else b'second image')
         self.seed_local_details(fixture)
+        self.engines[1].clinical.replace(fixture)
         self.pair()
         job = self.run_sync()
         self.assertEqual(job['status'], 'completed_with_conflicts', job)
@@ -309,12 +315,12 @@ class SyncTests(unittest.TestCase):
         self.write(0,rel,b'image');self.save_details(0,rel,dict(note='Portable note',tooth_ids=['A']))
         self.pair();self.assert_completed(self.run_sync())
         moved=json_request(self.urls[1]+'/api/file/move','POST',{'x-lumin-key':self.keys[1]},dict(relativePath=rel,targetCategory='Panoramic'))
-        new_rel=moved['newRelativePath'];self.assert_completed(self.run_sync())
+        new_rel=moved['newRelativePath'];self.resolve(self.run_sync(), 'delete_both')
         for engine in self.engines:
             self.assertFalse(engine.clinical.details(rel)['metadata_available'])
             self.assertEqual(engine.clinical.details(new_rel)['note'],'Portable note')
         json_request(self.urls[1]+'/api/file','DELETE',{'x-lumin-key':self.keys[1]},dict(relativePath=new_rel))
-        self.assert_completed(self.run_sync());self.assert_completed(self.run_sync())
+        self.resolve(self.run_sync(), 'delete_both');self.assert_completed(self.run_sync())
         for engine in self.engines:
             self.assertFalse(engine.clinical.details(new_rel)['metadata_available'])
 
@@ -394,8 +400,10 @@ class SyncTests(unittest.TestCase):
         self.pair(); self.assert_completed(self.run_sync())
         self.write(0, 'P/General/edit.pdf', b'new')
         self.engines[1].delete_local('P/General/remove.pdf')
-        job = self.run_sync(); self.assert_completed(job)
-        self.assertEqual(job['deletedFiles'], 1)
+        job = self.run_sync()
+        self.assertEqual(job['status'], 'completed_with_conflicts')
+        self.assertEqual(job['deletedFiles'], 0)
+        self.resolve(job, 'delete_both')
         self.assertEqual((self.engines[1].root / 'P/General/edit.pdf').read_bytes(), b'new')
         self.assertFalse((self.engines[0].root / 'P/General/remove.pdf').exists())
         self.assertTrue(any(p.read_bytes() == b'old' for p in self.engines[1].state_root.glob('archive/**/*.pdf')))
@@ -406,8 +414,10 @@ class SyncTests(unittest.TestCase):
         file = self.write(0, 'P/General/one.pdf', b'one')
         self.pair(); self.assert_completed(self.run_sync())
         file.unlink()
-        job = self.run_sync(); self.assert_completed(job)
-        self.assertEqual((job['totalBytes'], job['totalFiles'], job['deletedFiles']), (0, 1, 1))
+        job = self.run_sync()
+        self.assertEqual((job['totalBytes'], job['totalFiles'], job['deletedFiles']), (0, 0, 0))
+        self.assertTrue((self.engines[1].root / 'P/General/one.pdf').exists())
+        self.resolve(job, 'delete_both')
         self.assertFalse((self.engines[1].root / 'P/General/one.pdf').exists())
 
     def test_concurrent_edits_preserve_both_originals_and_deduplicate_conflict_copies(self):
@@ -434,6 +444,8 @@ class SyncTests(unittest.TestCase):
         job = self.run_sync()
         self.assertEqual(job['status'], 'completed_with_conflicts', job)
         self.assertEqual(job['conflicts'][0]['kind'], 'delete_modified')
+        self.assertFalse((self.engines[0].root / 'P/General/edit.pdf').exists())
+        self.resolve(job, 'keep_remote')
         for e in self.engines:
             self.assertEqual((e.root / 'P/General/edit.pdf').read_bytes(), b'important change')
         self.assert_completed(self.run_sync())
@@ -451,12 +463,12 @@ class SyncTests(unittest.TestCase):
             'relativePath': old, 'targetCategory': 'Panoramic'}).get_json()
         self.assertTrue(moved['success'], moved)
         new = moved['newRelativePath']
-        self.assert_completed(self.run_sync())
+        self.resolve(self.run_sync(), 'delete_both')
         self.assertFalse((self.engines[1].root / old).exists())
         self.assertTrue((self.engines[1].root / new).exists())
         deleted = client.delete('/api/file', headers={'x-lumin-key': self.keys[0]}, json={'relativePath': new})
         self.assertEqual(deleted.status_code, 200)
-        self.assert_completed(self.run_sync())
+        self.resolve(self.run_sync(), 'delete_both')
         self.assertFalse((self.engines[1].root / new).exists())
 
     def test_byte_progress_stages_and_duplicate_clicks(self):
@@ -623,6 +635,183 @@ class SyncTests(unittest.TestCase):
         response = client.get(route, headers=self.headers)
         self.assertEqual(response.status_code, 200, response.get_json())
         return paths, job, route, client, response.get_json()
+
+    def assert_chosen_image(self, paths, expected):
+        for engine, path in zip(self.engines, paths):
+            self.assertEqual((engine.root / path).read_bytes(), expected)
+            self.assertEqual(list(engine.root.rglob('*__conflict-*.zip')), [])
+        self.assertEqual(self.engines[0].record(paths[0]), self.engines[1].record(paths[1]))
+        self.assert_completed(self.run_sync())
+
+    def test_review_can_keep_dedicated_pc_image_only_on_both_servers(self):
+        paths, job, _, _, snapshot = self.review_fixture()
+        self.assertIn('keep_local', snapshot['actions'])
+        self.resolve(job, 'keep_local')
+        self.assert_chosen_image(paths, b'PC original')
+        self.assertTrue(any(p.read_bytes() == b'laptop original'
+                            for p in self.engines[1].state_root.glob('archive/**/*.zip')))
+
+    def test_review_can_keep_laptop_image_only_on_both_servers(self):
+        paths, job, _, _, _ = self.review_fixture()
+        self.resolve(job, 'keep_remote')
+        self.assert_chosen_image(paths, b'laptop original')
+
+    def test_review_choice_keeps_selected_annotations_and_next_edit_is_one_sided(self):
+        fixture = self.clinical_fixture(); rel = fixture['files'][0]['relative_path']
+        for index in range(2):
+            self.write(index, rel, b'PC image' if index == 0 else b'laptop image')
+            local = copy.deepcopy(fixture)
+            local['files'][0].update(note='PC notes' if index == 0 else 'Laptop notes', tooth_ids=['3'] if index == 0 else ['A'])
+            self.engines[index].clinical.replace(local)
+        self.pair(); job = self.run_sync()
+        self.resolve(job, 'keep_remote')
+        for engine in self.engines:
+            self.assertEqual((engine.root / rel).read_bytes(), b'laptop image')
+            self.assertEqual(engine.clinical.details(rel)['note'], 'Laptop notes')
+            self.assertEqual(engine.clinical.details(rel)['tooth_ids'], ['A'])
+            self.assertFalse(list(engine.root.rglob('*__conflict-*.png')))
+        self.save_details(0, rel, dict(note='Next ordinary edit', tooth_ids=[]))
+        self.assert_completed(self.run_sync())
+        self.assertEqual(self.engines[1].clinical.details(rel)['note'], 'Next ordinary edit')
+        self.assertEqual(self.engines[1].clinical.details(rel)['tooth_ids'], [])
+
+    def test_metadata_review_can_choose_one_set_without_creating_extra_images(self):
+        fixture = self.clinical_fixture(); rel = fixture['files'][0]['relative_path']
+        self.write(0, rel, b'image'); self.save_details(0, rel, dict(note='Original'))
+        self.pair(); self.assert_completed(self.run_sync())
+        self.save_details(0, rel, dict(note='Keep PC', tooth_ids=['3']))
+        self.save_details(1, rel, dict(note='Discard laptop', tooth_ids=['A']))
+        job = self.run_sync(); self.assertEqual(job['conflicts'][0]['kind'], 'metadata')
+        self.resolve(job, 'keep_local')
+        for engine in self.engines:
+            self.assertEqual(engine.clinical.details(rel)['note'], 'Keep PC')
+            self.assertEqual(list(engine.root.rglob('*.png')), [engine.root / rel])
+        self.assert_completed(self.run_sync())
+
+    def deletion_fixture(self, deleted_side):
+        fixture = self.clinical_fixture(); rel = fixture['files'][0]['relative_path']
+        self.write(0, rel, b'image'); self.save_details(0, rel, dict(note='Retain me', tooth_ids=['A']))
+        self.pair(); self.assert_completed(self.run_sync())
+        json_request(self.urls[deleted_side] + '/api/file', 'DELETE', {'x-lumin-key': self.keys[deleted_side]}, dict(relativePath=rel))
+        job = self.run_sync()
+        self.assertEqual(job['status'], 'completed_with_conflicts', job)
+        self.assertFalse((self.engines[deleted_side].root / rel).exists())
+        self.assertTrue((self.engines[1 - deleted_side].root / rel).exists())
+        self.assertEqual(self.engines[1 - deleted_side].clinical.details(rel)['note'], 'Retain me')
+        return rel, job
+
+    def test_deleted_dedicated_pc_copy_can_be_restored_with_annotations(self):
+        rel, job = self.deletion_fixture(0)
+        self.resolve(job, 'keep_remote')
+        for engine in self.engines:
+            self.assertEqual((engine.root / rel).read_bytes(), b'image')
+            self.assertEqual(engine.clinical.details(rel)['note'], 'Retain me')
+            self.assertEqual(engine.clinical.details(rel)['tooth_ids'], ['A'])
+        self.assert_completed(self.run_sync())
+
+    def test_deleted_laptop_copy_can_be_restored_with_annotations(self):
+        rel, job = self.deletion_fixture(1)
+        self.resolve(job, 'keep_local')
+        for engine in self.engines:
+            self.assertEqual((engine.root / rel).read_bytes(), b'image')
+            self.assertEqual(engine.clinical.details(rel)['note'], 'Retain me')
+        self.assert_completed(self.run_sync())
+
+    def test_deletion_review_can_delete_both_and_remove_annotations_without_resurrection(self):
+        rel, job = self.deletion_fixture(0)
+        resolved = self.resolve(job, 'delete_both')
+        self.assertEqual(resolved['conflicts'][0]['resolution'], 'delete_both')
+        for engine in self.engines:
+            self.assertFalse((engine.root / rel).exists())
+            self.assertFalse(engine.clinical.details(rel)['metadata_available'])
+            self.assertTrue(any(p.read_bytes() == b'image' for p in engine.state_root.glob('archive/**/*.png')))
+        self.assert_completed(self.run_sync()); self.assert_completed(self.run_sync())
+
+    def test_new_review_actions_reject_stale_files_missing_winner_and_edited_copies(self):
+        paths, job, route, client, snapshot = self.review_fixture()
+        self.write(1, paths[1], b'changed')
+        response = client.post(route, headers=self.headers, json=dict(action='keep_local', revision=snapshot['revision']))
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual((self.engines[0].root / paths[0]).read_bytes(), b'PC original')
+        snapshot = client.get(route, headers=self.headers).get_json()
+        copy_path = next(self.engines[0].root.rglob('*__conflict-*.zip'))
+        copy_path.write_bytes(b'edited separate copy')
+        response = client.post(route, headers=self.headers, json=dict(action='keep_local', revision=snapshot['revision']))
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.get_json()['code'], 'conflict_copy_changed')
+        self.assertEqual(copy_path.read_bytes(), b'edited separate copy')
+        self.assertNotIn('pendingAction', self.engines[0].jobs()[0]['conflicts'][0])
+
+    def test_review_resolution_resumes_after_lost_response_and_server_restart(self):
+        paths, job, route, client, snapshot = self.review_fixture()
+        engine = self.engines[0]; original = engine.send_review_resolution
+        def disconnected(destination, data, source=None):
+            original(destination, data, source)
+            if destination == 'remote':
+                raise SyncError('Synchronization failed. Check both servers and retry.', 503)
+        with patch.object(engine, 'send_review_resolution', side_effect=disconnected):
+            response = client.post(route, headers=self.headers, json=dict(action='keep_local', revision=snapshot['revision']))
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(engine.jobs()[0]['conflicts'][0].get('reviewed'))
+        with self.assertRaises(SyncError) as busy:
+            engine.start()
+        self.assertEqual(busy.exception.code, 'review_pending')
+        restarted = SyncEngine(engine.root, engine.state_root, engine.extensions)
+        latest = restarted.review_snapshot(job['id'], 0)
+        self.assertEqual(latest['actions'], ['keep_local'])
+        restarted.resolve_review(job['id'], 0, latest['revision'], 'keep_local')
+        self.assert_chosen_image(paths, b'PC original')
+
+    def test_deletion_review_rejects_a_missing_winner_and_keep_both(self):
+        _, job = self.deletion_fixture(0)
+        route = self.urls[0] + '/api/sync/jobs/%s/conflicts/0' % job['id']
+        snapshot = json_request(route, headers=self.headers)
+        self.assertEqual(snapshot['actions'], ['keep_remote', 'delete_both'])
+        for action in ('keep_local', 'keep_both'):
+            with self.assertRaises(SyncError) as invalid:
+                json_request(route, 'POST', self.headers, dict(action=action, revision=snapshot['revision']))
+            self.assertEqual(invalid.exception.status, 400)
+
+    def test_resolution_checks_annotation_changes_before_overwriting_image(self):
+        fixture = self.clinical_fixture(); rel = fixture['files'][0]['relative_path']
+        for index in range(2):
+            self.write(index, rel, b'PC image' if index == 0 else b'laptop image')
+            self.engines[index].clinical.replace(fixture)
+        self.pair(); job = self.run_sync()
+        engine = self.engines[0]; original = engine.send_review_resolution
+        def edit_during_save(destination, data, source=None):
+            if destination == 'remote' and data['record']['path'] == rel:
+                self.save_details(1, rel, dict(note='New note while saving'))
+            return original(destination, data, source)
+        with patch.object(engine, 'send_review_resolution', side_effect=edit_during_save), self.assertRaises(SyncError) as changed:
+            self.resolve(job, 'keep_local')
+        self.assertEqual(changed.exception.code, 'review_changed')
+        self.assertEqual((self.engines[1].root / rel).read_bytes(), b'laptop image')
+        self.assertEqual(self.engines[1].clinical.details(rel)['note'], 'New note while saving')
+        self.assertFalse(engine.jobs()[0]['conflicts'][0].get('reviewed'))
+
+    def test_resolution_streams_long_notes_and_preserves_missing_annotations(self):
+        fixture = self.clinical_fixture(); rel = fixture['files'][0]['relative_path']
+        self.write(0, rel, b'image'); self.save_details(0, rel, dict(note='Long note ' * 6500, tooth_ids=['A']))
+        self.pair(); self.assert_completed(self.run_sync())
+        for index in range(2):
+            self.write(index, rel, b'changed PC' if index == 0 else b'changed laptop')
+        job = self.run_sync(); self.resolve(job, 'keep_local')
+        self.assertEqual(self.engines[1].clinical.details(rel)['note'], 'Long note ' * 6500)
+        self.engines[1].clinical.remove(rel)
+        self.write(0, rel, b'PC again'); self.write(1, rel, b'laptop again')
+        job = self.run_sync(); self.resolve(job, 'keep_remote')
+        for engine in self.engines:
+            self.assertFalse(engine.clinical.details(rel)['metadata_available'])
+            self.assertEqual((engine.root / rel).read_bytes(), b'laptop again')
+
+    def test_peer_resolution_requires_pair_auth_and_valid_envelope(self):
+        self.pair(); client = self.modules[1].app.test_client()
+        for data in (b'', b'\x00\x00\x00\x02{}', b'\x00\x10\x00\x01'):
+            self.assertEqual(client.put('/api/sync/peer/review-resolution', data=data).status_code, 401)
+            response = client.put('/api/sync/peer/review-resolution', headers=self.engines[0].peer_headers(), data=data)
+            self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.engines[1].scan(), {})
 
     def test_review_compares_originals_and_keeps_both_on_both_servers_durably(self):
         paths, job, route, client, snapshot = self.review_fixture()
@@ -811,7 +1000,7 @@ class SyncTests(unittest.TestCase):
             self.assertEqual((self.engines[1].root / rel).read_bytes(), payload)
         removed = client.delete('/api/file', headers={'x-lumin-key': self.keys[0]}, json={'relativePath': paths[0]})
         self.assertEqual(removed.status_code, 200)
-        self.run_sync()
+        self.resolve(self.run_sync(), 'delete_both')
         self.assertFalse((self.engines[1].root / paths[0]).exists())
 
 

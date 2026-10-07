@@ -151,7 +151,7 @@ test('Storage Server panel pairs once, syncs in one click, restores progress, re
   page.on('pageerror',e=>errors.push(e.message));
   let paired=false,job=null,starts=0,pairs=0,statusRequests=0,laptopFileScope='patient-files-v1',pcNodeId='pc-node',pairError=null;
   let legacyReview=false,staleReview=false,reviewsSaved=0,originalDownloads=0,slowPreview=false,brokenPreview=false,slowComparison=false,oldLaptopPair=false;
-  let conflictKind='path_case';
+  let conflictKind='path_case',missingSide=null,expectedAction='keep_both',oldResolutionPeer=false;
   const delayedPreviews=[],delayedComparisons=[];
   const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
   const newJob=()=>({id:'job-1',status:'running',phase:'scanning',totalBytes:0,transferredBytes:0,totalFiles:0,completedFiles:0,conflicts:[]});
@@ -175,12 +175,13 @@ test('Storage Server panel pairs once, syncs in one click, restores progress, re
       if(slowComparison && req.method()==='GET')await new Promise(resolve=>delayedComparisons.push(resolve));
       if(legacyReview){await route.fulfill({status:404,contentType:'application/json',body:'{}'});return;}
       if(req.method()==='POST'){
-        assert.deepEqual(req.postDataJSON(),{action:'keep_both',revision:'review-revision'});
+        assert.deepEqual(req.postDataJSON(),{action:expectedAction,revision:'review-revision'});
         if(staleReview){await route.fulfill({status:409,contentType:'application/json',body:JSON.stringify({code:'review_changed'})});return;}
-        reviewsSaved++;job={...job,status:'completed',conflicts:job.conflicts.map(c=>({...c,reviewed:true}))};result={job};
+        reviewsSaved++;job={...job,status:'completed',conflicts:job.conflicts.map(c=>({...c,reviewed:true,resolution:expectedAction}))};result={job};
       }else result={path:job.conflicts[0].path,kind:conflictKind,revision:'review-revision',reviewed:false,
+        actions:oldResolutionPeer?['keep_both']:missingSide?[missingSide==='local'?'keep_remote':'keep_local','delete_both']:conflictKind==='path_case'?['keep_both']:['keep_both','keep_local','keep_remote'],
         details:Object.fromEntries(['local','remote'].map(side=>[side,{patient_name:'مريض تجريبي',patient_id:'12345678-1234-4234-8234-123456789abc',patient_number:'1042',tooth_ids:['3','A'],display_name:'فحص الأسنان',note:side+' Follow-up <img onerror="window.clinicalInjected=true">',scan_date:'2026-10-07',scan_config:{rotation:90},metadata_available:true}])),
-        versions:{local:{path:job.conflicts[0].path,size:png.length,sha256:'a'.repeat(64),deleted:false},remote:{path:job.conflicts[0].path,size:png.length,sha256:'a'.repeat(64),deleted:false}}};
+        versions:Object.fromEntries(['local','remote'].map(side=>[side,{path:job.conflicts[0].path,size:side===missingSide?0:png.length,sha256:side===missingSide?null:'a'.repeat(64),deleted:side===missingSide}]))};
     }
     else if(suffix==='jobs/job-1/conflicts/0/file'){
       originalDownloads++;
@@ -271,6 +272,51 @@ test('Storage Server panel pairs once, syncs in one click, restores progress, re
   await page.locator('#storage-sync-review-0').focus();
   await page.waitForTimeout(2200);
   assert.equal(await page.evaluate(()=>document.activeElement.id),'storage-sync-review-0');
+  // Choosing either version is explicit and saves that action on both servers.
+  for(const action of ['keep_local','keep_remote','delete_both']){
+    expectedAction=action;conflictKind=action==='delete_both'?'delete_modified':'both_modified';
+    missingSide=action==='delete_both'?'local':null;
+    job={...job,status:'completed_with_conflicts',conflicts:[{path:'أحمد/أشعة/صورة.png',kind:conflictKind}]};
+    await page.waitForFunction(()=>document.querySelector('#storage-sync-conflicts strong').textContent==='Needs review');
+    await page.locator('#storage-sync-review-0').click();
+    await page.waitForFunction(()=>document.querySelector('[data-apply]'));
+    assert.equal(await page.locator('[data-apply]').isDisabled(),true);
+    if(missingSide){
+      assert.equal(await page.locator('[data-download="local"]').count(),0);
+      assert.equal(await page.locator('[data-choice="keep_local"]').count(),0);
+      assert.match(await page.locator('[data-choice="keep_remote"]').textContent(),/Restore this copy on both/);
+      assert.equal(await page.locator('[data-keep]').count(),0);
+    }
+    await page.locator(`[data-choice="${action}"]`).click();
+    assert.equal(await page.locator(`[data-choice="${action}"]`).getAttribute('aria-pressed'),'true');
+    assert.match(await page.locator('.storage-review-choice-summary').textContent(),action==='delete_both'?/removed from both/:/selected image/);
+    await page.locator('[data-apply]').click();
+    await page.waitForFunction(()=>document.querySelector('.storage-review-overlay')===null);
+    assert.match(await page.locator('#storage-sync-conflicts').textContent(),action==='delete_both'?/deleted on both/:/chosen copy on both/);
+  }
+  for(const side of ['local','remote']){
+    expectedAction=side==='local'?'keep_remote':'keep_local';conflictKind='delete_modified';missingSide=side;
+    job={...job,status:'completed_with_conflicts',conflicts:[{path:'أحمد/أشعة/صورة.png',kind:conflictKind}]};
+    await page.waitForFunction(()=>document.querySelector('#storage-sync-conflicts strong').textContent==='Needs review');
+    await page.locator('#storage-sync-review-0').click();
+    await page.waitForFunction(()=>document.querySelector('[data-apply]'));
+    await page.locator(`[data-choice="${expectedAction}"]`).click();
+    assert.match(await page.locator('.storage-review-choice-summary').textContent(),/restored to both/);
+    await page.locator('[data-apply]').click();
+    await page.waitForFunction(()=>document.querySelector('.storage-review-overlay')===null);
+  }
+  assert.equal(reviewsSaved,5);
+  // An older peer keeps existing safe actions and offers no unsupported choices.
+  oldResolutionPeer=true;missingSide=null;conflictKind='both_modified';
+  job={...job,status:'completed_with_conflicts',conflicts:[{path:'أحمد/أشعة/صورة.png',kind:conflictKind}]};
+  await page.waitForFunction(()=>document.querySelector('#storage-sync-conflicts strong').textContent==='Needs review');
+  await page.locator('#storage-sync-review-0').click();
+  await page.waitForFunction(()=>!document.querySelector('[data-keep]').disabled);
+  assert.equal(await page.locator('[data-choice]').count(),0);
+  await page.locator('[data-close]').click();
+  oldResolutionPeer=false;
+  expectedAction='keep_both';conflictKind='path_case';reviewsSaved=0;
+  job={...job,status:'completed_with_conflicts',conflicts:[{path:'أحمد/أشعة/صورة.png',kind:'path_case'}]};
   await page.locator('#storage-sync-review-0').click();
   await page.waitForFunction(()=>document.querySelectorAll('.storage-review-preview img').length===2);
   assert.equal(await page.locator('.storage-review-download').count(),2);

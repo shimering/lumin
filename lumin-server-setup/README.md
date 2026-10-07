@@ -42,6 +42,21 @@ Lumin administrator on both servers, waits for running sync jobs, and preserves
 stored files, revision history and annotations. An incorrect saved clinic key
 is reported separately from an expired administrator session.
 
+## Reviewing image differences and deletions
+
+Update this setup app on **both computers** before using the new review choices.
+In Lumin Admin, open **Review** next to a sync difference. For two images, select
+**Keep this version on both** below the image you want, then **Save choice on both
+servers**. Its notes, tooth assignments and scan settings accompany it; the other
+version and its unchanged conflict copies move into the private recovery archive.
+You can also keep both versions on both computers.
+
+If one image was deleted, choose **Restore this copy on both** or **Delete on both
+servers**, then save the choice. Deletions wait for review, including an old path
+after a category move. New files are copied normally. A disconnected save keeps
+the chosen action: reload its review and click **Resume saving** before starting
+another sync. Files and previous annotations remain recoverable in the archive.
+
 ## Automatic startup
 
 Turn on **Start with Windows and connect automatically** after choosing the

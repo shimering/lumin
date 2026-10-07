@@ -9,6 +9,7 @@ storage-server/.lumin-sync/
 **/__pycache__/
 lumin-server-setup/build/
 lumin-server-setup/release/
+lumin-server-setup/review-choice-preview/
 lumin-server-setup/*.zip
 lumin-server-setup/*-test-result.json
 lumin-server-setup/.test-temp/

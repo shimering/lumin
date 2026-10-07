@@ -30,6 +30,7 @@ CHUNK = 256 * 1024
 PROTOCOL = 1
 MAX_CLOCK_ENTRIES = 64
 FILE_SCOPE = 'patient-files-v1'
+REVIEW_RESOLUTION_VERSION = 1
 EXCLUDED_EXTENSIONS = {'json', 'sql', 'sqlite', 'sqlite3', 'db'}
 # Only these fixed messages may be forwarded from a peer. Never relay arbitrary
 # response bodies, which can contain patient paths, proxy pages or credentials.
@@ -58,6 +59,7 @@ KNOWN_SYNC_ERRORS = {
     'Update and restart the storage server on both computers to sync patient files only.': 'update_required',
     'Files changed while reviewing. Reload the comparison.': 'review_changed',
     'Wait for the current sync to finish before reviewing.': 'sync_busy',
+    'Finish the pending review before starting synchronization.': 'review_pending',
     'This server is already paired with another computer.': 'already_paired',
     'Select the existing dedicated PC as the coordinator.': 'wrong_coordinator',
     'Invalid peer manifest.': 'invalid_manifest',
@@ -474,6 +476,9 @@ class SyncEngine:
         fields = ('patient_id', 'relative_path', 'display_name', 'note', 'tooth_ids', 'scan_date', 'scan_config')
         return {side: {k: row.get(k) for k in fields} for side, row in details.items()}
 
+    def stored_annotation_signature(self, details):
+        return self.annotation_signature({'file': details}) if details.get('metadata_available') else None
+
     def sync_clinical_metadata(self, job, local_files, remote_files):
         """Merge edits from both local stores against the last successful sync.
 
@@ -505,6 +510,14 @@ class SyncEngine:
         reviewed = self.meta('reviewedConflicts') or {}
         for key in sorted(set(a_rows) | set(b_rows)):
             a, b, prior_a, prior_b = (m.get(key) for m in maps)
+            # Keep annotations with their own image until its review is resolved,
+            # including notes on the remaining copy of a deleted file.
+            if any(c['path'].casefold() == key and not c.get('reviewed') for c in job['conflicts']):
+                if a:
+                    output_a[key] = a
+                if b:
+                    output_b[key] = b
+                continue
             known = key in a_old or key in b_old
             if a == b:
                 winner = a
@@ -608,7 +621,16 @@ class SyncEngine:
                                               sort_keys=True).encode()).hexdigest()
         return dict(jobId=job_id, index=index, path=conflict['path'], kind=conflict['kind'],
                     reviewed=bool(conflict.get('reviewed')), revision=revision, versions=versions,
-                    details=details)
+                    details=details, copies=conflict.get('copies', []), resolution=conflict.get('resolution'),
+                    pendingAction=conflict.get('pendingAction'),
+                    actions=([conflict['pendingAction']] if conflict.get('pendingAction') else
+                             ['keep_both'] if conflict['kind'] == 'path_case' else
+                             [action for action, available in (
+                                 ('keep_both', live(local) and live(versions['remote'])),
+                                 ('keep_local', live(local)), ('keep_remote', live(versions['remote'])),
+                                 ('delete_both', live(local) != live(versions['remote']))) if available])
+                    if peer.get('reviewResolutionVersion') == REVIEW_RESOLUTION_VERSION else
+                    (['keep_both'] if live(local) and live(versions['remote']) else []))
 
     def keep_reviewed_versions(self, job_id, index, revision):
         with self.lock:
@@ -619,6 +641,8 @@ class SyncEngine:
                 raise SyncError('Files changed while reviewing. Reload the comparison.', 409)
             a, b = snapshot['versions']['local'], snapshot['versions']['remote']
             # Preserve distinct contents on BOTH computers without replacing
+            if snapshot.get('pendingAction') or not live(a) or not live(b):
+                raise SyncError('Choose a supported review action.')
             # either original. This also handles case-only names in older jobs.
             if live(a) and live(b) and (not same_content(a, b) or snapshot['kind'] == 'metadata'):
                 pair = self.meta('pair')
@@ -663,21 +687,232 @@ class SyncEngine:
             current = self.review_snapshot(job_id, index)
             if current['revision'] != snapshot['revision']:
                 raise SyncError('Files changed while reviewing. Reload the comparison.', 409)
-            decisions = self.meta('reviewedConflicts') or {}
-            key = snapshot['path'].casefold()
-            decisions.pop(key, None)
-            decisions[key] = self.conflict_signature(snapshot['kind'], a, b, snapshot['details'])
-            self.meta('reviewedConflicts', dict(list(decisions.items())[-512:]))
-            job = next(j for j in self.jobs() if j['id'] == job_id)
-            job['conflicts'][index].update(reviewed=True, reviewedAt=time.time(), resolution='keep_both')
-            if job['status'] == 'completed_with_conflicts' and all(c.get('reviewed') for c in job['conflicts']):
-                job['status'] = 'completed'
-            self.update_job(job)
-            if callable(self.on_change):
-                self.on_change()
-            if self.clinical.snapshot() is not None:
-                self.peer_json('finalize', 'POST', {})
-            return job
+            return self.finish_review(snapshot, 'keep_both')
+
+    def finish_review(self, snapshot, action):
+        # Refresh exports before declaring that the review was saved.
+        if callable(self.on_change):
+            result = self.on_change()
+            if isinstance(result, dict) and result.get('error'):
+                raise SyncError('Storage indexes could not be refreshed. Retry synchronization.', 503)
+        self.peer_json('finalize', 'POST', {})
+        decisions = self.meta('reviewedConflicts') or {}
+        key = snapshot['path'].casefold()
+        decisions.pop(key, None)
+        decisions[key] = self.conflict_signature(snapshot['kind'], snapshot['versions']['local'],
+                                                 snapshot['versions']['remote'], snapshot['details'])
+        self.meta('reviewedConflicts', dict(list(decisions.items())[-512:]))
+        job = next(j for j in self.jobs() if j['id'] == snapshot['jobId'])
+        job['conflicts'][snapshot['index']].update(reviewed=True, reviewedAt=time.time(), resolution=action)
+        if job['status'] == 'completed_with_conflicts' and all(c.get('reviewed') for c in job['conflicts']):
+            job['status'] = 'completed'
+        job['conflicts'][snapshot['index']].pop('pendingAction', None)
+        self.update_job(job)
+        self.meta('pendingReview:%s:%s' % (snapshot['jobId'], snapshot['index']), {})
+        return job
+
+    def apply_review_resolution(self, data, stream=None):
+        """Commit a guarded file and its annotations together on one server.
+
+        The other computer commits separately. A failed connection leaves the
+        review open; expected versions prevent a retry from erasing later edits.
+        """
+        record = data.get('record')
+        self.validate_record(record)
+        path = record['path']
+        with self.lock, self.clinical.lock:
+            prior_details = self.clinical.details(path)
+            if path.casefold() not in self.clinical.files:
+                prior_details = {}
+            desired = data.get('details') or {}
+            matching_details = (self.stored_annotation_signature(prior_details) == self.stored_annotation_signature(desired)
+                                if live(record) and desired.get('metadata_available') else path.casefold() not in self.clinical.files)
+            if self.review_record(path) == record and matching_details:
+                return  # An already committed operation with a lost response.
+            self.check_expected(path, data.get('expected'))
+            if self.stored_annotation_signature(prior_details) != self.stored_annotation_signature(data.get('expectedDetails') or {}):
+                raise SyncError('Files changed while reviewing. Reload the comparison.', 409)
+            prior = self.clinical.snapshot()
+            updated = prior or dict(version=CLINICAL_VERSION, patients=[], files=[])
+            updated['files'] = [r for r in updated['files'] if r['relative_path'].casefold() != path.casefold()]
+            details = desired
+            if live(record) and details.get('metadata_available'):
+                pid = details.get('patient_id')
+                if not any(p['id'] == pid for p in updated['patients']):
+                    updated['patients'].append(dict(id=pid, name=details.get('patient_name'),
+                                                    patient_number=details.get('patient_number')))
+                row = dict(details, relative_path=path)
+                if row.get('source_relative_path') == details.get('relative_path'):
+                    row['source_relative_path'] = ''
+                updated['files'].append(row)
+            updated = self.clinical.normalise(updated)  # Validate before replacing any bytes.
+            recovery = self.state_root / 'archive' / str(uuid.uuid4())
+            recovery.mkdir(parents=True)
+            (recovery / 'review-annotations.json').write_text(json.dumps(
+                dict(path=path, details=prior_details), ensure_ascii=False), encoding='utf-8')
+            self.apply(record, data.get('expected'), stream)
+            self.clinical.replace(updated)
+            self.clinical.write_folder(path.split('/')[0])
+
+    def send_review_resolution(self, destination, data, source=None):
+        if same_content(data['record'], data.get('expected')):
+            source = None
+        if destination == 'local':
+            if source:
+                with source.open('rb') as stream:
+                    self.apply_review_resolution(data, stream)
+            else:
+                self.apply_review_resolution(data)
+            return
+        # A length-prefixed JSON envelope avoids putting long clinical notes in
+        # HTTP headers and streams large images/ZIPs without loading them in RAM.
+        metadata = json.dumps(data, ensure_ascii=False).encode()
+        prefix = len(metadata).to_bytes(4, 'big') + metadata
+        def chunks():
+            yield prefix
+            if source:
+                with source.open('rb') as stream:
+                    yield from iter(lambda: stream.read(CHUNK), b'')
+        headers = self.peer_headers()
+        headers.update({'Content-Type': 'application/octet-stream',
+                        'Content-Length': str(len(prefix) + (source.stat().st_size if source else 0))})
+        with open_request(self.meta('pair')['url'] + '/api/sync/peer/review-resolution',
+                          'PUT', headers, chunks()) as response:
+            json.load(response)
+
+    def resolve_review(self, job_id, index, revision, action):
+        with self.lock:
+            if any(j['status'] == 'running' for j in self.jobs()):
+                raise SyncError('Wait for the current sync to finish before reviewing.', 409)
+            snapshot = self.review_snapshot(job_id, index)
+            if not hmac.compare_digest(str(revision or ''), snapshot['revision']):
+                raise SyncError('Files changed while reviewing. Reload the comparison.', 409)
+            if snapshot['reviewed'] or action not in snapshot['actions'] or action == 'keep_both':
+                raise SyncError('Choose a supported review action.')
+            pair = self.meta('pair')
+            plan_key = 'pendingReview:%s:%s' % (job_id, index)
+            pending = self.meta(plan_key)
+            displayed_snapshot = snapshot
+            if pending:
+                if pending['action'] != action:
+                    raise SyncError('Choose a supported review action.')
+                snapshot = pending['snapshot']
+            a, b = snapshot['versions']['local'], snapshot['versions']['remote']
+            source_side = action.removeprefix('keep_') if action != 'delete_both' else None
+            winner = snapshot['versions'][source_side] if source_side else None
+            details = snapshot['details'][source_side] if source_side else {}
+            clock = merged_clock(a, b)
+            clock[self.node_id] = clock.get(self.node_id, 0) + 1
+            target = dict(winner, clock=clock) if winner else dict(
+                path=snapshot['path'], deleted=True, sha256=None, size=0, clock=clock)
+            # Only remove the deterministic copies of these two reviewed versions.
+            # An independently edited copy is a separate file and blocks cleanup.
+            copies = {}
+            if pending:
+                copies = pending['copies']
+                target = pending['target']
+            elif snapshot['kind'] in ('both_modified', 'metadata'):
+                for original, origin, side in ((a, self.node_id, 'local'), (b, pair['peerId'], 'remote')):
+                    if not live(original):
+                        continue
+                    path = Path(original['path'])
+                    annotation = snapshot['details'][side]
+                    checksum = (hashlib.sha256(json.dumps(self.annotation_signature({side: annotation}), sort_keys=True).encode()).hexdigest()
+                                if snapshot['kind'] == 'metadata' else original['sha256'])
+                    copy_path = path.with_name('%s__conflict-%s-%s%s' % (
+                        path.stem, origin[:8], checksum[:12], path.suffix)).as_posix()
+                    for destination in ('local', 'remote'):
+                        current = (dict(record=self.review_record(copy_path), details=self.clinical.details(copy_path),
+                                        annotationsStored=copy_path.casefold() in self.clinical.files)
+                                   if destination == 'local' else self.peer_review_record(copy_path))
+                        if not current.get('annotationsStored'):
+                            current['details'] = {}
+                        record = current.get('record')
+                        if live(record):
+                            expected_details = dict(annotation, relative_path=copy_path)
+                            actual_details = current.get('details') or {}
+                            if record['sha256'] != original['sha256'] or self.stored_annotation_signature(actual_details) != self.stored_annotation_signature(expected_details):
+                                raise SyncError('A preserved conflict copy was changed. Review it before retrying.', 409)
+                        copies.setdefault(copy_path, {})[destination] = current
+                for saved_copy in snapshot.get('copies', []):
+                    path = saved_copy['path']
+                    if path in copies:
+                        continue
+                    for destination in ('local', 'remote'):
+                        current = (dict(record=self.review_record(path), details=self.clinical.details(path),
+                                        annotationsStored=path.casefold() in self.clinical.files)
+                                   if destination == 'local' else self.peer_review_record(path))
+                        if not current.get('annotationsStored'):
+                            current['details'] = {}
+                        if live(current.get('record')) and (current['record']['sha256'] != saved_copy['sha256'] or
+                            ('details' in saved_copy and self.stored_annotation_signature(current['details']) !=
+                             self.stored_annotation_signature(saved_copy['details']))):
+                            raise SyncError('A preserved conflict copy was changed. Review it before retrying.', 409)
+                        copies.setdefault(path, {})[destination] = current
+            staging = self.state_root / 'staging'
+            staging.mkdir(exist_ok=True)
+            staged = staging / str(uuid.uuid4())
+            try:
+                if winner:
+                    if source_side == 'local':
+                        with safe_path(self.root, winner['path']).open('rb') as stream, staged.open('wb') as output:
+                            shutil.copyfileobj(stream, output, CHUNK)
+                    else:
+                        query = urllib.parse.urlencode({'path': winner['path'], 'sha256': winner['sha256']})
+                        with open_request(pair['url'] + '/api/sync/peer/file?' + query, headers=self.peer_headers()) as stream, staged.open('wb') as output:
+                            shutil.copyfileobj(stream, output, CHUNK)
+                    if digest_file(staged) != (winner['sha256'], winner['size']):
+                        raise SyncError('Files changed while reviewing. Reload the comparison.', 409)
+                if self.review_snapshot(job_id, index)['revision'] != displayed_snapshot['revision']:
+                    raise SyncError('Files changed while reviewing. Reload the comparison.', 409)
+                if not pending:
+                    for path, sides in copies.items():
+                        copy_clock = merged_clock(*(r.get('record') for r in sides.values()))
+                        copy_clock[self.node_id] = copy_clock.get(self.node_id, 0) + 1
+                        for state in sides.values():
+                            state['target'] = dict(path=path, deleted=True, sha256=None, size=0, clock=copy_clock)
+                    self.meta(plan_key, dict(action=action, snapshot=snapshot, target=target, copies=copies))
+                    job = next(j for j in self.jobs() if j['id'] == job_id)
+                    job['conflicts'][index]['pendingAction'] = action
+                    self.update_job(job)
+                for destination in ('remote', 'local'):
+                    self.send_review_resolution(destination, dict(record=target,
+                        expected=snapshot['versions'][destination], expectedDetails=snapshot['details'][destination],
+                        details=details), staged if winner else None)
+                for path, sides in copies.items():
+                    for destination in ('remote', 'local'):
+                        current = sides[destination]
+                        self.send_review_resolution(destination, dict(record=current['target'],
+                            expected=current.get('record'), expectedDetails=current.get('details') or {}, details={}))
+                current = self.review_snapshot(job_id, index)
+                if any(record != target for record in current['versions'].values()):
+                    raise SyncError('Files changed before final verification. Retry sync.', 409)
+                desired_signature = self.stored_annotation_signature(details) if winner else None
+                if any(self.stored_annotation_signature(row) != desired_signature for row in current['details'].values()):
+                    raise SyncError('Files changed while reviewing. Reload the comparison.', 409)
+                for path, sides in copies.items():
+                    for side in ('local', 'remote'):
+                        record = self.review_record(path) if side == 'local' else self.peer_review_record(path).get('record')
+                        if record != sides[side]['target']:
+                            raise SyncError('Files changed before final verification. Retry sync.', 409)
+                # Establish the chosen annotations as the baseline, so the next
+                # ordinary edit on either PC is recognized as a one-sided change.
+                baseline = self.meta('clinicalBaseline') or {}
+                if baseline.get('peerId') == pair['peerId']:
+                    paths = {snapshot['path'].casefold(), *(p.casefold() for p in copies)}
+                    remote_metadata = self.peer_json('metadata')['snapshot']
+                    for side, metadata in (('local', self.clinical.snapshot()), ('remote', remote_metadata)):
+                        old = baseline.get(side) or dict(version=CLINICAL_VERSION, patients=[], files=[])
+                        old['files'] = [r for r in old['files'] if r['relative_path'].casefold() not in paths]
+                        old['files'].extend(r for r in (metadata or {}).get('files', []) if r['relative_path'].casefold() in paths)
+                        patients = {p['id']: p for p in old['patients']}
+                        patients.update({p['id']: p for p in (metadata or {}).get('patients', [])})
+                        old['patients'] = list(patients.values())
+                        baseline[side] = old
+                    self.meta('clinicalBaseline', baseline)
+                return self.finish_review(current, action)
+            finally:
+                staged.unlink(missing_ok=True)
 
     def save_copy_annotations(self, data):
         path, source = data.get('path'), data.get('sourcePath')
@@ -702,6 +937,8 @@ class SyncEngine:
             active = next((j for j in self.jobs() if j['status'] == 'running'), None)
             if active:
                 return active
+            if any(c.get('pendingAction') and not c.get('reviewed') for j in self.jobs() for c in j.get('conflicts', [])):
+                raise SyncError('Finish the pending review before starting synchronization.', 409)
             job = dict(id=str(uuid.uuid4()), status='running', phase='scanning', totalBytes=0,
                        transferredBytes=0, totalFiles=0, completedFiles=0, copiedFiles=0,
                        deletedFiles=0, conflicts=[], error=None, startedAt=time.time(), fileScope=FILE_SCOPE,
@@ -734,7 +971,9 @@ class SyncEngine:
             def flag(kind, a, b):
                 path = (a or b)['path']
                 if reviewed.get(path.casefold()) != self.conflict_signature(kind, a, b):
-                    job['conflicts'].append({'path': path, 'kind': kind})
+                    conflict = {'path': path, 'kind': kind}
+                    job['conflicts'].append(conflict)
+                    return conflict
 
             def schedule(record, destination, expected, source_path=None):
                 op = (record, destination, expected, source_path or record['path'])
@@ -760,22 +999,23 @@ class SyncEngine:
                     schedule(b, 'local', None)
                 elif not b:
                     schedule(a, 'remote', None)
+                elif live(a) != live(b):
+                    # Every known deletion waits for an explicit review choice.
+                    # None above means a new file, whereas a tombstone means deleted.
+                    flag('delete_modified', a, b)
                 elif dominates(a, b):
                     schedule(a, 'remote', b)
                 elif dominates(b, a):
                     schedule(b, 'local', a)
-                elif live(a) != live(b):
-                    survivor = dict(a if live(a) else b, clock=merged_clock(a, b))
-                    schedule(survivor, 'local', a)
-                    schedule(survivor, 'remote', b)
-                    flag('delete_modified', a, b)
                 else:
-                    flag('both_modified', a, b)
+                    conflict = flag('both_modified', a, b)
                     for original, destination, inventory, origin in (
                             (a, 'remote', remote, self.node_id), (b, 'local', local, pair['peerId'])):
                         path = Path(original['path'])
                         conflict_path = path.with_name('%s__conflict-%s-%s%s' % (
                             path.stem, origin[:8], original['sha256'][:12], path.suffix)).as_posix()
+                        if conflict is not None:
+                            conflict.setdefault('copies', []).append(dict(path=conflict_path, sha256=original['sha256'], destination=destination))
                         prior = inventory.get(conflict_path.casefold())
                         copy = dict(original, path=conflict_path, clock=merged_clock(original, prior))
                         if prior and not same_content(prior, copy):
@@ -821,6 +1061,13 @@ class SyncEngine:
                 self.update_job(job)
                 self.sync_clinical_metadata(job, verified_local, verified_remote)
                 self.peer_json('finalize', 'POST', {})
+            for conflict in job['conflicts']:
+                for copy in conflict.get('copies', []):
+                    if copy['destination'] == 'local':
+                        copy['details'] = self.clinical.details(copy['path']) if copy['path'].casefold() in self.clinical.files else {}
+                    else:
+                        details = self.peer_review_record(copy['path'])
+                        copy['details'] = details.get('details') or {} if details.get('annotationsStored') else {}
             job.update(status='completed_with_conflicts' if job['conflicts'] else 'completed', phase='finished')
             if callable(self.on_change):
                 result = self.on_change()
@@ -982,9 +1229,12 @@ def install_sync_routes(app, engine, admin_check):
     def keep_conflict_versions(job_id, index):
         require_admin()
         data = request.get_json() or {}
-        if data.get('action') != 'keep_both':
+        action = data.get('action')
+        if action not in ('keep_both', 'keep_local', 'keep_remote', 'delete_both'):
             raise SyncError('Choose a supported review action.')
-        return jsonify(job=engine().keep_reviewed_versions(job_id, index, data.get('revision')))
+        if action == 'keep_both':
+            return jsonify(job=engine().keep_reviewed_versions(job_id, index, data.get('revision')))
+        return jsonify(job=engine().resolve_review(job_id, index, data.get('revision'), action))
 
     @app.get('/api/sync/jobs/<job_id>/conflicts/<int:index>/file')
     def conflict_file(job_id, index):
@@ -1025,7 +1275,48 @@ def install_sync_routes(app, engine, admin_check):
     def peer_review_record():
         instance = require_peer()
         path = request.args.get('path', '')
-        return jsonify(nodeId=instance.node_id, record=instance.review_record(path), details=instance.clinical.details(path))
+        return jsonify(nodeId=instance.node_id, record=instance.review_record(path), details=instance.clinical.details(path),
+                       annotationsStored=path.casefold() in instance.clinical.files,
+                       reviewResolutionVersion=REVIEW_RESOLUTION_VERSION)
+
+    @app.put('/api/sync/peer/review-resolution')
+    def peer_review_resolution():
+        instance = require_peer()
+        if instance.meta('pair').get('role') != 'replica':
+            raise SyncError('Start synchronization on the paired dedicated PC.', 409)
+        try:
+            prefix = request.stream.read(4)
+            length = int.from_bytes(prefix, 'big')
+            if len(prefix) != 4 or not 0 < length <= 1024 * 1024:
+                raise ValueError('Invalid envelope')
+            data = json.loads(request.stream.read(length))
+            if not isinstance(data, dict):
+                raise ValueError('Invalid envelope')
+            instance.validate_record(data.get('record'))
+            size = data['record']['size'] if live(data['record']) and not same_content(data['record'], data.get('expected')) else 0
+            if request.content_length != 4 + length + size:
+                raise ValueError('Invalid envelope size')
+        except (ValueError, TypeError, UnicodeError):
+            raise SyncError('Invalid transfer metadata.')
+        staging = instance.state_root / 'staging'
+        staging.mkdir(exist_ok=True)
+        staged = staging / str(uuid.uuid4())
+        try:
+            # Consume the upload before responding, including an idempotent retry.
+            if size:
+                with staged.open('wb') as output:
+                    shutil.copyfileobj(request.stream, output, CHUNK)
+                if digest_file(staged) != (data['record']['sha256'], size):
+                    raise SyncError('File verification failed. Retry sync.', 409)
+                with staged.open('rb') as stream:
+                    instance.apply_review_resolution(data, stream)
+            else:
+                instance.apply_review_resolution(data)
+        except (ValueError, TypeError, AttributeError):
+            raise SyncError('Invalid clinical metadata.')
+        finally:
+            staged.unlink(missing_ok=True)
+        return jsonify(success=True)
 
     @app.route('/api/sync/peer/metadata', methods=['GET', 'POST'])
     def peer_clinical_metadata():

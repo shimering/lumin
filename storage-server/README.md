@@ -161,11 +161,23 @@ In **Admin → Storage Server**:
    patient files. Both computers must stay on. The browser may be closed after
    starting; reopen the panel to recover the current job and its progress.
 
-The first run merges files. Subsequent runs replicate additions, changes,
-deletions, and category moves in both directions. If one copy is edited while
-the other is deleted, the edited copy is preserved and marked for review.
-Conflicting edits keep both originals and create deterministic conflict copies.
-Review these files before deciding which version to retain. There is no automatic schedule.
+The first run merges files. Subsequent runs replicate additions and changes in
+both directions. A known deletion (including a category move's old path) waits
+for **Review**: choose **Restore this copy on both** to copy the surviving image
+and its annotations back, or **Delete on both servers** to remove the remaining
+copy. A new file that has never existed on the other PC is copied normally.
+
+For conflicting images or annotations, choose **Keep this version on both** under
+either image, then **Save choice on both servers**. Both PCs keep the chosen image,
+notes, teeth and scan settings; the other version and its unchanged conflict
+copies are removed into recovery archives. **Keep both and mark reviewed** remains
+available to preserve both versions on both PCs. Edited conflict copies block
+cleanup so independent changes are not discarded. There is no automatic schedule.
+
+Update both servers before using these choices. Reviews check the compared file
+and annotation revisions before committing. If saving is interrupted, reload the
+review and **Resume saving** to finish the saved choice. New sync jobs wait until
+that pending review completes. The choice and its cleanup plan survive a restart.
 
 Progress shows scanning, transfer bytes/file counts, deletions, verification, and
 completion. A restart or connection failure leaves a failed job; **Retry** scans
@@ -176,6 +188,7 @@ The existing coordinator remains the dedicated PC.
 Private runtime data lives in `storage-server/.lumin-sync/` (or the optional
 `sync_state_path` configured outside patient storage). `archive/<unique-id>/`
 retains original folder paths for files removed or replaced through Lumin or sync.
+Review actions also archive the previous annotations in `review-annotations.json`.
 To recover a version, copy it from that archive back to its original patient path;
 the next sync recognizes it as a new local change. Archives are retained until
 manually cleared and are not served or replicated. Ordinary File Explorer

@@ -45,7 +45,7 @@ def main():
     if hashes != {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in sources}:
         raise RuntimeError("Server sources changed during the build. Rebuild before distributing.")
     shutil.copyfile(BASE / "README.md", OUTPUT / "READ-ME.md")
-    manifest = {"serverRevision": revision, "syncProtocol": 1, "clinicalMetadataVersion": 2,
+    manifest = {"serverRevision": revision, "syncProtocol": 1, "clinicalMetadataVersion": 2, "reviewResolutionVersion": 1,
                 "defaults": current_defaults(), "sources": hashes}
     executable = OUTPUT / "LuminStorageSetup.exe"
     for flag, name in (("--self-test-output", "server-verification.json"), ("--ui-test-output", "ui-verification.json")):

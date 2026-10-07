@@ -55,6 +55,12 @@
 .storage-review-dialog header button { flex:none; padding:10px; }
 .storage-review-dialog svg { width:18px; height:18px; flex:none; }
 .storage-review-dialog .storage-review-download,.storage-review-dialog [data-keep] { background:#eff6ff; color:#1d4ed8; }
+.storage-review-dialog .storage-review-choice { display:flex; width:100%; margin-top:12px; background:#eff6ff; color:#1d4ed8; }
+.storage-review-dialog .storage-review-delete { margin-top:20px; background:#fff1f2; color:#be123c; }
+.storage-review-dialog [data-choice][aria-pressed="true"] { background:#dbeafe; box-shadow:inset 0 0 0 2px #3b82f6; }
+.storage-review-dialog .storage-review-delete[aria-pressed="true"] { background:#ffe4e6; box-shadow:inset 0 0 0 2px #e11d48; }
+.storage-review-dialog [data-apply] { background:#ecfdf5; color:#047857; }
+.storage-review-choice-summary { margin:16px 0 0; font-size:13px; line-height:1.7; color:#475569; overflow-wrap:anywhere; }
 .storage-review-dialog :is(button,a):hover:not(:disabled) { background:#dbeafe; }
 .storage-review-dialog :is(button,a):active:not(:disabled) { transform:scale(.98); }
 .storage-review-dialog :is(button,a):focus-visible { outline:2px solid #3b82f6; outline-offset:3px; }

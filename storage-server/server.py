@@ -780,6 +780,7 @@ def health_check():
         "syncProtocol": 1,
         "capabilities": {"patient3dScans": True, "scanOriginalFilenames": True,
                          "syncConflictReview": True, "syncHistoricalRevisions": True, "syncClinicalMetadata": True,
+                         "syncConflictChoices": True, "syncDeletionReview": True,
                          "localMediaMetadata": True}
     })
 

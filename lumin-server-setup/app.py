@@ -338,6 +338,8 @@ def self_test(output):
                       "independentIdentity": True, "stableIdentity": True, "syncProtocol": PROTOCOL,
                       "patient3dScans": health["capabilities"]["patient3dScans"],
                       "scanOriginalFilenames": health["capabilities"]["scanOriginalFilenames"],
+                      "syncConflictChoices": health["capabilities"]["syncConflictChoices"],
+                      "syncDeletionReview": health["capabilities"]["syncDeletionReview"],
                       "maxFileSizeMB": health["maxFileSizeMB"]}
     except Exception as error:
         result["error"] = type(error).__name__ + ": " + str(error)
