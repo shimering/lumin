@@ -166,6 +166,11 @@ both directions. A known deletion (including a category move's old path) waits
 for **Review**: choose **Restore this copy on both** to copy the surviving image
 and its annotations back, or **Delete on both servers** to remove the remaining
 copy. A new file that has never existed on the other PC is copied normally.
+If the file is already deleted on both PCs, the next sync removes its local
+annotation rows and per-patient JSON entries on both servers. It leaves no new
+comparison, including for capitalization-only names. Deletion history remains
+private so old copies cannot be copied back automatically. Metadata for surviving
+files and the patient record remain intact.
 
 For conflicting images or annotations, choose **Keep this version on both** under
 either image, then **Save choice on both servers**. Both PCs keep the chosen image,

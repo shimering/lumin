@@ -400,7 +400,8 @@
     const data = review.data;
     const actions = data?.actions || ['keep_both'];
     const disabled = review.saving || !data?.revision || data.reviewed;
-    const oneMissing = data?.versions && ['local', 'remote'].some(side => !data.versions[side] || data.versions[side].deleted);
+    const missingCopies = data?.versions ? ['local', 'remote'].filter(side => !data.versions[side] || data.versions[side].deleted).length : 0;
+    const oneMissing = missingCopies === 1, bothMissing = missingCopies === 2;
     const choices = data ? ['local', 'remote'].filter(side => !data.versions || (data.versions[side] && !data.versions[side].deleted)).map(side => 'keep_' + side) : [];
     if (oneMissing) choices.push('delete_both');
     if (data?.pendingAction && !choices.includes(data.pendingAction)) choices.push(data.pendingAction);
@@ -429,7 +430,7 @@
       : review.choice ? (oneMissing ? t('The remaining image and its annotations will be restored to both servers.', 'ستُستعاد الصورة المتبقية وبياناتها على الخادمين.')
         : t('Both servers will keep the selected image and its annotations. The other version and its conflict copies will be removed and archived.', 'سيحتفظ الخادمان بالصورة المختارة وبياناتها. تُحذف النسخة الأخرى ونسخ التعارض الخاصة بها وتُحفظ في الأرشيف.')) : '';
     return `<section role="dialog" aria-modal="true" aria-labelledby="storage-review-title" class="storage-review-dialog" dir="${t('ltr', 'rtl')}">
-      <header><div><h3 id="storage-review-title">${t('Review file difference', 'مراجعة اختلاف الملف')}</h3><p>${escapeHtml(reviewKind(data?.kind || review.conflict.kind))}</p></div><button type="button" data-close aria-label="${t('Close review', 'إغلاق المراجعة')}" ${review.saving ? 'disabled' : ''}><i data-lucide="x" aria-hidden="true"></i></button></header>
+      <header><div><h3 id="storage-review-title">${t('Review file difference', 'مراجعة اختلاف الملف')}</h3><p>${escapeHtml(bothMissing ? t('This file is no longer present on either computer. There is no remaining copy to restore or delete.', 'لم يعد هذا الملف موجوداً على أي من الجهازين. لا توجد نسخة متبقية لاستعادتها أو حذفها.') : reviewKind(data?.kind || review.conflict.kind))}</p></div><button type="button" data-close aria-label="${t('Close review', 'إغلاق المراجعة')}" ${review.saving ? 'disabled' : ''}><i data-lucide="x" aria-hidden="true"></i></button></header>
       <div class="storage-review-body">
         ${updateRequired ? `<section class="storage-review-update" role="status"><h4><i data-lucide="circle-arrow-up" aria-hidden="true"></i>${t('Storage app update required', 'يلزم تحديث تطبيق التخزين')}</h4><p>${escapeHtml(updateMessage)}</p></section>` : ''}
         <div class="storage-review-versions">${versions}</div>
@@ -438,7 +439,7 @@
         <p class="storage-review-choice-summary" role="status">${escapeHtml(choiceText)}</p><p class="storage-review-message" role="status">${escapeHtml(review.message || '')}</p>
       </div>
       <footer><button type="button" data-reload ${review.saving ? 'disabled' : ''}><i data-lucide="rotate-cw" aria-hidden="true"></i><span>${t('Reload comparison', 'إعادة تحميل المقارنة')}</span></button>
-        ${actions.includes('keep_both') ? `<button type="button" data-keep ${disabled ? 'disabled' : ''}>${review.saving ? t('Saving review…', 'جارٍ حفظ المراجعة…') : data?.reviewed ? resolutionLabel(data.resolution) : t('Keep both', 'حفظ النسختين')}</button>` : ''}
+        ${actions.includes('keep_both') && !bothMissing ? `<button type="button" data-keep ${disabled ? 'disabled' : ''}>${review.saving ? t('Saving review…', 'جارٍ حفظ المراجعة…') : data?.reviewed ? resolutionLabel(data.resolution) : t('Keep both', 'حفظ النسختين')}</button>` : ''}
         ${choices.length ? `<button type="button" data-apply ${disabled || !review.choice || !actions.includes(review.choice) ? 'disabled' : ''}><i data-lucide="check-check" aria-hidden="true"></i>${review.saving ? t('Saving on both…', 'جارٍ الحفظ على الجهازين…') : data?.pendingAction ? t('Resume saving', 'استكمال الحفظ') : t('Save choice', 'حفظ الاختيار')}</button>` : ''}
       </footer></section>`;
   }
@@ -586,7 +587,7 @@
     }
     review.message = legacy ? t('Install the updated Lumin Storage Setup on the dedicated PC to save this review. You can preview and download the originals now.',
       'ثبّت إصدار إعداد خادم Lumin المحدّث على جهاز العيادة لحفظ المراجعة. يمكنك معاينة الأصلين وتنزيلهما الآن.') : '';
-    if (!legacy && data.actions?.length === 0) review.message = t('Install the updated Lumin Storage Setup on both computers to resolve this deletion.',
+    if (!legacy && data.actions?.length === 0 && Object.values(data.versions || {}).some(record => record && !record.deleted)) review.message = t('Install the updated Lumin Storage Setup on both computers to resolve this deletion.',
       'ثبّت إصدار إعداد خادم Lumin المحدّث على الجهازين لاتخاذ قرار بشأن هذا الحذف.');
     renderReview(review);
   }

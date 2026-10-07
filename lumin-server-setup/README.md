@@ -193,6 +193,18 @@ both PCs. Supabase still handles the existing administrator authentication and
 server settings. Install this EXE on both computers and update the Lumin web
 interface. No Supabase migration is needed.
 
+When a file has been deleted on both servers, **Sync now** removes its tooth
+assignments, notes and scan settings from both local stores and per-patient JSON
+backups. No comparison is needed, even if the old filenames differed in letter
+case. Other files and patient details stay intact; private deletion history
+prevents an old copy from reappearing.
+
+عند حذف ملف من الخادمين، يزيل **المزامنة الآن** بياناته المحلية من الجهازين،
+بما فيها الأسنان والملاحظات وإعدادات المسح وبيانات الملف في نسخة JSON للمريض.
+لا يحتاج الملف المحذوف من الجهازين إلى مقارنة، حتى عند اختلاف حالة الأحرف
+في اسمه. تبقى بيانات المريض والملفات الأخرى محفوظة، ويمنع سجل الحذف الخاص
+عودة نسخة قديمة تلقائياً.
+
 يستخدم مخطط الأسنان ومعرض الصور ومعرض المسح ثلاثي الأبعاد بيانات الخادم
 المحلي المحدد للقراءة والحفظ. تُستورد ملفات `patient_media_details.json`
 الموجودة وتُحفظ نسخة محلية لكل مريض. تشمل البيانات معرّف المريض ورقمه،

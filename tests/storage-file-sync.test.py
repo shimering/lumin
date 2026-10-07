@@ -727,6 +727,53 @@ class SyncTests(unittest.TestCase):
             self.assertTrue(any(p.read_bytes() == b'image' for p in engine.state_root.glob('archive/**/*.png')))
         self.assert_completed(self.run_sync()); self.assert_completed(self.run_sync())
 
+    def test_independent_deletions_on_both_servers_remove_only_the_deleted_files_metadata(self):
+        fixture = self.clinical_fixture(); rel = fixture['files'][0]['relative_path']
+        retained = rel.replace('photo.png', 'retained.png')
+        fixture['files'].append(dict(fixture['files'][0], relative_path=retained, note='Keep this note'))
+        self.write(0, rel, b'delete me'); self.write(0, retained, b'keep me')
+        for module in self.modules:
+            module.update_storage_mapping_files = module._mapping_writer
+            module.fetch_all_patients_metadata_from_supabase = lambda: self.fail('Must use caller-scoped cache')
+        self.seed_local_details(fixture); self.pair(); self.assert_completed(self.run_sync())
+        for i, engine in enumerate(self.engines):
+            (engine.root / rel).unlink()  # Outside-app deletions leave annotations behind.
+        job = self.run_sync(); self.assert_completed(job)
+        self.assertEqual(job['conflicts'], [])
+        for engine in self.engines:
+            self.assertTrue(engine.record(rel)['deleted'])
+            self.assertNotIn(rel.casefold(), engine.clinical.files)
+            self.assertEqual(engine.clinical.details(retained)['note'], 'Keep this note')
+            self.assertEqual((engine.root / retained).read_bytes(), b'keep me')
+            details = json.loads((engine.root / rel.split('/')[0] / 'patient_media_details.json').read_text(encoding='utf-8'))
+            self.assertNotIn('Periapical/photo.png', details['files'])
+            mapping = json.loads((engine.root / 'patients_mapping.json').read_text(encoding='utf-8'))
+            self.assertEqual([row['relative_path'] for row in mapping['files']], [retained])
+        self.assert_completed(self.run_sync())
+        self.assertEqual(len(self.engines[0].clinical.snapshot()['patients']), 1)
+
+    def test_deleted_case_aliases_leave_no_review_or_metadata_and_do_not_resurrect(self):
+        fixture = self.clinical_fixture(); original = fixture['files'][0]['relative_path']
+        paths = [original, original.replace('Periapical/photo.png', 'periapical/PHOTO.PNG')]
+        for i, path in enumerate(paths):
+            self.write(i, path, b'image')
+            data = copy.deepcopy(fixture); data['files'][0]['relative_path'] = path
+            self.engines[i].clinical.replace(data)
+        self.pair(); old_job = self.run_sync()
+        self.assertEqual(old_job['conflicts'][0]['kind'], 'path_case')
+        for i, path in enumerate(paths):
+            self.engines[i].delete_local(path)
+        job = self.run_sync(); self.assert_completed(job)
+        self.assertEqual(job['conflicts'], [])
+        for i, engine in enumerate(self.engines):
+            self.assertEqual(engine.clinical.snapshot()['files'], [])
+            self.assertTrue(engine.record(paths[i])['deleted'])
+            self.assertEqual(engine.record(paths[i])['path'], paths[i])
+            self.assertFalse((engine.root / paths[i]).exists())
+            details = json.loads((engine.root / paths[i].split('/')[0] / 'patient_media_details.json').read_text(encoding='utf-8'))
+            self.assertEqual(details['files'], {})
+        self.assert_completed(self.run_sync()); self.assert_completed(self.run_sync())
+
     def test_new_review_actions_reject_stale_files_missing_winner_and_edited_copies(self):
         paths, job, route, client, snapshot = self.review_fixture()
         self.write(1, paths[1], b'changed')

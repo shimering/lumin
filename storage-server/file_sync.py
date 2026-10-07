@@ -515,6 +515,11 @@ class SyncEngine:
             return content(first) == content(second)
         for key in sorted(set(a_rows) | set(b_rows)):
             a, b, prior_a, prior_b = (m.get(key) for m in maps)
+            record_a, record_b = local_files.get(key), remote_files.get(key)
+            # Only confirmed deletions on both PCs remove clinical annotations.
+            # Keep the file tombstones so old copies cannot be resurrected.
+            if record_a and record_b and record_a['deleted'] and record_b['deleted']:
+                continue
             # Keep annotations with their own image until its review is resolved,
             # including notes on the remaining copy of a deleted file.
             if any(c['path'].casefold() == key and not c.get('reviewed') for c in job['conflicts']):
@@ -1008,6 +1013,13 @@ class SyncEngine:
 
             for key in sorted(set(local) | set(remote)):
                 a, b = local.get(key), remote.get(key)
+                if a and b and a['deleted'] and b['deleted']:
+                    # Deleted case aliases do not have two images to compare.
+                    # Merge their history while preserving each PC's spelling.
+                    clock = merged_clock(a, b)
+                    schedule(dict(a, clock=clock), 'local', a)
+                    schedule(dict(b, clock=clock), 'remote', b)
+                    continue
                 if a and b and a['path'] != b['path']:
                     # A Windows case alias is not two different files. Keep data and ask for review.
                     flag('path_case', a, b)

@@ -179,9 +179,9 @@ test('Storage Server panel pairs once, syncs in one click, restores progress, re
         if(staleReview){await route.fulfill({status:409,contentType:'application/json',body:JSON.stringify({code:'review_changed'})});return;}
         reviewsSaved++;job={...job,status:'completed',conflicts:job.conflicts.map(c=>({...c,reviewed:true,resolution:expectedAction}))};result={job};
       }else result={path:job.conflicts[0].path,kind:conflictKind,revision:'review-revision',reviewed:false,
-        actions:oldResolutionPeer?['keep_both']:missingSide?[missingSide==='local'?'keep_remote':'keep_local','delete_both']:['keep_both','keep_local','keep_remote'],
+        actions:oldResolutionPeer?['keep_both']:missingSide==='both'?[]:missingSide?[missingSide==='local'?'keep_remote':'keep_local','delete_both']:['keep_both','keep_local','keep_remote'],
         details:Object.fromEntries(['local','remote'].map(side=>[side,{patient_name:'مريض تجريبي',patient_id:'12345678-1234-4234-8234-123456789abc',patient_number:'1042',tooth_ids:['3','A'],display_name:'فحص الأسنان',note:side+' Follow-up <img onerror="window.clinicalInjected=true">',scan_date:'2026-10-07',scan_config:{rotation:90},metadata_available:true}])),
-        versions:Object.fromEntries(['local','remote'].map(side=>[side,{path:job.conflicts[0].path,size:side===missingSide?0:png.length,sha256:side===missingSide?null:'a'.repeat(64),deleted:side===missingSide}]))};
+        versions:Object.fromEntries(['local','remote'].map(side=>[side,{path:job.conflicts[0].path,size:side===missingSide||missingSide==='both'?0:png.length,sha256:side===missingSide||missingSide==='both'?null:'a'.repeat(64),deleted:side===missingSide||missingSide==='both'}]))};
     }
     else if(suffix==='jobs/job-1/conflicts/0/file'){
       originalDownloads++;
@@ -318,6 +318,19 @@ test('Storage Server panel pairs once, syncs in one click, restores progress, re
   assert.match(await page.locator('.storage-review-update').textContent(),/Update and restart both storage apps/);
   await page.locator('[data-close]').click();
   oldResolutionPeer=false;
+  // An empty action list also means both copies are gone, not an outdated setup.
+  missingSide='both';conflictKind='path_case';
+  for(const language of ['en','ar']){
+    await page.evaluate(language=>{currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';LuminStorageSync.render()},language);
+    await page.locator('#storage-sync-review-0').click();
+    await page.waitForFunction(()=>document.querySelector('.storage-review-dialog header p').textContent.includes(currentUiLanguage==='ar'?'لا توجد نسخة متبقية':'no remaining copy'));
+    assert.equal(await page.locator('.storage-review-update').count(),0);
+    assert.equal(await page.locator('[data-choice],[data-apply],[data-keep],[data-download]').count(),0);
+    assert.equal(await page.locator('.storage-review-message').textContent(),'');
+    await page.locator('[data-close]').click();
+  }
+  missingSide=null;
+  await page.evaluate(()=>{currentUiLanguage='en';document.documentElement.dir='ltr';LuminStorageSync.render()});
   expectedAction='keep_both';conflictKind='path_case';reviewsSaved=0;
   job={...job,status:'completed_with_conflicts',conflicts:[{path:'أحمد/أشعة/صورة.png',kind:'path_case'}]};
   await page.locator('#storage-sync-review-0').click();
