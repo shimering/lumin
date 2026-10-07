@@ -39,10 +39,20 @@ def tailscale_binary():
     return executable
 
 
+def hidden_process_options():
+    """Console children of a windowed EXE must also be explicitly hidden."""
+    if os.name != "nt":
+        return {}
+    startup = subprocess.STARTUPINFO()
+    startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    startup.wShowWindow = 0
+    return {"creationflags": subprocess.CREATE_NO_WINDOW, "startupinfo": startup}
+
+
 def run_cli(executable, *arguments):
     try:
         result = subprocess.run([executable, *arguments], capture_output=True, text=True,
-                                timeout=30, check=False)
+                                timeout=30, check=False, **hidden_process_options())
     except (OSError, subprocess.TimeoutExpired) as error:
         raise AccessError("Tailscale did not respond. Open Tailscale and check its connection.") from error
     if result.returncode:

@@ -60,7 +60,33 @@ test('409 errors distinguish pairing problems from file changes in English and A
     assert.match(render('Server request failed (HTTP 409).','file_changed'),language==='en'?/Pause uploads/:/أوقف رفع/);
     assert.doesNotMatch(render('Server request failed (HTTP 409).'),/Files may have changed|قد تكون الملفات تغيرت/);
     assert.match(render('Preview unavailable.','preview_unavailable'),language==='en'?/Retry or download/:/أعد المحاولة أو نزّل/);
+    assert.match(render('Unauthorized. Invalid or missing clinic secret key.'),language==='en'?/clinic key saved/:/مفتاح العيادة المحفوظ/);
+    assert.match(render('This server is already paired with another computer.'),language==='en'?/existing partner/:/الجهاز المقترن/);
+    assert.match(render('Invalid peer manifest.'),language==='en'?/inconsistent file list/:/قائمة ملفات غير متسقة/);
   }
+});
+
+test('an expired admin token is refreshed once; invalid clinic keys never trigger sign-in recovery', async () => {
+  let refreshes=0, requests=0;
+  const ctx=vm.createContext({window:{addEventListener(){}},document:{addEventListener(){}},currentUiLanguage:'en',
+    currentUserAccess:{isAdmin:true},AbortController,DOMException,setTimeout,clearTimeout,
+    normaliseStoragePresetUrl:url=>url,
+    db:{auth:{getSession:async()=>({data:{session:{access_token:'expired'}}}),
+      refreshSession:async()=>{refreshes++;return {data:{session:{access_token:'fresh'}}}}}},
+    fetch:async (url,options)=>{requests++;return options.headers.Authorization==='Bearer fresh'
+      ? {ok:true,json:async()=>({nodeId:'pc'})}
+      : {ok:false,status:401,json:async()=>({error:'Invalid administrator session.'})}}
+  });
+  vm.runInContext(syncSource.replace('window.LuminStorageSync =','window.syncApi=api; window.syncErrorText=errorText; window.LuminStorageSync ='),ctx);
+  const server={name:'Laptop',url:'https://pc.test',key:'fixture'};
+  assert.equal((await ctx.window.syncApi(server,'info')).nodeId,'pc');
+  assert.equal(refreshes,1);assert.equal(requests,2);
+  ctx.fetch=async()=>({ok:false,status:401,json:async()=>({error:'Invalid administrator session.'})});
+  await assert.rejects(ctx.window.syncApi(server,'info'),e=>e.status===401);
+  assert.equal(refreshes,2,'a repeated rejection must stop after one refresh');
+  ctx.fetch=async()=>({ok:false,status:401,json:async()=>({error:'Unauthorized. Invalid or missing clinic secret key.'})});
+  await assert.rejects(ctx.window.syncApi(server,'info'),e=>e.code==='invalid_clinic_key' && /Laptop: .*clinic key/.test(ctx.window.syncErrorText(e)));
+  assert.equal(refreshes,2,'a clinic key mismatch cannot be fixed by refreshing the admin session');
 });
 
 test('aborts and timeouts show helpful bilingual explanations instead of raw browser signal abort errors', () => {
@@ -124,7 +150,7 @@ test('Storage Server panel pairs once, syncs in one click, restores progress, re
   const errors=[];
   page.on('pageerror',e=>errors.push(e.message));
   let paired=false,job=null,starts=0,pairs=0,statusRequests=0,laptopFileScope='patient-files-v1',pcNodeId='pc-node',pairError=null;
-  let legacyReview=false,staleReview=false,reviewsSaved=0,originalDownloads=0,slowPreview=false,brokenPreview=false,slowComparison=false;
+  let legacyReview=false,staleReview=false,reviewsSaved=0,originalDownloads=0,slowPreview=false,brokenPreview=false,slowComparison=false,oldLaptopPair=false;
   let conflictKind='path_case';
   const delayedPreviews=[],delayedComparisons=[];
   const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
@@ -135,14 +161,14 @@ test('Storage Server panel pairs once, syncs in one click, restores progress, re
     const isLaptop = new URL(req.url()).hostname === 'laptop.test';
     assert.equal(req.headers()['x-lumin-key'],isLaptop?'laptop-key':'pc-key');
     let result;
-    if(suffix==='info')result=isLaptop?{nodeId:'laptop-node',protocol:1,fileScope:laptopFileScope,clinicalMetadataVersion:2}
+    if(suffix==='info')result=isLaptop?{nodeId:'laptop-node',protocol:1,fileScope:laptopFileScope,clinicalMetadataVersion:2,pair:oldLaptopPair?{role:'replica',peerId:'reinstalled-pc'}:paired?{role:'replica',peerId:'pc-node'}:null}
       :{nodeId:pcNodeId,protocol:1,fileScope:'patient-files-v1',clinicalMetadataVersion:2,pair:paired?{role:'coordinator',peerId:'laptop-node'}:null};
     else if(suffix==='jobs/latest'){statusRequests++;result={job};}
     else if(suffix==='pair'){
       pairs++;
-      assert.deepEqual(req.postDataJSON(),{url:'https://laptop.test',key:'laptop-key'});
+      assert.deepEqual(req.postDataJSON(),{url:'https://laptop.test',key:'laptop-key',...(oldLaptopPair?{replacePair:true}:{})});
       if(pairError){await route.fulfill({status:409,contentType:'application/json',body:JSON.stringify(pairError)});return;}
-      paired=true;result={peerId:'laptop-node',paired:true};
+      paired=true;oldLaptopPair=false;result={peerId:'laptop-node',paired:true};
     }
     else if(suffix==='jobs'){starts++;job=newJob();result=job;}
     else if(suffix==='jobs/job-1/conflicts/0'){
@@ -216,6 +242,7 @@ test('Storage Server panel pairs once, syncs in one click, restores progress, re
   while(statusRequests===beforePairErrorPoll) await page.waitForTimeout(200);
   assert.match(await page.locator('#storage-sync-message').textContent(),/still running/,'successful status polling must preserve action errors');
   pairError=null;
+  oldLaptopPair=true;
   await page.locator('#storage-sync-pair').click();
   await page.waitForFunction(()=>!document.getElementById('storage-sync-start').disabled);
   assert.equal(pairs,2);
@@ -330,6 +357,7 @@ test('Storage Server panel pairs once, syncs in one click, restores progress, re
   assert.equal(await page.evaluate(()=>document.activeElement.id),'storage-sync-review-0');
   // A page reload recovers the persisted pairing and server-side latest job.
   await page.evaluate(()=>LuminStorageSync.close());
+  await page.evaluate(()=>localStorage.removeItem('lumin_storage_sync_pair'));
   await page.reload();
   await page.addScriptTag({url:origin+'/vendor/lucide.min.js'});
   await page.addScriptTag({content:`

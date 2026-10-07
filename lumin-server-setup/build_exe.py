@@ -30,13 +30,16 @@ def main():
     defaults_path = BASE / "server-defaults.json"
     defaults_path.write_text(json.dumps(current_defaults(), indent=2) + "\n", encoding="utf-8")
     sources = (BASE / "app.py", defaults_path, SERVER / "server.py", SERVER / "file_sync.py",
-               SERVER / "tailscale_access.py", SERVER / "clinical_metadata.py")
+               SERVER / "tailscale_access.py", SERVER / "clinical_metadata.py",
+               BASE.parent / "icons/dental-icon-v1-32.png")
     hashes = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in sources}
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=BASE, text=True).strip()
     command = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile", "--windowed",
                "--name", "LuminStorageSetup", "--distpath", str(OUTPUT),
                "--workpath", str(BASE / "build"), "--specpath", str(BASE / "build"),
                "--paths", str(SERVER), "--collect-data", "customtkinter",
+               "--hidden-import", "pystray._win32",
+               "--add-data", str(BASE.parent / "icons/dental-icon-v1-32.png") + os.pathsep + ".",
                "--add-data", str(defaults_path) + os.pathsep + ".", str(BASE / "app.py")]
     subprocess.run(command, cwd=BASE, check=True)
     if hashes != {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in sources}:
@@ -52,7 +55,8 @@ def main():
         if not json.loads(report.read_text(encoding="utf-8"))["ok"]:
             raise RuntimeError("Packaged verification failed: " + name)
     manifest["executableSHA256"] = hashlib.sha256(executable.read_bytes()).hexdigest()
-    manifest["verified"] = {"server": True, "englishArabicUI": True, "clinicalMetadata": True, "localMediaMetadata": True}
+    manifest["verified"] = {"server": True, "englishArabicUI": True, "clinicalMetadata": True, "localMediaMetadata": True,
+                            "trayToggle": True, "trayReopenAndQuit": True}
     (OUTPUT / "build-info.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     with zipfile.ZipFile(BASE / "LuminStorageSetup.zip", "w", zipfile.ZIP_DEFLATED) as package:
         for name in ("LuminStorageSetup.exe", "READ-ME.md", "build-info.json"):
@@ -63,6 +67,11 @@ def main():
         for name in ("server.py", "file_sync.py", "clinical_metadata.py", "tailscale_access.py", "README.md"):
             package.write(SERVER / name, "storage-server/" + name)
         package.write(OUTPUT / "build-info.json", "build-info.json")
+    # Keep the existing README download link current, with its original flat
+    # layout for extraction directly into an existing server installation.
+    with zipfile.ZipFile(SERVER / "lumin-storage-sync-update.zip", "w", zipfile.ZIP_DEFLATED) as package:
+        for name in ("server.py", "file_sync.py", "clinical_metadata.py", "tailscale_access.py", "README.md"):
+            package.write(SERVER / name, name)
     with zipfile.ZipFile(BASE / "LuminStorageWebUpdate.zip", "w", zipfile.ZIP_DEFLATED) as package:
         for name in ("index.html", "lumin-storage-sync.js", "lumin-storage-sync.css", "lumin-chart-media.js", "lumin-patient-scans.js", "sw.js", "app-version.json"):
             package.write(BASE.parent / name, name)

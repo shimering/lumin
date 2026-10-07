@@ -387,8 +387,13 @@ TEXT = {
     "startup": ("Start with Windows and connect automatically", "التشغيل مع Windows والاتصال تلقائيًا"),
     "startup_hint": ("After Windows sign-in, starts the server minimized and enables remote access using your saved settings.", "بعد تسجيل الدخول إلى Windows، يشغّل الخادم مصغّرًا ويفعّل الوصول عن بُعد باستخدام الإعدادات المحفوظة."),
     "startup_failed": ("Could not save the startup setting. View the log and try again.", "تعذّر حفظ إعداد التشغيل التلقائي. افتح السجل وحاول مرة أخرى."),
+    "tray": ("Minimize to tray", "التصغير إلى منطقة الإعلام"),
+    "tray_hint": ("Keep the server running quietly when minimized or closed. Use the tray icon to reopen the app or quit.", "يستمر الخادم بالعمل بصمت عند تصغير النافذة أو إغلاقها. استخدم أيقونة منطقة الإعلام لإعادة فتح التطبيق أو إنهائه."),
+    "tray_open": ("Open Lumin Storage Setup", "فتح إعداد خادم Lumin"),
+    "tray_quit": ("Quit and stop server", "إنهاء التطبيق وإيقاف الخادم"),
+    "tray_failed": ("Could not enable the tray icon. The app will stay visible. View the setup log and try again.", "تعذر تفعيل أيقونة منطقة الإعلام. سيبقى التطبيق ظاهرًا. افتح سجل الإعداد وحاول مرة أخرى."),
     "remote_retry": ("Waiting for internet or Tailscale. Remote access will retry automatically.", "في انتظار الإنترنت أو Tailscale. ستتم إعادة محاولة الاتصال تلقائيًا."),
-    "already_running": ("Lumin Storage Setup is already running. Open it from the taskbar. Close it before opening an updated version.", "تطبيق إعداد خادم Lumin يعمل بالفعل. افتحه من شريط المهام، وأغلقه قبل فتح إصدار جديد."),
+    "already_running": ("Lumin Storage Setup is already running. Open it from the taskbar or tray icon. Quit it before opening an updated version.", "تطبيق إعداد خادم Lumin يعمل بالفعل. افتحه من شريط المهام أو أيقونة منطقة الإعلام، وأنهِ التطبيق قبل فتح إصدار جديد."),
 }
 
 
@@ -416,11 +421,18 @@ def gui(test_output=None, autostart=False):
             self.directory = directory
             self.config_path = self.directory / "config.json"
             self.settings_path = self.directory / "settings.json"
-            self.startup_enabled = False
+            self.settings = {}
             try:
-                self.startup_enabled = json.loads(self.settings_path.read_text(encoding="utf-8")).get("startupConnect") is True
+                self.settings = json.loads(self.settings_path.read_text(encoding="utf-8"))
             except (OSError, ValueError, AttributeError):
                 pass
+            if not isinstance(self.settings, dict):
+                self.settings = {}
+            self.startup_enabled = self.settings.get("startupConnect") is True
+            self.tray_enabled = self.settings.get("minimizeToTray") is True
+            self.tray_icon = None
+            self.tray_ready = False
+            self.tray_hide_pending = False
             self.auto_remote_active = self.startup_enabled
             self.remote_retry = None
             self.remote_attempts = 0
@@ -513,6 +525,17 @@ def gui(test_output=None, autostart=False):
             self.startup_hint = ctk.CTkLabel(startup_card, text="", anchor="w", justify="left",
                                             wraplength=530, font=("Segoe UI", 13), text_color="#64748b")
             self.startup_hint.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 16))
+            self.tray_switch = ctk.CTkSwitch(startup_card, text="", command=self.on_tray_change,
+                                            height=44, switch_width=44, switch_height=24,
+                                            font=("Segoe UI", 13, "bold"), text_color="#334155",
+                                            progress_color="#2563eb", button_color="#ffffff",
+                                            button_hover_color="#dbeafe", fg_color="#cbd5e1")
+            self.tray_switch.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 0))
+            if self.tray_enabled:
+                self.tray_switch.select()
+            self.tray_hint = ctk.CTkLabel(startup_card, text="", anchor="w", justify="left",
+                                        wraplength=530, font=("Segoe UI", 13), text_color="#64748b")
+            self.tray_hint.grid(row=3, column=0, sticky="ew", padx=16, pady=(0, 16))
             self.start_button = self.button(card, "", self.start_or_stop)
             self.start_button.grid(row=8, column=0, sticky="ew", padx=22)
             status_card = ctk.CTkFrame(card, fg_color="#f8fafc", corner_radius=14)
@@ -538,6 +561,7 @@ def gui(test_output=None, autostart=False):
             self.log_button = self.button(footer, "", self.view_log, secondary=True, width=120)
             self.log_button.grid(row=0, column=1, padx=(12, 0))
             self.bind("<Configure>", self.fit_labels)
+            self.bind("<Unmap>", self.on_minimize)
             self.translate()
             self.after(150, self.poll)
             if self.startup_enabled and not test_output:
@@ -549,7 +573,7 @@ def gui(test_output=None, autostart=False):
                     self.log_setup_error("Startup registration refresh failed")
                 self.after(350, self.resume_startup)
                 if autostart:
-                    self.after(500, self.iconify)
+                    self.after(500, self.hide_to_tray if self.tray_enabled else self.iconify)
 
         def fit_labels(self, event):
             if event.widget is not self:
@@ -560,6 +584,7 @@ def gui(test_output=None, autostart=False):
             self.status.configure(wraplength=max(250, width - 32))
             self.address_label.configure(wraplength=max(250, width - 32))
             self.startup_hint.configure(wraplength=max(250, width - 32))
+            self.tray_hint.configure(wraplength=max(250, width - 32))
             self.subtitle.configure(wraplength=max(280, event.width - 56))
 
         def text(self, key):
@@ -593,6 +618,12 @@ def gui(test_output=None, autostart=False):
             self.startup_switch.configure(text=self.text("startup"))
             self.startup_hint.configure(text=self.text("startup_hint"), anchor="e" if rtl else "w",
                                         justify="right" if rtl else "left")
+            self.tray_switch.configure(text=self.text("tray"))
+            self.tray_hint.configure(text=self.text("tray_hint"), anchor="e" if rtl else "w",
+                                     justify="right" if rtl else "left")
+            if self.tray_icon:
+                self.tray_icon.menu = self.tray_menu()
+                self.tray_icon.update_menu()
             for widget, key in ((self.folder_label, "folder"), (self.folder_hint, "folder_hint"),
                                 (self.key_label, "key"), (self.key_hint, "key_hint"),
                                 (self.port_label, "port"), (self.limit_label, "upload_limit"),
@@ -681,7 +712,8 @@ def gui(test_output=None, autostart=False):
                 return
             try:
                 configure_startup(enabled, self.directory)
-                write_json(self.settings_path, {"startupConnect": enabled})
+                settings = {**self.settings, "startupConnect": enabled}
+                write_json(self.settings_path, settings)
             except (OSError, ValueError):
                 # Keep the registration consistent with the previous saved state.
                 try:
@@ -693,6 +725,7 @@ def gui(test_output=None, autostart=False):
                 self.set_message("startup_failed", True)
                 return
             self.startup_enabled = enabled
+            self.settings = settings
             self.auto_remote_active = enabled
             self.cancel_remote_retry()
             self.remote_attempts = 0
@@ -703,6 +736,100 @@ def gui(test_output=None, autostart=False):
                     self.start_or_stop()
             elif self.message_key == "remote_retry":
                 self.set_message("online" if self.process else "offline")
+
+        def tray_menu(self):
+            import pystray
+            # Callbacks run on the tray thread. Only the Tk event loop touches UI.
+            return pystray.Menu(
+                pystray.MenuItem(self.text("tray_open"), lambda *_: self.events.put(("tray_open", None)), default=True),
+                pystray.MenuItem(self.text("tray_quit"), lambda *_: self.events.put(("tray_quit", None))))
+
+        def ensure_tray(self):
+            if self.tray_icon:
+                return True
+            try:
+                import pystray
+                from PIL import Image
+                resource = RESOURCE_ROOT / "dental-icon-v1-32.png"
+                if not resource.is_file() and not getattr(sys, "frozen", False):
+                    resource = Path(__file__).resolve().parents[1] / "icons/dental-icon-v1-32.png"
+                with Image.open(resource) as source:
+                    image = source.convert("RGBA")
+                self.tray_icon = pystray.Icon("LuminStorageSetup", image, self.text("title"), self.tray_menu())
+
+                def ready(icon):
+                    try:
+                        if self.closing.is_set() or self.tray_icon is not icon:
+                            # A quick toggle-off can precede the native message
+                            # loop. Stop it now that its setup callback is ready.
+                            icon.stop()
+                            return
+                        icon.visible = True
+                        self.events.put(("tray_ready", icon))
+                    except Exception:
+                        self.events.put(("tray_error", icon))
+
+                self.tray_icon.run_detached(setup=ready)
+                return True
+            except Exception:
+                self.stop_tray()
+                self.log_setup_error("Tray icon could not start")
+                return False
+
+        def stop_tray(self):
+            icon, self.tray_icon = self.tray_icon, None
+            self.tray_ready = False
+            self.tray_hide_pending = False
+            if icon:
+                try:
+                    icon.stop()
+                except Exception:
+                    self.log_setup_error("Tray icon could not stop")
+
+        def on_tray_change(self):
+            enabled = bool(self.tray_switch.get())
+            if enabled and not self.ensure_tray():
+                self.tray_switch.deselect()
+                self.set_message("tray_failed", True)
+                return
+            try:
+                settings = {**self.settings, "minimizeToTray": enabled}
+                write_json(self.settings_path, settings)
+            except OSError:
+                self.tray_switch.select() if self.tray_enabled else self.tray_switch.deselect()
+                if not self.tray_enabled:
+                    self.stop_tray()
+                self.set_message("tray_failed", True)
+                return
+            self.settings = settings
+            self.tray_enabled = enabled
+            if enabled:
+                self.hide_to_tray()
+            else:
+                self.restore_window()
+                self.stop_tray()
+
+        def on_minimize(self, event):
+            if event.widget is self and self.tray_enabled and self.state() == "iconic":
+                self.hide_to_tray()
+
+        def hide_to_tray(self):
+            if self.closing.is_set():
+                return
+            if not self.ensure_tray():
+                self.restore_window()
+                self.set_message("tray_failed", True)
+                return
+            self.tray_hide_pending = True
+            # Never hide the only way to reopen the app before its icon exists.
+            if self.tray_ready:
+                self.tray_hide_pending = False
+                self.withdraw()
+
+        def restore_window(self):
+            self.tray_hide_pending = False
+            self.deiconify()
+            self.lift()
 
         def retry_remote(self):
             self.remote_retry = None
@@ -829,7 +956,23 @@ def gui(test_output=None, autostart=False):
             try:
                 while True:
                     event, value = self.events.get_nowait()
-                    if event == "started":
+                    if event == "tray_ready":
+                        if self.tray_icon is value and self.tray_enabled:
+                            self.tray_ready = True
+                            if self.tray_hide_pending:
+                                self.hide_to_tray()
+                    elif event == "tray_open":
+                        self.restore_window()
+                    elif event == "tray_quit":
+                        self.shutdown()
+                        return
+                    elif event == "tray_error":
+                        if self.tray_icon is not value:
+                            continue
+                        self.stop_tray()
+                        self.restore_window()
+                        self.set_message("tray_failed", True)
+                    elif event == "started":
                         self.process = value
                         self.busy = False
                         self.address = "http://localhost:%s" % self.port
@@ -928,9 +1071,16 @@ def gui(test_output=None, autostart=False):
             os.startfile(path)
 
         def close(self):
+            if self.tray_enabled:
+                self.hide_to_tray()
+            else:
+                self.shutdown()
+
+        def shutdown(self):
             # The app owns only this subprocess. Other server installations and
             # patient files are never stopped, moved or overwritten here.
             self.closing.set()
+            self.stop_tray()
             self.cancel_remote_retry()
             with self.lifecycle_lock:
                 process, ready, remote = self.process, self.ready, self.remote_process
@@ -953,6 +1103,8 @@ def gui(test_output=None, autostart=False):
                     assert button.cget("height") >= 44
                 assert window.start_button.cget("text") == window.text("start")
                 assert window.startup_switch.cget("height") >= 44
+                assert window.tray_switch.cget("height") >= 44
+                assert window.tray_switch.cget("text") == window.text("tray")
                 assert window.remote_button.cget("state") == "disabled"
                 window.start_or_stop()
                 assert window.message_key == "key_required"
@@ -1013,15 +1165,89 @@ def gui(test_output=None, autostart=False):
                     assert window.startup_enabled and calls[-1] == "remote"
                     window.startup_switch.deselect()
                     window.on_startup_change()
+            class FakeTray:
+                def __init__(self, name, image, title, menu):
+                    self.menu = menu
+                    self.visible = False
+                    self.stopped = False
+                def run_detached(self, setup):
+                    setup(self)
+                def update_menu(self):
+                    pass
+                def stop(self):
+                    self.stopped = True
+            with patch("pystray.Icon", FakeTray), patch.object(window, "withdraw") as hide, \
+                    patch.object(window, "deiconify") as show, patch.object(window, "lift"), \
+                    patch(__name__ + ".configure_startup"):
+                process = window.process
+                window.tray_switch.select()
+                window.on_tray_change()
+                icon = window.tray_icon
+                assert window.tray_enabled and icon.visible
+                assert json.loads(window.settings_path.read_text(encoding="utf-8"))["minimizeToTray"]
+                assert hide.call_count == 0, "Do not hide until the tray ready event is processed"
+                window.poll()
+                assert hide.call_count == 1
+                window.close()
+                assert not window.closing.is_set() and window.process is process
+                assert hide.call_count == 2
+                for language in ("en", "ar"):
+                    window.language = language
+                    window.translate()
+                    assert list(icon.menu)[0].text == window.text("tray_open")
+                list(icon.menu)[0](icon)
+                window.poll()
+                assert show.call_count == 1 and window.process is process
+                window.startup_switch.select()
+                window.on_startup_change()
+                assert json.loads(window.settings_path.read_text(encoding="utf-8"))["minimizeToTray"]
+                window.startup_switch.deselect()
+                window.on_startup_change()
+                window.tray_switch.deselect()
+                window.on_tray_change()
+                assert icon.stopped and not window.tray_enabled
+                settings = json.loads(window.settings_path.read_text(encoding="utf-8"))
+                assert settings == {"startupConnect":False, "minimizeToTray":False}
+                with patch("pystray.Icon", side_effect=RuntimeError("tray unavailable")):
+                    window.tray_switch.select()
+                    window.on_tray_change()
+                    assert not window.tray_switch.get() and not window.tray_enabled
+                    assert window.message_key == "tray_failed" and not window.closing.is_set()
+                class DeferredTray(FakeTray):
+                    def run_detached(self, setup):
+                        self.setup_callback = setup
+                        self.stops = 0
+                    def stop(self):
+                        self.stops += 1
+                with patch("pystray.Icon", DeferredTray):
+                    window.tray_switch.select()
+                    window.on_tray_change()
+                    deferred = window.tray_icon
+                    window.tray_switch.deselect()
+                    window.on_tray_change()
+                    deferred.setup_callback(deferred)
+                    assert deferred.stops == 2 and not deferred.visible
+                    assert window.tray_icon is None and not window.tray_enabled
+                window.tray_switch.select()
+                window.on_tray_change()
+                window.poll()
+                with patch.object(window, "shutdown") as quit_app:
+                    list(window.tray_icon.menu)[1](window.tray_icon)
+                    window.poll()
+                    quit_app.assert_called_once()
             write_json(test_output, {"ok": True, "languages": ["en", "ar"], "touchTargets": True,
                                      "clinicKeyRequired": True, "keyMasked": True,
                                      "startupToggle": True, "automaticRemoteAccess": True,
                                      "remoteRetry": True, "disableCancelsRetry": True,
                                      "currentDefaults": True, "customPortValidation": True,
-                                     "runningConfigPreserved": True})
+                                     "runningConfigPreserved": True, "trayToggle":True,
+                                     "trayReopenAndQuit":True, "trayKeepsServerRunning":True,
+                                     "trayFailureStaysVisible":True, "preferencesPreserved":True,
+                                     "cancelledTrayStartupStopped":True})
         except Exception as error:
             write_json(test_output, {"ok": False, "error": str(error)})
         finally:
+            window.stop_tray()
             window.destroy()
             instance_lock.close()
             workspace.cleanup()
@@ -1029,6 +1255,7 @@ def gui(test_output=None, autostart=False):
         try:
             window.mainloop()
         finally:
+            window.stop_tray()
             instance_lock.close()
 
 

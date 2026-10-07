@@ -23,6 +23,7 @@ from clinical_metadata import VERSION as CLINICAL_VERSION, media_sql, media_sqli
 from PIL import Image, ImageOps
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
+from tailscale_access import hidden_process_options
 
 SUPABASE_URL = "https://pqbayjkypzfxvnksgwwf.supabase.co"
 SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxYmF5amt5cHpmeHZua3Nnd3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkxMjI4NzAsImV4cCI6MjEwNDY5ODg3MH0.e5tPe3PKUiFiS_ZnXcpDF9CRtGtp_B1oZsK37phOQ8Q"
@@ -687,7 +688,8 @@ def _tailscale_keepalive_worker():
                 if cand.is_file():
                     exe = str(cand)
             if exe:
-                subprocess.run([exe, "status"], capture_output=True, timeout=5, check=False)
+                subprocess.run([exe, "status"], capture_output=True, timeout=5, check=False,
+                               **hidden_process_options())
         except Exception:
             pass
 
@@ -758,7 +760,8 @@ def check_authentication():
         return
     # Check key for other routes
     if not verify_auth():
-        return jsonify({"error": "Unauthorized. Invalid or missing clinic secret key."}), 401
+        return jsonify({"error": "Unauthorized. Invalid or missing clinic secret key.",
+                        "code": "invalid_clinic_key"}), 401
 
 @app.route("/api/health", methods=["GET"])
 def health_check():

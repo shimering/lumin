@@ -22,7 +22,7 @@ installation or terminal commands are needed.
    Otherwise choose the existing **Patients** folder containing the patient subfolders.
    Do not select the old server program folder or an individual patient.
 3. Enter the clinic key saved for that server in **Lumin Admin → Storage Server**.
-4. Click **Start server**. Keep this app open while using the server.
+4. Click **Start server**. Keep the app running while using the server; it can run quietly in the tray.
 5. For access from the web app and other computers, use **Enable remote access**.
    Tailscale must already be installed and signed in on this computer. This
    button sets up its HTTPS Funnel and verifies public browser access. It
@@ -36,6 +36,12 @@ installation or terminal commands are needed.
    select the dedicated PC as coordinator and the laptop as peer, then click
    **Pair servers** and **Sync now**. Both PCs must be running compatible servers.
 
+If one computer has been reinstalled and the previous pairing no longer matches,
+click **Update pairing** to reconnect the selected PCs. This requires an active
+Lumin administrator on both servers, waits for running sync jobs, and preserves
+stored files, revision history and annotations. An incorrect saved clinic key
+is reported separately from an expired administrator session.
+
 ## Automatic startup
 
 Turn on **Start with Windows and connect automatically** after choosing the
@@ -45,10 +51,24 @@ starts the server and reconnects through Tailscale automatically. If the interne
 or Tailscale is still starting, remote access retries automatically.
 
 Tailscale must be installed, signed in, and allowed to run at startup. Windows
-sign-in is required; the app does not run before anyone signs in. Minimize the
-app to keep the server running. Closing it or pressing **Stop server** stops this
-session; it starts again at the next sign-in. Turn the toggle off to remove its
-automatic startup registration.
+sign-in is required; the app does not run before anyone signs in. Turn the startup
+toggle off to remove its automatic startup registration.
+
+## Silent operation and system tray
+
+Tailscale checks run without opening command windows. The server and remote
+access helpers are also hidden; their diagnostic output remains in local logs.
+
+Turn on **Minimize to tray** to hide the setup window immediately. The preference
+is saved for this computer. Minimizing or closing the window then keeps storage
+running in the Windows notification area. Double-click the tray icon, or choose
+**Open Lumin Storage Setup**, to reopen it. Choose **Quit and stop server** to
+exit completely. Turning the toggle off restores normal taskbar behavior.
+
+With both startup and tray enabled, Windows sign-in starts storage in the tray.
+Without tray enabled, it starts minimized on the taskbar; closing the window
+stops this session. **Stop server** always stops the server. Automatic startup
+starts it again at the next sign-in.
 
 Enabling startup installs a copy of the EXE inside this computer's private
 AppData folder, so moving the extracted ZIP folder does not break startup.

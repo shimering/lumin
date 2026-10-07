@@ -58,6 +58,14 @@ KNOWN_SYNC_ERRORS = {
     'Update and restart the storage server on both computers to sync patient files only.': 'update_required',
     'Files changed while reviewing. Reload the comparison.': 'review_changed',
     'Wait for the current sync to finish before reviewing.': 'sync_busy',
+    'This server is already paired with another computer.': 'already_paired',
+    'Select the existing dedicated PC as the coordinator.': 'wrong_coordinator',
+    'Invalid peer manifest.': 'invalid_manifest',
+    'Unauthorized. Invalid or missing clinic secret key.': 'invalid_clinic_key',
+    'Invalid sync peer credentials.': 'invalid_peer_credentials',
+    'Patient storage is unavailable. No deletions were applied.': 'storage_unavailable',
+    'Could not read patient storage. No deletions were applied.': 'storage_unreadable',
+    'Storage indexes could not be refreshed. Retry synchronization.': 'indexes_unavailable',
 }
 
 
@@ -905,17 +913,20 @@ def install_sync_routes(app, engine, admin_check):
             raise SyncError('Choose two different servers with compatible sync support.', 409)
         if info.get('fileScope') not in (None, FILE_SCOPE):
             raise SyncError('Update and restart the storage server on both computers to sync patient files only.', 426)
+        replace_pair = data.get('replacePair') is True
         with instance.lock:
             previous = instance.meta('pair')
             if any(job['status'] == 'running' for job in instance.jobs()):
                 raise SyncError('Wait for the current sync to finish before pairing.', 409)
-            if previous and previous['peerId'] != info['nodeId']:
+            if previous and previous['peerId'] != info['nodeId'] and not replace_pair:
                 raise SyncError('This server is already paired with another computer.', 409)
-            if previous and previous['role'] != 'coordinator':
+            if previous and previous['role'] != 'coordinator' and not replace_pair:
                 raise SyncError('Select the existing dedicated PC as the coordinator.', 409)
-            secret = previous['secret'] if previous else secrets.token_urlsafe(32)
+            # Explicit repair rotates credentials, invalidating the old peer.
+            # File revisions, recovery archives and local annotations stay intact.
+            secret = previous['secret'] if previous and not replace_pair else secrets.token_urlsafe(32)
             json_request(url + '/api/sync/pair/accept', 'POST', headers,
-                         {'peerId': instance.node_id, 'secret': secret})
+                         {'peerId': instance.node_id, 'secret': secret, 'replacePair': replace_pair})
             instance.meta('pair', dict(peerId=info['nodeId'], url=url, secret=secret, role='coordinator'))
         return jsonify(peerId=info['nodeId'], paired=True)
 
@@ -932,9 +943,12 @@ def install_sync_routes(app, engine, admin_check):
             raise SyncError('Invalid pairing request.')
         with instance.lock:
             previous = instance.meta('pair')
-            if previous and previous['peerId'] != data['peerId']:
+            if any(job['status'] == 'running' for job in instance.jobs()):
+                raise SyncError('Wait for the current sync to finish before pairing.', 409)
+            replace_pair = data.get('replacePair') is True
+            if previous and previous['peerId'] != data['peerId'] and not replace_pair:
                 raise SyncError('This server is already paired with another computer.', 409)
-            if previous and previous['role'] != 'replica':
+            if previous and previous['role'] != 'replica' and not replace_pair:
                 raise SyncError('Select the existing dedicated PC as the coordinator.', 409)
             instance.meta('pair', dict(peerId=data['peerId'], secret=str(data['secret']), role='replica'))
         return jsonify(paired=True)

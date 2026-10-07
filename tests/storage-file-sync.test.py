@@ -544,6 +544,72 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(job['errorCode'], 'file_changed')
         self.assertEqual(job['errorStatus'], 409)
 
+    def test_wrong_clinic_key_is_distinguished_from_an_admin_session_failure(self):
+        client = self.modules[0].app.test_client()
+        result = client.get('/api/sync/info', headers={**self.headers, 'x-lumin-key': 'wrong-key'})
+        self.assertEqual(result.status_code, 401)
+        self.assertEqual(result.get_json()['code'], 'invalid_clinic_key')
+        result = client.get('/api/sync/info', headers={'x-lumin-key': self.keys[0]})
+        self.assertEqual(result.status_code, 401)
+        self.assertNotEqual(result.get_json().get('code'), 'invalid_clinic_key')
+
+    def test_peer_pairing_rejections_keep_the_recovery_reason_without_secret_data(self):
+        from file_sync import open_request
+        import urllib.error
+        for message, code in [
+                ('This server is already paired with another computer.', 'already_paired'),
+                ('Select the existing dedicated PC as the coordinator.', 'wrong_coordinator'),
+                ('Invalid peer manifest.', 'invalid_manifest'),
+                ('Invalid sync peer credentials.', 'invalid_peer_credentials')]:
+            response = urllib.error.HTTPError('http://peer.test', 409, 'Conflict', {},
+                       io.BytesIO(json.dumps({'error': message}).encode()))
+            with patch('file_sync.urllib.request.OpenerDirector.open', side_effect=response):
+                with self.assertRaises(SyncError) as raised:
+                    open_request('http://peer.test')
+            self.assertEqual(raised.exception.code, code)
+
+    def test_explicit_admin_pair_repair_reconnects_reinstalled_servers_and_preserves_files(self):
+        self.write(0, 'P/General/a.pdf', b'clinic original')
+        self.write(1, 'P/General/b.pdf', b'laptop original')
+        self.pair()
+        originals = [e.scan() for e in self.engines]
+        old_secret = self.engines[0].meta('pair')['secret']
+        import uuid
+        old_node = str(uuid.uuid4())
+        prior = self.engines[1].meta('pair')
+        self.engines[1].meta('pair', {**prior, 'peerId': old_node})
+        request = {'url':self.urls[1], 'key':self.keys[1]}
+        client = self.modules[0].app.test_client()
+        rejected = client.post('/api/sync/pair', headers=self.headers, json=request)
+        self.assertEqual(rejected.status_code, 409)
+        self.assertEqual(rejected.get_json()['code'], 'already_paired')
+        denied = client.post('/api/sync/pair', headers={'x-lumin-key':self.keys[0]},
+                             json={**request, 'replacePair':True})
+        self.assertEqual(denied.status_code, 401)
+        self.assertEqual(self.engines[1].meta('pair')['peerId'], old_node)
+        repaired = client.post('/api/sync/pair', headers=self.headers, json={**request, 'replacePair':True})
+        self.assertEqual(repaired.status_code, 200)
+        self.assertNotEqual(self.engines[0].meta('pair')['secret'], old_secret)
+        self.assertEqual(self.engines[1].meta('pair')['peerId'], self.engines[0].node_id)
+        for engine, records in zip(self.engines, originals):
+            self.assertEqual(engine.scan(), records)
+        job = self.run_sync()
+        self.assert_completed(job)
+        for engine in self.engines:
+            self.assertEqual((engine.root/'P/General/a.pdf').read_bytes(), b'clinic original')
+            self.assertEqual((engine.root/'P/General/b.pdf').read_bytes(), b'laptop original')
+
+    def test_pair_repair_cannot_replace_a_busy_replica_or_accept_a_stale_peer(self):
+        self.pair()
+        replica = self.engines[1]
+        original_pair = replica.meta('pair')
+        replica.update_job({'id':'busy-fixture','status':'running'})
+        result = self.modules[0].app.test_client().post('/api/sync/pair', headers=self.headers,
+                 json={'url':self.urls[1], 'key':self.keys[1], 'replacePair':True})
+        self.assertEqual(result.status_code, 409)
+        self.assertEqual(result.get_json()['code'], 'sync_busy')
+        self.assertEqual(replica.meta('pair'), original_pair)
+
 
     def review_fixture(self, case_only=False):
         paths = ['مريض/Panoramic/scan.PNG', 'مريض/panoramic/scan.png'] if case_only else ['مريض/3D-Scans/scan.zip'] * 2

@@ -1,6 +1,6 @@
 /* Manual patient-file synchronization. The dedicated PC owns the durable job. */
 (() => {
-  const state = { selection: null, paired: false, job: null, busy: false, error: '', actionError: '', timer: null, refreshing: false, epoch: 0, review: null };
+  const state = { selection: null, paired: false, repairPair: false, job: null, busy: false, error: '', actionError: '', timer: null, refreshing: false, epoch: 0, review: null };
   const selectionKey = 'lumin_storage_sync_pair';
   const t = (en, ar) => typeof currentUiLanguage !== 'undefined' && currentUiLanguage === 'ar' ? ar : en;
   const admin = () => typeof currentUserAccess !== 'undefined' && currentUserAccess?.isAdmin;
@@ -57,6 +57,20 @@
     if (!error) return '';
     const msg = error.message || '';
     const reasons = {
+      invalid_clinic_key: t('The clinic key saved for this server does not match its setup app. Edit the saved server and use that computer\'s clinic key.',
+        'مفتاح العيادة المحفوظ لهذا الخادم لا يطابق تطبيق الإعداد. عدّل الخادم المحفوظ واستخدم مفتاح العيادة الخاص بذلك الكمبيوتر.'),
+      invalid_peer_credentials: t('The saved pairing no longer matches on both computers. Click Pair servers to reconnect them, then retry.',
+        'لم تعد بيانات الاقتران متطابقة على الجهازين. اضغط اقتران الخادمين لإعادة توصيلهما ثم أعد المحاولة.'),
+      already_paired: t('One of these servers is paired with another computer. Select its existing partner; update pairing after a server reinstall.',
+        'أحد الخادمين مقترن بكمبيوتر آخر. اختر الجهاز المقترن به؛ وحدّث الاقتران بعد إعادة تثبيت الخادم.'),
+      invalid_manifest: t('The other server returned an inconsistent file list. Update and restart both storage apps, then retry. Existing files are preserved.',
+        'أرسل الخادم الآخر قائمة ملفات غير متسقة. حدّث تطبيقَي التخزين وأعد تشغيلهما ثم أعد المحاولة. تبقى الملفات الموجودة محفوظة.'),
+      storage_unavailable: t('The patient drive or folder is unavailable on one computer. Reconnect the drive and restart that storage app. No deletions were applied.',
+        'محرك أو مجلد المرضى غير متاح على أحد الجهازين. أعد توصيل المحرك وأعد تشغيل تطبيق التخزين عليه. لم يتم تطبيق أي حذف.'),
+      storage_unreadable: t('Patient files cannot be read on one computer. Check folder permissions, then retry. No deletions were applied.',
+        'تعذر قراءة ملفات المرضى على أحد الجهازين. تحقق من صلاحيات المجلد ثم أعد المحاولة. لم يتم تطبيق أي حذف.'),
+      indexes_unavailable: t('The storage indexes could not be refreshed. Check available disk space on both computers, then retry.',
+        'تعذر تحديث فهارس التخزين. تحقق من المساحة المتاحة على الجهازين ثم أعد المحاولة.'),
       invalid_clinical_metadata: t('Patient details could not be verified. Retry after checking the patient and file records.',
         'تعذر التحقق من بيانات المرضى. راجع سجلات المرضى والملفات ثم أعد المحاولة.'),
       metadata_unavailable: t('Patient details could not be refreshed. Cached details are shown; retry when the connection is restored.',
@@ -99,6 +113,14 @@
       [/Choose two different servers with compatible sync support/i, 'same_server'],
       [/Wait for the current sync to finish/i, 'sync_busy'],
       [/Server redirects are not allowed/i, 'server_redirect'],
+      [/Invalid or missing clinic secret key/i, 'invalid_clinic_key'],
+      [/Invalid sync peer credentials/i, 'invalid_peer_credentials'],
+      [/already paired with another computer/i, 'already_paired'],
+      [/Select the existing dedicated PC as the coordinator/i, 'wrong_coordinator'],
+      [/Invalid peer manifest/i, 'invalid_manifest'],
+      [/Patient storage is unavailable/i, 'storage_unavailable'],
+      [/Could not read patient storage/i, 'storage_unreadable'],
+      [/Storage indexes could not be refreshed/i, 'indexes_unavailable'],
       [/Peer identity changed/i, 'peer_changed'],
       [/Pair the two servers first/i, 'pair_required'],
       [/Start synchronization on the paired dedicated PC/i, 'wrong_coordinator'],
@@ -108,7 +130,7 @@
       [/preserved conflict copy was changed/i, 'conflict_copy_changed']
     ];
     const reason = error.code || legacyReasons.find(([pattern]) => pattern.test(msg))?.[1];
-    if (reasons[reason]) return reasons[reason];
+    if (reasons[reason]) return `${error.serverName ? error.serverName + ': ' : ''}${reasons[reason]}`;
     if (error.status === 408 || error.name === 'AbortError' || error.name === 'TimeoutError' || /abort/i.test(msg) || /timeout/i.test(msg)) {
       return t(
         'Connection timed out. Ensure the storage server is running on both computers and reachable.',
@@ -165,19 +187,31 @@
     const effectiveTimeout = timeoutMs || (['pair', 'jobs'].includes(route) ? 45000 : 25000);
     try {
       return await timedRequest(async requestSignal => {
-        const { data, error } = await db.auth.getSession();
-        if (error || !data?.session?.access_token) throw Object.assign(new Error('Sign in again to synchronize storage.'), { status: 401 });
-        const response = await fetch(`${normaliseStoragePresetUrl(server.url)}/api/sync/${route}`, {
-          method, cache: 'no-store', signal: requestSignal,
-          headers: { 'x-lumin-key': server.key || '', Authorization: `Bearer ${data.session.access_token}`,
-            ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
-          ...(body !== undefined ? { body: JSON.stringify(body) } : {})
-        });
-        if (response.ok && binary) return await response.blob();
-        let result;
-        try { result = await response.json(); } catch (_) { result = {}; }
-        if (!response.ok) throw Object.assign(new Error(result.error || `Storage request failed (HTTP ${response.status}).`), { status: response.status, code: result.code });
-        return result;
+        let sessionResult = await db.auth.getSession();
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const { data, error } = sessionResult;
+          if (requestSignal.aborted) throw requestSignal.reason;
+          if (error || !data?.session?.access_token) throw Object.assign(new Error('Sign in again to synchronize storage.'), { status: 401 });
+          const response = await fetch(`${normaliseStoragePresetUrl(server.url)}/api/sync/${route}`, {
+            method, cache: 'no-store', signal: requestSignal,
+            headers: { 'x-lumin-key': server.key || '', Authorization: `Bearer ${data.session.access_token}`,
+              ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
+            ...(body !== undefined ? { body: JSON.stringify(body) } : {})
+          });
+          if (response.ok && binary) return await response.blob();
+          let result;
+          try { result = await response.json(); } catch (_) { result = {}; }
+          if (!result || typeof result !== 'object') result = {};
+          const clinicKeyRejected = result.code === 'invalid_clinic_key' || /Invalid or missing clinic secret key/i.test(result.error || '');
+          if (response.status === 401 && !clinicKeyRejected && attempt === 0 && typeof db.auth.refreshSession === 'function') {
+            sessionResult = await db.auth.refreshSession();
+            continue;
+          }
+          if (!response.ok) throw Object.assign(new Error(result.error || `Storage request failed (HTTP ${response.status}).`), {
+            status: response.status, code: clinicKeyRejected ? 'invalid_clinic_key' : result.code, serverName: server.name
+          });
+          return result;
+        }
       }, effectiveTimeout, signal);
     } catch (err) {
       if (err.name === 'AbortError' || err.name === 'TimeoutError' || /abort/i.test(err.message || '')) {
@@ -205,7 +239,7 @@
     if (info[0].nodeId && info[0].nodeId === info[1].nodeId) {
       throw Object.assign(new Error('Both addresses identify the same storage server.'), { status: 409, code: 'same_server' });
     }
-    return info[0];
+    return { ...info[0], peer: info[1] };
   }
 
   function render() {
@@ -247,7 +281,7 @@
     }
     const pairButton = document.getElementById('storage-sync-pair');
     pairButton.disabled = !ready() || state.busy || activeJob();
-    set('storage-sync-pair-label', state.busy ? t('Connecting…', 'جارٍ الاتصال…') : state.paired ? t('Update pairing', 'تحديث الاقتران') : t('Pair servers', 'اقتران الخادمين'));
+    set('storage-sync-pair-label', state.busy ? t('Connecting…', 'جارٍ الاتصال…') : state.paired || state.repairPair ? t('Update pairing', 'تحديث الاقتران') : t('Pair servers', 'اقتران الخادمين'));
     document.getElementById('storage-sync-start').disabled = !ready() || !state.paired || state.busy || activeJob();
     set('storage-sync-start-label', activeJob() ? t('Syncing…', 'جارٍ المزامنة…') : state.job?.status === 'failed' ? t('Retry', 'إعادة المحاولة') : t('Sync now', 'مزامنة الآن'));
     document.getElementById('storage-sync-progress').classList.toggle('hidden', !state.job);
@@ -278,6 +312,8 @@
           : t('Patient IDs, assigned teeth, notes, and scan details are synchronized on both computers.',
             'تمت مزامنة معرّفات المرضى والأسنان المحددة والملاحظات وبيانات المسح على الجهازين.') : '')
       || (!ready() ? t('Set both server URLs in Saved servers, then pair them once.', 'أدخل رابطَي الجهازين في الخوادم المحفوظة، ثم اقرنهما مرة واحدة.')
+      : state.repairPair ? t('The selected servers have an old pairing. Update pairing reconnects these two computers and preserves their stored files.',
+        'الخادمان المحددان لديهما اقتران قديم. تحديث الاقتران يعيد توصيل هذين الجهازين ويحافظ على الملفات المخزنة.')
       : state.paired ? t('Paired. Both computers must be running and reachable.', 'تم الاقتران. يجب تشغيل الجهازين وإمكانية الاتصال بهما.')
       : t('Pair these two servers to enable one-click sync.', 'اقرن الخادمين لتفعيل المزامنة بنقرة واحدة.'));
     const message = state.actionError || state.error || statusMessage;
@@ -292,10 +328,16 @@
     try {
       const info = await compatibleInfo();
       if (epoch !== state.epoch) return;
-      state.paired = info.pair?.role === 'coordinator' && info.pair.peerId === selection().peerId;
+      state.paired = info.pair?.role === 'coordinator' && info.pair.peerId === info.peer.nodeId
+        && info.peer.pair?.role === 'replica' && info.peer.pair.peerId === info.nodeId;
+      state.repairPair = !state.paired && Boolean(info.pair || info.peer.pair);
+      if (state.paired && selection().peerId !== info.peer.nodeId) {
+        selection().peerId = info.peer.nodeId;
+        localStorage.setItem(selectionKey, JSON.stringify(selection()));
+      }
       const result = await api(coordinator, 'jobs/latest');
       if (epoch !== state.epoch) return;
-      state.job = result.job;
+      state.job = !state.paired || (result.job?.peerId && result.job.peerId !== info.peer.nodeId) ? null : result.job;
       state.error = '';
     } catch (error) { if (epoch === state.epoch) { state.paired = false; state.error = errorText(error); } }
     finally { state.refreshing = false; render(); }
@@ -305,12 +347,16 @@
     if (!admin() || !ready() || state.busy || activeJob() || state.review) return;
     state.busy = true; state.error = ''; state.actionError = ''; render();
     try {
-      await compatibleInfo();
+      const info = await compatibleInfo();
       const { coordinator, laptop } = selectedServers();
-      const result = await api(coordinator, 'pair', 'POST', { url: normaliseStoragePresetUrl(laptop.url), key: laptop.key || '' });
+      const repair = Boolean((info.pair && (info.pair.peerId !== info.peer.nodeId || info.pair.role !== 'coordinator'))
+        || (info.peer.pair && (info.peer.pair.peerId !== info.nodeId || info.peer.pair.role !== 'replica')));
+      const result = await api(coordinator, 'pair', 'POST', { url: normaliseStoragePresetUrl(laptop.url), key: laptop.key || '',
+        ...(repair ? {replacePair:true} : {}) });
       selection().peerId = result.peerId;
       localStorage.setItem(selectionKey, JSON.stringify(selection()));
       state.paired = true;
+      state.repairPair = false;
     } catch (error) { state.paired = false; state.actionError = errorText(error); }
     finally { state.busy = false; render(); }
   }
@@ -538,7 +584,7 @@
     if (!['coordinator', 'laptop'].includes(role) || state.busy || activeJob() || state.review?.saving) return;
     closeReview(); selection()[role] = id; selection().peerId = null;
     localStorage.setItem(selectionKey, JSON.stringify(selection()));
-    state.epoch++; state.paired = false; state.job = null; state.error = ''; state.actionError = '';
+    state.epoch++; state.paired = false; state.repairPair = false; state.job = null; state.error = ''; state.actionError = '';
     render(); void refresh();
   }
 

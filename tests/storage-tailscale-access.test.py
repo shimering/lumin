@@ -30,6 +30,18 @@ def response(payload=None, status=200, headers=None):
 
 
 class TailscaleAccessTests(unittest.TestCase):
+    def test_tailscale_commands_are_hidden_including_children_of_windowed_setup(self):
+        with patch.object(access.subprocess, "run") as run:
+            run.return_value.returncode = 0
+            run.return_value.stdout = "{}"
+            self.assertEqual(access.run_cli("tailscale.exe", "status", "--json"), "{}")
+        options = run.call_args.kwargs
+        self.assertTrue(options["capture_output"])
+        if access.os.name == "nt":
+            self.assertEqual(options["creationflags"], access.subprocess.CREATE_NO_WINDOW)
+            self.assertTrue(options["startupinfo"].dwFlags & access.subprocess.STARTF_USESHOWWINDOW)
+            self.assertEqual(options["startupinfo"].wShowWindow, 0)
+
     def test_public_dns_ignores_magicdns_and_private_addresses(self):
         payload = {"Answer": [{"type": 1, "data": "100.91.9.40"},
                               {"type": 1, "data": "127.0.0.1"},
