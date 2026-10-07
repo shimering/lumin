@@ -50,6 +50,10 @@ In Lumin Admin, open **Review** next to a sync difference. For two images, selec
 servers**. Its notes, tooth assignments and scan settings accompany it; the other
 version and its unchanged conflict copies move into the private recovery archive.
 You can also keep both versions on both computers.
+Keep-one choices also work for filename capitalization differences, preserving
+the existing filename spelling on each computer. The comparison shows these
+choices above each preview. If an older app is responding, the choices remain
+visible but disabled and an update notice explains how to enable them.
 
 If one image was deleted, choose **Restore this copy on both** or **Delete on both
 servers**, then save the choice. Deletions wait for review, including an old path

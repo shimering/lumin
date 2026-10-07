@@ -857,6 +857,55 @@ class SyncTests(unittest.TestCase):
         self.write(1, paths[1], b'changed')
         self.assertEqual(self.run_sync()['status'], 'completed_with_conflicts')
 
+    def test_case_only_names_offer_either_image_and_preserve_each_servers_path(self):
+        paths, job, route, client, snapshot = self.review_fixture(case_only=True)
+        self.write(0, paths[0], b'PC choice')
+        self.write(1, paths[1], b'laptop choice')
+        snapshot = client.get(route, headers=self.headers).get_json()
+        self.assertEqual(snapshot['actions'], ['keep_both', 'keep_local', 'keep_remote'])
+        self.resolve(job, 'keep_local')
+        for i, engine in enumerate(self.engines):
+            self.assertEqual((engine.root / paths[i]).read_bytes(), b'PC choice')
+            self.assertEqual([r['path'] for r in engine.scan().values() if not r['deleted']], [paths[i]])
+        self.assert_completed(self.run_sync())
+        self.write(1, paths[1], b'new laptop choice')
+        self.resolve(self.run_sync(), 'keep_remote')
+        for i, engine in enumerate(self.engines):
+            self.assertEqual((engine.root / paths[i]).read_bytes(), b'new laptop choice')
+        self.assert_completed(self.run_sync())
+
+    def test_case_only_names_choose_annotations_and_accept_later_one_sided_edits(self):
+        fixture = self.clinical_fixture(); original = fixture['files'][0]['relative_path']
+        paths = [original, original.replace('Periapical/photo.png', 'periapical/PHOTO.PNG')]
+        for i in range(2):
+            self.write(i, paths[i], b'PC' if i == 0 else b'laptop')
+            row = copy.deepcopy(fixture); row['files'][0].update(relative_path=paths[i], note='PC' if i == 0 else 'laptop')
+            self.engines[i].clinical.replace(row)
+        self.pair(); job = self.run_sync(); self.assertEqual(job['conflicts'][0]['kind'], 'path_case')
+        self.resolve(job, 'keep_remote')
+        for i, engine in enumerate(self.engines):
+            self.assertEqual((engine.root / paths[i]).read_bytes(), b'laptop')
+            self.assertEqual(engine.clinical.details(paths[i])['note'], 'laptop')
+            self.assertEqual(engine.clinical.files[paths[i].casefold()]['relative_path'], paths[i])
+        self.assert_completed(self.run_sync())
+        self.save_details(0, paths[0], dict(note='Next local note'))
+        self.assert_completed(self.run_sync())
+        self.assertEqual(self.engines[1].clinical.details(paths[1])['note'], 'Next local note')
+
+    def test_case_only_names_offer_deletion_or_restoration_when_one_copy_is_deleted(self):
+        paths, _, _, _, _ = self.review_fixture(case_only=True)
+        self.engines[0].delete_local(paths[0])
+        job = self.run_sync()
+        self.resolve(job, 'keep_remote')
+        for i, engine in enumerate(self.engines):
+            self.assertEqual((engine.root / paths[i]).read_bytes(), b'same')
+        self.assert_completed(self.run_sync())
+        self.engines[1].delete_local(paths[1])
+        self.resolve(self.run_sync(), 'delete_both')
+        for i, engine in enumerate(self.engines):
+            self.assertFalse((engine.root / paths[i]).exists())
+        self.assert_completed(self.run_sync())
+
     def test_stale_review_and_file_requests_reject_changes_without_accepting_them(self):
         paths, _, route, client, snapshot = self.review_fixture()
         self.write(1, paths[1], b'edited after comparison')

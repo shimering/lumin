@@ -508,6 +508,11 @@ class SyncEngine:
             patients[pid] = b if a == prior_a and b != prior_b else a or b
         output_a, output_b = {}, {}
         reviewed = self.meta('reviewedConflicts') or {}
+        def same_annotations(first, second):
+            def content(row):
+                return dict(row, relative_path=row['relative_path'].casefold(),
+                            source_relative_path=row.get('source_relative_path', '').casefold()) if row else None
+            return content(first) == content(second)
         for key in sorted(set(a_rows) | set(b_rows)):
             a, b, prior_a, prior_b = (m.get(key) for m in maps)
             # Keep annotations with their own image until its review is resolved,
@@ -519,11 +524,14 @@ class SyncEngine:
                     output_b[key] = b
                 continue
             known = key in a_old or key in b_old
+            if a and b and same_annotations(a, b):
+                output_a[key], output_b[key] = a, b
+                continue
             if a == b:
                 winner = a
-            elif known and a == prior_a and b != prior_b:
+            elif known and same_annotations(a, prior_a) and not same_annotations(b, prior_b):
                 winner = b
-            elif known and b == prior_b and a != prior_a:
+            elif known and same_annotations(b, prior_b) and not same_annotations(a, prior_a):
                 winner = a
             elif not known and (a is None or b is None):
                 winner = a or b
@@ -541,7 +549,8 @@ class SyncEngine:
                         job['conflicts'].append(dict(path=(a or b)['relative_path'], kind='metadata'))
                 continue
             if winner:
-                output_a[key] = output_b[key] = winner
+                output_a[key] = dict(winner, relative_path=(local_files.get(key) or {'path': winner['relative_path']})['path'])
+                output_b[key] = dict(winner, relative_path=(remote_files.get(key) or {'path': winner['relative_path']})['path'])
         # Original annotations also accompany automatically preserved byte copies.
         for source, output, records in ((a_rows, output_b, remote_files), (b_rows, output_a, local_files)):
             for record in records.values():
@@ -622,9 +631,10 @@ class SyncEngine:
         return dict(jobId=job_id, index=index, path=conflict['path'], kind=conflict['kind'],
                     reviewed=bool(conflict.get('reviewed')), revision=revision, versions=versions,
                     details=details, copies=conflict.get('copies', []), resolution=conflict.get('resolution'),
+                    reviewResolutionVersion=REVIEW_RESOLUTION_VERSION,
+                    choicesUnavailableReason=None if peer.get('reviewResolutionVersion') == REVIEW_RESOLUTION_VERSION else 'peer_update_required',
                     pendingAction=conflict.get('pendingAction'),
                     actions=([conflict['pendingAction']] if conflict.get('pendingAction') else
-                             ['keep_both'] if conflict['kind'] == 'path_case' else
                              [action for action, available in (
                                  ('keep_both', live(local) and live(versions['remote'])),
                                  ('keep_local', live(local)), ('keep_remote', live(versions['remote'])),
@@ -742,7 +752,7 @@ class SyncEngine:
                     updated['patients'].append(dict(id=pid, name=details.get('patient_name'),
                                                     patient_number=details.get('patient_number')))
                 row = dict(details, relative_path=path)
-                if row.get('source_relative_path') == details.get('relative_path'):
+                if row.get('source_relative_path', '').casefold() == details.get('relative_path', '').casefold():
                     row['source_relative_path'] = ''
                 updated['files'].append(row)
             updated = self.clinical.normalise(updated)  # Validate before replacing any bytes.
@@ -755,6 +765,15 @@ class SyncEngine:
             self.clinical.write_folder(path.split('/')[0])
 
     def send_review_resolution(self, destination, data, source=None):
+        # Windows treats case aliases as one path. Keep the spelling already on
+        # each PC while selecting the same bytes/annotations on both computers.
+        path = data['record']['path']
+        data = dict(data)
+        for field in ('details', 'expectedDetails'):
+            if (data.get(field) or {}).get('metadata_available'):
+                if field == 'details' and data[field].get('source_relative_path', '').casefold() == data[field].get('relative_path', '').casefold():
+                    data[field] = dict(data[field], source_relative_path='')
+                data[field] = dict(data[field], relative_path=path)
         if same_content(data['record'], data.get('expected')):
             source = None
         if destination == 'local':
@@ -876,7 +895,8 @@ class SyncEngine:
                     job['conflicts'][index]['pendingAction'] = action
                     self.update_job(job)
                 for destination in ('remote', 'local'):
-                    self.send_review_resolution(destination, dict(record=target,
+                    destination_path = (snapshot['versions'][destination] or target)['path']
+                    self.send_review_resolution(destination, dict(record=dict(target, path=destination_path),
                         expected=snapshot['versions'][destination], expectedDetails=snapshot['details'][destination],
                         details=details), staged if winner else None)
                 for path, sides in copies.items():
@@ -885,7 +905,8 @@ class SyncEngine:
                         self.send_review_resolution(destination, dict(record=current['target'],
                             expected=current.get('record'), expectedDetails=current.get('details') or {}, details={}))
                 current = self.review_snapshot(job_id, index)
-                if any(record != target for record in current['versions'].values()):
+                if any(record != dict(target, path=(snapshot['versions'][side] or target)['path'])
+                       for side, record in current['versions'].items()):
                     raise SyncError('Files changed before final verification. Retry sync.', 409)
                 desired_signature = self.stored_annotation_signature(details) if winner else None
                 if any(self.stored_annotation_signature(row) != desired_signature for row in current['details'].values()):
@@ -918,7 +939,7 @@ class SyncEngine:
         path, source = data.get('path'), data.get('sourcePath')
         safe_path(self.root, source)
         record = self.observe(path)
-        if not live(record) or record['sha256'] != data.get('sha256') or path.split('/')[0] != source.split('/')[0] or '__conflict-' not in Path(path).stem:
+        if not live(record) or record['sha256'] != data.get('sha256') or path.split('/')[0].casefold() != source.split('/')[0].casefold() or '__conflict-' not in Path(path).stem:
             raise SyncError('Files changed while reviewing. Reload the comparison.', 409)
         details = data.get('details') or {}
         existing = self.clinical.details(path)

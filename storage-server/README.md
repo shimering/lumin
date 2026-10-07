@@ -173,11 +173,15 @@ notes, teeth and scan settings; the other version and its unchanged conflict
 copies are removed into recovery archives. **Keep both and mark reviewed** remains
 available to preserve both versions on both PCs. Edited conflict copies block
 cleanup so independent changes are not discarded. There is no automatic schedule.
+The same choices are available when filenames differ only in capitalization;
+each PC keeps its existing filename spelling while receiving the chosen image.
 
 Update both servers before using these choices. Reviews check the compared file
 and annotation revisions before committing. If saving is interrupted, reload the
 review and **Resume saving** to finish the saved choice. New sync jobs wait until
 that pending review completes. The choice and its cleanup plan survive a restart.
+Older servers show the unavailable choices disabled with an update notice,
+instead of silently hiding them.
 
 Progress shows scanning, transfer bytes/file counts, deletions, verification, and
 completion. A restart or connection failure leaves a failed job; **Retry** scans
