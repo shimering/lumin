@@ -49,37 +49,24 @@ function createHarness() {
     getKnownPatient: id => ({ id, name: 'Patient' }), updatePatientWorkspaceNavigation() {}, translateUiTree() {},
     closePatientMediaUploadModal() {}, closePatientMediaMoveModal() {},
     fetch: async (url, options) => {
+      if (url.includes('/media-details')) {
+        calls.saves++;
+        const body = JSON.parse(options.body);
+        const record = { patient_id: 'patient-1', relative_path: body.relativePath, ...body.details };
+        if (saveError) return {ok:false,json:async()=>({error:'Local metadata unavailable'})};
+        rows.set(record.patient_id + ':' + record.relative_path, structuredClone(record));
+        return {ok:true,json:async()=>({metadataSource:'local',details:record})};
+      }
       if (url.includes('/api/file/move')) {
         const body = JSON.parse(options.body); calls.moves.push(body);
-        return { ok: true, json: async () => ({ newRelativePath: body.relativePath.replace(/\/[^/]+\//, '/' + body.targetCategory + '/'), newCategory: body.targetCategory }) };
+        const newPath = body.relativePath.replace(/\/[^/]+\//, '/' + body.targetCategory + '/');
+        const row = rows.get('patient-1:' + body.relativePath);
+        if (row) {rows.delete('patient-1:' + body.relativePath); rows.set('patient-1:' + newPath, {...row,relative_path:newPath});}
+        return { ok: true, json: async () => ({ newRelativePath:newPath, newCategory:body.targetCategory }) };
       }
-      return { ok: true, json: async () => ({ files: [{ filename:"film's.png", relativePath:filePath, category:'Periapical', sizeBytes:1024 }] }) };
+      return { ok: true, json: async () => ({ metadataSource:'local', files: [{ filename:"film's.png", relativePath:filePath, category:'Periapical', sizeBytes:1024, mediaDetails:rows.get('patient-1:' + filePath) || null }] }) };
     },
-    db: { from(table) {
-      assert.equal(table, 'patient_media_details');
-      const filters = [];
-      let operation = 'select', record;
-      const query = {
-        upsert(value) { operation = 'save'; record = value; return this; },
-        select() { return this; }, single() { return this; },
-        eq(key, value) { filters.push([key, value]); return this; },
-        delete() { operation = 'delete'; return this; },
-        then(resolve, reject) {
-          let result;
-          if (operation === 'save') {
-            calls.saves++;
-            if (saveError) result = { data: null, error: new Error('Database unavailable') };
-            else { rows.set(record.patient_id + ':' + record.relative_path, structuredClone(record)); result = { data: record, error: null }; }
-          } else {
-            const matches = [...rows.values()].filter(row => filters.every(([key,value]) => row[key] === value));
-            if (operation === 'delete') matches.forEach(row => rows.delete(row.patient_id + ':' + row.relative_path));
-            result = { data: operation === 'select' ? matches : null, error: null };
-          }
-          return Promise.resolve(result).then(resolve, reject);
-        },
-      };
-      return query;
-    } },
+    db: {from() {throw new Error('Clinical metadata must not access Supabase');}},
     XMLHttpRequest: class {
       upload = {}; status = 200; responseText = JSON.stringify({ relativePath: filePath });
       open() {} setRequestHeader() {}

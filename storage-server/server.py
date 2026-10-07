@@ -17,7 +17,9 @@ import time
 import urllib.request
 import urllib.parse
 import threading
+from contextlib import closing
 from file_sync import SyncEngine, SyncError, install_sync_routes, safe_path, json_request
+from clinical_metadata import VERSION as CLINICAL_VERSION, media_sql, media_sqlite, patient_id as metadata_patient_id
 from PIL import Image, ImageOps
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -38,7 +40,7 @@ def sanitize_name(name: str) -> str:
     return cleaned
 
 def resolve_patient_name(patient_id: str, supplied_name: str = "") -> str:
-    """Resolve clean patient name from argument, local cache, or Supabase RPC."""
+    """Resolve a patient folder from supplied identity and local storage."""
     clean_supplied = sanitize_name(supplied_name) if supplied_name else ""
     if clean_supplied and clean_supplied != "Patient" and clean_supplied != "Unnamed":
         PATIENT_NAME_CACHE[patient_id] = clean_supplied
@@ -47,27 +49,9 @@ def resolve_patient_name(patient_id: str, supplied_name: str = "") -> str:
     if patient_id in PATIENT_NAME_CACHE:
         return PATIENT_NAME_CACHE[patient_id]
 
-    try:
-        url = f"{SUPABASE_URL}/rest/v1/rpc/get_patient_name"
-        headers = {
-            "apikey": SUPABASE_ANON_KEY,
-            "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
-            "Content-Type": "application/json"
-        }
-        payload = json.dumps({
-            "patient_uuid": patient_id,
-            "clinic_key": config.get("clinic_secret_key", "LuminClinicKey_2026")
-        }).encode("utf-8")
-        req = urllib.request.Request(url, data=payload, headers=headers)
-        with urllib.request.urlopen(req, timeout=3) as resp:
-            raw = resp.read().decode("utf-8").strip()
-            name = json.loads(raw)
-            if name:
-                cleaned = sanitize_name(name)
-                PATIENT_NAME_CACHE[patient_id] = cleaned
-                return cleaned
-    except Exception as e:
-        logger.debug(f"Could not resolve patient name via Supabase for {patient_id}: {e}")
+    for folder in STORAGE_ROOT.iterdir():
+        if folder.is_dir() and not folder.name.startswith('.') and get_folder_patient_id(folder) == patient_id:
+            return folder.name
 
     return ""
 
@@ -150,23 +134,27 @@ def generate_thumbnail(original_file_path: Path):
         return None
 
 def get_folder_patient_id(folder_path: Path) -> str:
-    """Read patient_id from .patient_id metadata file in folder."""
-    try:
-        meta_file = folder_path / ".patient_id"
-        if meta_file.is_file():
-            content = meta_file.read_text(encoding="utf-8").strip()
-            if content.startswith("{"):
-                data = json.loads(content)
-                return str(data.get("patient_id") or "").strip()
-            return content.strip()
-    except Exception:
-        pass
+    """Read a real patient UUID from the local tag or legacy JSON."""
+    for name, limit in (('.patient_id', 65536), ('patient_media_details.json', 32 * 1024 * 1024)):
+        try:
+            meta = folder_path / name
+            if not meta.is_file() or meta.is_symlink() or getattr(meta.lstat(), 'st_file_attributes', 0) & 1024 or meta.stat().st_size > limit:
+                continue
+            content = meta.read_text(encoding='utf-8').strip()
+            pid = json.loads(content).get('patient_id') if content.startswith('{') else content
+            return metadata_patient_id(pid)
+        except (OSError, ValueError, AttributeError):
+            continue
     return ""
 
 
 def set_folder_patient_id(folder_path: Path, patient_id: str, patient_name: str = "", patient_number: str = "", phone: str = ""):
     """Write .patient_id metadata file into patient folder."""
     if not patient_id or patient_id == "General" or not folder_path.is_dir():
+        return
+    try:
+        patient_id = metadata_patient_id(patient_id)
+    except ValueError:
         return
     try:
         meta_file = folder_path / ".patient_id"
@@ -190,57 +178,8 @@ def set_folder_patient_id(folder_path: Path, patient_id: str, patient_name: str 
         logger.warning(f"Could not write .patient_id in {folder_path}: {e}")
 
 
-def get_patient_folder_from_supabase(patient_id: str) -> str:
-    """Query Supabase RPC to find the recorded folder prefix for this patient's media."""
-    try:
-        url = f"{SUPABASE_URL}/rest/v1/rpc/get_patient_media_folder"
-        headers = {
-            "apikey": SUPABASE_ANON_KEY,
-            "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
-            "Content-Type": "application/json"
-        }
-        payload = json.dumps({
-            "p_patient_uuid": patient_id,
-            "clinic_key": config.get("clinic_secret_key", "LuminClinicKey_2026")
-        }).encode("utf-8")
-        req = urllib.request.Request(url, data=payload, headers=headers)
-        with urllib.request.urlopen(req, timeout=4) as resp:
-            raw = resp.read().decode("utf-8").strip()
-            folder = json.loads(raw)
-            if folder:
-                return sanitize_name(folder)
-    except Exception as e:
-        logger.debug(f"Could not get patient media folder via Supabase RPC for {patient_id}: {e}")
-    return ""
-
-
-def update_supabase_media_paths(patient_id: str, old_folder: str, new_folder: str) -> int:
-    """Update relative_path in Supabase patient_media_details using secure RPC."""
-    try:
-        url = f"{SUPABASE_URL}/rest/v1/rpc/update_patient_media_folder"
-        headers = {
-            "apikey": SUPABASE_ANON_KEY,
-            "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
-            "Content-Type": "application/json"
-        }
-        payload = json.dumps({
-            "p_patient_uuid": patient_id,
-            "p_old_prefix": f"{old_folder}/",
-            "p_new_prefix": f"{new_folder}/",
-            "clinic_key": config.get("clinic_secret_key", "LuminClinicKey_2026")
-        }).encode("utf-8")
-        req = urllib.request.Request(url, data=payload, headers=headers)
-        with urllib.request.urlopen(req, timeout=4) as resp:
-            updated_count = json.loads(resp.read().decode("utf-8").strip())
-            logger.info(f"Updated {updated_count} media detail rows in Supabase for patient {patient_id}")
-            return updated_count or 0
-    except Exception as e:
-        logger.warning(f"Could not update Supabase media folder for {patient_id}: {e}")
-        return 0
-
-
 def rename_patient_storage_folder(patient_id: str, old_folder_name: str, new_folder_name: str) -> bool:
-    """Safely rename a patient's directory on disk, thumbnails, sync records, and Supabase."""
+    """Rename a patient's local folder, thumbnails, sync records and annotations."""
     clean_old = sanitize_name(old_folder_name)
     clean_new = sanitize_name(new_folder_name)
     if not clean_old or not clean_new or clean_old == clean_new:
@@ -251,21 +190,14 @@ def rename_patient_storage_folder(patient_id: str, old_folder_name: str, new_fol
 
     if not old_dir.is_dir():
         return False
+    if new_dir.exists():
+        logger.warning('Patient folder rename destination already exists.')
+        return False
 
     try:
-        if not new_dir.exists():
-            old_dir.rename(new_dir)
-        else:
-            for root, dirs, files in os.walk(old_dir):
-                rel_dir = Path(root).relative_to(old_dir)
-                target_sub = new_dir / rel_dir
-                target_sub.mkdir(parents=True, exist_ok=True)
-                for f in files:
-                    src_file = Path(root) / f
-                    dst_file = target_sub / f
-                    if not dst_file.exists():
-                        shutil.move(str(src_file), str(dst_file))
-            shutil.rmtree(str(old_dir), ignore_errors=True)
+        clinical = get_sync_engine().clinical
+        clinical.import_folder(clean_old)
+        old_dir.rename(new_dir)
 
         # Rename thumbnails
         old_thumb = THUMBNAIL_ROOT / clean_old
@@ -306,8 +238,7 @@ def rename_patient_storage_folder(patient_id: str, old_folder_name: str, new_fol
         except Exception as sync_e:
             logger.warning(f"Could not update local sync records during rename: {sync_e}")
 
-        # Update Supabase records
-        update_supabase_media_paths(patient_id, clean_old, clean_new)
+        clinical.rename_folder(clean_old, clean_new, patient_id, clean_new.replace('_', ' '))
 
         # Update PATIENT_NAME_CACHE
         PATIENT_NAME_CACHE[patient_id] = clean_new
@@ -339,27 +270,6 @@ def sql_quote(val) -> str:
     escaped = val_str.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r")
     return f"'{escaped}'"
 
-def fetch_all_patients_metadata_from_supabase() -> list:
-    """Fetch complete patient metadata (id, patient_number, name, phone) from Supabase RPC."""
-    try:
-        url = f"{SUPABASE_URL}/rest/v1/rpc/get_all_patients_storage_metadata"
-        headers = {
-            "apikey": SUPABASE_ANON_KEY,
-            "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
-            "Content-Type": "application/json"
-        }
-        payload = json.dumps({
-            "clinic_key": config.get("clinic_secret_key", "LuminClinicKey_2026")
-        }).encode("utf-8")
-        req = urllib.request.Request(url, data=payload, headers=headers)
-        with urllib.request.urlopen(req, timeout=6) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            if isinstance(data, list):
-                return data
-    except Exception as e:
-        logger.warning(f"Could not fetch patients metadata via Supabase RPC: {e}")
-    return []
-
 def update_storage_mapping_files() -> dict:
     """
     Generate and synchronize:
@@ -377,7 +287,10 @@ def update_storage_mapping_files() -> dict:
         now_dt = datetime.now()
         now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
 
-        all_metadata = fetch_all_patients_metadata_from_supabase()
+        clinical = get_sync_engine().clinical
+        clinical.import_all()
+        snapshot = clinical.snapshot()
+        all_metadata = snapshot['patients'] if snapshot is not None else []
         patients_by_id = {p["id"]: p for p in all_metadata if p.get("id")}
         patients_by_name = {p["name"].strip(): p for p in all_metadata if p.get("name")}
 
@@ -387,6 +300,7 @@ def update_storage_mapping_files() -> dict:
         for d in sorted(STORAGE_ROOT.iterdir()):
             if not d.is_dir() or d.name.startswith('.'):
                 continue
+            clinical.write_folder(d.name)
 
             meta_file = d / ".patient_id"
             pid = ""
@@ -403,7 +317,7 @@ def update_storage_mapping_files() -> dict:
                     pass
 
             clean_folder_name = d.name.replace("_", " ")
-            pdata = patients_by_id.get(pid) or patients_by_name.get(clean_folder_name) or {}
+            pdata = clinical.patient_for_folder(d.name) or patients_by_id.get(pid) or patients_by_name.get(clean_folder_name) or {}
 
             resolved_id = pdata.get("id") or pid or d.name
             resolved_num = str(pdata.get("patient_number") or existing_meta.get("patient_number") or "")
@@ -447,6 +361,14 @@ def update_storage_mapping_files() -> dict:
                         "modified_at": mod_dt,
                         "updated_at": now_str
                     }
+                    details = clinical.details(rel)
+                    f_rec.update({k: details.get(k) for k in (
+                        'display_name', 'note', 'tooth_id', 'tooth_ids', 'scan_date', 'scan_config',
+                        'source_relative_path', 'metadata_available')})
+                    f_rec['patient_number'] = details.get('patient_number') or resolved_num
+                    if details.get('patient_id'):
+                        f_rec['patient_id'] = details['patient_id']
+                        f_rec['patient_name'] = details.get('patient_name') or resolved_name
                     patient_files.append(f_rec)
                     file_records.append(f_rec)
 
@@ -534,7 +456,7 @@ def update_storage_mapping_files() -> dict:
                             f"ON DUPLICATE KEY UPDATE `patient_name` = VALUES(`patient_name`), `folder_name` = VALUES(`folder_name`), `category` = VALUES(`category`), `filename` = VALUES(`filename`), `relative_path` = VALUES(`relative_path`), `file_size_bytes` = VALUES(`file_size_bytes`), `file_extension` = VALUES(`file_extension`), `modified_at` = VALUES(`modified_at`), `updated_at` = VALUES(`updated_at`);"
                         )
                     p_sql_lines.append("")
-                (d / "patient_mapping.sql").write_text("\n".join(p_sql_lines), encoding="utf-8")
+                (d / "patient_mapping.sql").write_text("\n".join(p_sql_lines) + media_sql(patient_files, sql_quote), encoding="utf-8")
             except Exception as e:
                 logger.warning(f"Could not write patient_mapping.sql in {d.name}: {e}")
 
@@ -626,14 +548,14 @@ def update_storage_mapping_files() -> dict:
                     f"VALUES ({sql_quote(fr['id'])}, {sql_quote(fr['patient_id'])}, {sql_quote(fr['patient_name'])}, {sql_quote(fr['folder_name'])}, {sql_quote(fr['category'])}, {sql_quote(fr['filename'])}, {sql_quote(fr['relative_path'])}, {fr['file_size_bytes']}, {sql_quote(fr['file_extension'])}, {sql_quote(fr['modified_at'])}, {sql_quote(fr['updated_at'])}) "
                     f"ON DUPLICATE KEY UPDATE `patient_name` = VALUES(`patient_name`), `folder_name` = VALUES(`folder_name`), `category` = VALUES(`category`), `filename` = VALUES(`filename`), `relative_path` = VALUES(`relative_path`), `file_size_bytes` = VALUES(`file_size_bytes`), `file_extension` = VALUES(`file_extension`), `modified_at` = VALUES(`modified_at`), `updated_at` = VALUES(`updated_at`);"
                 )
-            master_sql_path.write_text("\n".join(m_sql_lines), encoding="utf-8")
+            master_sql_path.write_text("\n".join(m_sql_lines) + media_sql(file_records, sql_quote), encoding="utf-8")
         except Exception as e:
             logger.warning(f"Could not write master SQL: {e}")
 
         # 5. Master SQLite DB
         try:
             import sqlite3
-            with sqlite3.connect(str(master_sqlite_path)) as con:
+            with closing(sqlite3.connect(str(master_sqlite_path))) as con, con:
                 cur = con.cursor()
                 cur.execute("""
                 CREATE TABLE IF NOT EXISTS patient_folders_mapping (
@@ -689,6 +611,7 @@ def update_storage_mapping_files() -> dict:
                         fr["filename"], fr["relative_path"], fr["file_size_bytes"], fr["file_extension"],
                         fr["modified_at"], fr["updated_at"]
                     ))
+                media_sqlite(con, file_records)
                 con.commit()
         except Exception as e:
             logger.warning(f"Could not write master SQLite: {e}")
@@ -711,7 +634,9 @@ def tag_existing_patient_folders():
     try:
         if not STORAGE_ROOT.is_dir():
             return
-        all_metadata = fetch_all_patients_metadata_from_supabase()
+        clinical = get_sync_engine().clinical
+        clinical.import_all()
+        all_metadata = (clinical.snapshot() or {}).get('patients', [])
         patients_by_id = {p["id"]: p for p in all_metadata if p.get("id")}
         patients_by_name = {p["name"].strip(): p for p in all_metadata if p.get("name")}
         for d in STORAGE_ROOT.iterdir():
@@ -778,7 +703,8 @@ def get_sync_engine():
             _sync_engine = SyncEngine(
                 STORAGE_ROOT,
                 config.get('sync_state_path') or Path(__file__).parent / '.lumin-sync',
-                list(set(config['allowed_extensions']) | {'zip'}), generate_thumbnail)
+                list(set(config['allowed_extensions']) | {'zip'}), generate_thumbnail,
+                on_change=lambda: update_storage_mapping_files())
     return _sync_engine
 
 
@@ -849,7 +775,9 @@ def health_check():
         "totalPatientFolders": total_folders,
         "maxFileSizeMB": config["max_file_size_mb"],
         "syncProtocol": 1,
-        "capabilities": {"patient3dScans": True, "scanOriginalFilenames": True}
+        "capabilities": {"patient3dScans": True, "scanOriginalFilenames": True,
+                         "syncConflictReview": True, "syncHistoricalRevisions": True, "syncClinicalMetadata": True,
+                         "localMediaMetadata": True}
     })
 
 @app.route("/api/upload", methods=["POST"])
@@ -881,11 +809,6 @@ def upload_file():
                 if get_folder_patient_id(d) == patient_id:
                     existing_folder = d.name
                     break
-        if not existing_folder:
-            supa_folder = get_patient_folder_from_supabase(patient_id)
-            if supa_folder and (STORAGE_ROOT / supa_folder).is_dir():
-                existing_folder = supa_folder
-
         if existing_folder and existing_folder != patient_folder_name:
             if rename_patient_storage_folder(patient_id, existing_folder, patient_folder_name):
                 logger.info(f"Auto-migrated folder {existing_folder} to {patient_folder_name} prior to upload")
@@ -964,7 +887,7 @@ def list_patient_files(patient_id):
     # 1. Primary: match clean patient name folder
     if safe_patient_name:
         name_dir = STORAGE_ROOT / safe_patient_name
-        if name_dir.is_dir():
+        if name_dir.is_dir() and get_folder_patient_id(name_dir) in ('', patient_id):
             matched_dirs.append(name_dir)
             set_folder_patient_id(name_dir, patient_id, safe_patient_name)
 
@@ -988,21 +911,6 @@ def list_patient_files(patient_id):
                     matched_dirs.append(d)
                     break
 
-    # 4. Check Supabase patient_media_details for previous folder if still not found
-    if not matched_dirs and safe_patient_id and safe_patient_id != "General":
-        supa_folder = get_patient_folder_from_supabase(patient_id)
-        if supa_folder:
-            candidate = STORAGE_ROOT / supa_folder
-            if candidate.is_dir():
-                if safe_patient_name and supa_folder != safe_patient_name:
-                    if rename_patient_storage_folder(patient_id, supa_folder, safe_patient_name):
-                        new_dir = STORAGE_ROOT / safe_patient_name
-                        if new_dir.is_dir():
-                            matched_dirs.append(new_dir)
-                if not matched_dirs:
-                    matched_dirs.append(candidate)
-                    set_folder_patient_id(candidate, patient_id, safe_patient_name or supa_folder)
-
     # 5. Match legacy folders starting with patient_id_ or ending with _patient_name
     for d in STORAGE_ROOT.iterdir():
         if d.is_dir() and not d.name.startswith('.') and d not in matched_dirs:
@@ -1012,8 +920,17 @@ def list_patient_files(patient_id):
                 matched_dirs.append(d)
 
     files_list = []
+    clinical = get_sync_engine().clinical
+    metadata_unavailable = False
     for patient_dir in matched_dirs:
+        safe_path(STORAGE_ROOT, patient_dir.name)
+        if get_folder_patient_id(patient_dir) not in ('', patient_id):
+            continue
         set_folder_patient_id(patient_dir, patient_id, safe_patient_name or patient_dir.name)
+        try:
+            clinical.import_folder(patient_dir.name)
+        except (ValueError, OSError):
+            metadata_unavailable = True
         for root, directories, files in os.walk(patient_dir):
             directories[:] = [name for name in directories if not name.startswith('.')]
             for filename in files:
@@ -1029,12 +946,44 @@ def list_patient_files(patient_id):
                     "relativePath": str(rel_path).replace("\\", "/"),
                     "sizeBytes": stat.st_size,
                     "modifiedAt": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                    "patientFolder": patient_dir.name
+                    "patientFolder": patient_dir.name,
+                    "mediaDetails": None if metadata_unavailable else clinical.details(rel_path.as_posix())
                 })
 
     # Sort newest first
     files_list.sort(key=lambda x: x["modifiedAt"], reverse=True)
-    return jsonify({"patientId": patient_id, "total": len(files_list), "files": files_list})
+    return jsonify({"patientId": patient_id, "total": len(files_list), "files": files_list,
+                    "metadataSource": "local", "metadataUnavailable": metadata_unavailable})
+
+
+@app.post('/api/patient/<patient_id>/media-details')
+def save_local_media_details(patient_id):
+    """Save annotations on the selected storage server, without a cloud request."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not isinstance(data.get('details'), dict):
+        return jsonify(error='Invalid local media details.'), 400
+    try:
+        pid = metadata_patient_id(patient_id)
+        path = safe_path(STORAGE_ROOT, data.get('relativePath') or '')
+        rel = path.relative_to(STORAGE_ROOT).as_posix()
+        if len(rel.split('/')) < 3 or not path.is_file() or not get_sync_engine().includes(rel):
+            return jsonify(error='Patient media file not found.'), 404
+        folder = rel.split('/')[0]
+        clinical = get_sync_engine().clinical
+        clinical.import_folder(folder)
+        tag = clinical._tag(folder)
+        known = clinical.patient_for_folder(folder)
+        if (tag.get('patient_id') and tag['patient_id'] != pid) or (known.get('id') and known['id'] != pid):
+            return jsonify(error='Patient identity does not match media.'), 409
+        patient = dict(name=data.get('patientName') or known.get('name') or tag.get('patient_name') or folder.replace('_', ' '),
+                       patient_number=data.get('patientNumber') if data.get('patientNumber') is not None else known.get('patient_number') or tag.get('patient_number'),
+                       phone=data.get('phone') if data.get('phone') is not None else known.get('phone') or tag.get('phone'))
+        details = clinical.upsert(rel, pid, data['details'], patient)
+        set_folder_patient_id(STORAGE_ROOT / folder, pid, patient['name'], patient['patient_number'], patient['phone'])
+        threading.Thread(target=update_storage_mapping_files, daemon=True, name='lumin-update-mappings').start()
+        return jsonify(success=True, metadataSource='local', details=details)
+    except (ValueError, TypeError, AttributeError):
+        return jsonify(error='Invalid local media details.'), 400
 
 
 @app.route("/api/patient/<patient_id>/rename", methods=["POST"])
@@ -1059,11 +1008,8 @@ def rename_patient(patient_id):
                 if get_folder_patient_id(d) == patient_id:
                     current_dir = d
                     break
-    if not current_dir:
-        supa_folder = get_patient_folder_from_supabase(patient_id)
-        if supa_folder and (STORAGE_ROOT / supa_folder).is_dir():
-            current_dir = STORAGE_ROOT / supa_folder
-
+    if current_dir and get_folder_patient_id(current_dir) not in ('', patient_id):
+        return jsonify(error='Patient identity does not match folder.'), 409
     if not current_dir:
         return jsonify({"success": True, "message": "No existing storage folder to rename."})
 
@@ -1092,7 +1038,9 @@ def delete_file():
         return jsonify({"error": "File not found."}), 404
 
     try:
+        get_sync_engine().clinical.import_folder(clean_rel_path.split('/')[0])
         get_sync_engine().delete_local(clean_rel_path)
+        get_sync_engine().clinical.remove(clean_rel_path)
         thumb_candidate = (THUMBNAIL_ROOT / clean_rel_path).with_suffix(".webp")
         if thumb_candidate.exists():
             try:
@@ -1151,7 +1099,9 @@ def move_file():
             suffix = dest_path.suffix
             dest_path = dest_dir / f"{stem}_{int(datetime.now().timestamp())}{suffix}"
 
+        get_sync_engine().clinical.import_folder(patient_folder)
         get_sync_engine().move_local(clean_rel_path, dest_path.relative_to(STORAGE_ROOT).as_posix())
+        get_sync_engine().clinical.move(clean_rel_path, dest_path.relative_to(STORAGE_ROOT).as_posix())
 
         # Move or update thumbnail
         old_thumb = (THUMBNAIL_ROOT / clean_rel_path).with_suffix(".webp")

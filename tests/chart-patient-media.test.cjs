@@ -106,14 +106,14 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
     function openMediaLightbox(...args) { window.lastLightbox = args; }
     function openPatientWorkspaceTab(tab) { window.lastWorkspaceTab = tab; }
     function openStorageSettings() { window.storageSettingsOpened = true; }
-    const db = {from(table) { if(table !== 'patient_media_details') throw Error(table); return {select() {return this;},eq(column,id) {return Promise.resolve({data:id === 'patient-1' ? details : [],error:metadataError ? Error('Details unavailable') : null});}};}};
+    const db = {from() { throw Error('Clinical metadata must not access Supabase'); }};
     const nativeFetch = window.fetch.bind(window);
     let holdPatientOne = false, releasePatientOne, holdText = false, releaseText;
     window.fetch = async (url, options) => {
       if (String(url).includes('/api/patient/')) {
         const id = String(url).split('/api/patient/')[1].split('/')[0];
         if (id === 'patient-1' && holdPatientOne) await new Promise(resolve => releasePatientOne = resolve);
-        return {ok:true,json:async () => ({files:filesByPatient[id] || []})};
+        return {ok:true,json:async () => ({metadataSource:'local',metadataUnavailable:metadataError,files:(filesByPatient[id] || []).map(file=>({...file,mediaDetails:metadataError ? null : details.find(row=>row.relative_path===file.relativePath) || null}))})};
       }
       if (String(url).includes('/files/') && String(url).includes('report.txt') && holdText) await new Promise(resolve => releaseText=resolve);
       return nativeFetch(url, options);

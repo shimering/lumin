@@ -40,6 +40,32 @@ Lumin maintains full, human-readable and queryable database mapping files direct
 
 These mapping files are automatically synchronized whenever a file is uploaded, moved, deleted, or when a patient folder is renamed.
 
+The dental chart, photo gallery and 3D scan gallery read and save annotations on
+**the selected local storage server**. Supabase is not used to load, save or repair
+media annotations. Existing `patient_media_details.json` files are imported, and
+local SQLite plus atomic per-patient JSON backups preserve labels, notes, tooth
+assignments (Lumin IDs 1–32 and A–T), scan dates and scan settings.
+
+Server sync shares patient UUIDs, numbers and these local annotations in both
+directions using the authenticated peer connection. A local edit made on either
+PC propagates to the other. Concurrent annotation edits remain separate and
+appear in Review; **Keep both and mark reviewed** preserves a copy with each
+version's annotations on both PCs. Edits made while sync or review is running
+are checked before applying a snapshot. Supabase remains in use for existing
+administrator authentication and server settings, rather than clinical file
+metadata. No cloud schema migration is required.
+
+Each PC regenerates its own indexes. Generated JSON/SQL/SQLite files are excluded
+from binary replication. JSON entries include the annotations; SQL and SQLite
+expose them in `patient_media_details_mapping`, joined by `relative_path` to
+`patient_files_mapping`. Conflict copies retain `source_relative_path`.
+
+Update the storage server on **both PCs**, restart, and update the web app. Use
+**Retry** for an interrupted sync and **Review** for unresolved differences.
+Revision history from previous installations is retained, avoiding the old
+HTTP 400 rejection after reinstallation. Patient media remain available locally
+without fetching annotation records from the cloud.
+
 ---
 
 ## 🚀 How to Run

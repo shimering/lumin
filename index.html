@@ -76,15 +76,15 @@
   <script src="lumin-loyalty.js?v=5"></script>
   <script src="lumin-finance-sync.js?v=2"></script>
   <script src="lumin-cash-flow.js?v=1"></script>
-  <script src="lumin-patient-scans.js?v=4"></script>
+  <script src="lumin-patient-scans.js?v=5"></script>
   <link rel="stylesheet" href="lumin-patient-scans.css?v=4" />
   <link rel="stylesheet" href="lumin-cash-flow.css?v=1" />
-  <script src="lumin-storage-sync.js?v=2"></script>
-  <link rel="stylesheet" href="lumin-storage-sync.css?v=1" />
+  <script src="lumin-storage-sync.js?v=11"></script>
+  <link rel="stylesheet" href="lumin-storage-sync.css?v=6" />
   <script src="lumin-patient-swipe.js?v=1"></script>
   <script src="lumin-patients.js?v=4"></script>
   <script src="lumin-chart-sync.js?v=1"></script>
-  <script src="lumin-chart-media.js?v=8"></script>
+  <script src="lumin-chart-media.js?v=9"></script>
   <script src="lumin-chart-dates.js?v=1"></script>
   <link rel="stylesheet" href="lumin-chart-dates.css?v=1" />
   <script src="lumin-media-teeth.js?v=2"></script>
@@ -28122,11 +28122,17 @@
 
     async function persistPatientMediaDetails(patientId, relativePath, details) {
       if (!patientId || !relativePath) throw new Error(currentUiLanguage === 'ar' ? 'تعذر تحديد الصورة المحفوظة.' : 'The saved photo could not be identified.');
-      const { data, error } = await db.from('patient_media_details')
-        .upsert({ patient_id: patientId, relative_path: relativePath, ...details }, { onConflict: 'patient_id,relative_path' })
-        .select('relative_path,display_name,note,tooth_id,tooth_ids').single();
-      if (error) throw error;
-      return data;
+      const config = getStorageServerConfig();
+      const patient = getKnownPatient(patientId);
+      const response = await fetch(`${config.url}/api/patient/${encodeURIComponent(patientId)}/media-details`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-lumin-key': config.key },
+        body: JSON.stringify({ relativePath, details, patientName: patient?.name, patientNumber: patient?.patient_number, phone: patient?.phone })
+      });
+      const data = await response.json();
+      if (!response.ok || data.metadataSource !== 'local' || !data.details) throw new Error(currentUiLanguage === 'ar'
+        ? 'تعذر حفظ التفاصيل على الخادم المحلي. تأكد من تحديث خادم التخزين ثم أعد المحاولة.'
+        : 'Could not save details on the local server. Update the storage server, then retry.');
+      return data.details;
     }
 
     function sanitizeStorageFolderName(name) {
@@ -28159,30 +28165,7 @@
         }
       }
 
-      // 2. Update Supabase patient_media_details directly
-      try {
-        const { data: mediaRows } = await db.from('patient_media_details')
-          .select('relative_path')
-          .eq('patient_id', patientId);
-
-        if (mediaRows && mediaRows.length > 0) {
-          const oldPrefix = oldFolder + '/';
-          const newPrefix = newFolder + '/';
-          for (const row of mediaRows) {
-            if (row.relative_path && row.relative_path.startsWith(oldPrefix)) {
-              const newRelPath = newPrefix + row.relative_path.slice(oldPrefix.length);
-              await db.from('patient_media_details')
-                .update({ relative_path: newRelPath })
-                .eq('patient_id', patientId)
-                .eq('relative_path', row.relative_path);
-            }
-          }
-        }
-      } catch (dbErr) {
-        console.warn('Failed to update patient_media_details during rename:', dbErr);
-      }
-
-      // 3. Refresh media cache if active
+      // The storage server migrates local annotations along with the files.
       if (typeof chartPatientMedia !== 'undefined' && chartPatientMedia.patientId === patientId) {
         void loadChartPatientMedia(patientId);
       }
@@ -28347,23 +28330,10 @@
 
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
-        const detailsResult = await db.from('patient_media_details').select('relative_path,display_name,note,tooth_id,tooth_ids').eq('patient_id', patient.id);
         if (renderToken !== patientMediaRenderToken) return;
-        patientMediaDetailsError = Boolean(detailsResult.error);
-        if (detailsResult.error) console.warn('Patient photo details could not be loaded:', detailsResult.error);
-        const detailsList = detailsResult.error ? [] : detailsResult.data || [];
-        const detailsByPath = new Map(detailsList.map(item => [item.relative_path, item]));
-        const detailsBySubpath = new Map(detailsList.map(item => [String(item.relative_path || '').split('/').slice(-2).join('/'), item]));
-        currentPatientMediaFiles = (data.files || []).filter(file => file.category !== '3D-Scans' && !/\.zip$/i.test(file.filename || '')).map(file => {
-          const subpath = [file.category, file.filename].join('/');
-          const match = detailsByPath.get(file.relativePath) || detailsBySubpath.get(subpath) || null;
-          if (match && match.relative_path !== file.relativePath) {
-            void db.from('patient_media_details').update({ relative_path: file.relativePath })
-              .eq('patient_id', patient.id).eq('relative_path', match.relative_path);
-            match.relative_path = file.relativePath;
-          }
-          return { ...file, mediaDetails: match };
-        });
+        patientMediaDetailsError = data.metadataSource !== 'local' || Boolean(data.metadataUnavailable);
+        currentPatientMediaFiles = (data.files || []).filter(file => file.category !== '3D-Scans' && !/\.zip$/i.test(file.filename || '')).map(file => ({ ...file,
+          mediaDetails: patientMediaDetailsError ? null : file.mediaDetails || null }));
         activePatientMediaPatientId = patient.id;
         renderPatientMediaGrid();
       } catch (err) {
@@ -28803,8 +28773,6 @@
           body: JSON.stringify({ relativePath })
         });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const { error: detailsError } = await db.from('patient_media_details').delete().eq('patient_id', patientId).eq('relative_path', relativePath);
-        if (detailsError) console.warn('Deleted photo metadata could not be cleared:', detailsError);
         await renderPatientMedia();
       } catch (err) {
         alert(currentUiLanguage === 'ar' ? `تعذر حذف الملف: ${err.message}` : `Failed to delete file: ${err.message}`);
@@ -29073,8 +29041,6 @@
             await requestPatientMediaMove(newPath, fileRecord.category, storageConfig);
             throw new Error(currentUiLanguage === 'ar' ? 'تعذر حفظ تفاصيل الصورة في التصنيف الجديد. تمت إعادة الصورة إلى تصنيفها الأصلي.' : 'Could not save photo details in the new category. The photo was restored to its original category.');
           }
-          const { error: cleanupError } = await db.from('patient_media_details').delete().eq('patient_id', patientId).eq('relative_path', relativePath);
-          if (cleanupError) console.warn('Previous photo metadata path could not be cleared:', cleanupError);
         }
 
         closePatientMediaMoveModal();

@@ -76,18 +76,15 @@
       this.host.innerHTML = `<div class="scan-skeleton" role="status">${this.t('loading')}</div>`;
       if (!this.storage.url) { this.shell(); this.host.querySelector('.scan-library').innerHTML = `<p>${this.t('noServer')}</p>${this.button('settings', 'settings', 'settings')}`; this.icons(); return; }
       try {
-        const [health, listing, metadata] = await Promise.all([
+        const [health, listing] = await Promise.all([
           this.request('/api/health').then(r => r.json()),
-          this.request(`/api/patient/${encodeURIComponent(this.patient.id)}/files?name=${encodeURIComponent(this.patient.name || '')}`).then(r => r.json()),
-          this.options.db.from('patient_media_details').select('relative_path,display_name,note,scan_date,scan_config').eq('patient_id', this.patient.id)
+          this.request(`/api/patient/${encodeURIComponent(this.patient.id)}/files?name=${encodeURIComponent(this.patient.name || '')}`).then(r => r.json())
         ]);
         if (!this.alive()) return;
-        if (metadata.error) throw metadata.error;
+        if (listing.metadataSource !== 'local' || listing.metadataUnavailable) throw new Error('serverUpdate');
         this.health = health;
-        const byPath = new Map((metadata.data || []).map(row => [row.relative_path, row]));
-        const bySubpath = new Map((metadata.data || []).map(row => [row.relative_path.split('/').slice(-2).join('/'), row]));
         this.files = (listing.files || []).filter(file => (file.category === '3D-Scans' || file.relativePath?.split('/')[1] === '3D-Scans') && /\.zip$/i.test(file.filename)).map(file => ({ ...file,
-          details: byPath.get(file.relativePath) || bySubpath.get(file.relativePath.split('/').slice(-2).join('/')) || {} }));
+          details: file.mediaDetails || {} }));
         this.shell(); this.library();
         if (pendingUploads.has(this.patient.id)) {
           const status = this.host.querySelector('.scan-message'); status.hidden = false;
@@ -269,8 +266,7 @@
         }
         if (pending?.result) pendingUploads.set(this.patient.id, { result: pending.result, details });
         const path = pending?.result.relativePath || file.relativePath;
-        const { error } = await this.options.db.from('patient_media_details').upsert({ patient_id: this.patient.id, relative_path: path, ...details }, { onConflict: 'patient_id,relative_path' });
-        if (error) throw error;
+        await this.saveDetails(path, details);
         pendingUploads.delete(this.patient.id);
         if (!this.alive() || epoch !== this.epoch) return;
         this.close(); await this.load();
@@ -282,6 +278,15 @@
       const url = URL.createObjectURL(blob), link = document.createElement('a');
       link.href = url; link.download = file.details.scan_config?.original_filename || file.filename; link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+    async saveDetails(relativePath, details) {
+      const result = await (await this.request(`/api/patient/${encodeURIComponent(this.patient.id)}/media-details`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ relativePath, details, patientName: this.patient.name,
+          patientNumber: this.patient.patient_number, phone: this.patient.phone })
+      })).json();
+      if (result.metadataSource !== 'local' || !result.details) throw new Error('serverUpdate');
+      return result.details;
     }
     async action(action, index) {
       if (action === 'close') return this.close();
@@ -299,13 +304,12 @@
       if (action === 'delete') {
         const file = this.files[Number(index)]; if (!file || !confirm(this.t('confirmDelete'))) return;
         await this.request('/api/file', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ relativePath: file.relativePath }) });
-        const { error } = await this.options.db.from('patient_media_details').delete().eq('patient_id', this.patient.id).in('relative_path', [...new Set([file.relativePath, file.details.relative_path].filter(Boolean))]);
-        this.close(); this.selected.clear(); await this.load(); if (error) throw error;
+        this.close(); this.selected.clear(); await this.load();
       }
       if (action === 'finishMetadata') {
         const pending = pendingUploads.get(this.patient.id); if (!pending) return;
-        const { error } = await this.options.db.from('patient_media_details').upsert({ patient_id: this.patient.id, relative_path: pending.result.relativePath, ...pending.details }, { onConflict: 'patient_id,relative_path' });
-        if (error) throw error; pendingUploads.delete(this.patient.id); return this.load();
+        await this.saveDetails(pending.result.relativePath, pending.details);
+        pendingUploads.delete(this.patient.id); return this.load();
       }
     }
     syncControls() {

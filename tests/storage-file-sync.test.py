@@ -36,15 +36,18 @@ class SyncTests(unittest.TestCase):
             with patch.dict(os.environ, {'LUMIN_STORAGE_CONFIG': str(config)}):
                 spec.loader.exec_module(module)
             # Endpoint tests exercise file/sync behavior without racing background SQL exports.
+            module._mapping_writer = module.update_storage_mapping_files
             module.update_storage_mapping_files = lambda: {}
 
-            def auth_json(url, method='GET', headers=None, data=None):
+            def auth_json(url, method='GET', headers=None, data=None, timeout=25):
                 if (headers or {}).get('Authorization') != 'Bearer admin':
                     raise SyncError('Expired token', 401)
                 if '/auth/v1/user' in url:
                     return {'id': 'admin-user'}
                 if '/rest/v1/user_profiles?' in url:
                     return [{'active': True, 'access_roles': {'is_admin': True}}]
+                if '/rest/v1/patients?' in url or '/rest/v1/patient_media_details?' in url:
+                    raise AssertionError('Sync must use local annotations, not Supabase media records')
                 raise AssertionError('Unexpected external request: ' + url)
 
             module.json_request = auth_json
@@ -84,6 +87,259 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(job['completedFiles'], job['totalFiles'])
         self.assertEqual(job['transferredBytes'], job['totalBytes'])
 
+    def clinical_fixture(self):
+        return dict(version=1, patients=[dict(id='12345678-1234-4234-8234-123456789abc',
+                    name='مريض تجريبي', patient_number=1042, phone='01000000000')], files=[dict(
+                    patient_id='12345678-1234-4234-8234-123456789abc', relative_path='مريض_تجريبي/Periapical/photo.png',
+                    display_name='فحص الأسنان', note="Follow-up 'note' <script>example</script>", tooth_id='14',
+                    tooth_ids=['14', '15', '14'], scan_date='2026-10-07', scan_config={'rotation': 90})])
+
+    def seed_local_details(self, snapshot=None):
+        self.engines[0].clinical.replace(snapshot or self.clinical_fixture())
+
+    def test_patient_ids_teeth_notes_and_scan_settings_sync_and_export_on_both_pcs(self):
+        import sqlite3
+        fixture = self.clinical_fixture()
+        rel = fixture['files'][0]['relative_path']
+        self.write(0, rel, b'clinical image')
+        self.seed_local_details(fixture)
+        for module in self.modules:
+            module.update_storage_mapping_files = module._mapping_writer
+            module.fetch_all_patients_metadata_from_supabase = lambda: self.fail('Must use caller-scoped cache')
+        self.pair()
+        job = self.run_sync()
+        self.assert_completed(job)
+        self.assertEqual(job['metadataStatus'], 'current')
+        self.assertEqual(job['metadataPatients'], 1)
+        for engine in self.engines:
+            tag = json.loads((engine.root / 'مريض_تجريبي/.patient_id').read_text(encoding='utf-8'))
+            self.assertEqual(tag['patient_id'], fixture['patients'][0]['id'])
+            data = json.loads((engine.root / 'patients_mapping.json').read_text(encoding='utf-8'))
+            media = data['files'][0]
+            self.assertEqual(media['patient_id'], fixture['patients'][0]['id'])
+            self.assertEqual(media['patient_number'], '1042')
+            self.assertEqual(media['tooth_ids'], ['14', '15'])
+            self.assertEqual(media['note'], fixture['files'][0]['note'])
+            self.assertEqual(media['scan_config'], {'rotation': 90})
+            sql = (engine.root / 'patients_mapping.sql').read_text(encoding='utf-8')
+            self.assertIn('patient_media_details_mapping', sql)
+            self.assertIn("Follow-up \\'note\\'", sql)
+            from contextlib import closing
+            with closing(sqlite3.connect(engine.root / 'patients_mapping.sqlite')) as db:
+                row = db.execute('SELECT patient_id,tooth_ids,scan_date,scan_config FROM patient_media_details_mapping').fetchone()
+            self.assertEqual(row[0], fixture['patients'][0]['id'])
+            self.assertEqual(json.loads(row[1]), ['14', '15'])
+            self.assertEqual(row[2], '2026-10-07')
+            self.assertEqual(json.loads(row[3]), {'rotation': 90})
+        self.assertEqual(self.run_sync()['copiedFiles'], 0)
+
+    def test_metadata_changes_and_cleared_teeth_update_without_retransferring_files(self):
+        fixture = self.clinical_fixture()
+        rel = fixture['files'][0]['relative_path']
+        self.write(0, rel, b'image unchanged')
+        self.seed_local_details(fixture)
+        self.pair()
+        self.assert_completed(self.run_sync())
+        self.engines[1].clinical.upsert(rel, fixture['patients'][0]['id'],
+            dict(tooth_ids=[], tooth_id=None, note='', display_name='Updated label', scan_config=None))
+        job = self.run_sync()
+        self.assert_completed(job)
+        self.assertEqual(job['copiedFiles'], 0)
+        for engine in self.engines:
+            details = engine.clinical.details(rel)
+            self.assertEqual(details['tooth_ids'], [])
+            self.assertEqual(details['note'], '')
+            self.assertEqual(details['display_name'], 'Updated label')
+            with engine.database() as db:
+                self.assertNotIn('Bearer admin', json.dumps(db.execute('SELECT value FROM meta').fetchall()))
+
+    def test_review_and_preserved_conflict_copies_retain_clinical_annotations(self):
+        fixture = self.clinical_fixture()
+        rel = fixture['files'][0]['relative_path']
+        for index in range(2):
+            self.write(index, rel, b'first image' if index == 0 else b'second image')
+        self.seed_local_details(fixture)
+        self.pair()
+        job = self.run_sync()
+        self.assertEqual(job['status'], 'completed_with_conflicts', job)
+        route = self.urls[0] + '/api/sync/jobs/%s/conflicts/0' % job['id']
+        review = json_request(route, headers=self.headers)
+        for side in ('local', 'remote'):
+            self.assertEqual(review['details'][side]['patient_id'], fixture['patients'][0]['id'])
+            self.assertEqual(review['details'][side]['tooth_ids'], ['14', '15'])
+        json_request(route, 'POST', self.headers, dict(action='keep_both', revision=review['revision']))
+        for engine in self.engines:
+            copies = [r['path'] for r in engine.scan().values() if '__conflict-' in r['path']]
+            self.assertEqual(len(copies), 2)
+            for path in copies:
+                self.assertEqual(engine.clinical.details(path)['source_relative_path'], rel)
+                self.assertEqual(engine.clinical.details(path)['tooth_ids'], ['14', '15'])
+
+    def test_sync_uses_local_annotations_without_cloud_metadata_reads(self):
+        fixture = self.clinical_fixture()
+        rel = fixture['files'][0]['relative_path']
+        self.write(0, rel, b'image')
+        self.seed_local_details(fixture)
+        self.pair()
+        self.assert_completed(self.run_sync())
+        self.write(0, rel, b'updated offline')
+        job = self.run_sync()
+        self.assert_completed(job)
+        self.assertEqual(job['metadataStatus'], 'current')
+        self.assertNotIn('metadataWarning', job)
+        for engine in self.engines:
+            self.assertEqual(engine.clinical.details(rel)['tooth_ids'], ['14', '15'])
+        restarted = SyncEngine(self.engines[1].root, self.engines[1].state_root, ['png'])
+        self.assertEqual(restarted.clinical.details(rel)['note'], fixture['files'][0]['note'])
+
+    def test_clinical_snapshot_is_validated_before_replacing_the_cache_and_requires_pair_credentials(self):
+        fixture = self.clinical_fixture()
+        self.pair()
+        self.engines[1].clinical.replace(fixture)
+        original = self.engines[1].clinical.snapshot()
+        route = self.urls[1] + '/api/sync/peer/metadata'
+        with self.assertRaises(SyncError) as unauthorized:
+            json_request(route, 'POST', {'x-lumin-key': self.keys[1]}, fixture)
+        self.assertEqual(unauthorized.exception.status, 401)
+        invalid = copy.deepcopy(fixture)
+        invalid['files'][0]['patient_id'] = '99999999-1234-4234-8234-123456789abc'
+        with self.assertRaises(SyncError) as rejected:
+            json_request(route, 'POST', self.engines[0].peer_headers(), dict(snapshot=invalid, expected=self.engines[1].clinical.digest(original)))
+        self.assertEqual(rejected.exception.code, 'invalid_clinical_metadata')
+        self.assertEqual(self.engines[1].clinical.snapshot(), original)
+
+    def save_details(self, index, rel, details, pid=None):
+        pid = pid or self.clinical_fixture()['patients'][0]['id']
+        return json_request(self.urls[index] + '/api/patient/' + pid + '/media-details', 'POST',
+                            {'x-lumin-key': self.keys[index]},
+                            dict(relativePath=rel, patientName='مريض تجريبي', patientNumber=1042, details=details))
+
+    def test_local_legacy_json_load_save_move_delete_and_restart_without_cloud(self):
+        fixture = self.clinical_fixture()
+        pid, rel = fixture['patients'][0]['id'], fixture['files'][0]['relative_path']
+        photo = self.write(0, rel, b'image')
+        (photo.parent.parent / 'patient_media_details.json').write_text(json.dumps(dict(
+            patient_id=pid, patient_name='مريض تجريبي', patient_number=1042,
+            files={'Periapical/photo.png':dict(display_name='Local original',note='Local note',tooth_id='A',tooth_ids=['3','A'],scan_config={'rotation':90})})), encoding='utf-8')
+        route = self.urls[0] + '/api/patient/' + pid + '/files'
+        listing = json_request(route, headers={'x-lumin-key':self.keys[0]})
+        self.assertEqual(listing['metadataSource'], 'local')
+        self.assertEqual(listing['files'][0]['mediaDetails']['tooth_ids'], ['3','A'])
+        saved = self.save_details(0, rel, dict(note='',tooth_ids=[]))
+        self.assertEqual(saved['details']['tooth_ids'], [])
+        self.assertEqual(saved['details']['scan_config'], {'rotation':90})
+        self.assertEqual(saved['details']['display_name'], 'Local original')
+        backup = json.loads((photo.parent.parent / 'patient_media_details.json').read_text(encoding='utf-8'))
+        self.assertEqual(backup['files']['Periapical/photo.png']['note'], '')
+        moved = json_request(self.urls[0] + '/api/file/move', 'POST', {'x-lumin-key':self.keys[0]},dict(relativePath=rel,targetCategory='Panoramic'))
+        new_rel = moved['newRelativePath']
+        restarted = SyncEngine(self.engines[0].root, self.engines[0].state_root, ['png'])
+        self.assertEqual(restarted.clinical.details(new_rel)['display_name'], 'Local original')
+        json_request(self.urls[0] + '/api/file', 'DELETE', {'x-lumin-key':self.keys[0]},dict(relativePath=new_rel))
+        self.assertFalse(self.engines[0].clinical.details(new_rel)['metadata_available'])
+
+    def test_simultaneous_local_annotation_edits_are_reviewable_and_keep_both_on_each_server(self):
+        fixture = self.clinical_fixture()
+        pid, rel = fixture['patients'][0]['id'], fixture['files'][0]['relative_path']
+        self.write(0, rel, b'same image')
+        self.save_details(0, rel, dict(note='Original',tooth_ids=['3','A']))
+        self.pair();self.assert_completed(self.run_sync())
+        for index in range(2):
+            self.save_details(index, rel, dict(note='Edit on PC %s' % index,tooth_ids=['3'] if index==0 else ['A']))
+        job=self.run_sync()
+        self.assertEqual(job['status'],'completed_with_conflicts',job)
+        self.assertEqual(job['conflicts'][0]['kind'],'metadata')
+        route=self.urls[0]+'/api/sync/jobs/%s/conflicts/0' % job['id']
+        review=json_request(route,headers=self.headers)
+        self.assertEqual(review['details']['local']['note'],'Edit on PC 0')
+        self.assertEqual(review['details']['remote']['note'],'Edit on PC 1')
+        self.save_details(1,rel,dict(note='Changed during review'))
+        with self.assertRaises(SyncError) as stale:
+            json_request(route,'POST',self.headers,dict(action='keep_both',revision=review['revision']))
+        self.assertEqual(stale.exception.status,409)
+        review=json_request(route,headers=self.headers)
+        json_request(route,'POST',self.headers,dict(action='keep_both',revision=review['revision']))
+        for engine in self.engines:
+            copies=[r['path'] for r in engine.scan().values() if '__conflict-' in r['path']]
+            self.assertEqual(len(copies),2)
+            self.assertEqual({engine.clinical.details(path)['note'] for path in copies},{'Edit on PC 0','Changed during review'})
+            self.assertEqual((engine.root/rel).read_bytes(),b'same image')
+        self.assert_completed(self.run_sync())
+        self.save_details(1,rel,dict(note='New annotation conflict'))
+        self.assertEqual(self.run_sync()['status'],'completed')
+        self.assertEqual(self.engines[0].clinical.details(rel)['note'],'New annotation conflict')
+
+    def test_peer_snapshot_rejects_overwriting_a_new_local_edit(self):
+        fixture=self.clinical_fixture();rel=fixture['files'][0]['relative_path']
+        self.write(1,rel,b'image');self.pair()
+        peer=self.urls[1]+'/api/sync/peer/metadata'
+        before=json_request(peer,headers=self.engines[0].peer_headers())
+        self.save_details(1,rel,dict(note='New local edit',tooth_ids=['A']))
+        with self.assertRaises(SyncError) as stale:
+            json_request(peer,'POST',self.engines[0].peer_headers(),dict(snapshot=fixture,expected=before['digest']))
+        self.assertEqual(stale.exception.status,409)
+        self.assertEqual(self.engines[1].clinical.details(rel)['note'],'New local edit')
+
+    def test_local_annotations_reject_foreign_patient_and_invalid_tooth_assignments(self):
+        fixture=self.clinical_fixture();pid=fixture['patients'][0]['id'];rel=fixture['files'][0]['relative_path']
+        self.write(0,rel,b'image');self.save_details(0,rel,dict(note='Original',tooth_ids=['32','T']))
+        for details in (dict(tooth_ids=['33']),dict(tooth_ids=['a']),dict(tooth_ids=[['3']])):
+            with self.assertRaises(SyncError) as invalid:self.save_details(0,rel,details)
+            self.assertEqual(invalid.exception.status,400)
+        with self.assertRaises(SyncError) as foreign:
+            self.save_details(0,rel,dict(note='Wrong patient'),'99999999-1234-4234-8234-123456789abc')
+        self.assertEqual(foreign.exception.status,409)
+        self.assertEqual(self.engines[0].clinical.details(rel)['note'],'Original')
+
+    def test_independent_annotation_edits_on_different_files_merge_in_both_directions(self):
+        fixture=self.clinical_fixture();rel=fixture['files'][0]['relative_path'];other=rel.replace('photo.png','second.png')
+        for path in (rel,other):
+            self.write(0,path,b'image');self.save_details(0,path,dict(note='Initial',tooth_ids=['3']))
+        self.pair();self.assert_completed(self.run_sync())
+        self.save_details(0,rel,dict(note='PC change',tooth_ids=['A']))
+        self.save_details(1,other,dict(note='Laptop change',tooth_ids=['T']))
+        job=self.run_sync();self.assert_completed(job)
+        self.assertEqual(job['copiedFiles'],0)
+        for engine in self.engines:
+            self.assertEqual(engine.clinical.details(rel)['note'],'PC change')
+            self.assertEqual(engine.clinical.details(other)['note'],'Laptop change')
+
+    def test_local_move_and_delete_sync_annotation_paths_without_reviving_old_details(self):
+        fixture=self.clinical_fixture();rel=fixture['files'][0]['relative_path']
+        self.write(0,rel,b'image');self.save_details(0,rel,dict(note='Portable note',tooth_ids=['A']))
+        self.pair();self.assert_completed(self.run_sync())
+        moved=json_request(self.urls[1]+'/api/file/move','POST',{'x-lumin-key':self.keys[1]},dict(relativePath=rel,targetCategory='Panoramic'))
+        new_rel=moved['newRelativePath'];self.assert_completed(self.run_sync())
+        for engine in self.engines:
+            self.assertFalse(engine.clinical.details(rel)['metadata_available'])
+            self.assertEqual(engine.clinical.details(new_rel)['note'],'Portable note')
+        json_request(self.urls[1]+'/api/file','DELETE',{'x-lumin-key':self.keys[1]},dict(relativePath=new_rel))
+        self.assert_completed(self.run_sync());self.assert_completed(self.run_sync())
+        for engine in self.engines:
+            self.assertFalse(engine.clinical.details(new_rel)['metadata_available'])
+
+    def test_local_patient_rename_preserves_annotations_without_cloud_requests(self):
+        fixture=self.clinical_fixture();pid=fixture['patients'][0]['id'];rel=fixture['files'][0]['relative_path']
+        self.write(0,rel,b'image');self.save_details(0,rel,dict(note='After rename',tooth_ids=['3','A']))
+        result=json_request(self.urls[0]+'/api/patient/'+pid+'/rename','POST',{'x-lumin-key':self.keys[0]},
+                            dict(oldName='مريض تجريبي',newName='Updated Patient'))
+        self.assertTrue(result['success'])
+        listing=json_request(self.urls[0]+'/api/patient/'+pid+'/files?name=Updated%20Patient',headers={'x-lumin-key':self.keys[0]})
+        self.assertEqual(listing['files'][0]['mediaDetails']['note'],'After rename')
+        self.assertEqual(listing['files'][0]['mediaDetails']['tooth_ids'],['3','A'])
+        self.assertEqual(listing['files'][0]['relativePath'],'Updated_Patient/Periapical/photo.png')
+
+    def test_existing_untagged_folder_can_be_associated_locally_after_index_regeneration(self):
+        fixture=self.clinical_fixture();pid=fixture['patients'][0]['id'];rel='Existing_Patient/Periapical/photo.png'
+        photo=self.write(0,rel,b'image')
+        self.modules[0]._mapping_writer()
+        self.assertFalse((photo.parent.parent/'.patient_id').exists())
+        route=self.urls[0]+'/api/patient/'+pid+'/files?name=Existing%20Patient'
+        listing=json_request(route,headers={'x-lumin-key':self.keys[0]})
+        self.assertEqual(len(listing['files']),1)
+        saved=self.save_details(0,rel,dict(note='Local association',tooth_ids=['3','A']))
+        self.assertEqual(saved['details']['tooth_ids'],['3','A'])
+
     def test_first_merge_both_directions_preserves_arabic_paths_and_skips_identical(self):
         self.write(0, 'أحمد/أشعة/صورة.pdf', b'PC x-ray')
         self.write(1, 'Patient/Clinical-Photos/laptop.pdf', b'laptop photo')
@@ -97,6 +353,40 @@ class SyncTests(unittest.TestCase):
         self.assertEqual((self.engines[0].root / 'Patient/Clinical-Photos/laptop.pdf').read_bytes(), b'laptop photo')
         self.assert_completed(self.run_sync())
         self.assertEqual(self.run_sync()['totalBytes'], 0)
+
+    def test_revision_history_after_reinstall_merges_without_http400_or_losing_causality(self):
+        import uuid
+        rel = 'P/Panoramic/history.png'
+        revisions = {}
+        for index, engine in enumerate(self.engines):
+            self.write(index, rel, b'same original image')
+            record = engine.observe(rel)
+            record['clock'][str(uuid.uuid4())] = 3
+            engine.save_record(record)
+            revisions.update(record['clock'])
+        self.pair()
+        job = self.run_sync()
+        self.assert_completed(job)
+        self.assertEqual(job['copiedFiles'], 0)
+        for engine in self.engines:
+            self.assertEqual(engine.record(rel)['clock'], revisions)
+            self.assertEqual((engine.root / rel).read_bytes(), b'same original image')
+        self.write(0, rel, b'new image after reinstall')
+        self.assert_completed(self.run_sync())
+        for engine in self.engines:
+            current = engine.record(rel)
+            self.assertEqual(set(current['clock']), set(revisions))
+            self.assertEqual((engine.root / rel).read_bytes(), b'new image after reinstall')
+        with self.assertRaises(SyncError):
+            self.engines[0].validate_record(dict(current, clock={str(uuid.uuid4()): 1 for _ in range(65)}))
+
+    def test_peer_upload_rejects_nonobject_metadata_with_specific_safe_error(self):
+        import base64
+        self.pair()
+        headers = {**self.engines[0].peer_headers(), 'x-lumin-sync-meta': base64.b64encode(b'[]').decode()}
+        response = self.modules[1].app.test_client().put('/api/sync/peer/file', headers=headers, data=b'')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()['code'], 'invalid_transfer')
 
     def test_updates_archive_previous_copy_and_track_deletions_both_directions(self):
         self.write(0, 'P/General/edit.pdf', b'old')
@@ -224,6 +514,133 @@ class SyncTests(unittest.TestCase):
             e.apply(old, old)
         self.assertEqual((e.root / old['path']).read_bytes(), b'changed during sync')
 
+    def test_peer_errors_report_safe_reasons_and_never_forward_arbitrary_response_bodies(self):
+        from file_sync import open_request
+        import urllib.error
+        safe_error = urllib.error.HTTPError('http://peer.test', 409, 'Conflict', {},
+                         io.BytesIO(b'{"error":"A file changed during synchronization. Retry sync."}'))
+        with patch('file_sync.urllib.request.OpenerDirector.open', side_effect=safe_error):
+            with self.assertRaises(SyncError) as raised:
+                open_request('http://peer.test')
+        self.assertEqual(raised.exception.code, 'file_changed')
+        self.assertEqual(raised.exception.status, 409)
+        private_error = urllib.error.HTTPError('http://peer.test', 409, 'Conflict', {},
+                            io.BytesIO(b'{"error":"secret-key-and-patient-path","code":"file_changed"}'))
+        with patch('file_sync.urllib.request.OpenerDirector.open', side_effect=private_error):
+            with self.assertRaises(SyncError) as raised:
+                open_request('http://peer.test')
+        self.assertEqual(str(raised.exception), 'Server request failed (HTTP 409).')
+        self.assertIsNone(raised.exception.code)
+
+    def test_pair_and_background_job_errors_keep_the_specific_reason(self):
+        client = self.modules[0].app.test_client()
+        result = client.post('/api/sync/pair', headers=self.headers,
+                             json={'url': self.urls[0], 'key': self.keys[0]})
+        self.assertEqual(result.status_code, 409)
+        self.assertEqual(result.get_json()['code'], 'same_server')
+        self.pair()
+        with patch.object(self.engines[0], 'scan', side_effect=SyncError('A file changed during scanning. Retry sync.', 409)):
+            job = self.run_sync()
+        self.assertEqual(job['errorCode'], 'file_changed')
+        self.assertEqual(job['errorStatus'], 409)
+
+
+    def review_fixture(self, case_only=False):
+        paths = ['مريض/Panoramic/scan.PNG', 'مريض/panoramic/scan.png'] if case_only else ['مريض/3D-Scans/scan.zip'] * 2
+        for i, path in enumerate(paths):
+            self.write(i, path, b'same' if case_only else [b'PC original', b'laptop original'][i])
+        self.pair()
+        job = self.run_sync()
+        self.assertEqual(job['status'], 'completed_with_conflicts', job)
+        route = '/api/sync/jobs/%s/conflicts/0' % job['id']
+        client = self.modules[0].app.test_client()
+        response = client.get(route, headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.get_json())
+        return paths, job, route, client, response.get_json()
+
+    def test_review_compares_originals_and_keeps_both_on_both_servers_durably(self):
+        paths, job, route, client, snapshot = self.review_fixture()
+        self.assertNotIn('secret', json.dumps(snapshot))
+        self.assertNotEqual(snapshot['versions']['local']['sha256'], snapshot['versions']['remote']['sha256'])
+        for side, expected in [('local', b'PC original'), ('remote', b'laptop original')]:
+            response = client.get(route + '/file', headers=self.headers,
+                                  query_string={'side': side, 'revision': snapshot['revision']})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.data, expected)
+            self.assertIn('no-store', response.headers['Cache-Control'])
+            response.close()
+        response = client.post(route, headers=self.headers, json={'action': 'keep_both', 'revision': snapshot['revision']})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        resolved = response.get_json()['job']
+        self.assertEqual(resolved['status'], 'completed')
+        self.assertTrue(resolved['conflicts'][0]['reviewed'])
+        for i, engine in enumerate(self.engines):
+            self.assertEqual((engine.root / paths[i]).read_bytes(), [b'PC original', b'laptop original'][i])
+            copies = list(engine.root.rglob('*__conflict-*.zip'))
+            self.assertEqual(len(copies), 2)
+            self.assertEqual({p.read_bytes() for p in copies}, {b'PC original', b'laptop original'})
+        self.assert_completed(self.run_sync())
+        self.assertTrue(client.get(route, headers=self.headers).get_json()['reviewed'])
+        # The decision survives a server restart and does not hide later changes.
+        e = self.engines[0]
+        restarted = SyncEngine(e.root, e.state_root, e.extensions, e.thumbnail)
+        self.assertEqual(restarted.meta('reviewedConflicts'), e.meta('reviewedConflicts'))
+        self.write(1, paths[1], b'new laptop edit')
+        changed = self.run_sync()
+        self.assertEqual(changed['status'], 'completed_with_conflicts')
+        self.assertFalse(changed['conflicts'][0].get('reviewed', False))
+
+    def test_case_only_names_can_be_reviewed_without_replacing_or_duplicating_originals(self):
+        paths, _, route, client, snapshot = self.review_fixture(case_only=True)
+        self.assertEqual(snapshot['kind'], 'path_case')
+        self.assertEqual(snapshot['versions']['local']['sha256'], snapshot['versions']['remote']['sha256'])
+        response = client.post(route, headers=self.headers, json={'action': 'keep_both', 'revision': snapshot['revision']})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        for i, engine in enumerate(self.engines):
+            self.assertEqual([p.relative_to(engine.root).as_posix() for p in engine.root.rglob('*') if p.is_file()], [paths[i]])
+        self.assert_completed(self.run_sync())
+        self.write(1, paths[1], b'changed')
+        self.assertEqual(self.run_sync()['status'], 'completed_with_conflicts')
+
+    def test_stale_review_and_file_requests_reject_changes_without_accepting_them(self):
+        paths, _, route, client, snapshot = self.review_fixture()
+        self.write(1, paths[1], b'edited after comparison')
+        for response in [client.post(route, headers=self.headers, json={'action': 'keep_both', 'revision': snapshot['revision']}),
+                         client.get(route + '/file', headers=self.headers, query_string={'side': 'remote', 'revision': snapshot['revision']})]:
+            self.assertEqual(response.status_code, 409)
+            self.assertEqual(response.get_json()['code'], 'review_changed')
+        self.assertFalse(client.get(route, headers=self.headers).get_json()['reviewed'])
+        self.assertEqual((self.engines[1].root / paths[1]).read_bytes(), b'edited after comparison')
+
+    def test_review_requires_clinic_key_admin_current_peer_and_supported_action(self):
+        _, job, route, client, snapshot = self.review_fixture()
+        for headers in [{}, {'x-lumin-key': self.keys[0]}, {'Authorization': 'Bearer admin'}]:
+            for method, endpoint in [('get', route), ('get', route + '/file'), ('post', route)]:
+                response = getattr(client, method)(endpoint, headers=headers)
+                self.assertIn(response.status_code, (401, 403))
+        self.assertEqual(client.post(route, headers=self.headers, json={'action': 'overwrite'}).status_code, 400)
+        self.assertEqual(client.get(route.replace('/0', '/999'), headers=self.headers).status_code, 404)
+        job['peerId'] = 'different-computer'
+        self.engines[0].update_job(job)
+        response = client.get(route, headers=self.headers)
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.get_json()['code'], 'peer_changed')
+
+    def test_review_during_sync_and_edited_preserved_copy_cannot_be_accepted(self):
+        _, job, route, client, snapshot = self.review_fixture()
+        copy_path = next(self.engines[0].root.rglob('*__conflict-*.zip'))
+        copy_path.write_bytes(b'edited preserved version')
+        response = client.post(route, headers=self.headers, json={'action': 'keep_both', 'revision': snapshot['revision']})
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.get_json()['code'], 'conflict_copy_changed')
+        self.assertFalse(self.engines[0].jobs()[0]['conflicts'][0].get('reviewed', False))
+        job['status'] = 'running'
+        self.engines[0].update_job(job)
+        for response in [client.get(route, headers=self.headers),
+                         client.post(route, headers=self.headers, json={'action': 'keep_both', 'revision': snapshot['revision']})]:
+            self.assertEqual(response.status_code, 409)
+            self.assertEqual(response.get_json()['code'], 'sync_busy')
+
     def test_archiving_failure_and_missing_root_never_delete_patient_files(self):
         self.write(0, 'P/General/a.pdf', b'old')
         e = self.engines[0]
@@ -330,6 +747,122 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(removed.status_code, 200)
         self.run_sync()
         self.assertFalse((self.engines[1].root / paths[0]).exists())
+
+
+
+    def test_metadata_regeneration_and_legacy_records_do_not_interrupt_file_sync(self):
+        """Generated metadata must never be transferred, verified or deleted."""
+        import hashlib
+        import zipfile
+        original = io.BytesIO()
+        with zipfile.ZipFile(original, 'w') as archive:
+            archive.writestr('upper.obj', 'v 0 0 1\n')
+        zip_bytes = original.getvalue()
+        image_path = 'Ahmed_Ali/Periapical/xray.png'
+        scan_path = 'Patient_B/3D-Scans/visit/Original Scan.ZIP'
+        metadata_path = 'Ahmed_Ali/patient_media_details.json'
+        self.write(0, image_path, b'png-binary-data')
+        self.write(1, scan_path, zip_bytes)
+        caches = [metadata_path, 'Ahmed_Ali/patient_media_details__conflict-old.json',
+                  'Ahmed_Ali/patient_media_details.conflict-old.json',
+                  'patients_mapping.json', 'patients_mapping.sql',
+                  'Ahmed_Ali/patient_mapping.json', 'Ahmed_Ali/notes.db',
+                  'Ahmed_Ali/index.sqlite3']
+        # Simulate sync history created by the previous server version.
+        for index, engine in enumerate(self.engines):
+            for path in caches:
+                content = ('local cache %s: %s' % (index, path)).encode()
+                self.write(index, path, content)
+                if Path(path).name.startswith('patient_media_details'):
+                    record = dict(path=path, deleted=False, size=len(content),
+                                  sha256=hashlib.sha256(content).hexdigest(),
+                                  clock={engine.node_id: 1})
+                    with engine.database() as db:
+                        db.execute('INSERT INTO records VALUES (?,?)',
+                                   (path.casefold(), json.dumps(record)))
+        def regenerate(index):
+            self.write(index, metadata_path, ('regenerated on node %s' % index).encode())
+        for index, engine in enumerate(self.engines):
+            engine.on_change = lambda index=index: regenerate(index)
+        self.pair()
+        job = self.run_sync()
+        self.assert_completed(job)
+        self.assertEqual(job['conflicts'], [])
+        self.assertEqual(job['copiedFiles'], 2)
+        self.assertEqual((self.engines[1].root / image_path).read_bytes(), b'png-binary-data')
+        self.assertEqual((self.engines[0].root / scan_path).read_bytes(), zip_bytes)
+        for index, engine in enumerate(self.engines):
+            for path in caches:
+                self.assertIsNone(engine.record(path))
+                self.assertTrue((engine.root / path).is_file())
+                expected = ('regenerated on node %s' % index) if path == metadata_path else ('local cache %s: %s' % (index, path))
+                self.assertEqual((engine.root / path).read_bytes(), expected.encode())
+            self.assertNotIn('json', engine.extensions)
+            self.assertIn('zip', engine.extensions)
+        self.assertEqual(self.run_sync()['copiedFiles'], 0)
+
+    def test_incompatible_scope_requires_update_before_any_patient_file_changes(self):
+        self.write(0, 'P/Panoramic/xray.png', b'original image')
+        self.pair()
+        engine = self.engines[0]
+        legacy = {'nodeId': self.engines[1].node_id, 'fileScope': 'incompatible-files', 'files': {}}
+        with patch.object(engine, 'peer_json', return_value=legacy):
+            job = self.run_sync()
+        self.assertEqual(job['status'], 'failed')
+        self.assertIn('Update and restart', job['error'])
+        self.assertEqual(job['copiedFiles'], 0)
+        self.assertFalse((self.engines[1].root / 'P/Panoramic/xray.png').exists())
+        with patch('file_sync.json_request', return_value={'nodeId': self.engines[1].node_id, 'protocol': 1,
+                                                        'fileScope': 'incompatible-files'}):
+            result = self.modules[0].app.test_client().post('/api/sync/pair', headers=self.headers,
+                         json={'url': self.urls[1], 'key': self.keys[1]})
+        self.assertEqual(result.status_code, 426)
+
+    def test_zip_is_included_with_image_only_config_and_metadata_is_rejected(self):
+        engine = SyncEngine(self.engines[0].root, self.base / 'image-only-state', ['png', 'JSON', 'sqlite3'])
+        self.assertEqual(engine.extensions, {'png', 'zip', 'dcm', 'dicom'})
+        self.write(0, 'P/3D-Scans/original.ZIP', b'original archive')
+        self.write(0, 'P/patient_media_details.json', b'{}')
+        self.assertEqual(set(engine.scan()), {'p/3d-scans/original.zip'})
+        with self.assertRaises(SyncError):
+            engine.observe('P/patient_media_details.json')
+
+
+
+    def test_review_and_original_downloads_check_only_the_selected_file(self):
+        _, _, route, client, snapshot = self.review_fixture()
+        self.write(0, 'Another_Patient/3D-Scans/unrelated.zip', b'unrelated large scan')
+        self.write(1, 'Another_Patient/3D-Scans/unrelated.zip', b'other unrelated scan')
+        with patch.object(self.engines[0], 'scan', side_effect=AssertionError('review rescanned the clinic')), \
+             patch.object(self.engines[1], 'scan', side_effect=AssertionError('review rescanned the peer')):
+            response = client.get(route, headers=self.headers)
+            self.assertEqual(response.status_code, 200, response.get_json())
+            self.assertEqual(response.get_json()['revision'], snapshot['revision'])
+            for side, expected in [('local', b'PC original'), ('remote', b'laptop original')]:
+                response = client.get(route + '/file', headers=self.headers,
+                    query_string={'side': side, 'revision': snapshot['revision']})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.data, expected)
+                response.close()
+
+
+    def test_targeted_review_requires_peer_auth_and_handles_older_peer(self):
+        paths, _, route, client, snapshot = self.review_fixture()
+        remote = self.modules[1].app.test_client()
+        endpoint = '/api/sync/peer/review-record'
+        self.assertEqual(remote.get(endpoint, query_string={'path': paths[1]}).status_code, 401)
+        headers = self.engines[0].peer_headers()
+        self.assertEqual(remote.get(endpoint, headers=headers, query_string={'path': '../outside.pdf'}).status_code, 403)
+        self.assertEqual(remote.get(endpoint, headers=headers, query_string={'path': 'P/patient_media_details.json'}).status_code, 400)
+        peer_json = self.engines[0].peer_json
+        def older_peer(route, *args, **kwargs):
+            if route.startswith('review-record?'):
+                raise SyncError('Older peer endpoint unavailable', 404)
+            return peer_json(route, *args, **kwargs)
+        with patch.object(self.engines[0], 'peer_json', side_effect=older_peer):
+            response = client.get(route, headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.get_json())
+        self.assertEqual(response.get_json()['revision'], snapshot['revision'])
 
 
 if __name__ == '__main__':

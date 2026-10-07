@@ -9,16 +9,15 @@ const root = path.resolve(__dirname, '..');
 const sample = process.env.LUMIN_SCAN_SAMPLE || 'C:/Users/Lenovo/Desktop/Mervat Sa3eed Sadek.zip';
 const obj = 'mtllib arch.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0 0\nvt 1 0\nvt 0 1\nusemtl _texture\nf 1/1 2/2 3/3\n';
 const bootstrap = `
-window.records = []; window.failMetadata = false;
-window.fakeDb = { from() { return {
- select() { return { eq: async (_,id) => ({data:window.records.filter(r=>r.patient_id===id),error:null}) }; },
- async upsert(row) {
-   if(window.failMetadata) {window.failMetadata=false;return {error:{message:'forced failure'}};}
-   const index=window.records.findIndex(r=>r.relative_path===row.relative_path);
-   if(index<0)window.records.push(row);else window.records[index]={...window.records[index],...row};
-   return {error:null};
- }, delete() { return {eq() {return {in:async (_,paths)=>{window.records=window.records.filter(r=>!paths.includes(r.relative_path));return {error:null};}}}}; }
-}; } };
+window.failMetadata = false;
+window.fakeDb = {from() {throw Error('Scan metadata must not access Supabase');}};
+const scanFetch = window.fetch.bind(window);
+window.fetch = async (url, options) => {
+ if(String(url).includes('/media-details') && window.failMetadata) {
+   window.failMetadata=false;return {ok:false};
+ }
+ return scanFetch(url,options);
+};
 window.mount = (id='test-patient') => { window.scans?.dispose(); window.scans=LuminPatientScans.mount(document.getElementById('view-patient-scans'),{
  patient:{id,name:'Test Patient'},storage:{url:location.origin,key:'test-key'},db:fakeDb,
  language:document.documentElement.lang==='ar'?'ar':'en',isCurrent:()=>true,openSettings:()=>{}
@@ -32,7 +31,14 @@ test('scan viewer: original ZIP, comparison, controls, retries, safety, and resp
     if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/files/')) {
       if(url.pathname!=='/api/health' && req.headers['x-lumin-key']!=='test-key') {res.statusCode=401;res.end();return;}
       if (url.pathname==='/api/health') {res.setHeader('Content-Type','application/json');res.end(JSON.stringify({maxFileSizeMB:50,capabilities:{patient3dScans:true,scanOriginalFilenames:true}}));return;}
-      if (url.pathname.startsWith('/api/patient/')) {res.end(JSON.stringify({files:url.pathname.includes('/test-patient/')?files:[]}));return;}
+      if (url.pathname.endsWith('/media-details')) {
+        const chunks=[];for await(const c of req)chunks.push(c);
+        const data=JSON.parse(Buffer.concat(chunks));
+        const file=files.find(f=>f.relativePath===data.relativePath);
+        file.mediaDetails={...file.mediaDetails,...data.details,relative_path:data.relativePath};
+        res.end(JSON.stringify({metadataSource:'local',details:file.mediaDetails}));return;
+      }
+      if (url.pathname.startsWith('/api/patient/')) {res.end(JSON.stringify({metadataSource:'local',files:url.pathname.includes('/test-patient/')?files:[]}));return;}
       if (url.pathname==='/api/upload') {
         const parts=[]; for await(const part of req)parts.push(part);
         const data=Buffer.concat(parts), boundary=Buffer.from('--'+req.headers['content-type'].split('boundary=')[1]);
@@ -118,7 +124,7 @@ test('scan viewer: original ZIP, comparison, controls, retries, safety, and resp
   await page.locator('[data-scan-action="save"]').click();await page.waitForFunction(()=>document.querySelectorAll('.scan-card').length===1);assert.equal(uploads,1);
   const downloadPromise=page.waitForEvent('download');await page.locator('[data-scan-action="download"]').click();const download=await downloadPromise;
   assert.equal(download.suggestedFilename(),'Original scan.zip');assert.deepEqual(fs.readFileSync(await download.path()),bytes);
-  // A fresh instance represents another clinic device loading shared server files and DB details.
+  // A fresh instance represents another clinic device loading shared server files and local annotations.
   await page.evaluate(()=>mount());await page.locator('[data-scan-action="open"]').click();await page.waitForFunction(()=>scans.previewReady,{},{timeout:60000});
   await page.locator('[data-scan-field="name"]').fill('Renamed baseline');await page.locator('[data-scan-action="save"]').click();await page.waitForFunction(()=>document.querySelector('.scan-card h4')?.textContent==='Renamed baseline');
   await importZip(bytes,'Second scan.zip');await page.locator('[data-scan-field="name"]').fill('Follow-up');await page.locator('[data-scan-action="save"]').click();await page.waitForFunction(()=>document.querySelectorAll('.scan-card').length===2);
