@@ -15518,13 +15518,19 @@
       const operationId = document.getElementById('chart-operation-select')?.value;
       const operation = dentalOperations.find(item => item.id === operationId && item.active);
       if (!operation) return;
+      let applied = false;
       if (operation.actionScope === 'mouth') {
-        applyMouthOperation(operation.code, activeClinicalOperationStatus, operation.price, operation.steps);
+        applied = applyMouthOperation(operation.code, activeClinicalOperationStatus, operation.price, operation.steps);
       } else if (operation.actionScope === 'surface') {
-        applySurfaceCondition(operation.code, activeClinicalOperationStatus, operation.price, operation.steps);
+        applied = applySurfaceCondition(operation.code, activeClinicalOperationStatus, operation.price, operation.steps);
       } else {
-        applyToothStatus(operation.code, activeClinicalOperationStatus, operation.price, operation.steps);
+        applied = applyToothStatus(operation.code, activeClinicalOperationStatus, operation.price, operation.steps);
       }
+      if (applied && typeof setClinicalActionsPanelOpen === 'function') {
+        setClinicalActionsPanelOpen(false);
+        document.getElementById('chart-actions-toggle')?.focus({ preventScroll: true });
+      }
+      return applied;
     }
 
     function dentalOperationCode(name, specialtyId = '') {
@@ -30559,6 +30565,9 @@
         }
         if (!e.target.closest('.finding-tooth-picker')) closeFindingToothEditors();
         const clickPath = typeof e.composedPath === 'function' ? e.composedPath() : [];
+        // Procedure selection redraws the clicked row; keep its original event ancestry.
+        const clickedInsideClinicalActions = clickPath.some(node => node?.id === 'action-palette-card')
+          || Boolean(e.target.closest('#action-palette-card'));
         const clickedInsideChartSpecialtyMenu = clickPath.some(node => node?.id === 'chart-specialty-menu-shell')
           || Boolean(e.target.closest('#chart-specialty-menu-shell'));
         if (!clickedInsideChartSpecialtyMenu) closeChartProcedureMenu();
@@ -30584,7 +30593,7 @@
 
         // 3. Click on Action Palette, Modal, or Navigation -> Maintain selection
         if (
-          e.target.closest('#action-palette-card') ||
+          clickedInsideClinicalActions ||
           e.target.closest('#chart-media-panel') ||
           e.target.closest('#patient-attachment-modal') ||
           e.target.closest('#patient-media-lightbox') ||

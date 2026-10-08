@@ -44,7 +44,7 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
     'toggleSurface', 'updateSelectionUI', 'activeDentalSpecialties', 'closeChartProcedureMenu', 'renderChartSpecialtyRail',
     'renderChartProcedureMenu', 'renderClinicalActionSelectors', 'setClinicalOperationStatus', 'renderClinicalOperationStatusSelector',
     'renderChartOperationOptions', 'updateClinicalOperationPreview', 'applySelectedDentalOperation', 'applySurfaceCondition',
-    'applyToothStatus', 'applyMouthOperation'].map(source).join('\n');
+    'applyToothStatus', 'applyMouthOperation', 'bindGlobalClickEvents'].map(source).join('\n');
   await page.addScriptTag({ content: `
     let currentUiLanguage='en', activePatientId='patient-1', activeClinicalOperationStatus='P';
     let activeSelection={tooth:null,slot:null,surfaces:[],targets:[]};
@@ -60,9 +60,9 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
       {id:'mouth',name:'Whole-mouth examination',specialtyId:'endo',active:true,actionScope:'mouth',code:'mouth',price:200,steps:[]},
       {id:'inactive',name:'Inactive procedure',specialtyId:'endo',active:false,actionScope:'tooth',price:0}
     ];
-    let patients=[{id:'patient-1',chartState:{}},{id:'patient-2',chartState:{}}];
+    let patients=[{id:'patient-1',chartState:{}},{id:'patient-2',chartState:{}}], missingPatient=false;
     window.savedCharts=[]; window.alerts=[];
-    function getActivePatient(){return patients.find(patient=>patient.id===activePatientId);}
+    function getActivePatient(){return missingPatient ? null : patients.find(patient=>patient.id===activePatientId);}
     function chartToothLabel(id){return 'UL'+id;}
     function surfaceAbbreviation(id,surface){return surface==='center'?'O':surface;}
     function renderToothVisuals(){}
@@ -89,17 +89,16 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
     function renderChartMediaPanel(){document.getElementById('chart-clinical-workspace').classList.toggle('is-media-collapsed',chartPatientMedia.collapsed);updateChartSidePanelLayout();}
     function alert(message){window.alerts.push(message);}
     function clearSelectedTooth(){}
+    const toothDentitionLongPressSuppressClickUntil=0;
+    function beginToothDentitionLongPress(){}
+    function moveToothDentitionLongPress(){}
+    function finishToothDentitionLongPress(){}
+    function closeFindingToothEditors(){}
     ${functions}
     ${fs.readFileSync(path.join(root, 'lumin-chart-appointments.js'), 'utf8').match(/function updateChartSidePanelLayout\(\) \{[\s\S]*?\n\}/)[0]}
     document.getElementById('upper-arch').innerHTML=Array.from({length:16},(_,i)=>'<div class="tooth-card" id="tooth-card-'+(i+1)+'" data-tooth-card="'+(i+1)+'" data-slot="'+(i+1)+'" role="button" tabindex="0"><span>UL'+(i+1)+'</span><button type="button" class="fixture-surface" data-tooth="'+(i+1)+'" data-surface="center" id="tooth-'+(i+1)+'-center">O</button></div>').join('');
     document.getElementById('lower-arch').innerHTML=Array.from({length:16},(_,i)=>'<div class="tooth-card" id="tooth-card-'+(i+17)+'" data-tooth-card="'+(i+17)+'" data-slot="'+(i+17)+'" role="button" tabindex="0"><span>LL'+(i+1)+'</span><button type="button" class="fixture-surface" data-tooth="'+(i+17)+'" data-surface="center" id="tooth-'+(i+17)+'-center">O</button></div>').join('');
-    document.addEventListener('click',event=>{
-      if(event.target.closest('#action-palette-card')||event.target.closest('#chart-side-panels'))return;
-      const surface=event.target.closest('[data-surface]');
-      if(surface){toggleSurface(surface.dataset.tooth,surface.dataset.surface,Number(surface.dataset.tooth));return;}
-      const tooth=event.target.closest('[data-tooth-card]');
-      if(tooth)toggleSelectedChartTooth(tooth.dataset.toothCard,Number(tooth.dataset.slot));
-    });
+    bindGlobalClickEvents();
     renderClinicalActionSelectors();renderChartMediaPanel();renderChartAppointmentsPanel();
   ` });
   await page.addScriptTag({ path: path.join(root, 'lumin-clinical-actions.js') });
@@ -123,8 +122,10 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
       await page.locator('#chart-actions-search').fill('root');
       assert.equal(await page.locator('[data-clinical-operation]').count(),1);
       await page.locator('[data-clinical-operation="root-canal"]').click();
+      assert.equal(await toggle.getAttribute('aria-expanded'),'true','Choosing a procedure keeps the panel open');
       assert.deepEqual(await page.evaluate(()=>chartSelectionTargets().map(target=>target.tooth)),['1']);
       await page.locator('#chart-operation-status-select').selectOption('In');
+      assert.equal(await toggle.getAttribute('aria-expanded'),'true','Changing status keeps the panel open');
       assert.equal(await page.locator('#chart-apply-operation-button').isEnabled(),true);
       const apply=await page.locator('#chart-apply-operation-button').boundingBox();
       assert.ok(apply.width>=44&&apply.height>=44,JSON.stringify({viewport,language,apply}));
@@ -139,8 +140,10 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
       assert.equal(await toggle.getAttribute('aria-expanded'),'true','Adding another tooth reopens the panel');
       assert.deepEqual(await page.evaluate(()=>chartSelectionTargets().map(target=>target.tooth)),['1','2']);
       await page.locator('#chart-apply-operation-button').click();
+      assert.equal(await toggle.getAttribute('aria-expanded'),'false','Apply closes the panel after adding the treatment');
+      assert.deepEqual(await page.evaluate(()=>chartSelectionTargets().map(target=>target.tooth)),['1','2'],'Apply preserves selected teeth');
       assert.deepEqual(await page.evaluate(()=>['1','2'].map(id=>getActivePatient().chartState[id].wholeOperations.at(-1).status)),['In','In']);
-      await page.locator('#chart-actions-clear-selection').click();
+      await page.evaluate(()=>clearClinicalActionsSelection());
       assert.equal(await toggle.getAttribute('aria-expanded'),'false');
       assert.equal(await page.evaluate(()=>chartSelectionTargets().length),0);
     }
@@ -150,6 +153,7 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
   await page.locator('[data-clinical-operation="composite"]').click();
   await page.locator('#chart-operation-status-select').selectOption('C');
   await page.locator('#chart-apply-operation-button').click();
+  assert.equal(await page.locator('#chart-actions-toggle').getAttribute('aria-expanded'),'false','Surface Apply closes the panel');
   assert.equal(await page.evaluate(()=>getActivePatient().chartState['3'].surfaces.center.at(-1).status),'C');
   assert.equal(await page.locator('#chart-apply-operation-button').isEnabled(),false,'Surface procedures require surfaces after applying');
   await page.locator('#tooth-3-center').click();
@@ -165,12 +169,25 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
   assert.equal(await page.locator('#chart-apply-operation-button').isEnabled(),true,'Mouth procedures remain available without a tooth');
   await page.locator('#chart-apply-operation-button').click();
   assert.equal(await page.evaluate(()=>chartMouthFindings(getActivePatient()).length),1);
+  assert.equal(await page.locator('#chart-actions-toggle').getAttribute('aria-expanded'),'false','Whole-mouth Apply closes the panel');
+  await page.locator('#chart-actions-toggle').click();
   await page.locator('#chart-actions-search').fill('unmatched');
   assert.match(await page.locator('#chart-actions-operations').textContent(),/No matching procedures/);
   await page.locator('#chart-actions-operations button').click();
   assert.equal(await page.locator('[data-clinical-operation]').count(),4);
   await page.locator('#chart-actions-specialty-filter').selectOption('endo');
   assert.equal(await page.locator('[data-clinical-operation]').count(),2);
+  await page.evaluate(()=>{resetClinicalActionsFilters();toggleSelectedChartTooth('4',4);});
+  await page.locator('[data-clinical-operation="crown"] svg').click();
+  assert.equal(await page.locator('#chart-actions-toggle').getAttribute('aria-expanded'),'true','Clicking a procedure icon also keeps the panel open');
+  const savesBeforeFailure=await page.evaluate(()=>window.savedCharts.length);
+  await page.evaluate(()=>{missingPatient=true;});
+  await page.locator('#chart-apply-operation-button').click();
+  assert.equal(await page.locator('#chart-actions-toggle').getAttribute('aria-expanded'),'true','Unsuccessful Apply keeps the panel open');
+  assert.equal(await page.evaluate(()=>window.savedCharts.length),savesBeforeFailure);
+  await page.evaluate(()=>{missingPatient=false;});
+  await page.locator('#chart-apply-operation-button').click();
+  assert.equal(await page.locator('#chart-actions-toggle').getAttribute('aria-expanded'),'false');
   await page.evaluate(()=>{activePatientId='patient-2';activeSelection=emptyChartSelection();updateSelectionUI();});
   assert.equal(await page.locator('#chart-actions-toggle').getAttribute('aria-expanded'),'false');
   assert.equal(await page.locator('#chart-operation-select').inputValue(),'');
