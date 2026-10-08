@@ -24,8 +24,7 @@
       const related = data.items.filter(item => item.targets.some(target => target.toothId === id));
       const label = LuminQuotationModel.toothLabel(id);
       const name = `${label}${related.length ? ': '+related.map(item => item.name).join(', ') : ''}`;
-      const anatomy = LuminToothAnatomy.generate(id,tooth.slot,true)
-        .replaceAll('id="',`id="${prefix}-`).replaceAll('url(#guttaPerchaGrad)',`url(#${prefix}-gutta)`);
+      const anatomy = LuminToothAnatomy.photo(id,tooth.slot,true).replaceAll('id="',`id="${prefix}-`);
       const surfaces = ['top','left','center','right','bottom'];
       const shapes = {top:'M3 3H37L29 11H11Z',left:'M3 3L11 11V29L3 37Z',center:'M11 11H29V29H11Z',right:'M37 3V37L29 29V11Z',bottom:'M3 37L11 29H29L37 37Z'};
       const matrix = `<svg class="q-matrix" viewBox="0 0 40 40" aria-hidden="true">${surfaces.map(surface => {
@@ -36,7 +35,7 @@
     }
     const upper = data.teeth.filter(tooth => tooth.slot <= 16).sort((a,b) => a.slot-b.slot);
     const lower = data.teeth.filter(tooth => tooth.slot > 16).sort((a,b) => b.slot-a.slot);
-    return `<div class="q-chart-scroll"><div class="q-chart" dir="ltr"><svg width="0" height="0" aria-hidden="true"><defs><linearGradient id="${prefix}-gutta"><stop stop-color="#60a5fa"/><stop offset="1" stop-color="#2563eb"/></linearGradient></defs></svg><div class="q-quadrants"><span>${text(language,'Upper right','الفك العلوي الأيمن')}</span><span>${text(language,'Upper left','الفك العلوي الأيسر')}</span></div><div class="q-arch">${upper.map(toothMarkup).join('')}</div><div class="q-arch-divider"></div><div class="q-arch">${lower.map(toothMarkup).join('')}</div><div class="q-quadrants"><span>${text(language,'Lower right','الفك السفلي الأيمن')}</span><span>${text(language,'Lower left','الفك السفلي الأيسر')}</span></div></div></div>`;
+    return `<div class="q-chart-scroll"><div class="q-chart" dir="ltr"><div class="q-quadrants"><span>${text(language,'Upper right','الفك العلوي الأيمن')}</span><span>${text(language,'Upper left','الفك العلوي الأيسر')}</span></div><div class="q-arch">${upper.map(toothMarkup).join('')}</div><div class="q-arch-divider"></div><div class="q-arch">${lower.map(toothMarkup).join('')}</div><div class="q-quadrants"><span>${text(language,'Lower right','الفك السفلي الأيمن')}</span><span>${text(language,'Lower left','الفك السفلي الأيسر')}</span></div></div></div>`;
   }
   function render(container,data,language = 'en',options = {}) {
     const prefix = container.id || 'quotation';
@@ -57,17 +56,17 @@
       for (const item of related) {
         if (item.scope !== 'whole') continue;
         const color = item.status === 'In' ? '#2563eb' : '#d97706';
-        const crown = tooth.querySelector('[id*="crown-body-"]');
+        const crown = tooth.querySelector('[id*="tooth-crown-overlay-"]');
         const anatomy = tooth.querySelector('[id*="anatomy-group-"]');
         const visual = item.visualCode;
-        if (['crown','ceramic_crown','zirconia_crown','temporary_crown','bridge','veneer'].includes(visual) && crown) {crown.setAttribute('fill',item.status === 'In' ? '#bfdbfe' : '#fde68a');crown.setAttribute('stroke',color);}
-        if (visual === 'rct') {const rct=tooth.querySelector('[id*="rct-layer-"]');if(rct){rct.classList.remove('hidden');rct.style.display='block';rct.querySelectorAll('path').forEach(path=>path.setAttribute('stroke',color));}}
+        if (['crown','ceramic_crown','zirconia_crown','temporary_crown','bridge','veneer'].includes(visual) && crown) {crown.style.opacity='1';crown.style.filter=item.status === 'In' ? 'brightness(0) saturate(100%) invert(35%) sepia(96%) saturate(2698%) hue-rotate(214deg) brightness(96%) contrast(96%)' : 'brightness(0) saturate(100%) invert(54%) sepia(93%) saturate(1760%) hue-rotate(5deg) brightness(96%) contrast(95%)';}
+        if (visual === 'rct') {const rct=tooth.querySelector('[id*="rct-layer-"]');if(rct){rct.classList.remove('hidden');rct.style.display='block';rct.style.setProperty('--operation-status-color',color);rct.style.setProperty('--operation-status-soft',item.status === 'In' ? '#2563eb3d' : '#d977063d');}}
         if (['missing','extraction_planned'].includes(visual)) {if(anatomy)anatomy.style.opacity='.28';tooth.classList.add('q-extraction');}
-        if (visual === 'impacted' && anatomy) anatomy.setAttribute('transform','rotate(20 32 46)');
+        if (visual === 'impacted' && anatomy) anatomy.style.transform='rotate(25deg) scale(.9)';
         if (visual === 'unerupted' && anatomy) anatomy.style.opacity='.3';
         if (['implant','bracket'].includes(visual)) {
           const overlay=tooth.querySelector('[id*="anatomy-overlay-"]');
-          if(overlay) overlay.innerHTML=visual === 'implant' ? `<svg viewBox="0 0 64 92" class="q-implant" aria-hidden="true"><path d="M25 22H39V69H25Z M22 28H42 M22 36H42 M22 44H42 M22 52H42 M22 60H42" fill="#cbd5e1" stroke="${color}" stroke-width="3"/><path d="M18 70H46V87H18Z" fill="#e2e8f0" stroke="${color}" stroke-width="2"/></svg>` : `<span class="q-bracket" style="color:${color}"></span>`;
+          if(overlay) overlay.insertAdjacentHTML('beforeend',`<span class="photo-${visual}" style="--operation-status-color:${color}" aria-hidden="true"></span>`);
           if(visual === 'implant' && anatomy) anatomy.style.opacity='.15';
         }
       }

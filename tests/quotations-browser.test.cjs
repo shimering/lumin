@@ -30,7 +30,7 @@ async function setup(t) {
     const url=new URL(req.url,'http://localhost');
     const target=path.resolve(root,'.'+decodeURIComponent(url.pathname));
     if(!target.startsWith(root+path.sep)||!fs.existsSync(target)||!fs.statSync(target).isFile()){res.statusCode=404;res.end();return;}
-    res.setHeader('Content-Type',target.endsWith('.html')?'text/html':target.endsWith('.css')?'text/css':target.endsWith('.svg')?'image/svg+xml':'application/javascript');res.end(fs.readFileSync(target));
+    res.setHeader('Content-Type',target.endsWith('.html')?'text/html':target.endsWith('.css')?'text/css':target.endsWith('.svg')?'image/svg+xml':target.endsWith('.webp')?'image/webp':'application/javascript');res.end(fs.readFileSync(target));
   });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   t.after(()=>new Promise(resolve=>{server.close(resolve);server.closeAllConnections();}));
@@ -47,6 +47,7 @@ test('patient page charts only quoted treatments, works in both languages and vi
   await page.route('**/functions/v1/quotation-view',route=>{calls.push(route.request());return route.fulfill({json:sample()});});
   await page.goto(base+'/quotation.html#'+'a'.repeat(64));
   await page.waitForSelector('.q-procedure');
+  await page.waitForFunction(()=>[...document.querySelectorAll('.q-tooth img')].every(image=>image.complete&&image.naturalWidth>0));
   assert.equal(await page.locator('.q-procedure').count(),4);
   assert.match(await page.locator('.q-total').textContent(),/11,300/);
   assert.equal(calls[0].method(),'POST');assert.equal(calls[0].postDataJSON().token,'a'.repeat(64));assert.equal(calls[0].headers().referer,undefined);
@@ -71,6 +72,56 @@ test('patient page charts only quoted treatments, works in both languages and vi
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   assert.deepEqual(errors,[]);
   if(process.env.LUMIN_QUOTATION_SCREENSHOTS){await page.emulateMedia({media:'screen'});await page.setViewportSize({width:1200,height:1100});await page.locator('[data-q-language]').click();await page.screenshot({path:path.join(process.env.LUMIN_QUOTATION_SCREENSHOTS,'quotation-desktop.png'),fullPage:true});await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(process.env.LUMIN_QUOTATION_SCREENSHOTS,'quotation-mobile.png'),fullPage:true});}
+});
+
+test('quotation uses the clinic tooth images and orientations for permanent and primary teeth, with working photo treatment overlays',async t=>{
+  const {page,base,errors}=await setup(t);
+  const fixtureChart=structuredClone(chart);
+  fixtureChart._meta.toothDentition={6:'primary',25:'primary'};
+  fixtureChart.C={wholeOperations:[{id:id(5),code:'rct',price:1200,status:'P'}]};
+  fixtureChart.P={wholeOperations:[{id:id(6),code:'bracket',price:600,status:'In'}]};
+  fixtureChart[20]={wholeOperations:[{id:id(7),code:'implant',price:7000,status:'P'}]};
+  const catalog=[...operations,{code:'implant',name:'Implant',action_scope:'whole',visual_code:'implant'},{code:'bracket',name:'Orthodontic bracket',action_scope:'whole',visual_code:'bracket'}];
+  const data={...sample(),...model.publicProjection(fixtureChart,catalog,[1,2,3,4,5,6,7].map(id))};
+  await page.route('**/functions/v1/quotation-view',route=>route.fulfill({json:data}));
+  await page.goto(base+'/quotation.html#'+'a'.repeat(64));
+  await page.waitForFunction(()=>document.querySelectorAll('.q-tooth img').length===64&&[...document.querySelectorAll('.q-tooth img')].every(image=>image.complete&&image.naturalWidth>0));
+  const app=fs.readFileSync(path.join(root,'index.html'),'utf8');
+  const start=app.indexOf('    function generateRealisticToothPhoto('),end=app.indexOf('\n    }',start)+6;
+  const clinic=vm.createContext({showRootsAnatomy:true});
+  new vm.Script(fs.readFileSync(path.join(root,'lumin-tooth-anatomy.js'),'utf8')).runInContext(clinic);
+  new vm.Script(app.slice(start,end)).runInContext(clinic);
+  const reference=await page.context().newPage();
+  const head=app.slice(0,app.indexOf('</head>')+7).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'');
+  const references=['3','4','8','11','14','19','20','27','C','P'];
+  const clinicMarkup=references.map(tooth=>`<div class="tooth-card">${clinic.generateRealisticToothPhoto(tooth,model.slotForTooth(tooth))}</div>`).join('');
+  await reference.route(base+'/clinic-chart-reference',route=>route.fulfill({contentType:'text/html',body:`${head}<body><main id="app-shell"><section class="clinical-odontogram-stage">${clinicMarkup}</section></main></body>`}));
+  await reference.goto(base+'/clinic-chart-reference');
+  await reference.evaluate(()=>{const layer=document.getElementById('rct-layer-3');layer.classList.remove('hidden');layer.classList.add('operation-status-in');});
+  assert.equal(await reference.locator('#rct-layer-3').evaluate(node=>getComputedStyle(node).getPropertyValue('--operation-status-color').trim()),'#2563eb');
+  for(const toothId of ['3','4','8','11','14','19','20','27','C','P']) {
+    const markup=clinic.generateRealisticToothPhoto(toothId,model.slotForTooth(toothId));
+    const comparison=await page.evaluate(({toothId,markup})=>{
+      const template=document.createElement('template');template.innerHTML=markup;
+      const appImage=template.content.querySelector('.tooth-photo');
+      const quoteImage=document.querySelector(`[data-q-tooth="${toothId}"] .tooth-photo`);
+      return {app:{source:appImage.getAttribute('src'),classes:appImage.className},quotation:{source:quoteImage.getAttribute('src'),classes:quoteImage.className},fit:getComputedStyle(quoteImage).objectFit};
+    },{toothId,markup});
+    assert.deepEqual(comparison.quotation,comparison.app);assert.equal(comparison.fit,'contain');
+    assert.equal(await reference.locator(`#tooth-photo-${toothId}`).evaluate(node=>getComputedStyle(node).transform),await page.locator(`[data-q-tooth="${toothId}"] .tooth-photo:not(.tooth-crown-color-overlay)`).evaluate(node=>getComputedStyle(node).transform));
+  }
+  assert.equal(await page.locator('[data-q-tooth="C"] .tooth-photo.is-primary-photo.is-upper-photo.is-mirrored-photo').count(),2);
+  assert.equal(await page.locator('[data-q-tooth="P"] .tooth-photo.is-primary-photo.is-mirrored-photo:not(.is-upper-photo)').count(),2);
+  assert.equal(await page.locator('[data-q-tooth="3"] .tooth-crown-color-overlay').evaluate(node=>getComputedStyle(node).opacity),'1');
+  for(const [tooth,color] of [['3','#2563eb'],['C','#d97706']]) {
+    const layer=page.locator(`[data-q-tooth="${tooth}"] .photo-rct-mask`);
+    assert.equal(await layer.evaluate(node=>getComputedStyle(node).display),'block');
+    assert.equal(await layer.evaluate(node=>node.style.getPropertyValue('--operation-status-color')),color);
+    assert.ok(await layer.locator('.rct-canal').count()>0);
+  }
+  assert.equal(await page.locator('[data-q-tooth="20"] .photo-implant').isVisible(),true);
+  assert.equal(await page.locator('[data-q-tooth="P"] .photo-bracket').isVisible(),true);
+  assert.deepEqual(errors,[]);
 });
 
 test('the same token refreshes prices and completion, then removes patient information on revocation or a network failure',async t=>{

@@ -99,10 +99,11 @@
   <script src="lumin-dashboard-motion.js?v=3"></script>
   <script src="lumin-whatsapp-actions.js?v=2"></script>
   <script src="lumin-quotation-model.js?v=1"></script>
-  <script src="lumin-tooth-anatomy.js?v=1"></script>
-  <script src="lumin-quotation-view.js?v=1"></script>
+  <script src="lumin-tooth-anatomy.js?v=2"></script>
+  <script src="lumin-quotation-view.js?v=2"></script>
   <script src="lumin-quotations.js?v=1"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <link rel="stylesheet" href="lumin-tooth-images.css?v=1" />
   
   <style>
     /* Lock viewport pinch-zoom on document root while retaining full native single-finger scrolling */
@@ -210,125 +211,6 @@
     .surface-unerupted { fill: #f1f5f9; stroke: #94a3b8; stroke-width: 1.3; stroke-dasharray: 5 3; opacity: 0.55; }
     .surface-extraction_planned { fill: #fee2e2; stroke: #dc2626; stroke-width: 1.8; stroke-dasharray: 4 2; }
 
-    /* Photorealistic raster tooth anatomy with HTML surface hit areas */
-    .tooth-photo-stage {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      filter: drop-shadow(0 3px 3px rgba(71, 50, 25, 0.2));
-    }
-    .tooth-photo {
-      --tooth-photo-rotation: 0deg;
-      --tooth-photo-mirror: 1;
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      transform: rotate(var(--tooth-photo-rotation)) scaleX(var(--tooth-photo-mirror));
-      transform-origin: center;
-      transition: filter 0.18s ease, opacity 0.18s ease, transform 0.18s ease;
-      user-select: none;
-    }
-    .tooth-photo.is-upper-photo { --tooth-photo-rotation: 180deg; }
-    .tooth-photo.is-mirrored-photo { --tooth-photo-mirror: -1; }
-    .tooth-photo.is-primary-photo { inset: 5%; width: 90%; height: 90%; }
-    .tooth-crown-color-overlay {
-      z-index: 2;
-      opacity: 0;
-      mix-blend-mode: multiply;
-      pointer-events: none;
-      -webkit-mask-image: linear-gradient(to bottom, #000 0 38%, rgba(0, 0, 0, 0.92) 42%, transparent 49%);
-      mask-image: linear-gradient(to bottom, #000 0 38%, rgba(0, 0, 0, 0.92) 42%, transparent 49%);
-      transition: filter 0.18s ease, opacity 0.18s ease;
-    }
-    .photo-rct-mask {
-      --operation-status-color: #000000;
-      --operation-status-soft: rgba(0, 0, 0, 0.22);
-      position: absolute;
-      inset: 0;
-      z-index: 3;
-      pointer-events: none;
-      filter: drop-shadow(0 0 2px var(--operation-status-color));
-    }
-    .photo-rct-mask.is-primary-rct { inset: 5%; }
-    .rct-canal {
-      position: absolute;
-      width: 2px;
-      border-radius: 999px;
-      background: var(--operation-status-color);
-      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28);
-    }
-    .photo-rct-mask.is-lower .rct-canal {
-      top: 43%;
-      height: 51%;
-      transform-origin: top center;
-    }
-    .photo-rct-mask.is-upper .rct-canal {
-      bottom: 43%;
-      height: 51%;
-      transform-origin: bottom center;
-    }
-    .photo-rct-mask.family-incisor .canal-1,
-    .photo-rct-mask.family-canine .canal-1 { left: calc(50% - 1px); }
-    .photo-rct-mask.family-canine .canal-1 { width: 2.5px; }
-    .photo-rct-mask.family-premolar .canal-1 { left: 43%; }
-    .photo-rct-mask.family-premolar .canal-2 { left: 56%; }
-    .photo-rct-mask.family-premolar.is-lower .canal-1 { transform: rotate(6deg); }
-    .photo-rct-mask.family-premolar.is-lower .canal-2 { transform: rotate(-6deg); }
-    .photo-rct-mask.family-premolar.is-upper .canal-1 { transform: rotate(-6deg); }
-    .photo-rct-mask.family-premolar.is-upper .canal-2 { transform: rotate(6deg); }
-    .photo-rct-mask.family-molar .canal-1 { left: 34%; }
-    .photo-rct-mask.family-molar .canal-2 { left: calc(50% - 1px); height: 47%; }
-    .photo-rct-mask.family-molar .canal-3 { left: 66%; }
-    .photo-rct-mask.family-molar.is-lower .canal-1 { transform: rotate(13deg); }
-    .photo-rct-mask.family-molar.is-lower .canal-3 { transform: rotate(-13deg); }
-    .photo-rct-mask.family-molar.is-upper .canal-1 { transform: rotate(-13deg); }
-    .photo-rct-mask.family-molar.is-upper .canal-3 { transform: rotate(13deg); }
-    .rct-pulp-chamber {
-      position: absolute;
-      left: 50%;
-      height: 9%;
-      border: 2px solid var(--operation-status-color);
-      border-radius: 45% 45% 38% 38%;
-      background: var(--operation-status-soft);
-      transform: translateX(-50%);
-    }
-    .photo-rct-mask.is-lower .rct-pulp-chamber { top: 35%; }
-    .photo-rct-mask.is-upper .rct-pulp-chamber { bottom: 35%; }
-    .photo-rct-mask.family-incisor .rct-pulp-chamber { width: 13%; }
-    .photo-rct-mask.family-canine .rct-pulp-chamber { width: 15%; }
-    .photo-rct-mask.family-premolar .rct-pulp-chamber { width: 25%; }
-    .photo-rct-mask.family-molar .rct-pulp-chamber { width: 40%; }
-    .photo-implant {
-      display: block;
-      width: 1.35rem;
-      height: 3.25rem;
-      border-radius: 0.35rem 0.35rem 45% 45%;
-      background: repeating-linear-gradient(180deg, #e2e8f0 0 6px, var(--operation-status-color, #000000) 6px 8px), linear-gradient(90deg, var(--operation-status-color, #000000), #f8fafc 45%, var(--operation-status-color, #000000));
-      border: 1px solid var(--operation-status-color, #000000);
-      box-shadow: 0 5px 9px rgba(15, 23, 42, 0.25);
-    }
-    .photo-bracket {
-      display: block;
-      position: relative;
-      width: 48%;
-      aspect-ratio: 1;
-      border-radius: 0.25rem;
-      border: 2px solid var(--operation-status-color, #000000);
-      background: linear-gradient(135deg, #f8fafc, var(--operation-status-color, #000000));
-      box-shadow: 0 1px 4px rgba(15, 23, 42, 0.35);
-    }
-    .photo-bracket::after {
-      content: '';
-      position: absolute;
-      left: -80%;
-      right: -80%;
-      top: 50%;
-      height: 2px;
-      background: var(--operation-status-color, #000000);
-      transform: translateY(-50%);
-    }
     .surface-map-html {
       position: relative;
       isolation: isolate;
@@ -5422,7 +5304,7 @@
   <link rel="stylesheet" href="lumin-chart-appointments.css?v=1" />
   <link rel="stylesheet" href="lumin-clinical-actions.css?v=4" />
   <link rel="stylesheet" href="lumin-media-teeth.css?v=1" />
-  <link rel="stylesheet" href="lumin-quotations.css?v=1" />
+  <link rel="stylesheet" href="lumin-quotations.css?v=2" />
   <style id="finance-ledger-styles">
     #finance-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     #finance-summary-cards > div { min-width: 0; }
@@ -18690,48 +18572,8 @@
       return LuminToothAnatomy.generate(toothId, slotNumber, showRootsAnatomy);
     }
 
-    const TOOTH_PHOTO_ASSETS = Object.freeze({
-      incisor: 'assets/teeth-3d/incisor.webp',
-      canine: 'assets/teeth-3d/canine.webp',
-      premolar: 'assets/teeth-3d/premolar.webp',
-      molar: 'assets/teeth-3d/molar.webp'
-    });
-
-    function toothPhotoFamily(anatomyType) {
-      if (anatomyType.includes('molar')) return anatomyType.includes('premolar') ? 'premolar' : 'molar';
-      if (anatomyType.includes('canine')) return 'canine';
-      return 'incisor';
-    }
-
     function generateRealisticToothPhoto(toothId, slotNumber) {
-      const id = String(toothId);
-      const slot = Number(slotNumber || SLOT_BY_PRIMARY_TOOTH[id] || id);
-      const anatomyType = getAnatomyType(id, slot);
-      const family = toothPhotoFamily(anatomyType);
-      const isUpper = slot >= 1 && slot <= 16;
-      const isPrimary = isPrimaryToothId(id);
-      const isPatientRight = slot <= 8 || slot >= 25;
-      const photoClasses = [
-        'tooth-photo',
-        isUpper ? 'is-upper-photo' : '',
-        isPatientRight ? 'is-mirrored-photo' : '',
-        isPrimary ? 'is-primary-photo' : ''
-      ].filter(Boolean).join(' ');
-      const rootCanalCount = family === 'molar' ? 3 : family === 'premolar' ? 2 : 1;
-      const rootCanalMarkup = Array.from({ length: rootCanalCount }, (_, index) => `<span class="rct-canal canal-${index + 1}"></span>`).join('');
-      return `
-        <div id="anatomy-wrapper-${id}" class="anatomy-wrapper odontogram-anatomy relative select-none ${showRootsAnatomy ? '' : 'hidden'} pointer-events-none" style="width:${isPrimary ? '44px' : '48px'};height:78px;min-width:${isPrimary ? '44px' : '48px'}">
-          <div id="anatomy-group-${id}" class="absolute inset-0">
-            <div class="tooth-photo-stage">
-              <img id="tooth-photo-${id}" src="${TOOTH_PHOTO_ASSETS[family]}" alt="" aria-hidden="true" draggable="false" class="${photoClasses}" />
-              <img id="tooth-crown-overlay-${id}" src="${TOOTH_PHOTO_ASSETS[family]}" alt="" aria-hidden="true" draggable="false" class="${photoClasses} tooth-crown-color-overlay" />
-              <div id="rct-layer-${id}" class="hidden photo-rct-mask family-${family} ${isUpper ? 'is-upper' : 'is-lower'} ${isPrimary ? 'is-primary-rct' : ''}">
-                <span class="rct-pulp-chamber"></span>${rootCanalMarkup}
-              </div>
-            </div>
-          </div>
-          <div id="anatomy-overlay-${id}" class="absolute inset-0 pointer-events-none flex items-center justify-center"></div>
-        </div>`;
+      return LuminToothAnatomy.photo(toothId, slotNumber, showRootsAnatomy);
     }
 
     function generateSurfaceMapSVG(toothId, slotNumber) {

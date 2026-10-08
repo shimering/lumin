@@ -156,5 +156,49 @@
         </div>
       `;
     }
-  root.LuminToothAnatomy = {type:getAnatomyType, generate:generateRealisticToothSVG};
+    const TOOTH_PHOTO_ASSETS = Object.freeze({
+      incisor: 'assets/teeth-3d/incisor.webp',
+      canine: 'assets/teeth-3d/canine.webp',
+      premolar: 'assets/teeth-3d/premolar.webp',
+      molar: 'assets/teeth-3d/molar.webp'
+    });
+
+    function toothPhotoFamily(anatomyType) {
+      if (anatomyType.includes('molar')) return anatomyType.includes('premolar') ? 'premolar' : 'molar';
+      if (anatomyType.includes('canine')) return 'canine';
+      return 'incisor';
+    }
+
+    function generateRealisticToothPhoto(toothId, slotNumber, showRootsAnatomy = true) {
+      const id = String(toothId);
+      const slot = Number(slotNumber || SLOT_BY_PRIMARY_TOOTH[id] || id);
+      const anatomyType = getAnatomyType(id, slot);
+      const family = toothPhotoFamily(anatomyType);
+      const isUpper = slot >= 1 && slot <= 16;
+      const isPrimary = isPrimaryToothId(id);
+      const isPatientRight = slot <= 8 || slot >= 25;
+      const photoClasses = [
+        'tooth-photo',
+        isUpper ? 'is-upper-photo' : '',
+        isPatientRight ? 'is-mirrored-photo' : '',
+        isPrimary ? 'is-primary-photo' : ''
+      ].filter(Boolean).join(' ');
+      const rootCanalCount = family === 'molar' ? 3 : family === 'premolar' ? 2 : 1;
+      const rootCanalMarkup = Array.from({ length: rootCanalCount }, (_, index) => `<span class="rct-canal canal-${index + 1}"></span>`).join('');
+      return `
+        <div id="anatomy-wrapper-${id}" class="anatomy-wrapper odontogram-anatomy relative select-none ${showRootsAnatomy ? '' : 'hidden'} pointer-events-none" style="width:${isPrimary ? '44px' : '48px'};height:78px;min-width:${isPrimary ? '44px' : '48px'}">
+          <div id="anatomy-group-${id}" class="absolute inset-0">
+            <div class="tooth-photo-stage">
+              <img id="tooth-photo-${id}" src="${TOOTH_PHOTO_ASSETS[family]}" alt="" aria-hidden="true" draggable="false" class="${photoClasses}" />
+              <img id="tooth-crown-overlay-${id}" src="${TOOTH_PHOTO_ASSETS[family]}" alt="" aria-hidden="true" draggable="false" class="${photoClasses} tooth-crown-color-overlay" />
+              <div id="rct-layer-${id}" class="hidden photo-rct-mask family-${family} ${isUpper ? 'is-upper' : 'is-lower'} ${isPrimary ? 'is-primary-rct' : ''}">
+                <span class="rct-pulp-chamber"></span>${rootCanalMarkup}
+              </div>
+            </div>
+          </div>
+          <div id="anatomy-overlay-${id}" class="absolute inset-0 pointer-events-none flex items-center justify-center"></div>
+        </div>`;
+    }
+
+  root.LuminToothAnatomy = {type:getAnatomyType, generate:generateRealisticToothSVG, photo:generateRealisticToothPhoto};
 })(globalThis);
