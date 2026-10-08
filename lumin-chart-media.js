@@ -355,7 +355,7 @@ async function loadChartPatientMedia(patientId = activePatientId) {
     chartPatientMedia.filterToothIds = [];
     chartPatientMedia.lastToothId = '';
     chartPatientMedia.activeTab = 'xrays';
-    chartPatientMedia.collapsed = !(typeof chartAppointmentsCanView === 'function' && chartAppointmentsCanView() && chartMediaIsLandscape());
+    chartPatientMedia.collapsed = true;
     chartMediaPreviousFocus = null;
     if (typeof patientMediaUploadContext !== 'undefined' && patientMediaUploadContext?.fromChart) closePatientMediaUploadModal();
     if (patientMediaToothPicker?.prefix === 'chart-filter') closePatientMediaToothPicker(false);

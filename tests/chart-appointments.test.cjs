@@ -38,6 +38,22 @@ function fixture() {
   return { ctx, reads, intervals, state, advance: value => { timestamp = value; } };
 }
 
+test('appointments start collapsed and data refreshes preserve manual expansion', async () => {
+  const { ctx, state, reads } = fixture();
+  assert.equal(state().collapsed, true);
+  ctx.toggleChartAppointmentsPanel();
+  assert.equal(state().collapsed, false);
+  const pending = ctx.loadChartAppointments();
+  await settle();
+  reads[0].resolve({ data: [row('a')] });
+  await pending;
+  assert.equal(state().collapsed, false, 'loading the daily queue keeps it manually expanded');
+  ctx.resetChartAppointments({ keepTimer: true });
+  assert.equal(state().collapsed, false, 'daily rollover preserves the user’s panel state');
+  ctx.resetChartAppointments();
+  assert.equal(state().collapsed, true, 'a fresh session starts collapsed');
+});
+
 test('today queue includes overdue and active patients, excludes finished visits and notes, and sorts by time', () => {
   const { ctx, state } = fixture();
   state().records = [row('future'), row('waiting', 'Checked in', 10), row('ongoing', 'In progress', 14), row('done', 'Completed'),
@@ -144,12 +160,14 @@ test('midnight rollover refreshes the day, clears yesterday, and keeps the rollo
 });
 
 test('chart navigation, local saves, realtime refresh, reconnect, and offline shell include the queue', () => {
+  assert.match(source('switchView'), /viewName === 'chart' && typeof collapseChartSidePanels === 'function'\) collapseChartSidePanels\(\);[\s\S]*?setChartAppointmentsActive\(viewName === 'chart'\)/);
   assert.match(source('switchView'), /setChartAppointmentsActive\(viewName === 'chart'\)/);
   assert.match(source('flushRealtimeRefresh'), /realtimeViewIsVisible\('chart'\)[\s\S]*?loadChartAppointments\(\{ refresh: true, throwOnError: true \}\)/);
   assert.match(source('queueRealtimeLoadedRefresh'), /realtimeViewIsVisible\('chart'\)/);
   assert.match(source('replaceNormalisedAppointmentRecord'), /updateChartAppointmentRecord\(normalized\)/);
   assert.match(source('deleteAppointment'), /removeChartAppointmentRecord\(appointmentId\)/);
   const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
-  assert.match(sw, /lumin-chart-appointments.js\?v=1/);
+  const appointmentsScript = html.match(/src="(lumin-chart-appointments\.js\?v=\d+)"/)[1];
+  assert.ok(sw.includes('/' + appointmentsScript), 'the offline shell uses the current appointment script');
   assert.match(sw, /lumin-chart-appointments.css\?v=1/);
 });

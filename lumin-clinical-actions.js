@@ -62,6 +62,17 @@ function toggleClinicalActionsPanel() {
   document.getElementById('chart-actions-toggle')?.focus({ preventScroll: true });
 }
 
+function collapseChartSidePanels() {
+  // Record the retained selection so chart refreshes do not reopen the rail.
+  syncClinicalActionsPanel();
+  clinicalActionsPanel.open = false;
+  if (typeof chartPatientMedia !== 'undefined') chartPatientMedia.collapsed = true;
+  if (typeof chartAppointments !== 'undefined') chartAppointments.collapsed = true;
+  if (typeof renderChartMediaPanel === 'function') renderChartMediaPanel();
+  if (typeof renderChartAppointmentsPanel === 'function') renderChartAppointmentsPanel();
+  updateClinicalActionsRailLayout();
+}
+
 function clearClinicalActionsSelection() {
   activeSelection = emptyChartSelection();
   updateSelectionUI();

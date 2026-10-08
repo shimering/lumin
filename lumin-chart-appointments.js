@@ -1,7 +1,7 @@
 // A day-scoped queue: independent of the calendar's selected day and filters.
 const chartAppointments = {
   records: [], dateKey: '', userId: null, status: 'idle', error: null,
-  pending: null, expiresAt: 0, generation: 0, collapsed: false, timer: null,
+  pending: null, expiresAt: 0, generation: 0, collapsed: true, timer: null,
   exits: new Map()
 };
 
@@ -62,7 +62,7 @@ function invalidateChartAppointments() {
 
 function resetChartAppointments(options = {}) {
   const timer = options.keepTimer ? chartAppointments.timer : null;
-  const collapsed = options.keepTimer ? chartAppointments.collapsed : false;
+  const collapsed = options.keepTimer ? chartAppointments.collapsed : true;
   if (chartAppointments.timer && !options.keepTimer) window.clearInterval(chartAppointments.timer);
   chartAppointments.exits.forEach(animation => animation.cancel());
   chartAppointments.exits.clear();

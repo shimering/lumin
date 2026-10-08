@@ -46,6 +46,26 @@ async function settleChartMediaMotion(page) {
   });
 }
 
+test('X-rays start collapsed for each patient on landscape screens with appointment access', async () => {
+  const context = vm.createContext({
+    window: { matchMedia: () => ({ matches: true }) }, document: { addEventListener() {}, getElementById: () => null },
+    activePatientId: 'patient-1', patientMediaToothPicker: null, patientAttachmentState: null,
+    chartAppointmentsCanView: () => true, getKnownPatient: id => ({ id }), hasPageAccess: () => true,
+    getStorageServerConfig: () => ({ url: '' })
+  });
+  vm.runInContext(fs.readFileSync(path.join(root, 'lumin-chart-media.js'), 'utf8'), context);
+  context.renderChartMediaPanel = () => {};
+  const state = vm.runInContext('chartPatientMedia', context);
+  await context.loadChartPatientMedia();
+  assert.equal(state.collapsed, true);
+  state.collapsed = false;
+  await context.loadChartPatientMedia();
+  assert.equal(state.collapsed, false, 'refreshing media preserves manual expansion');
+  context.activePatientId = 'patient-2';
+  await context.loadChartPatientMedia();
+  assert.equal(state.collapsed, true, 'a different patient opens with the viewer collapsed');
+});
+
 test('landscape chart viewer stays on the right while scrolling; attachment previews and patient changes are isolated', { skip: !chromium && 'Playwright is not available' }, async t => {
   const fixture = head + '<body><header id="app-header" style="height:64px;padding:20px;font-weight:600">LUMIN · Dental clinic</header><main id="app-main"><header id="patient-workspace-header" style="height:64px;padding:20px;background:white;border-radius:16px;margin-bottom:16px">Ahmed Hassan · Dental chart</header>' + chart + '</main></body></html>';
   const server = http.createServer((req, res) => {

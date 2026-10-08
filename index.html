@@ -84,12 +84,12 @@
   <script src="lumin-patient-swipe.js?v=1"></script>
   <script src="lumin-patients.js?v=4"></script>
   <script src="lumin-chart-sync.js?v=1"></script>
-  <script src="lumin-chart-media.js?v=16"></script>
+  <script src="lumin-chart-media.js?v=17"></script>
   <script src="lumin-xray-rotation.js?v=1"></script>
   <script src="lumin-tooth-notes.js?v=3"></script>
-  <script src="lumin-chart-appointments.js?v=2"></script>
+  <script src="lumin-chart-appointments.js?v=3"></script>
   <script src="lumin-chart-dates.js?v=1"></script>
-  <script src="lumin-clinical-actions.js?v=1"></script>
+  <script src="lumin-clinical-actions.js?v=2"></script>
   <link rel="stylesheet" href="lumin-chart-dates.css?v=1" />
   <script src="lumin-media-teeth.js?v=2"></script>
   <script src="lumin-nav-motion.js?v=1"></script>
@@ -6806,7 +6806,7 @@
     <!-- ================= VIEW 2: ACTIVE DENTAL CHART ================= -->
     <section id="view-chart" class="hidden space-y-6">
 
-      <div id="chart-clinical-workspace" class="chart-clinical-workspace is-media-collapsed">
+      <div id="chart-clinical-workspace" class="chart-clinical-workspace is-media-collapsed is-appointments-collapsed is-chart-rail-collapsed">
       <div class="chart-clinical-column">
 
       <!-- Main Chart Layout -->
@@ -6928,9 +6928,9 @@
       <aside id="chart-appointments-panel" class="chart-appointments-panel" aria-labelledby="chart-appointments-title" hidden>
         <header class="chart-appointments-header">
           <h3><i data-lucide="calendar-clock" aria-hidden="true"></i><span id="chart-appointments-title">Today’s appointments</span><span id="chart-appointments-count" class="chart-appointments-count">0</span></h3>
-          <button id="chart-appointments-collapse" type="button" class="chart-media-button is-neutral" onclick="toggleChartAppointmentsPanel()" aria-controls="chart-appointments-body" aria-expanded="true" aria-label="Collapse today’s appointments"><i data-lucide="chevron-down" aria-hidden="true"></i></button>
+          <button id="chart-appointments-collapse" type="button" class="chart-media-button is-neutral" onclick="toggleChartAppointmentsPanel()" aria-controls="chart-appointments-body" aria-expanded="false" aria-label="Expand today’s appointments"><i data-lucide="chevron-up" aria-hidden="true"></i></button>
         </header>
-        <div id="chart-appointments-body" class="chart-appointments-body" role="region" aria-labelledby="chart-appointments-title">
+        <div id="chart-appointments-body" class="chart-appointments-body" role="region" aria-labelledby="chart-appointments-title" hidden inert>
           <p id="chart-appointments-feedback" class="chart-appointments-feedback" role="status" hidden></p>
           <div id="chart-appointments-list" class="chart-appointments-list"></div>
         </div>
@@ -30212,6 +30212,7 @@
       if (whatsAppActive) resetWhatsAppWindowScroll();
 
       document.getElementById(`view-${viewName}`)?.classList.remove('hidden');
+      if (viewName === 'chart' && typeof collapseChartSidePanels === 'function') collapseChartSidePanels();
       if (typeof setChartAppointmentsActive === 'function') setChartAppointmentsActive(viewName === 'chart');
       if (workspaceView) {
         const cachedPatient = getKnownPatient(requestedPatientId);

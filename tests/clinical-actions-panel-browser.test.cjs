@@ -124,6 +124,13 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
       await page.locator('[data-clinical-operation="root-canal"]').click();
       assert.equal(await toggle.getAttribute('aria-expanded'),'true','Choosing a procedure keeps the panel open');
       assert.deepEqual(await page.evaluate(()=>chartSelectionTargets().map(target=>target.tooth)),['1']);
+      await page.evaluate(()=>{collapseChartSidePanels();updateSelectionUI();});
+      assert.equal(await toggle.getAttribute('aria-expanded'),'false','Reopening the chart stays collapsed with a retained selection');
+      assert.deepEqual(await page.evaluate(()=>chartSelectionTargets().map(target=>target.tooth)),['1']);
+      assert.equal(await page.locator('#chart-operation-select').inputValue(),'root-canal','Reopening preserves the procedure draft');
+      assert.equal(await page.locator('#chart-clinical-workspace').evaluate(node=>node.classList.contains('is-chart-rail-collapsed')),true);
+      await toggle.click();
+      assert.equal(await toggle.getAttribute('aria-expanded'),'true','The panel still opens manually');
       await page.locator('#chart-operation-status-select').selectOption('In');
       assert.equal(await toggle.getAttribute('aria-expanded'),'true','Changing status keeps the panel open');
       assert.equal(await page.locator('#chart-apply-operation-button').isEnabled(),true);
@@ -161,6 +168,9 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
   await page.evaluate(()=>{chartPatientMedia.collapsed=false;renderChartMediaPanel();});
   assert.equal(await page.locator('#chart-actions-toggle').getAttribute('aria-expanded'),'false','Viewer opens without a competing clinical pane');
   assert.deepEqual(await page.evaluate(()=>chartSelectionTargets().map(target=>target.tooth)),['3']);
+  await page.evaluate(()=>{chartAppointments.collapsed=false;renderChartAppointmentsPanel();collapseChartSidePanels();updateSelectionUI();});
+  assert.deepEqual(await page.evaluate(()=>({media:chartPatientMedia.collapsed,appointments:chartAppointments.collapsed,actions:clinicalActionsPanel.open})),{media:true,appointments:true,actions:false},'Returning to the chart collapses every side panel');
+  assert.equal(await page.locator('#chart-appointments-body').isVisible(),false);
   await page.locator('#chart-actions-toggle').click();
   assert.equal(await page.evaluate(()=>chartPatientMedia.collapsed),true);
   await page.locator('#chart-actions-clear-selection').click();
