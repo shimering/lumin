@@ -15,6 +15,18 @@ function source(name) {
   assert.ok(start >= 0, name);
   return html.slice(start, html.indexOf('\n    }', start) + 6);
 }
+async function assertToothActionOrder(page) {
+  const positions = await page.locator('.chart-tooth-actions').evaluateAll(actions => actions.map(action => ({
+    upper: Number(action.closest('[data-tooth-card]').dataset.slot) <= 16,
+    xray: action.querySelector('.chart-tooth-xray-indicator').getBoundingClientRect().toJSON(),
+    notes: action.querySelector('.chart-tooth-note-indicator').getBoundingClientRect().toJSON()
+  })));
+  for (const { upper, xray, notes } of positions) {
+    assert.ok(Math.abs(xray.x - notes.x) < 1, 'Icons stay vertically aligned');
+    assert.ok(upper ? notes.bottom <= xray.top : xray.bottom <= notes.top,
+      'X-ray icons face the gap between arches; notes face their own arch');
+  }
+}
 const notesHelpers = ['escapeHtml', 'normaliseChartCreatedAt', 'normaliseChartOperationNoteRoot',
   'normaliseChartOperationNote', 'normaliseChartOperationNotes', 'collectDocumentedFindings',
   'chartFindingCreatedAtTimestamp', 'chartFindingNoteTextMarkup'].map(source).join('\n');
@@ -159,12 +171,14 @@ test('notes open and save through the diagnostic editor, stay live, and fit expa
       await trigger.scrollIntoViewIfNeeded();
       const landscape=viewport.width>=768&&viewport.width>viewport.height;
       assert.equal(await trigger.evaluate(node=>getComputedStyle(node.parentElement).flexDirection),'column');
+      await assertToothActionOrder(page);
       for(const selector of ['[data-tooth-note-trigger="3"]','[data-tooth-xray-slot="3"] button']){
         const box=await page.locator(selector).boundingBox();assert.ok(box.width>=44&&box.height>=44);
       }
       if(landscape) {
         await page.locator('#chart-media-collapse').click();
         assert.equal(await trigger.evaluate(node=>getComputedStyle(node.parentElement).flexDirection),'column');
+        await assertToothActionOrder(page);
         assert.equal(await page.locator('#upper-arch').evaluate(node=>getComputedStyle(node).minWidth),'768px');
       }
       await trigger.click();

@@ -19026,7 +19026,9 @@
       const longPressLabel = `Press and hold for more than half a second to switch this position to ${targetLabel}`;
       const hasFinding = chartToothHasFinding(getActivePatient(), id);
       const notesLabel = currentUiLanguage === 'ar' ? 'ملاحظات السن' : 'Tooth notes';
-      const xraySlot = `<div class="chart-tooth-actions"><div class="chart-tooth-xray-slot" data-tooth-xray-slot="${id}"></div><button type="button" class="chart-tooth-note-indicator" data-tooth-note-trigger="${id}" data-finding-note-trigger aria-haspopup="dialog" aria-expanded="false" aria-controls="chart-finding-note-popover" aria-label="${escapeHtml(notesLabel)} · ${escapeHtml(chartToothLabel(id))}" title="${escapeHtml(notesLabel)} · ${escapeHtml(chartToothLabel(id))}" onpointerdown="event.stopPropagation()" onclick="toggleChartFindingNotePreview(event, this)"><span><i data-lucide="sticky-note" aria-hidden="true"></i></span></button></div>`;
+      const xraySlot = `<div class="chart-tooth-xray-slot" data-tooth-xray-slot="${id}"></div>`;
+      const notesButton = `<button type="button" class="chart-tooth-note-indicator" data-tooth-note-trigger="${id}" data-finding-note-trigger aria-haspopup="dialog" aria-expanded="false" aria-controls="chart-finding-note-popover" aria-label="${escapeHtml(notesLabel)} · ${escapeHtml(chartToothLabel(id))}" title="${escapeHtml(notesLabel)} · ${escapeHtml(chartToothLabel(id))}" onpointerdown="event.stopPropagation()" onclick="toggleChartFindingNotePreview(event, this)"><span><i data-lucide="sticky-note" aria-hidden="true"></i></span></button>`;
+      const toothActions = `<div class="chart-tooth-actions">${isUpper ? notesButton + xraySlot : xraySlot + notesButton}</div>`;
 
       return `
         <div id="tooth-card-${id}"
@@ -19040,8 +19042,8 @@
              title="${escapeHtml(longPressLabel)}"
              class="tooth-card relative flex min-w-0 flex-1 cursor-pointer select-none flex-col items-center transition-colors ${isPrimary ? 'is-primary-tooth' : ''} ${hasFinding ? 'has-charted-finding' : ''}">
           ${isUpper
-            ? anatomyPhoto + surfaceMap + `<span class="tooth-number-badge pointer-events-none">${escapeHtml(palmerQuadrantLabel(id, slot))}</span>` + xraySlot
-            : xraySlot + `<span class="tooth-number-badge pointer-events-none">${escapeHtml(palmerQuadrantLabel(id, slot))}</span>` + surfaceMap + anatomyPhoto}
+            ? anatomyPhoto + surfaceMap + `<span class="tooth-number-badge pointer-events-none">${escapeHtml(palmerQuadrantLabel(id, slot))}</span>` + toothActions
+            : toothActions + `<span class="tooth-number-badge pointer-events-none">${escapeHtml(palmerQuadrantLabel(id, slot))}</span>` + surfaceMap + anatomyPhoto}
         </div>`;
     }
 
