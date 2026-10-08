@@ -89,7 +89,7 @@
   <script src="lumin-tooth-notes.js?v=3"></script>
   <script src="lumin-chart-appointments.js?v=3"></script>
   <script src="lumin-chart-dates.js?v=1"></script>
-  <script src="lumin-clinical-actions.js?v=2"></script>
+  <script src="lumin-clinical-actions.js?v=3"></script>
   <link rel="stylesheet" href="lumin-chart-dates.css?v=1" />
   <script src="lumin-media-teeth.js?v=2"></script>
   <script src="lumin-nav-motion.js?v=1"></script>
@@ -5516,7 +5516,7 @@
   <link rel="stylesheet" href="lumin-xray-rotation.css?v=1" />
   <link rel="stylesheet" href="lumin-tooth-notes.css?v=4" />
   <link rel="stylesheet" href="lumin-chart-appointments.css?v=1" />
-  <link rel="stylesheet" href="lumin-clinical-actions.css?v=1" />
+  <link rel="stylesheet" href="lumin-clinical-actions.css?v=2" />
   <link rel="stylesheet" href="lumin-media-teeth.css?v=1" />
   <style id="finance-ledger-styles">
     #finance-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -6888,12 +6888,14 @@
       </div>
       <div id="chart-side-panels" class="chart-side-panels">
       <aside id="action-palette-card" class="chart-actions-panel is-collapsed" aria-labelledby="chart-actions-title" hidden>
+        <div class="chart-actions-sheet-handle" aria-hidden="true"><span></span></div>
         <header class="chart-actions-header">
           <h3><i data-lucide="wand-sparkles" aria-hidden="true"></i><span id="chart-actions-title">Clinical actions</span></h3>
           <button id="chart-actions-clear-findings" type="button" class="chart-actions-button chart-actions-icon-button" onclick="clearSelectedTooth()" disabled aria-label="Clear selected tooth findings"><i data-lucide="trash-2" aria-hidden="true"></i></button>
           <button id="chart-actions-toggle" type="button" class="chart-actions-button chart-actions-icon-button" onclick="toggleClinicalActionsPanel()" aria-controls="chart-actions-body" aria-expanded="false" aria-label="Expand clinical actions"><i data-lucide="panel-right-open" aria-hidden="true"></i></button>
         </header>
         <div id="chart-actions-body" hidden inert>
+          <div class="chart-actions-content">
           <div class="chart-actions-selection" id="selection-target-container">
             <span id="selection-badge" class="chart-actions-selection-badge"><span id="selection-target-text">Select one or more teeth or surfaces</span></span>
             <button id="chart-actions-clear-selection" type="button" class="chart-actions-button chart-actions-icon-button" onclick="clearClinicalActionsSelection()" aria-label="Clear tooth selection"><i data-lucide="x" aria-hidden="true"></i></button>
@@ -6907,6 +6909,7 @@
             <select id="chart-actions-specialty-filter" class="chart-actions-select" onchange="filterClinicalActionsSpecialty(this.value)" aria-label="Filter procedures by specialty"><option value="">All specialties</option></select>
           </div>
           <div id="chart-actions-operations" aria-label="Dental procedures"></div>
+          </div>
           <footer class="chart-actions-footer">
             <div id="chart-operation-preview" class="chart-actions-preview" aria-live="polite">Choose a procedure to apply.</div>
             <div class="chart-actions-footer-row">
@@ -15528,7 +15531,7 @@
       }
       if (applied && typeof setClinicalActionsPanelOpen === 'function') {
         setClinicalActionsPanelOpen(false);
-        document.getElementById('chart-actions-toggle')?.focus({ preventScroll: true });
+        if (typeof focusClinicalActionsTrigger === 'function') focusClinicalActionsTrigger();
       }
       return applied;
     }

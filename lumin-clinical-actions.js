@@ -1,5 +1,10 @@
 // A selection-aware action rail. Catalog and chart writes use the existing chart workflow.
 const clinicalActionsPanel = { open: false, selectionKey: '', patientId: null, query: '', specialty: '' };
+let clinicalActionsSheetGesture = null;
+
+function clinicalActionsIsMobile() {
+  return window.matchMedia('(max-width: 767px)').matches || Boolean(window.LuminMobileNav?.isPhone());
+}
 
 function clinicalActionsText(english, arabic) {
   return (typeof currentUiLanguage !== 'undefined' && currentUiLanguage === 'ar') ? arabic : english;
@@ -17,6 +22,8 @@ function updateClinicalActionsRailLayout() {
   const body = document.getElementById('chart-actions-body');
   const toggle = document.getElementById('chart-actions-toggle');
   if (!workspace || !panel || !body || !toggle) return;
+  const mobile = clinicalActionsIsMobile();
+  document.documentElement.classList.toggle('chart-actions-mobile', mobile);
   const mediaOpen = typeof chartPatientMedia !== 'undefined' && !chartPatientMedia.collapsed;
   const appointmentsOpen = workspace.classList.contains('has-chart-appointments')
     && typeof chartAppointments !== 'undefined' && !chartAppointments.collapsed;
@@ -26,13 +33,17 @@ function updateClinicalActionsRailLayout() {
   workspace.classList.toggle('is-clinical-actions-open', clinicalActionsPanel.open);
   workspace.classList.toggle('is-chart-rail-collapsed', !clinicalActionsPanel.open && !mediaOpen && !appointmentsOpen);
   panel.classList.toggle('is-collapsed', !clinicalActionsPanel.open);
+  panel.inert = mobile && !clinicalActionsPanel.open;
+  if (mobile && clinicalActionsPanel.open) panel.setAttribute('role', 'dialog');
+  else panel.removeAttribute('role');
+  if (!mobile || !clinicalActionsPanel.open) clearClinicalActionsSheetGesture();
   body.hidden = !clinicalActionsPanel.open;
   body.inert = !clinicalActionsPanel.open;
   toggle.setAttribute('aria-expanded', String(clinicalActionsPanel.open));
   toggle.setAttribute('aria-label', clinicalActionsPanel.open
-    ? clinicalActionsText('Collapse clinical actions', 'طي الإجراءات السريرية')
+    ? mobile ? clinicalActionsText('Close clinical actions', 'إغلاق الإجراءات السريرية') : clinicalActionsText('Collapse clinical actions', 'طي الإجراءات السريرية')
     : clinicalActionsText('Expand clinical actions', 'توسيع الإجراءات السريرية'));
-  const iconName = clinicalActionsPanel.open ? 'panel-right-close' : 'panel-right-open';
+  const iconName = mobile && clinicalActionsPanel.open ? 'x' : clinicalActionsPanel.open ? 'panel-right-close' : 'panel-right-open';
   if (toggle.dataset.icon !== iconName) {
     toggle.dataset.icon = iconName;
     toggle.innerHTML = `<i data-lucide="${iconName}" aria-hidden="true"></i>`;
@@ -59,7 +70,69 @@ function setClinicalActionsPanelOpen(open) {
 
 function toggleClinicalActionsPanel() {
   setClinicalActionsPanelOpen(!clinicalActionsPanel.open);
-  document.getElementById('chart-actions-toggle')?.focus({ preventScroll: true });
+  focusClinicalActionsTrigger();
+}
+
+function focusClinicalActionsTrigger() {
+  const tooth = chartSelectionTargets().at(-1)?.tooth;
+  const trigger = clinicalActionsIsMobile() && !clinicalActionsPanel.open
+    ? tooth && document.querySelector(`[data-tooth-card="${CSS.escape(tooth)}"]`)
+    : document.getElementById('chart-actions-toggle');
+  trigger?.focus({ preventScroll: true });
+}
+
+function clearClinicalActionsSheetGesture() {
+  clinicalActionsSheetGesture = null;
+  const panel = document.getElementById('action-palette-card');
+  panel?.style.removeProperty('transform');
+  panel?.classList.remove('is-sheet-dragging');
+}
+
+function setupClinicalActionsSheetSwipe() {
+  const panel = document.getElementById('action-palette-card');
+  if (!panel || panel.dataset.swipeReady) return;
+  panel.dataset.swipeReady = 'true';
+  panel.addEventListener('touchstart', event => {
+    clearClinicalActionsSheetGesture();
+    if (event.touches.length !== 1 || !clinicalActionsIsMobile() || !clinicalActionsPanel.open
+      || event.target.closest('button, a, input, textarea, select, [contenteditable]')) return;
+    // Preserve native scrolling until every scroll box under the touch is at its top.
+    for (let node = event.target; node && node !== panel; node = node.parentElement) {
+      if (node.scrollTop > 0 && /auto|scroll/.test(getComputedStyle(node).overflowY)) return;
+    }
+    const touch = event.touches[0];
+    clinicalActionsSheetGesture = { id: touch.identifier, x: touch.clientX, y: touch.clientY, time: event.timeStamp, distance: 0, dragging: false };
+  }, { passive: true });
+  panel.addEventListener('touchmove', event => {
+    const gesture = clinicalActionsSheetGesture;
+    if (!gesture) return;
+    if (event.touches.length !== 1) { clearClinicalActionsSheetGesture(); return; }
+    const touch = [...event.touches].find(touch => touch.identifier === gesture.id);
+    if (!touch) return;
+    const dx = touch.clientX - gesture.x, dy = touch.clientY - gesture.y;
+    if (!gesture.dragging) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 8) return;
+      if (dy <= 0 || Math.abs(dx) > dy * .8) { clinicalActionsSheetGesture = null; return; }
+      gesture.dragging = true;
+      panel.classList.add('is-sheet-dragging');
+    }
+    if (event.cancelable) event.preventDefault();
+    gesture.distance = Math.max(0, dy);
+    const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+    panel.style.transform = `translateY(${gesture.distance / zoom}px)`;
+  }, { passive: false });
+  const finish = event => {
+    const gesture = clinicalActionsSheetGesture;
+    if (!gesture) return;
+    const close = gesture.dragging && event.type !== 'touchcancel'
+      && (gesture.distance >= Math.min(120, panel.getBoundingClientRect().height * .22)
+        || (gesture.distance >= 40 && gesture.distance / Math.max(1, event.timeStamp - gesture.time) > .55));
+    if (gesture.dragging && event.cancelable) event.preventDefault();
+    clearClinicalActionsSheetGesture();
+    if (close) { setClinicalActionsPanelOpen(false); focusClinicalActionsTrigger(); }
+  };
+  panel.addEventListener('touchend', finish, { passive: false });
+  panel.addEventListener('touchcancel', finish, { passive: false });
 }
 
 function collapseChartSidePanels() {
@@ -201,5 +274,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const operation = event.target.closest('[data-clinical-operation]');
     if (operation) chooseClinicalActionsOperation(operation.dataset.clinicalOperation);
   });
+  setupClinicalActionsSheetSwipe();
   syncClinicalActionsPanel();
+});
+
+window.addEventListener('resize', () => {
+  clearClinicalActionsSheetGesture();
+  updateClinicalActionsRailLayout();
+}, { passive: true });
+
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape' || !clinicalActionsIsMobile() || !clinicalActionsPanel.open
+    || document.getElementById('view-chart')?.classList.contains('hidden')) return;
+  event.preventDefault();
+  setClinicalActionsPanelOpen(false);
+  focusClinicalActionsTrigger();
 });

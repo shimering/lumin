@@ -1,6 +1,7 @@
 /* Selection-aware clinical rail. Physical right placement keeps the odontogram's anatomy stable in RTL. */
 .chart-actions-panel { display: flex; flex-direction: column; min-width: 0; overflow: hidden; border: 1px solid #e2e8f0; border-radius: 20px; background: var(--lumin-face, #fff); box-shadow: var(--lumin-raised, 0 8px 24px -18px #64748b); text-align: start; }
 .chart-actions-panel[hidden] { display: none; }
+.chart-actions-sheet-handle { display: none; }
 .chart-actions-header { display: flex; align-items: center; gap: 4px; min-height: 56px; padding: 6px 8px 6px 16px; border-bottom: 1px solid #f1f5f9; flex: none; }
 .chart-actions-header h3 { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; color: #0f172a; font-size: 14px; font-weight: 600; }
 .chart-actions-header h3 > svg { width: 18px; height: 18px; color: #2563eb; flex: none; }
@@ -16,6 +17,7 @@
 #chart-actions-clear-findings:hover { background: #fff1f2; color: #be123c; }
 #chart-actions-body { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 #chart-actions-body[hidden] { display: none; }
+.chart-actions-content { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .chart-actions-selection { display: flex; align-items: center; gap: 4px; padding: 8px 12px; flex: none; }
 .chart-actions-selection-badge { display: inline-flex; flex: 1; min-width: 0; gap: 8px; align-items: center; border: 0; border-radius: 12px; background: #eff6ff; color: #1d4ed8; padding: 10px 12px; font-size: 12px; line-height: 1.5; font-weight: 600; overflow-wrap: anywhere; }
 .chart-actions-filters { display: grid; gap: 8px; padding: 0 16px 12px; flex: none; }
@@ -87,18 +89,36 @@
   #chart-clinical-workspace.has-clinical-actions-panel .chart-side-panels { position: sticky; height: auto; max-height: none; }
   #chart-clinical-workspace.has-clinical-actions-panel .chart-actions-panel:not(.is-collapsed) { height: max(420px, calc(var(--lumin-app-viewport-height, 100dvh) - var(--chart-media-sticky-top, 144px) - 16px)); flex: none; }
 }
-@media (max-width: 767px) {
-  #view-chart:has(.chart-actions-panel) { padding-bottom: 80px; }
-  .chart-actions-panel { position: fixed; z-index: 73; inset-inline: 0; bottom: 0; border-radius: 20px 20px 0 0; height: min(600px, 70dvh); max-height: calc(var(--lumin-app-viewport-height, 100dvh) - 64px); box-shadow: 0 -8px 32px #0f172a1f; }
-  .chart-actions-panel.is-collapsed { inset-inline: 12px; bottom: calc(var(--mobile-nav-height, 0px) + max(12px, env(safe-area-inset-bottom))); height: 56px; border-radius: 16px; }
-  .chart-actions-panel.is-collapsed #chart-actions-clear-findings { display: none; }
-  #view-chart.hidden .chart-actions-panel { display: none; }
-  .chart-actions-filters { grid-template-columns: minmax(0, 1fr) minmax(0, .8fr); padding-bottom: 8px; }
-  .chart-actions-search input { font-size: 16px; }
-  .chart-actions-selection { padding-block: 2px; }
-  .chart-actions-footer { padding-top: 8px; gap: 6px; }
-  #chart-actions-operations { min-height: 48px; }
+/* Keep the upper chart interactive so additional teeth can join the selection. */
+html.chart-actions-mobile #chart-clinical-workspace.has-clinical-actions-panel { display: block; }
+html.chart-actions-mobile #chart-clinical-workspace.has-clinical-actions-panel .chart-side-panels { position: static; height: auto; }
+html.chart-actions-mobile #chart-clinical-workspace.has-clinical-actions-panel .chart-actions-panel {
+  position: fixed; z-index: 73; inset-inline: 0; bottom: var(--lumin-app-viewport-bottom-offset, 0px);
+  width: var(--lumin-app-viewport-width, 100%); margin-inline: auto; border-radius: 20px 20px 0 0;
+  height: calc(var(--lumin-app-viewport-height, 100dvh) * .5); max-height: calc(var(--lumin-app-viewport-height, 100dvh) * .5);
+  min-height: 0; box-shadow: 0 -8px 32px #0f172a1f; overscroll-behavior: contain; transition: transform 180ms ease-out;
+}
+html.chart-actions-mobile .chart-actions-panel.is-collapsed,
+html.chart-actions-mobile #view-chart.hidden .chart-actions-panel { display: none; }
+html.chart-actions-mobile .chart-actions-sheet-handle { display: grid; place-items: center; flex: 0 0 20px; touch-action: pan-y; user-select: none; }
+html.chart-actions-mobile .chart-actions-sheet-handle span { width: 36px; height: 4px; border-radius: 999px; background: #cbd5e1; }
+html.chart-actions-mobile .chart-actions-header { min-height: 44px; padding-block: 0; touch-action: pan-y; }
+html.chart-actions-mobile #chart-clinical-workspace .chart-actions-header { flex-direction: row; gap: 4px; padding: 0 8px 0 16px; border-bottom: 1px solid #f1f5f9; }
+html.chart-actions-mobile #chart-clinical-workspace .chart-actions-header h3 { writing-mode: horizontal-tb; min-height: 0; flex: 1; }
+html.chart-actions-mobile #chart-actions-body { overflow: hidden; }
+html.chart-actions-mobile .chart-actions-content { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+html.chart-actions-mobile .chart-actions-filters { grid-template-columns: minmax(0, 1fr) minmax(0, .8fr); padding-bottom: 8px; }
+html.chart-actions-mobile .chart-actions-search input { font-size: 16px; }
+html.chart-actions-mobile .chart-actions-selection { padding-block: 2px; }
+html.chart-actions-mobile .chart-actions-footer { padding-top: 8px; gap: 6px; }
+html.chart-actions-mobile .chart-actions-preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+html.chart-actions-mobile #chart-actions-operations { overflow: visible; flex: none; min-height: 0; }
+html.chart-actions-mobile .chart-actions-panel.is-sheet-dragging { transition: none; will-change: transform; user-select: none; }
+@media (max-height: 500px) {
+  html.chart-actions-mobile .chart-actions-preview,
+  html.chart-actions-mobile .chart-actions-footer-row label > span { display: none; }
+  html.chart-actions-mobile .chart-actions-footer { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .chart-actions-panel *, #chart-clinical-workspace.has-clinical-actions-panel { transition: none !important; animation: none !important; }
+  .chart-actions-panel, .chart-actions-panel *, #chart-clinical-workspace.has-clinical-actions-panel { transition: none !important; animation: none !important; }
 }

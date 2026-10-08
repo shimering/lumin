@@ -44,7 +44,7 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
     'toggleSurface', 'updateSelectionUI', 'activeDentalSpecialties', 'closeChartProcedureMenu', 'renderChartSpecialtyRail',
     'renderChartProcedureMenu', 'renderClinicalActionSelectors', 'setClinicalOperationStatus', 'renderClinicalOperationStatusSelector',
     'renderChartOperationOptions', 'updateClinicalOperationPreview', 'applySelectedDentalOperation', 'applySurfaceCondition',
-    'applyToothStatus', 'applyMouthOperation', 'bindGlobalClickEvents'].map(source).join('\n');
+    'applyToothStatus', 'applyMouthOperation', 'bindGlobalClickEvents', 'updateAppViewportDimensions'].map(source).join('\n');
   await page.addScriptTag({ content: `
     let currentUiLanguage='en', activePatientId='patient-1', activeClinicalOperationStatus='P';
     let activeSelection={tooth:null,slot:null,surfaces:[],targets:[]};
@@ -101,6 +101,7 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
     bindGlobalClickEvents();
     renderClinicalActionSelectors();renderChartMediaPanel();renderChartAppointmentsPanel();
   ` });
+  await page.addScriptTag({ path: path.join(root, 'lumin-mobile-nav.js') });
   await page.addScriptTag({ path: path.join(root, 'lumin-clinical-actions.js') });
   await page.evaluate(() => { document.dispatchEvent(new Event('DOMContentLoaded')); updateSelectionUI(); });
   const screenshots = path.join(os.tmpdir(), 'lumin-clinical-actions-panel');
@@ -115,8 +116,10 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
       }, language);
       const panel=page.locator('#action-palette-card'), toggle=page.locator('#chart-actions-toggle');
       assert.equal(await toggle.getAttribute('aria-expanded'),'false');
+      if(viewport.width<768)assert.equal(await panel.isVisible(),false,'The collapsed mobile panel has no floating bar');
       await page.locator('#tooth-card-1').click({position:{x:10,y:10}});
       assert.equal(await toggle.getAttribute('aria-expanded'),'true');
+      if(viewport.width<768){const box=await panel.boundingBox();assert.ok(Math.abs(box.height-viewport.height/2)<2,JSON.stringify({viewport,box}));}
       assert.equal(await page.evaluate(()=>document.activeElement.tagName==='INPUT'),false,'Selecting a tooth never opens the keyboard');
       assert.equal(await page.locator('[data-clinical-operation="inactive"]').count(),0);
       await page.locator('#chart-actions-search').fill('root');
@@ -129,8 +132,11 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
       assert.deepEqual(await page.evaluate(()=>chartSelectionTargets().map(target=>target.tooth)),['1']);
       assert.equal(await page.locator('#chart-operation-select').inputValue(),'root-canal','Reopening preserves the procedure draft');
       assert.equal(await page.locator('#chart-clinical-workspace').evaluate(node=>node.classList.contains('is-chart-rail-collapsed')),true);
-      await toggle.click();
-      assert.equal(await toggle.getAttribute('aria-expanded'),'true','The panel still opens manually');
+      if(viewport.width<768){
+        assert.equal(await panel.isVisible(),false);
+        await page.evaluate(()=>toggleClinicalActionsPanel());
+      }else await toggle.click();
+      assert.equal(await toggle.getAttribute('aria-expanded'),'true','The desktop panel still opens manually');
       await page.locator('#chart-operation-status-select').selectOption('In');
       assert.equal(await toggle.getAttribute('aria-expanded'),'true','Changing status keeps the panel open');
       assert.equal(await page.locator('#chart-apply-operation-button').isEnabled(),true);
@@ -204,6 +210,80 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
   assert.equal(await page.locator('#chart-actions-search').inputValue(),'');
   assert.equal(await page.locator('#chart-actions-specialty-filter').inputValue(),'');
   assert.equal(await page.evaluate(()=>Object.keys(getActivePatient().chartState).length),0,'Patient change does not carry draft work into another chart');
+  await t.test('mobile half-screen sheet supports multiple teeth and native swipe dismissal without a floating bar', async st => {
+    const touch=await page.context().newCDPSession(page);
+    st.after(()=>touch.detach());
+    await touch.send('Network.setUserAgentOverride',{userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1'});
+    await page.evaluate(()=>{
+      activePatientId='patient-1';
+      dentalOperations.push(...Array.from({length:40},(_,i)=>({id:'extra-'+i,name:'Additional procedure '+i,specialtyId:'endo',active:true,actionScope:'tooth',code:'extra-'+i,price:100,steps:[]})));
+    });
+    const swipe=async(selector,dx,dy,cancel=false)=>{
+      const box=await page.locator(selector).boundingBox();
+      const x=box.x+(selector==='.chart-actions-content'?2:box.width/2),y=box.y+Math.min(10,box.height/2);
+      await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+      for(let step=1;step<=4;step++)await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+dx*step/4,y:y+dy*step/4}]});
+      const transform=await page.locator('#action-palette-card').evaluate(node=>getComputedStyle(node).transform);
+      await touch.send('Input.dispatchTouchEvent',{type:cancel?'touchCancel':'touchEnd',touchPoints:[]});
+      return transform;
+    };
+    for(const viewport of [{width:390,height:844},{width:320,height:568},{width:844,height:390}])for(const language of ['en','ar']){
+      await page.setViewportSize(viewport);
+      await page.evaluate(language=>{
+        currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';
+        activeSelection=emptyChartSelection();resetClinicalActionsFilters();updateSelectionUI();updateAppViewportDimensions();
+      },language);
+      const panel=page.locator('#action-palette-card');
+      assert.equal(await panel.isVisible(),false);
+      await page.locator('#tooth-card-1').evaluate(node=>node.scrollIntoView({block:'start'}));
+      await page.locator('#tooth-card-1').click({position:{x:10,y:10}});
+      assert.equal(await panel.isVisible(),true);
+      const box=await panel.boundingBox();
+      assert.ok(Math.abs(box.height-viewport.height/2)<2,JSON.stringify({viewport,language,box}));
+      assert.ok(Math.abs(box.y-viewport.height/2)<2);
+      assert.equal(await page.locator('.chart-clinical-column').evaluate(node=>node.inert),false,'The upper chart stays interactive for multiple selection');
+      await page.locator('#tooth-card-2').click({position:{x:10,y:10}});
+      assert.deepEqual(await page.evaluate(()=>chartSelectionTargets().map(target=>target.tooth)),['1','2']);
+      await page.evaluate(()=>chooseClinicalActionsOperation('root-canal'));
+      const content=page.locator('.chart-actions-content');
+      await content.evaluate(node=>node.scrollTop=100);
+      assert.ok(await content.evaluate(node=>node.scrollTop)>0,'Procedures scroll inside the half-screen sheet');
+      await swipe('.chart-actions-content',0,65);
+      assert.equal(await page.evaluate(()=>clinicalActionsPanel.open),true,'A list scrolled away from the top never dismisses');
+      await content.evaluate(node=>node.scrollTop=0);
+      await swipe('.chart-actions-content',0,-60);
+      assert.equal(await page.evaluate(()=>clinicalActionsPanel.open),true,'Upward scrolling does not dismiss');
+      await swipe('.chart-actions-sheet-handle',0,20);
+      assert.equal(await page.evaluate(()=>clinicalActionsPanel.open),true,'Short pulls return the sheet');
+      await swipe('.chart-actions-sheet-handle',65,10);
+      assert.equal(await page.evaluate(()=>clinicalActionsPanel.open),true,'Horizontal swipes do not dismiss');
+      await swipe('.chart-actions-sheet-handle',0,100,true);
+      assert.equal(await page.evaluate(()=>clinicalActionsPanel.open),true,'Cancelled touches do not dismiss');
+      const apply=await page.locator('#chart-apply-operation-button').boundingBox();
+      assert.ok(apply.width>=44&&apply.height>=44&&apply.y>=box.y&&apply.y+apply.height<=viewport.height+1,JSON.stringify({viewport,language,apply}));
+      if(viewport.width===390||viewport.width===844)await page.screenshot({path:path.join(screenshots,`mobile-half-sheet-${viewport.width}-${language}.png`)});
+      assert.notEqual(await swipe('.chart-actions-sheet-handle',0,140),'none','The sheet follows a downward pull');
+      assert.equal(await panel.isVisible(),false,'Swiping down removes the entire panel');
+      await page.evaluate(()=>updateSelectionUI());
+      assert.equal(await panel.isVisible(),false,'A refresh does not reopen a dismissed sheet');
+      assert.deepEqual(await page.evaluate(()=>chartSelectionTargets().map(target=>target.tooth)),['1','2']);
+      assert.equal(await page.locator('#chart-operation-select').inputValue(),'root-canal','Dismissal retains the procedure draft');
+      await page.locator('#tooth-card-3').click({position:{x:10,y:10}});
+      assert.equal(await panel.isVisible(),true,'Selecting another tooth reopens the sheet');
+      await page.locator('#chart-apply-operation-button').click();
+      assert.equal(await panel.isVisible(),false,'Apply removes the panel without a floating bar');
+      assert.equal(await page.evaluate(()=>document.activeElement.dataset.toothCard),'3','Focus returns to the selected tooth');
+    }
+    await page.setViewportSize({width:390,height:844});
+    await page.evaluate(()=>{
+      document.documentElement.style.zoom='.85';updateAppViewportDimensions();
+      activeSelection=emptyChartSelection();updateSelectionUI();toggleSelectedChartTooth('1',1);
+    });
+    assert.ok(Math.abs((await page.locator('#action-palette-card').boundingBox()).height-422)<2,'The sheet stays at half the visible viewport with app scaling');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#action-palette-card').isVisible(),false);
+    await page.evaluate(()=>{document.documentElement.style.removeProperty('zoom');updateAppViewportDimensions();});
+  });
   assert.deepEqual(await page.evaluate(()=>window.alerts),[]);
   assert.deepEqual(errors,[]);
 });
