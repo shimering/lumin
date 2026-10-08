@@ -4205,6 +4205,7 @@
       white-space: nowrap;
     }
     .patient-workspace-tab > svg { width: calc(1rem + 2px); height: calc(1rem + 2px); flex-shrink: 0; }
+    .dental-chart-icon { color: #111111; }
     .patient-workspace-tab > img { width: calc(1.25rem + 2px); height: calc(1.25rem + 2px); }
     .patient-workspace-tab[data-patient-workspace-tab="profile"] {
       width: clamp(9rem, 12vw, 11rem);
@@ -6409,7 +6410,7 @@
         </button>
         <div role="tablist" aria-label="Patient record sections" class="patient-workspace-tabs flex min-w-0 flex-1 gap-1 overflow-x-auto p-1">
           <button type="button" role="tab" aria-controls="view-patient-profile" data-patient-workspace-tab="profile" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('profile')"><span class="patient-workspace-identity"><span class="patient-workspace-name" dir="auto">Patient</span><span id="patient-workspace-meta" class="patient-workspace-meta">—</span></span></button>
-          <button type="button" role="tab" aria-controls="view-chart" data-patient-workspace-tab="chart" data-workspace-requires="chart" onclick="openPatientWorkspaceTab('chart')" aria-label="Dental chart" title="Dental chart"><img src="assets/specialties-3d/dental-general.webp?v=2" width="32" height="32" decoding="async" alt="" aria-hidden="true" class="dental-specialty-icon" /><span>Dental chart</span></button>
+          <button type="button" role="tab" aria-controls="view-chart" data-patient-workspace-tab="chart" data-workspace-requires="chart" onclick="openPatientWorkspaceTab('chart')" aria-label="Dental chart" title="Dental chart"><i data-lucide="tooth" class="h-4 w-4 dental-chart-icon" aria-hidden="true"></i><span>Dental chart</span></button>
           <button type="button" role="tab" aria-controls="view-patient-media" data-patient-workspace-tab="media" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('media')" aria-label="X-Rays & Media" title="X-Rays & Media"><i data-lucide="images" class="h-4 w-4"></i><span>X-Rays & Media</span></button>
           <button type="button" role="tab" aria-controls="view-patient-scans" data-patient-workspace-tab="scans" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('scans')" aria-label="3D Scans" title="3D Scans"><i data-lucide="box" class="h-4 w-4"></i><span>3D Scans</span></button>
           <button type="button" role="tab" aria-controls="view-patient-appointments" data-patient-workspace-tab="appointments" data-workspace-requires="appointments" onclick="openPatientWorkspaceTab('appointments')" aria-label="Appointments" title="Appointments"><i data-lucide="calendar-days" class="h-4 w-4"></i><span>Appointments</span></button>
@@ -9923,10 +9924,21 @@
     // Lucide's browser helper otherwise revisits and replaces every existing icon
     // whenever a view updates. Preserve its synchronous behavior while limiting
     // subsequent work to newly-rendered <i data-lucide> placeholders.
+    // Keep the dental chart pictogram in the same stroke system as Lucide.
+    const luminLucideIcons = {
+      ...window.lucide.icons,
+      Tooth: ['svg', {
+        xmlns: 'http://www.w3.org/2000/svg', width: 24, height: 24,
+        viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+        'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+      }, [
+        ['path', { d: 'M12 4c-1.6 0-2.8-1-4.5-1C5 3 3.5 5 3.5 7.5c0 2 1.3 3.8 1.8 5.6l1.2 5.4c.3 1.6 1 2.5 2 2.5 1.5 0 1.5-6 3.5-6s2 6 3.5 6c1 0 1.7-.9 2-2.5l1.2-5.4c.5-1.8 1.8-3.6 1.8-5.6C20.5 5 19 3 16.5 3c-1.7 0-2.9 1-4.5 1Z' }]
+      ]]
+    };
     const createAllLucideIcons = window.lucide.createIcons.bind(window.lucide);
-    window.lucide.createIcons = (...args) => {
+    window.lucide.createIcons = (options = {}) => {
       if (!document.querySelector('i[data-lucide]')) return;
-      createAllLucideIcons(...args);
+      createAllLucideIcons({ ...options, icons: options.icons ? { ...luminLucideIcons, ...options.icons } : luminLucideIcons });
       document.querySelectorAll('svg[data-lucide]').forEach(icon => {
         icon.setAttribute('data-lumin-lucide', icon.getAttribute('data-lucide') || '');
         icon.removeAttribute('data-lucide');
@@ -23515,7 +23527,7 @@
                   <i data-lucide="pencil" class="patient-edit-icon h-4 w-4"></i><span class="patient-action-label patient-edit-label">${currentUiLanguage === 'ar' ? 'تعديل' : 'Edit'}</span>
                 </button>
                 ${chartAllowed
-                  ? `<button type="button" onclick="event.stopPropagation(); openPatientChart('${p.id}')" aria-label="${currentUiLanguage === 'ar' ? 'فتح مخطط' : 'Open chart for'} ${escapeHtml(p.name)}" title="${currentUiLanguage === 'ar' ? 'المخطط' : 'Chart'}" class="patient-row-action-button patient-open-chart inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-600 transition hover:bg-blue-600 hover:text-white"><img src="assets/specialties-3d/dental-general.webp?v=2" width="32" height="32" decoding="async" alt="" aria-hidden="true" class="dental-specialty-icon" /><span class="patient-action-label patient-open-label">${currentUiLanguage === 'ar' ? 'المخطط' : 'Chart'}</span></button>`
+                  ? `<button type="button" onclick="event.stopPropagation(); openPatientChart('${p.id}')" aria-label="${currentUiLanguage === 'ar' ? 'فتح مخطط' : 'Open chart for'} ${escapeHtml(p.name)}" title="${currentUiLanguage === 'ar' ? 'المخطط' : 'Chart'}" class="patient-row-action-button patient-open-chart inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-600 transition hover:bg-blue-600 hover:text-white"><i data-lucide="tooth" class="h-4 w-4 dental-chart-icon" aria-hidden="true"></i><span class="patient-action-label patient-open-label">${currentUiLanguage === 'ar' ? 'المخطط' : 'Chart'}</span></button>`
                   : ''}
                 <button type="button" onclick="event.stopPropagation(); deletePatient('${p.id}')" aria-label="${currentUiLanguage === 'ar' ? 'حذف' : 'Delete'} ${escapeHtml(p.name)}" title="${currentUiLanguage === 'ar' ? 'حذف' : 'Delete'}" class="patient-row-action-button patient-delete-button inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 transition hover:border-red-600 hover:bg-red-600 hover:text-white">
                   <i data-lucide="trash-2" class="patient-delete-icon h-4 w-4"></i><span class="patient-action-label patient-delete-label">${currentUiLanguage === 'ar' ? 'حذف' : 'Delete'}</span>
@@ -34807,7 +34819,7 @@
                 <button type="button" onclick="openPatientInvoices('${entry.patientId}')" class="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-black text-violet-700 transition hover:bg-violet-100">
                   <i data-lucide="receipt-text" class="h-3.5 w-3.5"></i> Invoice
                 </button>
-                ${canOpenChart ? `<button type="button" onclick="openPatientChart('${entry.patientId}')" class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-black text-indigo-700 transition hover:bg-indigo-100"><img src="assets/specialties-3d/dental-general.webp?v=2" width="32" height="32" decoding="async" alt="" aria-hidden="true" class="dental-specialty-icon" /> Chart</button>` : ''}
+                ${canOpenChart ? `<button type="button" onclick="openPatientChart('${entry.patientId}')" class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-black text-indigo-700 transition hover:bg-indigo-100"><i data-lucide="tooth" class="h-4 w-4 dental-chart-icon" aria-hidden="true"></i> Chart</button>` : ''}
               </div>`}
             </div>
           </article>
