@@ -1,17 +1,7 @@
 /* Separate 44px touch targets keep notes and X-rays from overlapping. */
-#view-chart .chart-clinical-column .arch-scroll > div { min-width: calc(var(--arch-columns, 16) * 94px) !important; }
-.chart-tooth-actions { display: flex; justify-content: center; flex: 0 0 44px; width: 88px; height: 44px; direction: ltr; }
+#view-chart .chart-clinical-column .arch-scroll > div { min-width: calc(var(--arch-columns, 16) * 48px) !important; }
+.chart-tooth-actions { display: flex; flex-direction: column; justify-content: center; flex: 0 0 88px; width: 44px; height: 88px; direction: ltr; }
 .chart-tooth-actions .chart-tooth-xray-slot { width: 44px; flex-basis: 44px; }
-@media (min-width: 768px) and (orientation: landscape) {
-  html.chart-media-landscape #view-chart .chart-clinical-workspace:not(.is-media-collapsed) .arch-scroll > div,
-  html.chart-media-landscape #view-chart .has-chart-appointments:not(.is-side-panels-collapsed) .arch-scroll > div { min-width: calc(var(--arch-columns, 16) * 48px) !important; }
-  html.chart-media-landscape .chart-clinical-workspace:not(.is-media-collapsed) .chart-tooth-actions,
-  html.chart-media-landscape .has-chart-appointments:not(.is-side-panels-collapsed) .chart-tooth-actions { flex-direction: column; width: 44px; height: 88px; flex-basis: 88px; }
-}
-@media (max-width: 767px), (orientation: portrait) {
-  #view-chart .chart-clinical-column .arch-scroll > div { min-width: calc(var(--arch-columns, 16) * 48px) !important; }
-  .chart-tooth-actions { flex-direction: column; width: 44px; height: 88px; flex-basis: 88px; }
-}
 .chart-tooth-note-indicator { display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; padding: 4px; border: 0; border-radius: 12px; background: transparent; color: #94a3b8; cursor: pointer; transition: background 150ms ease-out, transform 150ms ease-out; }
 .chart-tooth-note-indicator > span { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 999px; background: #f1f5f9; }
 .chart-tooth-note-indicator svg { width: 16px; height: 16px; }

@@ -158,7 +158,7 @@ test('notes open and save through the diagnostic editor, stay live, and fit expa
       await page.evaluate(language=>{currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';chartPatientMedia.collapsed=true;renderChartMediaPanel();renderChartToothNoteIndicators();},language);
       await trigger.scrollIntoViewIfNeeded();
       const landscape=viewport.width>=768&&viewport.width>viewport.height;
-      assert.equal(await trigger.evaluate(node=>getComputedStyle(node.parentElement).flexDirection),landscape?'row':'column');
+      assert.equal(await trigger.evaluate(node=>getComputedStyle(node.parentElement).flexDirection),'column');
       for(const selector of ['[data-tooth-note-trigger="3"]','[data-tooth-xray-slot="3"] button']){
         const box=await page.locator(selector).boundingBox();assert.ok(box.width>=44&&box.height>=44);
       }
