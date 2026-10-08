@@ -3955,7 +3955,7 @@
       min-height: 0;
       flex-direction: column;
       gap: 1.25rem;
-      overflow: hidden;
+      overflow: visible;
     }
     #view-dashboard > div:not(#dashboard-scroll-panels) { flex: 0 0 auto; }
     #dashboard-scroll-panels {
@@ -5403,7 +5403,8 @@
       .wa-settings-primary-button { flex: 1 1 0; }
     }
   </style>
-  <link rel="stylesheet" href="lumin-theme.css?v=21" />
+  <link rel="stylesheet" href="lumin-theme.css?v=22" />
+  <link rel="stylesheet" href="lumin-backgrounds.css?v=1" />
   <link rel="stylesheet" href="lumin-whatsapp-actions.css?v=2" />
   <link rel="stylesheet" href="lumin-dashboard-motion.css?v=1" />
   <link rel="stylesheet" href="lumin-appointment-status.css?v=2" />
@@ -7986,6 +7987,36 @@
             <option value="blue">Blue</option><option value="violet">Violet</option><option value="teal">Teal</option><option value="green">Green</option><option value="rose">Rose</option><option value="amber">Amber</option><option value="slate">Slate</option>
           </select>
           <p id="settings-tint-description" class="text-xs text-slate-500">Applies when the raised theme is on. Clinical and payment status colors keep their meaning.</p>
+          <fieldset class="lumin-background-fieldset" aria-describedby="settings-background-description">
+            <legend>App background</legend>
+            <p id="settings-background-description" class="lumin-background-description">A subtle background across every page. Saved for your account.</p>
+            <div class="lumin-background-grid">
+              <label class="lumin-background-choice">
+                <input type="radio" name="settings-app-background" value="default" onchange="handleUiBackgroundChange(this.value)" checked />
+                <span class="lumin-background-option"><span class="lumin-background-swatch" data-ui-background-preset="default" aria-hidden="true"><span></span><span></span><span></span></span><span class="lumin-background-caption"><span>Default</span><i data-lucide="check" aria-hidden="true"></i></span></span>
+              </label>
+              <label class="lumin-background-choice">
+                <input type="radio" name="settings-app-background" value="pearl" onchange="handleUiBackgroundChange(this.value)" />
+                <span class="lumin-background-option"><span class="lumin-background-swatch" data-ui-background-preset="pearl" aria-hidden="true"><span></span><span></span><span></span></span><span class="lumin-background-caption"><span>Pearl</span><i data-lucide="check" aria-hidden="true"></i></span></span>
+              </label>
+              <label class="lumin-background-choice">
+                <input type="radio" name="settings-app-background" value="mist" onchange="handleUiBackgroundChange(this.value)" />
+                <span class="lumin-background-option"><span class="lumin-background-swatch" data-ui-background-preset="mist" aria-hidden="true"><span></span><span></span><span></span></span><span class="lumin-background-caption"><span>Mist</span><i data-lucide="check" aria-hidden="true"></i></span></span>
+              </label>
+              <label class="lumin-background-choice">
+                <input type="radio" name="settings-app-background" value="sage" onchange="handleUiBackgroundChange(this.value)" />
+                <span class="lumin-background-option"><span class="lumin-background-swatch" data-ui-background-preset="sage" aria-hidden="true"><span></span><span></span><span></span></span><span class="lumin-background-caption"><span>Sage</span><i data-lucide="check" aria-hidden="true"></i></span></span>
+              </label>
+              <label class="lumin-background-choice">
+                <input type="radio" name="settings-app-background" value="linen" onchange="handleUiBackgroundChange(this.value)" />
+                <span class="lumin-background-option"><span class="lumin-background-swatch" data-ui-background-preset="linen" aria-hidden="true"><span></span><span></span><span></span></span><span class="lumin-background-caption"><span>Linen</span><i data-lucide="check" aria-hidden="true"></i></span></span>
+              </label>
+              <label class="lumin-background-choice">
+                <input type="radio" name="settings-app-background" value="dots" onchange="handleUiBackgroundChange(this.value)" />
+                <span class="lumin-background-option"><span class="lumin-background-swatch" data-ui-background-preset="dots" aria-hidden="true"><span></span><span></span><span></span></span><span class="lumin-background-caption"><span>Soft dots</span><i data-lucide="check" aria-hidden="true"></i></span></span>
+              </label>
+            </div>
+          </fieldset>
           <div class="space-y-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
             <div class="flex items-start justify-between gap-4">
               <span>
@@ -10587,6 +10618,7 @@
     let currentUiLanguage = 'en';
     let currentUiTheme = 'flat';
     let currentUiTint = 'blue';
+    let currentUiBackground = 'default';
     const UI_SCALE_MIN = 80;
     const UI_SCALE_MAX = 125;
     const UI_SCALE_STEP = 5;
@@ -11214,6 +11246,14 @@
       'Interface language': 'لغة الواجهة',
       'Appearance': 'المظهر',
       'Color tint': 'لون المظهر',
+      'App background': 'خلفية التطبيق',
+      'A subtle background across every page. Saved for your account.': 'خلفية هادئة لجميع صفحات التطبيق. تُحفظ لحسابك.',
+      'Pearl': 'لؤلؤي',
+      'Mist': 'ضبابي',
+      'Sage': 'أخضر هادئ',
+      'Linen': 'كتاني',
+      'Soft dots': 'نقاط ناعمة',
+      'Background saved.': 'تم حفظ الخلفية.',
       'Blue': 'أزرق',
       'Violet': 'بنفسجي',
       'Teal': 'فيروزي',
@@ -13419,6 +13459,25 @@
       return normaliseUiScale(user?.user_metadata?.lumin_ui_scale);
     }
 
+    function normaliseUiBackground(background) {
+      return ['default', 'pearl', 'mist', 'sage', 'linen', 'dots'].includes(background) ? background : 'default';
+    }
+
+    function userUiBackground(user) {
+      return normaliseUiBackground(user?.user_metadata?.lumin_ui_background);
+    }
+
+    function syncUiBackgroundControl() {
+      document.querySelectorAll('input[name="settings-app-background"]').forEach(input => {
+        input.checked = input.value === currentUiBackground;
+        input.disabled = Boolean(themeSaveRequest);
+      });
+    }
+
+    function handleUiBackgroundChange(background) {
+      return saveUiAppearance(currentUiTheme, currentUiTint, currentUiScale, normaliseUiBackground(background));
+    }
+
     function syncUiThemeToggle() {
       const toggle = document.getElementById('settings-theme-toggle');
       if (!toggle) return;
@@ -13427,6 +13486,7 @@
       const tint = document.getElementById('settings-theme-tint');
       if (tint) { tint.value = currentUiTint; tint.disabled = Boolean(themeSaveRequest); }
       syncUiScaleControl();
+      syncUiBackgroundControl();
     }
 
     function syncUiScaleControl() {
@@ -13462,14 +13522,16 @@
       return handleUiScaleChange(currentUiScale + Number(delta || 0));
     }
 
-    function applyUiTheme(theme, tint = 'blue', scale = UI_SCALE_DEFAULT) {
+    function applyUiTheme(theme, tint = 'blue', scale = UI_SCALE_DEFAULT, background = currentUiBackground) {
       const nextTheme = theme === 'raised' ? 'raised' : 'flat';
       const nextTint = normaliseUiTint(tint);
       const nextScale = normaliseUiScale(scale);
-      const changed = currentUiTheme !== nextTheme || currentUiTint !== nextTint || currentUiScale !== nextScale;
+      const nextBackground = normaliseUiBackground(background);
+      const changed = currentUiTheme !== nextTheme || currentUiTint !== nextTint || currentUiScale !== nextScale || currentUiBackground !== nextBackground;
       currentUiTheme = nextTheme;
       currentUiTint = nextTint;
       currentUiScale = nextScale;
+      currentUiBackground = nextBackground;
       const root = document.documentElement;
       const scaleFactor = nextScale / 100;
       root.style.setProperty('--lumin-app-scale', String(scaleFactor));
@@ -13478,6 +13540,7 @@
       document.body.classList.toggle('lumin-raised', nextTheme === 'raised');
       document.body.dataset.uiTint = currentUiTint;
       document.body.dataset.uiScale = String(currentUiScale);
+      document.body.dataset.uiBackground = currentUiBackground;
       syncUiThemeToggle();
       if (changed) {
         scheduleDashboardViewportUpdate();
@@ -13490,7 +13553,7 @@
     function resetUiTheme() {
       themeSaveRequest = null;
       uiThemeRevision += 1;
-      applyUiTheme('flat', 'blue', UI_SCALE_DEFAULT);
+      applyUiTheme('flat', 'blue', UI_SCALE_DEFAULT, 'default');
       const message = document.getElementById('settings-theme-message');
       if (message) { message.textContent = ''; message.classList.add('hidden'); }
     }
@@ -13499,7 +13562,7 @@
       if (themeSaveRequest && themeSaveRequest.userId === session?.user?.id) return;
       themeSaveRequest = null;
       uiThemeRevision += 1;
-      applyUiTheme(session?.user ? userUiTheme(session.user) : 'flat', session?.user?.user_metadata?.lumin_ui_tint, session?.user ? userUiScale(session.user) : UI_SCALE_DEFAULT);
+      applyUiTheme(session?.user ? userUiTheme(session.user) : 'flat', session?.user?.user_metadata?.lumin_ui_tint, session?.user ? userUiScale(session.user) : UI_SCALE_DEFAULT, userUiBackground(session?.user));
     }
 
     async function refreshUiThemePreference() {
@@ -13511,7 +13574,7 @@
         if (error || !data?.user || data.user.id !== userId) return;
         if (currentSession?.user?.id !== userId || revision !== uiThemeRevision || themeSaveRequest) return;
         currentSession = { ...currentSession, user: data.user };
-        applyUiTheme(userUiTheme(data.user), data.user.user_metadata?.lumin_ui_tint, userUiScale(data.user));
+        applyUiTheme(userUiTheme(data.user), data.user.user_metadata?.lumin_ui_tint, userUiScale(data.user), userUiBackground(data.user));
       } catch (_) { /* Keep the cached account preference while offline. */ }
     }
 
@@ -13523,7 +13586,7 @@
       return saveUiAppearance(currentUiTheme, normaliseUiTint(tint), currentUiScale);
     }
 
-    async function saveUiAppearance(nextTheme, nextTint, nextScale = currentUiScale) {
+    async function saveUiAppearance(nextTheme, nextTint, nextScale = currentUiScale, nextBackground = currentUiBackground) {
       const userId = currentSession?.user?.id;
       if (!userId || !currentUserAccess || !hasPageAccess('settings') || themeSaveRequest) {
         syncUiThemeToggle();
@@ -13532,15 +13595,17 @@
       nextTheme = nextTheme === 'raised' ? 'raised' : 'flat';
       nextTint = normaliseUiTint(nextTint);
       nextScale = normaliseUiScale(nextScale);
-      if (nextTheme === currentUiTheme && nextTint === currentUiTint && nextScale === currentUiScale) return;
+      nextBackground = normaliseUiBackground(nextBackground);
+      if (nextTheme === currentUiTheme && nextTint === currentUiTint && nextScale === currentUiScale && nextBackground === currentUiBackground) return;
       const metadata = {};
       if (nextTheme !== currentUiTheme) metadata.lumin_ui_theme = nextTheme;
       if (nextTint !== currentUiTint) metadata.lumin_ui_tint = nextTint;
       if (nextScale !== currentUiScale) metadata.lumin_ui_scale = nextScale;
-      const request = { userId, previousTheme: currentUiTheme, previousTint: currentUiTint, previousScale: currentUiScale };
+      if (nextBackground !== currentUiBackground) metadata.lumin_ui_background = nextBackground;
+      const request = { userId, previousTheme: currentUiTheme, previousTint: currentUiTint, previousScale: currentUiScale, previousBackground: currentUiBackground };
       themeSaveRequest = request;
       uiThemeRevision += 1;
-      applyUiTheme(nextTheme, nextTint, nextScale);
+      applyUiTheme(nextTheme, nextTint, nextScale, nextBackground);
       setAdminMessage('settings-theme-message', 'Saving appearance preference...');
       try {
         const { data, error } = await db.auth.updateUser({ data: metadata });
@@ -13549,16 +13614,18 @@
           throw new Error('Could not save the appearance preference. Please try again.');
         }
         currentSession = { ...currentSession, user: data.user };
-        applyUiTheme(userUiTheme(data.user), data.user.user_metadata?.lumin_ui_tint, userUiScale(data.user));
-        const successMessage = Object.hasOwn(metadata, 'lumin_ui_scale')
-          ? (currentUiLanguage === 'ar' ? `تم ضبط حجم التطبيق على ${nextScale}٪.` : `App scale set to ${nextScale}%.`)
-          : metadata.lumin_ui_theme
-            ? (nextTheme === 'raised' ? 'Raised 3D theme is on.' : 'Original flat appearance restored.')
-            : 'Color tint saved.';
+        applyUiTheme(userUiTheme(data.user), data.user.user_metadata?.lumin_ui_tint, userUiScale(data.user), userUiBackground(data.user));
+        const successMessage = Object.hasOwn(metadata, 'lumin_ui_background')
+          ? (currentUiLanguage === 'ar' ? 'تم حفظ الخلفية.' : 'Background saved.')
+          : Object.hasOwn(metadata, 'lumin_ui_scale')
+            ? (currentUiLanguage === 'ar' ? `تم ضبط حجم التطبيق على ${nextScale}٪.` : `App scale set to ${nextScale}%.`)
+            : metadata.lumin_ui_theme
+              ? (nextTheme === 'raised' ? 'Raised 3D theme is on.' : 'Original flat appearance restored.')
+              : 'Color tint saved.';
         setAdminMessage('settings-theme-message', successMessage);
       } catch (_) {
         if (themeSaveRequest !== request || currentSession?.user?.id !== userId) return;
-        applyUiTheme(request.previousTheme, request.previousTint, request.previousScale);
+        applyUiTheme(request.previousTheme, request.previousTint, request.previousScale, request.previousBackground);
         setAdminMessage('settings-theme-message', 'Could not save the appearance preference. Please try again.', 'error');
       } finally {
         if (themeSaveRequest === request) {

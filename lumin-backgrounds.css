@@ -1,0 +1,57 @@
+/* CSS-only backgrounds keep the whole application light and available offline. */
+@media screen {
+  [data-ui-background-preset] { --lumin-background-size: auto; }
+  [data-ui-background-preset="default"] {
+    --lumin-background-color: #f1f5fb;
+    --lumin-background-image: linear-gradient(145deg, #fafcff, hsl(var(--lumin-hue, 215) 80% 94%));
+  }
+  [data-ui-background="pearl"], [data-ui-background-preset="pearl"] {
+    --lumin-background-color: #f5f6f8;
+    --lumin-background-image: none;
+  }
+  [data-ui-background="mist"], [data-ui-background-preset="mist"] {
+    --lumin-background-color: #f1f6fb;
+    --lumin-background-image: radial-gradient(ellipse at 12% 0%, #e4eef9 0%, transparent 58%), linear-gradient(145deg, #f8fafc, #edf4fa);
+  }
+  [data-ui-background="sage"], [data-ui-background-preset="sage"] {
+    --lumin-background-color: #f1f6f3;
+    --lumin-background-image: radial-gradient(ellipse at 88% 0%, #e4eee8 0%, transparent 58%), linear-gradient(145deg, #f8faf8, #eef4f0);
+  }
+  [data-ui-background="linen"], [data-ui-background-preset="linen"] {
+    --lumin-background-color: #f7f4ef;
+    --lumin-background-image: radial-gradient(ellipse at 12% 0%, #eee7dc 0%, transparent 58%), linear-gradient(145deg, #fcfaf6, #f4f0e8);
+  }
+  [data-ui-background="dots"], [data-ui-background-preset="dots"] {
+    --lumin-background-color: #f7f8fa;
+    --lumin-background-image: radial-gradient(circle, #94a3b833 .75px, transparent .9px);
+    --lumin-background-size: 24px 24px;
+  }
+  body[data-ui-background]:not([data-ui-background="default"]) {
+    background-color: var(--lumin-background-color);
+    background-image: var(--lumin-background-image);
+    background-size: var(--lumin-background-size, auto);
+    background-attachment: fixed;
+  }
+  .lumin-background-fieldset { min-width: 0; padding: 0; border: 0; }
+  .lumin-background-fieldset legend { padding: 0; color: #334155; font-size: 14px; font-weight: 600; }
+  .lumin-background-description { margin-block: 6px 12px; color: #64748b; font-size: 12px; line-height: 1.6; }
+  .lumin-background-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .lumin-background-choice { position: relative; display: block; min-width: 0; cursor: pointer; }
+  .lumin-background-choice input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .lumin-background-option { display: block; overflow: hidden; border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; transition: border-color 150ms ease-out, box-shadow 150ms ease-out, transform 150ms ease-out; }
+  .lumin-background-swatch { display: flex; align-items: stretch; gap: 7px; height: 72px; padding: 14px; background-color: var(--lumin-background-color, #eef4fb); background-image: var(--lumin-background-image, linear-gradient(145deg, #f8fafc, #e5effc)); background-size: var(--lumin-background-size, auto); }
+  .lumin-background-swatch > span { border-radius: 5px; background: #ffffffcc; box-shadow: 0 4px 8px -4px #47556933; }
+  .lumin-background-swatch > span:first-child { width: 12px; flex: none; }
+  .lumin-background-swatch > span:not(:first-child) { flex: 1; min-width: 0; }
+  .lumin-background-caption { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 8px 12px; color: #475569; font-size: 12px; font-weight: 600; }
+  .lumin-background-caption > svg { width: 16px; height: 16px; flex: none; color: #2563eb; opacity: 0; }
+  .lumin-background-choice:hover .lumin-background-option { border-color: #cbd5e1; box-shadow: 0 4px 12px -6px #0f172a26; }
+  .lumin-background-choice:active .lumin-background-option { transform: scale(.98); }
+  .lumin-background-choice input:checked + .lumin-background-option { border-color: #93c5fd; box-shadow: 0 0 0 2px #dbeafe; }
+  .lumin-background-choice input:checked + .lumin-background-option .lumin-background-caption { color: #1d4ed8; }
+  .lumin-background-choice input:checked + .lumin-background-option svg { opacity: 1; }
+  .lumin-background-choice input:focus-visible + .lumin-background-option { outline: 2px solid #2563eb; outline-offset: 3px; }
+  .lumin-background-choice:has(input:disabled) { cursor: default; pointer-events: none; opacity: .55; }
+  @media (max-width: 479px) { .lumin-background-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (prefers-reduced-motion: reduce) { .lumin-background-option { transition: none; } }
+}

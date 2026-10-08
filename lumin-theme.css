@@ -162,6 +162,7 @@
       --lumin-ink: hsl(var(--lumin-hue) calc(72.2% * var(--lumin-chroma)) 22.5%);
       --lumin-muted: hsl(var(--lumin-hue) calc(29.6% * var(--lumin-chroma)) 45.7%);
       --lumin-raised: 0 14px 24px hsl(var(--lumin-hue) calc(46.2% * var(--lumin-chroma)) 76.7% / 0.420), 0 4px 6px hsl(var(--lumin-hue) calc(46.2% * var(--lumin-chroma)) 76.7% / 0.251), -7px -7px 18px #ffffff;
+      --lumin-dashboard-raised: 0 10px 22px -10px hsl(var(--lumin-hue) calc(40% * var(--lumin-chroma)) 38% / .24), 0 3px 8px -4px hsl(var(--lumin-hue) calc(40% * var(--lumin-chroma)) 38% / .14), 0 -1px 0 #ffffffa6;
       --lumin-card-raised: 0 9px 12px hsl(var(--lumin-hue) calc(47.0% * var(--lumin-chroma)) 74.1% / 0.349), 4px 5px 14px hsl(var(--lumin-hue) calc(44.6% * var(--lumin-chroma)) 80.2% / 0.361), -5px -5px 12px #ffffff;
       --lumin-small-raised: 0 5px 3px hsl(var(--lumin-hue) calc(42.9% * var(--lumin-chroma)) 82.2% / 0.349), 0 9px 13px hsl(var(--lumin-hue) calc(44.8% * var(--lumin-chroma)) 77.3% / 0.400), -4px -4px 10px #ffffff;
       --lumin-pressed: 0 3px 5px hsl(var(--lumin-hue) calc(44.8% * var(--lumin-chroma)) 77.3% / 0.502), -2px -2px 6px #ffffff;
@@ -296,7 +297,7 @@ body.lumin-raised #view-dashboard #dashboard-attendance-card {
       border-top-width: 2px;
       border-radius: 1.75rem;
       background: var(--lumin-face);
-      box-shadow: var(--lumin-raised);
+      box-shadow: var(--lumin-dashboard-raised);
     }
     body.lumin-raised #app-shell .app-page-bar {
       border-color: #ffffff;
@@ -404,6 +405,9 @@ body.lumin-raised #view-dashboard #dashboard-attendance-card {
       background: hsl(var(--lumin-hue) calc(100% * var(--lumin-chroma)) 98% / 0.5);
     }
     body.lumin-raised #dashboard-scroll-panels { gap: 1.5rem; }
+    @media (min-width: 1024px) {
+      body.dashboard-active #app-main { padding-bottom: 32px; }
+    }
     body.lumin-raised #view-dashboard .dashboard-scroll-card > div:first-child {
       padding: 1.25rem;
       border-bottom: 1px solid hsl(var(--lumin-hue) calc(55.6% * var(--lumin-chroma)) 91.2%);
