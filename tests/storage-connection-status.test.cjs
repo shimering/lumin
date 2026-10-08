@@ -143,7 +143,7 @@ test('focus, pageshow, and overlapping polls do not abort a slow health request'
   assert.equal(h.badge.dataset.state, 'connected');
 });
 
-test('polls every five seconds only while active and visible, and coalesces overlapping checks', async () => {
+test('polls every thirty seconds only while active and visible, and coalesces overlapping checks', async () => {
   const h = harness();
   assert.equal(h.intervals.size, 0, 'no polling before sign-in');
   h.ctx.startStorageConnectionMonitor();
@@ -151,7 +151,7 @@ test('polls every five seconds only while active and visible, and coalesces over
   await settle();
   assert.equal(h.intervals.size, 1);
   const interval = [...h.intervals.values()][0];
-  assert.equal(interval.delay, 5000);
+  assert.equal(interval.delay, 30000);
   assert.equal(h.requests.length, 1);
   h.ctx.document.visibilityState = 'hidden';
   interval.fn();
