@@ -121,6 +121,11 @@ function showChartToothXrays(toothId, trigger = document.activeElement) {
   chartMediaPreviousFocus = trigger;
   const selected = chartPatientMedia.filterToothIds;
   chartPatientMedia.filterToothIds = selected.includes(id) ? selected.filter(tooth => tooth !== id) : [...selected, id];
+  if (!selected.includes(id)) {
+    const toothXrays = chartPatientXrays([id]);
+    const current = toothXrays.find(file => file.relativePath === chartPatientMedia.selectedPath);
+    chartPatientMedia.selectedPath = (current || toothXrays[0])?.relativePath || '';
+  }
   chartPatientMedia.collapsed = false;
   renderChartMediaPanel();
   if (!chartMediaIsLandscape()) document.getElementById('chart-media-collapse')?.focus({ preventScroll: true });
@@ -284,6 +289,13 @@ function renderChartMediaPanel() {
     body.innerHTML = `<div class="chart-media-empty"><i data-lucide="scan-line"></i><h4>${chartPatientMedia.filterToothIds.length ? chartMediaText('No X-rays assigned to the selected teeth', 'لا توجد أشعة مرتبطة بالأسنان المحددة') : chartMediaText('No X-rays yet', 'لا توجد أشعة بعد')}</h4><p>${chartMediaText('Add an X-ray above. The selected teeth will be assigned automatically.', 'أضف أشعة من الزر أعلاه. سيتم تحديد الأسنان المختارة تلقائيًا.')}</p></div>${chartMediaPanelActions()}`;
   } else {
     let selected = xrays.findIndex(file => file.relativePath === chartPatientMedia.selectedPath);
+    // Also honor the latest tooth when files arrive after an icon was selected.
+    if (selected < 0) {
+      for (const toothId of [...chartPatientMedia.filterToothIds].reverse()) {
+        selected = xrays.findIndex(file => patientMediaToothIds(file.mediaDetails).includes(toothId));
+        if (selected >= 0) break;
+      }
+    }
     if (selected < 0) selected = 0;
     const file = xrays[selected];
     chartPatientMedia.selectedPath = file.relativePath;
