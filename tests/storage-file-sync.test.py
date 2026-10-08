@@ -244,6 +244,29 @@ class SyncTests(unittest.TestCase):
         json_request(self.urls[0] + '/api/file', 'DELETE', {'x-lumin-key':self.keys[0]},dict(relativePath=new_rel))
         self.assertFalse(self.engines[0].clinical.details(new_rel)['metadata_available'])
 
+    def test_image_rotation_persists_after_restart_and_sync_with_existing_annotations(self):
+        from PIL import Image
+        fixture = self.clinical_fixture()
+        pid, rel = fixture['patients'][0]['id'], fixture['files'][0]['relative_path']
+        buffer = io.BytesIO()
+        Image.new('RGB', (12, 8), (15, 23, 42)).save(buffer, 'PNG')
+        original_image = buffer.getvalue()
+        self.write(0, rel, original_image)
+        self.save_details(0, rel, dict(display_name='UR6', note='Preserve clinical note', tooth_ids=['3', 'A']))
+        self.save_details(0, rel, dict(scan_config=dict(image_rotation=90, other='Preserve setting')))
+        listing = json_request(self.urls[0] + '/api/patient/' + pid + '/files', headers={'x-lumin-key': self.keys[0]})
+        self.assertEqual(listing['files'][0]['mediaDetails']['scan_config']['image_rotation'], 90)
+        restarted = SyncEngine(self.engines[0].root, self.engines[0].state_root, ['png'])
+        self.assertEqual(restarted.clinical.details(rel)['scan_config']['image_rotation'], 90)
+        self.pair()
+        self.assert_completed(self.run_sync())
+        for engine in self.engines:
+            details = engine.clinical.details(rel)
+            self.assertEqual(details['scan_config'], dict(image_rotation=90, other='Preserve setting'))
+            self.assertEqual(details['note'], 'Preserve clinical note')
+            self.assertEqual(details['tooth_ids'], ['3', 'A'])
+            self.assertEqual((engine.root / rel).read_bytes(), original_image)
+
     def test_simultaneous_local_annotation_edits_are_reviewable_and_keep_both_on_each_server(self):
         fixture = self.clinical_fixture()
         pid, rel = fixture['patients'][0]['id'], fixture['files'][0]['relative_path']

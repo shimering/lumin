@@ -1,0 +1,29 @@
+.chart-media-preview, .chart-media-thumbnail { position: relative; }
+.media-card-preview { height: 176px; }
+img[data-media-rotation]:not([data-media-rotation="0"]) { position: absolute; top: 50%; left: 50%; max-width: none; max-height: none; object-fit: contain; transform: translate(-50%, -50%) rotate(var(--media-rotation, 0deg)); }
+.chart-media-nav { flex-wrap: wrap; }
+.chart-media-rotation { margin-top: 8px; }
+.xray-rotation-status { min-width: 0; overflow-wrap: anywhere; font-size: 11px; line-height: 1.5; color: #047857; }
+.xray-rotation-status.is-error { color: #be123c; }
+#lightbox-rotate-btn { border: 0; background: #eff6ff; color: #1d4ed8; transition: background 150ms ease-out, transform 150ms ease-out; }
+#lightbox-rotate-btn:hover { background: #dbeafe; }
+#lightbox-rotate-btn:active { transform: scale(.98); }
+#lightbox-rotate-btn:disabled { opacity: .5; pointer-events: none; }
+#lightbox-rotate-btn svg { width: 18px; height: 18px; }
+#patient-media-lightbox > [role="dialog"] { height: min(70dvh, 520px); min-height: min(320px, calc(100dvh - 32px)); max-height: calc(100dvh - 32px); }
+#patient-media-lightbox button svg, #patient-media-lightbox a svg { width: 18px; height: 18px; flex: none; }
+#lightbox-viewport { min-height: 0; flex: 1 1 0%; }
+#patient-media-lightbox > [role="dialog"] > :first-child { position: relative; flex-wrap: wrap; }
+#patient-media-lightbox > [role="dialog"] > :first-child > :last-child { flex: 1 1 auto; flex-wrap: wrap; min-width: 0; max-width: 100%; }
+#patient-media-lightbox .lightbox-status-bar { flex-wrap: wrap; gap: 8px; }
+@media (max-width: 767px) {
+  #patient-media-lightbox { align-items: flex-end; padding: env(safe-area-inset-top) 0 0; }
+  #patient-media-lightbox > [role="dialog"] { margin: 0; height: 90dvh; max-height: 90dvh; border-radius: 20px 20px 0 0; }
+  #patient-media-lightbox > [role="dialog"] > :first-child > :first-child { width: 100%; min-height: 44px; padding-inline-end: 52px; }
+  #patient-media-lightbox > [role="dialog"] > :first-child > :last-child { flex-basis: 100%; }
+  #patient-media-lightbox button[onclick="closeMediaLightbox()"] { position: absolute; top: 10px; inset-inline-end: 14px; margin: 0; }
+  #patient-media-lightbox .lightbox-status-bar { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #lightbox-rotate-btn, img[data-media-rotation], #patient-media-lightbox > [role="dialog"] { transition: none; animation: none !important; }
+}

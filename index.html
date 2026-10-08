@@ -84,7 +84,8 @@
   <script src="lumin-patient-swipe.js?v=1"></script>
   <script src="lumin-patients.js?v=4"></script>
   <script src="lumin-chart-sync.js?v=1"></script>
-  <script src="lumin-chart-media.js?v=11"></script>
+  <script src="lumin-chart-media.js?v=12"></script>
+  <script src="lumin-xray-rotation.js?v=1"></script>
   <script src="lumin-tooth-notes.js?v=1"></script>
   <script src="lumin-chart-appointments.js?v=1"></script>
   <script src="lumin-chart-dates.js?v=1"></script>
@@ -5507,6 +5508,7 @@
   <link rel="stylesheet" href="lumin-finance-sync.css?v=2" />
   <link rel="stylesheet" href="lumin-mobile-nav.css?v=2" />
   <link rel="stylesheet" href="lumin-chart-media.css?v=7" />
+  <link rel="stylesheet" href="lumin-xray-rotation.css?v=1" />
   <link rel="stylesheet" href="lumin-tooth-notes.css?v=1" />
   <link rel="stylesheet" href="lumin-chart-appointments.css?v=1" />
   <link rel="stylesheet" href="lumin-media-teeth.css?v=1" />
@@ -9336,8 +9338,8 @@
           </div>
 
           <!-- Rotate Button -->
-          <button type="button" onclick="lightboxRotate()" title="Rotate 90°" aria-label="Rotate 90°" class="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200/90 shadow-2xs transition">
-            <svg class="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><polyline points="21 3 21 8 16 8"></polyline></svg>
+          <button id="lightbox-rotate-btn" type="button" onclick="lightboxRotate()" title="Rotate 90° clockwise · saves automatically" aria-label="Rotate 90° clockwise · saves automatically" class="flex items-center justify-center rounded-xl">
+            <i data-lucide="rotate-cw" aria-hidden="true"></i>
           </button>
           
           <!-- Invert Button -->
@@ -9372,8 +9374,9 @@
       </div>
 
       <!-- Bottom status / hint bar -->
-      <div class="flex items-center justify-between border-t border-slate-100 bg-slate-50/90 px-3.5 py-1.5 text-[10px] sm:text-[11px] text-slate-500 shrink-0">
+      <div class="lightbox-status-bar flex items-center justify-between border-t border-slate-100 bg-slate-50/90 px-3.5 py-1.5 text-[10px] sm:text-[11px] text-slate-500 shrink-0">
         <span>Drag to pan • Pinch / +/- to zoom</span>
+        <span id="lightbox-rotation-status" class="xray-rotation-status" role="status" aria-live="polite" hidden></span>
         <button type="button" onclick="lightboxResetZoom()" class="text-blue-600 hover:text-blue-700 font-bold transition">Reset View</button>
       </div>
     </div>
@@ -11754,6 +11757,7 @@
       if (typeof renderChartMediaPanel === 'function') renderChartMediaPanel();
       if (typeof renderChartAppointmentsPanel === 'function') renderChartAppointmentsPanel();
       if (typeof renderChartToothNoteIndicators === 'function') renderChartToothNoteIndicators();
+      if (typeof renderPatientMediaRotationControls === 'function') renderPatientMediaRotationControls();
       if (typeof renderPatientAttachmentList === 'function') renderPatientAttachmentList();
       renderStorageConnectionStatus();
       if (typeof renderStorageServerPresets === 'function') renderStorageServerPresets();
@@ -28149,9 +28153,8 @@
       };
     }
 
-    async function persistPatientMediaDetails(patientId, relativePath, details) {
+    async function persistPatientMediaDetails(patientId, relativePath, details, config = getStorageServerConfig()) {
       if (!patientId || !relativePath) throw new Error(currentUiLanguage === 'ar' ? 'تعذر تحديد الصورة المحفوظة.' : 'The saved photo could not be identified.');
-      const config = getStorageServerConfig();
       const patient = getKnownPatient(patientId);
       const response = await fetch(`${config.url}/api/patient/${encodeURIComponent(patientId)}/media-details`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'x-lumin-key': config.key },
@@ -28437,7 +28440,7 @@
         } else if (isAttachment) {
           previewHtml = `<div class="flex h-44 w-full items-center justify-center bg-slate-100 text-slate-500"><i data-lucide="file-text" class="h-12 w-12"></i></div>`;
         } else {
-          previewHtml = `<img src="${escapeHtml(thumbUrl)}" alt="${escapeHtml(displayName)}" data-media-user-content loading="lazy" class="h-44 w-full object-cover transition duration-300 group-hover:scale-105" onerror="fallbackPatientMediaPreview(this, ${index})" />`;
+          previewHtml = `<img src="${escapeHtml(thumbUrl)}" alt="${escapeHtml(displayName)}" data-media-user-content ${typeof patientMediaRotationAttributes === 'function' ? patientMediaRotationAttributes(file, activePatientMediaPatientId) : ''} loading="lazy" class="h-44 w-full object-cover transition duration-300 group-hover:scale-105" onerror="fallbackPatientMediaPreview(this, ${index})" />`;
         }
 
         return `
@@ -28467,6 +28470,7 @@
 
       const detailsWarning = patientMediaDetailsError ? `<div role="status" class="mb-4 flex flex-wrap items-center gap-3 rounded-2xl bg-amber-50 p-4 text-sm text-amber-800"><i data-lucide="info" class="h-5 w-5"></i><p class="min-w-0 flex-1">${currentUiLanguage === 'ar' ? 'تعذر تحميل أسماء الصور والملاحظات وتحديد الأسنان. أعد المحاولة قبل تعديلها.' : 'Photo names, notes, and tooth assignments could not be loaded. Retry before editing.'}</p><button type="button" class="media-action" onclick="renderPatientMedia()">${currentUiLanguage === 'ar' ? 'إعادة المحاولة' : 'Retry'}</button></div>` : '';
       content.innerHTML = `${detailsWarning}<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">${cards}</div>`;
+      if (typeof fitPatientMediaRotations === 'function') fitPatientMediaRotations(content);
       if (window.lucide) lucide.createIcons();
     }
 
@@ -28810,6 +28814,7 @@
 
     let currentLightboxOriginalUrl = '';
     let currentLightboxRelativePath = '';
+    let currentLightboxPatientId = null;
     let lightboxPanX = 0;
     let lightboxPanY = 0;
     let lightboxIsDragging = false;
@@ -28913,7 +28918,7 @@
       });
     }
 
-    function openMediaLightbox(url, category, filename, dateStr, thumbUrl = '', relativePath = '') {
+    function openMediaLightbox(url, category, filename, dateStr, thumbUrl = '', relativePath = '', patientId = activePatientMediaPatientId) {
       const modal = document.getElementById('patient-media-lightbox');
       const img = document.getElementById('lightbox-img');
       const spinner = document.getElementById('lightbox-loading-spinner');
@@ -28928,9 +28933,14 @@
       const fullUrl = `${url}?key=${encodeURIComponent(storageConfig.key)}`;
       currentLightboxOriginalUrl = fullUrl;
       currentLightboxRelativePath = relativePath;
+      currentLightboxPatientId = patientId;
 
       lightboxScale = 1;
       lightboxRotation = 0;
+      if (typeof patientMediaRotationFile === 'function') {
+        const file = patientMediaRotationFile(patientId, relativePath);
+        if (file) lightboxRotation = patientMediaRotation(file, patientId);
+      }
       lightboxInverted = false;
       lightboxPanX = 0;
       lightboxPanY = 0;
@@ -28948,6 +28958,8 @@
 
       modal.classList.remove('hidden');
       modal.classList.add('flex');
+      if (typeof renderPatientMediaRotationControls === 'function') renderPatientMediaRotationControls();
+      img.onload = () => updateLightboxTransform();
       lucide.createIcons();
 
       // Progressive loading: display lightweight thumbnail immediately, preload full original in background
@@ -28975,6 +28987,7 @@
     function closeMediaLightbox() {
       currentLightboxOriginalUrl = '';
       currentLightboxRelativePath = '';
+      currentLightboxPatientId = null;
       const modal = document.getElementById('patient-media-lightbox');
       if (modal) {
         modal.classList.add('hidden');
@@ -29125,6 +29138,10 @@
     }
 
     function lightboxRotate() {
+      if (typeof rotatePatientMediaImage === 'function') {
+        if (patientMediaDetailsError) return;
+        return rotatePatientMediaImage(patientMediaRotationFile(currentLightboxPatientId, currentLightboxRelativePath), currentLightboxPatientId);
+      }
       lightboxRotation = (lightboxRotation + 90) % 360;
       updateLightboxTransform();
     }
@@ -29140,6 +29157,7 @@
       const invertBtn = document.getElementById('lightbox-invert-btn');
       if (!img) return;
 
+      if (typeof fitLightboxRotatedImage === 'function') fitLightboxRotatedImage(img);
       img.style.transform = `translate(${lightboxPanX}px, ${lightboxPanY}px) scale(${lightboxScale}) rotate(${lightboxRotation}deg)`;
       img.style.filter = lightboxInverted ? 'invert(100%) hue-rotate(180deg) contrast(120%)' : 'none';
 
