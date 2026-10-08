@@ -181,6 +181,10 @@ function updateChartMediaStickyTop() {
 function toggleChartMediaPanel() {
   if (chartPatientMedia.collapsed) chartMediaPreviousFocus = document.activeElement;
   chartPatientMedia.collapsed = !chartPatientMedia.collapsed;
+  if (chartMediaIsLandscape() && typeof chartAppointments !== 'undefined' && chartAppointmentsCanView()) {
+    chartAppointments.collapsed = chartPatientMedia.collapsed;
+    renderChartAppointmentsPanel();
+  }
   renderChartMediaPanel();
   if (!chartMediaIsLandscape()) {
     if (chartPatientMedia.collapsed) chartMediaPreviousFocus?.focus({ preventScroll: true });
@@ -259,9 +263,11 @@ function renderChartMediaPanel() {
   }
   body.inert = chartPatientMedia.collapsed;
   body.setAttribute('aria-hidden', String(chartPatientMedia.collapsed));
-  const expand = chartMediaText('Expand X-ray viewer', 'توسيع عارض الأشعة');
-  const collapse = sheetOpen ? chartMediaText('Close X-ray viewer', 'إغلاق عارض الأشعة') : chartMediaText('Collapse X-ray viewer', 'طي عارض الأشعة');
+  const sharedSidebar = chartMediaIsLandscape() && typeof chartAppointmentsCanView === 'function' && chartAppointmentsCanView();
+  const expand = sharedSidebar ? chartMediaText('Expand X-rays and appointments', 'توسيع الأشعة والمواعيد') : chartMediaText('Expand X-ray viewer', 'توسيع عارض الأشعة');
+  const collapse = sharedSidebar ? chartMediaText('Collapse X-rays and appointments', 'طي الأشعة والمواعيد') : sheetOpen ? chartMediaText('Close X-ray viewer', 'إغلاق عارض الأشعة') : chartMediaText('Collapse X-ray viewer', 'طي عارض الأشعة');
   const panelToggle = document.getElementById('chart-media-collapse');
+  panelToggle.setAttribute('aria-controls', sharedSidebar ? 'chart-media-panel-body chart-appointments-body' : 'chart-media-panel-body');
   panelToggle.setAttribute('aria-expanded', String(!chartPatientMedia.collapsed));
   panelToggle.setAttribute('aria-label', chartPatientMedia.collapsed ? expand : collapse);
   panelToggle.title = chartPatientMedia.collapsed ? expand : collapse;

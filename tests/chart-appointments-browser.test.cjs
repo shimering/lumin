@@ -64,7 +64,7 @@ test('chart sidebar fits four cards, scrolls independently, collapses, navigates
     const db={from(){return {select(){return this},gte(){return this},lt(){return this},order(){return this},async range(){window.queryCount++;return window.failReads?{error:Error('Offline')}:{data:structuredClone(window.serverRows)};}}}};
     ${helpers}
   ` });
-  await page.addScriptTag({ url: base + '/lumin-chart-media.js?v=10' });
+  await page.addScriptTag({ url: base + '/lumin-chart-media.js?v=11' });
   await page.addScriptTag({ url: base + '/lumin-chart-appointments.js?v=1' });
   await page.evaluate(async () => {
     document.getElementById('auth-gate').classList.add('hidden');
@@ -119,13 +119,22 @@ test('chart sidebar fits four cards, scrolls independently, collapses, navigates
         assert.ok(Math.abs((await page.locator('#chart-side-panels').boundingBox()).y-stuck.y)<2,'both panels stay beside the chart while it scrolls');
       }
       if(viewport.width===390 && language==='ar') await panel.screenshot({path:path.join(screenshots,'mobile-ar.png')});
-      await page.locator('#chart-appointments-collapse').click();
-      assert.equal(await body.isVisible(),false);
-      if(viewport.width===1440) {
+      if(viewport.width>=768 && viewport.width>viewport.height) {
+        assert.equal(await page.locator('#chart-media-collapse').getAttribute('aria-controls'),'chart-media-panel-body chart-appointments-body');
         await page.locator('#chart-media-collapse').click();
+        assert.equal(await body.isVisible(),false,'X-ray collapse also hides appointment cards');
+        assert.equal(await page.locator('#chart-media-panel-body').isVisible(),false);
+        assert.equal(await page.locator('#chart-appointments-collapse').getAttribute('aria-expanded'),'false');
+        assert.match(await page.locator('#chart-media-collapse').getAttribute('aria-label'),language==='ar'?/توسيع الأشعة والمواعيد/:/Expand X-rays and appointments/);
         assert.ok((await page.locator('#chart-side-panels').boundingBox()).width<=57,'both collapsed panels share a narrow rail');
         await page.locator('#chart-media-collapse').click();
+        assert.equal(await body.isVisible(),true,'X-ray expand restores appointment cards');
+        assert.equal(await page.locator('#chart-media-panel-body').isVisible(),true);
+        assert.equal(await page.locator('#chart-appointments-collapse').getAttribute('aria-expanded'),'true');
+        assert.ok((await page.locator('#chart-side-panels').boundingBox()).width>=272);
       }
+      await page.locator('#chart-appointments-collapse').click();
+      assert.equal(await body.isVisible(),false);
       await page.locator('#chart-appointments-collapse').click();
       assert.equal(await body.isVisible(),true);
     }
