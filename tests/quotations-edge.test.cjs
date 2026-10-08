@@ -27,8 +27,9 @@ function fixture(name,options={}) {
       },
       from(table) {
         const filters=[],query={operation:'read',payload:null,
-          select(columns){query.columns=columns;return query;},eq(key,value){filters.push([key,value]);return query;},is(key,value){filters.push([key,value]);return query;},order(){return query;},limit(){return query;},
+          select(columns){query.columns=columns;return query;},eq(key,value){filters.push([key,value]);return query;},is(key,value){filters.push([key,value]);return query;},order(){return query;},limit(){return query;},range(from,to){query.page=[from,to];return query;},
           insert(payload){query.operation='insert';query.payload=payload;return query;},update(payload){query.operation='update';query.payload=payload;return query;},
+          delete(){query.operation='delete';return query;},
           single(){return Promise.resolve(result());},maybeSingle(){return Promise.resolve(result());},then(resolve,reject){return Promise.resolve(result()).then(resolve,reject);}
         };
         function result() {
@@ -39,11 +40,14 @@ function fixture(name,options={}) {
             return {data:table==='quotation_settings'?{...settings,...query.payload}:{...record,...query.payload},error:null};
           }
           if(table==='user_profiles')return {data:{active:!options.inactive,access_roles:{is_admin:options.admin!==false,role_permissions:options.noChart?[]:[{page_key:'chart',can_view:true}]}},error:null};
-          if(table==='patients')return {data:options.patientDenied?null:patient,error:null};
+          if(table==='patients')return {data:options.patientDenied||!filters.every(([key,value])=>patient[key]===value)?null:patient,error:null};
           if(table==='quotation_settings')return {data:settings,error:null};
           if(table==='prescription_print_settings') {assert.ok(service);assert.equal(query.columns,'logo_data_url');return {data:state.printSettings,error:options.logoError?'failed':null};}
           if(table==='dental_operations')return {data:operations,error:null};
-          if(table==='patient_quotations')return {data:filters.every(([key,value])=>record[key]===value)?record:null,error:null};
+          if(table==='patient_quotations'){
+            if(query.page)return {data:(state.records||[record]).filter(row=>filters.every(([key,value])=>row[key]===value)).slice(query.page[0],query.page[1]+1),error:null};
+            return {data:filters.every(([key,value])=>record[key]===value)?record:null,error:null};
+          }
           throw new Error(table);
         }
         return query;
@@ -97,7 +101,7 @@ test('creation requires current planned IDs and makes a random private link',asy
   app.state.settings.whatsapp_phone='';assert.equal((await app.call(body)).status,409);
 });
 
-test('updates keep the token, allow expiry edits after completion, and reject stale or revoked edits',async()=>{
+test('updates keep the token, allow expiry edits after completion, preserve disabled links, and reject stale edits',async()=>{
   const app=fixture('quotation-manage');
   const body={action:'update',patient_id:id(90),id:id(99),revision:1,selected_ids:[id(1)],expires_at:future()};
   app.state.patient.chart_state[3].wholeOperations[0].status='C';
@@ -107,8 +111,44 @@ test('updates keep the token, allow expiry edits after completion, and reject st
   assert.equal((await app.call({...body,selected_ids:[id(2)]})).status,409);
   assert.equal((await app.call({...body,revision:9})).status,409);
   assert.equal((await app.call({...body,id:id(98)})).status,404);
-  app.state.record.revoked_at=new Date().toISOString();assert.equal((await app.call(body)).status,409);
+  app.state.record.revoked_at=new Date().toISOString();
+  const disabled=await app.call(body);assert.equal(disabled.status,200);assert.equal(disabled.body.quotation.revoked_at,app.state.record.revoked_at);
+  assert.equal(Object.hasOwn(app.writes.at(-1).payload,'revoked_at'),false);
   const concurrent=fixture('quotation-manage',{casFailure:true});assert.equal((await concurrent.call(body)).status,409);
+});
+
+test('patient history is paginated, scoped to the patient and permission checked; editing reads the current record',async()=>{
+  const app=fixture('quotation-manage',{admin:false});
+  app.state.records=Array.from({length:121},(_,i)=>({...app.state.record,id:id(100+i)}));
+  app.state.records.push({...app.state.record,id:id(999),patient_id:id(91)});
+  const first=await app.call({action:'list',patient_id:id(90)});
+  assert.equal(first.status,200);assert.equal(first.body.quotations.length,50);assert.equal(first.body.has_more,true);
+  const last=await app.call({action:'list',patient_id:id(90),offset:100});
+  assert.equal(last.body.quotations.length,21);assert.equal(last.body.has_more,false);
+  assert.equal((await app.call({action:'list',patient_id:id(91)})).status,404);
+  assert.equal((await app.call({action:'list',patient_id:id(90),offset:-1})).status,400);
+  assert.equal((await app.call({action:'list',patient_id:id(90),offset:1.5})).status,400);
+  app.state.record.revision=7;
+  const current=await app.call({action:'get',patient_id:id(90),id:id(99)});
+  assert.equal(current.status,200);assert.equal(current.body.quotation.revision,7);
+  assert.equal((await app.call({action:'get',patient_id:id(90),id:id(98)})).status,404);
+  assert.equal(app.writes.length,0);
+});
+
+test('deletion requires verified chart access and the patient, quotation and current revision',async()=>{
+  const body={action:'delete',patient_id:id(90),id:id(99),revision:1};
+  for(const [options,auth,status] of [[{},false,401],[{badSession:true},true,401],[{inactive:true},true,403],[{admin:false,noChart:true},true,403],[{patientDenied:true},true,404],[{casFailure:true},true,409]]){
+    const app=fixture('quotation-manage',options);
+    assert.equal((await app.call(body,auth)).status,status);assert.equal(app.writes.length,0);
+  }
+  const app=fixture('quotation-manage',{admin:false});
+  for(const invalid of [{patient_id:id(91)},{id:id(98)},{revision:2}]){
+    assert.ok([404,409].includes((await app.call({...body,...invalid})).status));assert.equal(app.writes.length,0);
+  }
+  app.state.record.revoked_at=new Date().toISOString();
+  const result=await app.call(body);assert.equal(result.status,200);assert.equal(result.body.deleted_id,id(99));
+  assert.equal(app.writes.length,1);assert.equal(app.writes[0].table,'patient_quotations');assert.equal(app.writes[0].operation,'delete');
+  assert.deepEqual(app.writes[0].filters,[['id',id(99)],['patient_id',id(90)],['revision',1]]);
 });
 
 test('revocation and administrator branding validate their writes',async()=>{

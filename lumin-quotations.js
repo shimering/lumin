@@ -1,6 +1,7 @@
 (function (root) {
   'use strict';
-  const ui = {request:0,patient:null,operations:[],settings:null,selectedIds:[],saved:null,records:[],busy:false,overlay:null,returnFocus:null,bodyOverflow:''};
+  const ui = {request:0,patient:null,operations:[],settings:null,selectedIds:[],saved:null,busy:false,overlay:null,returnFocus:null,bodyOverflow:''};
+  const history = {request:0,patientId:null,patient:null,operations:[],records:[],hasMore:false,busy:false};
   const view = () => root.LuminQuotationView;
   const language = () => typeof currentUiLanguage !== 'undefined' ? currentUiLanguage : 'en';
   const t = (en,ar) => view().text(language(),en,ar);
@@ -33,7 +34,9 @@
       'Some selected procedures are no longer planned. Refresh the chart and try again.':'لم تعد بعض الإجراءات المحددة في حالة التخطيط. حدّث المخطط وحاول مرة أخرى.',
       'This quotation changed. Reopen it before saving.':'تغيّر عرض الأسعار. أعد فتحه قبل الحفظ.',
       'This quotation was disabled. Create a new link.':'تم تعطيل عرض الأسعار. أنشئ رابطاً جديداً.',
-      'Choose a future expiry date.':'اختر تاريخ انتهاء في المستقبل.'
+      'Choose a future expiry date.':'اختر تاريخ انتهاء في المستقبل.',
+      'Select planned procedures.':'حدد الإجراءات المخططة.',
+      'Could not delete quotation.':'تعذر حذف عرض الأسعار.'
     };
     target.textContent = language() === 'ar' ? translations[message] || 'تعذر إكمال العملية. أعد المحاولة.' : message && !['request','session'].includes(message) ? message : 'Could not complete the request. Please try again.';
     target.hidden = false;
@@ -55,8 +58,9 @@
     if (!ui.overlay) return;
     ui.overlay.remove(); ui.overlay=null;
     document.body.style.overflow=ui.bodyOverflow;
-    ui.returnFocus?.isConnected && ui.returnFocus.focus({preventScroll:true});
-    ui.patient=null;ui.saved=null;ui.records=[];ui.selectedIds=[];ui.busy=false;
+    const returnFocus=ui.returnFocus?.isConnected?ui.returnFocus:document.querySelector('[data-patient-workspace-tab="quotations"][aria-selected="true"]');
+    returnFocus?.focus({preventScroll:true});
+    ui.patient=null;ui.saved=null;ui.selectedIds=[];ui.busy=false;
   }
   function modal(title) {
     close();
@@ -107,13 +111,35 @@
       expiresAt:ui.saved?.expires_at,clinic:{name:ui.settings?.clinic_name||'Lumin Dental',logo:ui.settings?.logo_data_url||'',whatsapp:ui.settings?.whatsapp_phone||''},
       ...LuminQuotationModel.publicProjection(ui.patient.chart_state,ui.operations,ui.selectedIds)};
   }
+  function procedurePicker() {
+    const candidates=LuminQuotationModel.collect(ui.patient.chart_state,ui.operations);
+    const original=new Set(ui.saved?.selected_ids||[]);
+    const ids=[...new Set([...candidates.filter(item=>item.status==='P'||original.has(item.id)).map(item=>item.id),...original])];
+    return `<details class="q-procedure-picker" ${ui.saved?'open':''}><summary>${t('Included procedures','الإجراءات المشمولة')} <span data-quote-selected-count>${ui.selectedIds.length}</span>${icon('chevron-down')}</summary><p>${t('Add planned procedures or remove procedures from this quotation.','أضف إجراءات مخططة أو أزل إجراءات من عرض الأسعار.')}</p><div class="q-procedure-options">${ids.map(id=>{
+      const candidate=candidates.find(item=>item.id===id);
+      const item=LuminQuotationModel.publicProjection(ui.patient.chart_state,ui.operations,[id]).items[0];
+      const label=item?.name||candidate?.op?.name||t('Removed from plan','أُزيل من الخطة');
+      const target=item?view().targetLabel(item,language()):candidate?.toothId?LuminQuotationModel.toothLabel(candidate.toothId):'';
+      const status=candidate?.status==='P'?t('Planned','مخطط'):candidate?.status==='In'?t('In progress','قيد التنفيذ'):t('No longer in plan','لم يعد ضمن الخطة');
+      return `<label class="q-procedure-option"><input type="checkbox" data-quote-procedure value="${id}" ${ui.selectedIds.includes(id)?'checked':''}/><span><strong dir="auto">${e(label)}</strong><small dir="auto">${e(target)} · ${status}</small></span><strong>${e(view().money(item?.amount||0,language()))}</strong></label>`;
+    }).join('')}</div></details>`;
+  }
   function renderComposer(excluded=0) {
     loaded();
     const body=ui.overlay.querySelector('[data-quote-body]');
     const expired=ui.saved && new Date(ui.saved.expires_at)<=new Date();
+    const shareable=ui.saved&&!expired&&!ui.saved.revoked_at;
     body.innerHTML=`${excluded ? `<p class="q-feedback">${t('Only selected procedures in Plan status are included.','يتضمن العرض الإجراءات المحددة التي لا تزال في حالة التخطيط فقط.')}</p>` : ''}${!ui.settings?.whatsapp_phone ? `<p class="q-feedback">${t('Set the clinic WhatsApp number under Admin → Print forms → Quotation settings before creating a link.','اضبط رقم واتساب العيادة من المسؤول ← نماذج الطباعة ← إعدادات عروض الأسعار قبل إنشاء الرابط.')}</p>` : ''}<div class="q-form-row"><label class="q-field">${t('Expiry date','تاريخ الانتهاء')}<input type="date" id="quotation-expiry" min="${localDate(new Date())}" value="${ui.saved&&!expired?localDate(new Date(ui.saved.expires_at)):defaultExpiry()}" required/></label>${ui.saved?button('replace',t('Use selected planned procedures','استخدام الإجراءات المخططة المحددة'),'list-checks'):''}</div>${ui.saved&&!expired?`<div class="q-link-field"><input aria-label="${t('Quotation link','رابط عرض الأسعار')}" value="${e(quoteLink(ui.saved))}" readonly/>${button('copy',t('Copy link','نسخ الرابط'),'copy')}${button('preview',t('Open page','فتح الصفحة'),'external-link')}</div>`:''}<div id="quotation-preview"></div>`;
     view().render(body.querySelector('#quotation-preview'),draftData(),language(),{preview:true});
-    ui.overlay.querySelector('[data-quote-footer]').innerHTML=`${ui.saved&&!expired?button('whatsapp',t('Open WhatsApp','فتح واتساب'),'message-circle'):''}${button('close',t('Close','إغلاق'),'x')}${button('save',ui.saved?t('Save changes','حفظ التغييرات'):t('Create quotation link','إنشاء رابط عرض الأسعار'),'link','q-primary')}`;
+    if(!shareable)body.querySelector('.q-link-field')?.remove();
+    if(ui.saved?.revoked_at)body.insertAdjacentHTML('afterbegin',`<p class="q-feedback">${t('This link is disabled. Editing keeps it disabled.','هذا الرابط معطل. سيظل معطلاً بعد التعديل.')}</p>`);
+    body.querySelector('#quotation-preview').insertAdjacentHTML('beforebegin',procedurePicker());
+    body.querySelectorAll('[data-quote-procedure]').forEach(input=>input.addEventListener('change',()=>{
+      ui.selectedIds=input.checked?[...new Set([...ui.selectedIds,input.value])]:ui.selectedIds.filter(id=>id!==input.value);
+      body.querySelector('[data-quote-selected-count]').textContent=ui.selectedIds.length;
+      view().render(body.querySelector('#quotation-preview'),draftData(),language(),{preview:true});
+    }));
+    ui.overlay.querySelector('[data-quote-footer]').innerHTML=`${shareable?button('whatsapp',t('Open WhatsApp','فتح واتساب'),'message-circle'):''}${button('close',t('Close','إغلاق'),'x')}${button('save',ui.saved?t('Save changes','حفظ التغييرات'):t('Create quotation link','إنشاء رابط عرض الأسعار'),'link','q-primary')}`;
     if(root.lucide)lucide.createIcons();
     focusDialog();
   }
@@ -137,25 +163,83 @@
     } catch(error){if(request===ui.request)loadFailure(error,'retry-composer');}
   }
   async function openHistory() {
-    if(!canUse())return;
-    const id=currentPatientId();if(!id)return;
-    const request=modal(t('Patient quotations','عروض أسعار المريض'));
-    try {
-      const [data,settings,history]=await Promise.all([patientData(id),api({action:'settings'}),api({action:'list',patient_id:id})]);
-      if(!isCurrent(request,id)){if(request===ui.request)close();return;}
-      Object.assign(ui,data,{settings:settings.settings,records:history.quotations});renderHistory();
-    } catch(error){if(request===ui.request)loadFailure(error,'retry-history');}
+    if(canUse()&&currentPatientId())openPatientWorkspaceTab('quotations');
   }
-  function renderHistory() {
-    loaded();
-    ui.saved=null;
-    ui.overlay.querySelector('[data-quote-body]').innerHTML=ui.records.length?ui.records.map(record=>{
+  const historyVisible=()=>!document.getElementById('view-patient-quotations')?.classList.contains('hidden')&&Boolean(document.getElementById('view-patient-quotations'));
+  function resetHistory() {
+    history.request++;Object.assign(history,{patientId:null,patient:null,operations:[],records:[],hasMore:false,busy:false});
+    const content=document.getElementById('patient-quotations-content');if(content){content.innerHTML='';content.removeAttribute('aria-busy');}
+  }
+  function historyLabels() {
+    const section=document.getElementById('view-patient-quotations');if(!section)return;
+    section.dir=language()==='ar'?'rtl':'ltr';
+    section.querySelector('.app-page-title').textContent=t('Quotations','عروض الأسعار');
+    section.querySelector('[data-quotation-chart-label]').textContent=t('Open dental chart','فتح مخطط الأسنان');
+  }
+  function renderHistoryCards() {
+    const content=document.getElementById('patient-quotations-content');if(!content)return;
+    content.innerHTML=`<p class="q-history-note">${t('Quotations for this patient. Totals follow the current treatment plan.','عروض أسعار هذا المريض. تتبع المبالغ خطة العلاج الحالية.')}</p><p class="q-feedback" data-history-feedback role="alert" hidden></p>`+(history.records.length?`<div class="q-history-grid">${history.records.map(record=>{
       const revoked=Boolean(record.revoked_at),expired=new Date(record.expires_at)<=new Date();
-      return `<article class="q-history-card"><div class="q-history-meta"><strong dir="ltr">QT-${record.id.slice(0,8).toUpperCase()}</strong><span class="q-badge ${revoked||expired?'q-planned':'q-live'}">${revoked?t('Disabled','معطل'):expired?t('Expired','منتهي'):t('Active','نشط')}</span></div><p>${t('Valid until','صالح حتى')} ${view().date(record.expires_at,language())}</p><div class="q-history-actions" data-quote-id="${record.id}">${!revoked?button('edit',t('Manage','إدارة'),'settings-2'):''}${!revoked&&!expired?button('history-copy',t('Copy link','نسخ الرابط'),'copy')+button('history-preview',t('Open page','فتح الصفحة'),'external-link'):''}${!revoked?button('revoke',t('Disable link','تعطيل الرابط'),'link-2-off','q-danger'):''}</div></article>`;
-    }).join(''):`<div class="q-empty">${icon('file-text')}<h3>${t('No quotations yet','لا توجد عروض أسعار بعد')}</h3><p>${t('Select planned procedures on the chart, then use the quotation button beside Add invoice.','حدد الإجراءات المخططة على المخطط، ثم اضغط زر عرض الأسعار بجانب إضافة إلى الفاتورة.')}</p></div>`;
-    ui.overlay.querySelector('[data-quote-footer]').innerHTML=button('close',t('Close','إغلاق'),'x');
+      const projection=LuminQuotationModel.publicProjection(history.patient.chart_state,history.operations,record.selected_ids);
+      return `<article class="q-history-card" data-quote-id="${record.id}"><div class="q-history-meta"><strong dir="ltr">QT-${record.id.slice(0,8).toUpperCase()}</strong><span class="q-badge ${revoked?'q-muted':expired?'q-planned':'q-live'}">${revoked?t('Disabled','معطل'):expired?t('Expired','منتهي'):t('Active','نشط')}</span></div><div class="q-history-value"><strong>${e(view().money(projection.total,language()))}</strong><span>${projection.items.length} ${projection.items.length===1?t('treatment remaining','إجراء متبقٍ'):t('treatments remaining','إجراءات متبقية')}</span></div><p>${record.created_at?t('Created','أُنشئ في')+' '+view().date(record.created_at,language())+' · ':''}${t('Valid until','صالح حتى')} ${view().date(record.expires_at,language())}</p><div class="q-history-actions">${button('edit',t('Edit','تعديل'),'pencil')}${!revoked&&!expired?button('history-copy',t('Copy link','نسخ الرابط'),'copy')+button('history-preview',t('Open page','فتح الصفحة'),'external-link'):''}${!revoked?button('revoke',t('Disable link','تعطيل الرابط'),'link-2-off'):''}${button('delete',t('Delete','حذف'),'trash-2','q-danger')}</div></article>`;
+    }).join('')}</div>${history.hasMore?button('more',t('Load more','تحميل المزيد'),'chevron-down'):''}`:`<div class="q-empty q-panel">${icon('file-text')}<h3>${t('No quotations yet','لا توجد عروض أسعار بعد')}</h3><p>${t('Select planned procedures on the chart, then use the quotation button beside Add invoice.','حدد الإجراءات المخططة على المخطط، ثم اضغط زر عرض الأسعار بجانب إضافة إلى الفاتورة.')}</p>${button('chart',t('Open dental chart','فتح مخطط الأسنان'),'layout-grid','q-primary')}</div>`);
     if(root.lucide)lucide.createIcons();
-    focusDialog();
+  }
+  async function renderPatientQuotations(options={}) {
+    const content=document.getElementById('patient-quotations-content'),id=currentPatientId();
+    if(!content||!canUse()||!id||!historyVisible()){resetHistory();return;}
+    historyLabels();
+    if(!content.dataset.quotationBound){content.dataset.quotationBound='true';content.addEventListener('click',event=>{const trigger=event.target.closest('[data-quote-action]');if(trigger&&!trigger.disabled)historyAction(trigger);});}
+    const append=options.append&&history.patientId===id;
+    const request=++history.request,user=sessionId();
+    const current=()=>request===history.request&&user===sessionId()&&id===currentPatientId()&&canUse()&&historyVisible();
+    if(history.patientId!==id){history.records=[];history.patientId=id;}
+    history.busy=true;content.setAttribute('aria-busy','true');
+    if(!append&&!options.quiet)content.innerHTML='<div class="q-skeleton"></div><div class="q-skeleton"></div>';
+    content.querySelectorAll('button').forEach(button=>button.disabled=true);
+    try {
+      const [data,result]=await Promise.all([patientData(id),api({action:'list',patient_id:id,offset:append?history.records.length:0})]);
+      if(!current())return;
+      Object.assign(history,data,{records:append?[...new Map([...history.records,...result.quotations].map(record=>[record.id,record])).values()]:result.quotations,hasMore:Boolean(result.has_more)});
+      if(typeof updatePatientWorkspaceNavigation==='function')updatePatientWorkspaceNavigation(typeof getKnownPatient==='function'?getKnownPatient(id)||data.patient:data.patient,'quotations');
+      renderHistoryCards();
+    }catch(_){if(current()){
+      content.innerHTML=`<div class="q-empty q-panel">${icon('cloud-off')}<h3>${t('Could not load quotations','تعذر تحميل عروض الأسعار')}</h3><p>${t('Check your connection and try again.','تحقق من اتصالك وحاول مجدداً.')}</p>${button('refresh',t('Try again','حاول مجدداً'),'refresh-cw')}</div>`;
+      if(root.lucide)lucide.createIcons();
+    }}finally{if(current()){history.busy=false;content.removeAttribute('aria-busy');}}
+  }
+  async function openEditor(record) {
+    const id=currentPatientId(),request=modal(t('Edit quotation','تعديل عرض الأسعار'));
+    try{
+      if(typeof waitForPatientChartSaves==='function')await waitForPatientChartSaves(id);
+      const [data,settings,result]=await Promise.all([patientData(id),api({action:'settings'}),api({action:'get',patient_id:id,id:record.id})]);
+      if(!isCurrent(request,id)){if(request===ui.request)close();return;}
+      Object.assign(ui,data,{settings:settings.settings,saved:result.quotation,selectedIds:[...result.quotation.selected_ids]});renderComposer();
+    }catch(error){if(request===ui.request){loadFailure(error,'retry-editor');ui.saved=record;}}
+  }
+  function confirmHistoryAction(record,deleting) {
+    modal(deleting?t('Delete quotation?','حذف عرض الأسعار؟'):t('Disable quotation link?','تعطيل رابط عرض الأسعار؟'));
+    ui.overlay.querySelector('.q-dialog').classList.add('q-confirm-dialog');
+    ui.patient={id:currentPatientId()};ui.saved=record;
+    ui.overlay.querySelector('[data-quote-body]').innerHTML=`<div class="q-empty">${icon(deleting?'trash-2':'link-2-off')}<h3 dir="ltr">QT-${record.id.slice(0,8).toUpperCase()}</h3><p>${deleting?t('This permanently deletes the quotation and stops its patient link. Patient treatments are kept.','سيُحذف عرض الأسعار نهائياً ويتوقف رابط المريض. ستبقى إجراءات العلاج محفوظة.'):t('The patient will no longer be able to open this link.','لن يتمكن المريض من فتح هذا الرابط بعد التعطيل.')}</p></div>`;
+    ui.overlay.querySelector('[data-quote-footer]').innerHTML=button('close',t('Cancel','إلغاء'),'x')+button(deleting?'delete':'revoke',deleting?t('Delete quotation','حذف عرض الأسعار'):t('Disable link','تعطيل الرابط'),deleting?'trash-2':'link-2-off','q-danger');
+    if(root.lucide)lucide.createIcons();focusDialog();
+  }
+  async function historyAction(trigger) {
+    const name=trigger.dataset.quoteAction,id=currentPatientId(),request=history.request;
+    if(!canUse()||!historyVisible()||history.busy||history.patientId!==id)return;
+    if(name==='refresh'){await renderPatientQuotations();return;}
+    if(name==='more'){await renderPatientQuotations({append:true});return;}
+    if(name==='chart'){openPatientWorkspaceTab('chart');return;}
+    const record=history.records.find(item=>item.id===trigger.closest('[data-quote-id]')?.dataset.quoteId);if(!record)return;
+    if(name==='edit'){await openEditor(record);return;}
+    if(name==='delete'||name==='revoke'){confirmHistoryAction(record,name==='delete');return;}
+    try{
+      if(name==='history-copy')await copy(record);
+      if(name==='history-preview')window.open(quoteLink(record),'_blank','noopener,noreferrer');
+    }catch(_){if(request===history.request&&id===currentPatientId()){
+      const target=document.querySelector('[data-history-feedback]');if(target){target.textContent=t('Could not copy the link. Open the editor and copy the link from its field.','تعذر نسخ الرابط. افتح المحرر وانسخ الرابط من حقله.');target.hidden=false;}
+    }}
   }
   async function copy(record) {
     const link=quoteLink(record);
@@ -169,15 +253,14 @@
   async function action(name,trigger) {
     if(name==='close'){if(!ui.busy)close();return;}
     if(name==='retry-composer'){if(!ui.busy)openComposer();return;}
-    if(name==='retry-history'){if(!ui.busy)openHistory();return;}
+    if(name==='retry-editor'){if(!ui.busy&&ui.saved)openEditor(ui.saved);return;}
     if(ui.busy||!canUse()||!ui.patient||ui.patient.id!==currentPatientId()){close();return;}
-    const record=ui.records.find(item=>item.id===trigger.closest('[data-quote-id]')?.dataset.quoteId)||ui.saved;
+    const record=ui.saved;
     const actionRequest=ui.request;
     const actionPatientId=ui.patient.id;
     try {
       if(name==='copy'||name==='history-copy'){await copy(record);return;}
       if(name==='preview'||name==='history-preview'){window.open(quoteLink(record),'_blank','noopener,noreferrer');return;}
-      if(name==='edit'){ui.saved=record;ui.selectedIds=[...record.selected_ids];renderComposer();return;}
       if(name==='replace') {
         const patient=getActivePatient();
         if(patient?.id!==ui.patient.id)throw new Error(t('Open this patient’s chart and select planned procedures first.','افتح مخطط هذا المريض وحدد الإجراءات المخططة أولاً.'));
@@ -196,12 +279,12 @@
         const message=t(`Hello ${ui.patient.name}, here is your treatment quotation from ${ui.settings.clinic_name}:`,`مرحباً ${ui.patient.name}، إليك عرض أسعار علاجك من ${ui.settings.clinic_name}:`);
         window.open(`https://wa.me/${international}?text=${encodeURIComponent(message+'\n'+quoteLink(record))}`,'_blank','noopener,noreferrer');return;
       }
-      if(!['save','revoke'].includes(name))return;
-      if(name==='revoke'&&!window.confirm(t('Disable this quotation link? The patient will no longer be able to open it.','هل تريد تعطيل رابط عرض الأسعار؟ لن يتمكن المريض من فتحه.')))return;
+      if(!['save','revoke','delete'].includes(name))return;
       const request=ui.request,id=ui.patient.id;
       ui.busy=true;ui.overlay.querySelectorAll('button').forEach(button=>button.disabled=true);
-      let payload={action:'revoke',patient_id:id,id:record?.id,revision:Number(record?.revision)};
+      let payload={action:name,patient_id:id,id:record?.id,revision:Number(record?.revision)};
       if(name==='save') {
+        if(!ui.selectedIds.length)throw new Error('Select planned procedures.');
         const input=ui.overlay.querySelector('#quotation-expiry');
         const expiry=new Date(input.value+'T23:59:59');
         if(!input.value||!Number.isFinite(expiry.getTime())||expiry<=new Date())throw new Error('Choose a future expiry date.');
@@ -211,7 +294,8 @@
       if(!isCurrent(request,id))return;
       ui.busy=false;
       if(name==='save'){ui.saved=response.quotation;renderComposer();}
-      else{ui.records=ui.records.map(item=>item.id===record.id?response.quotation:item);renderHistory();}
+      else close();
+      if(historyVisible())await renderPatientQuotations({quiet:true});
     } catch(error){if(actionRequest===ui.request)feedback(error);}
     finally{if(actionRequest===ui.request){ui.busy=false;ui.overlay?.querySelectorAll('button').forEach(button=>button.disabled=false);}}
   }
@@ -261,14 +345,20 @@
   }
   root.openPatientQuotation=openComposer;
   root.openPatientQuotations=openHistory;
+  root.renderPatientQuotations=renderPatientQuotations;
+  root.resetPatientQuotations=resetHistory;
   root.renderQuotationSelectionActions=renderSelection;
   root.renderQuotationSettings=renderSettings;
   root.refreshQuotationFormLogo=renderFormLogo;
-  root.resetQuotationUi=close;
+  root.resetQuotationUi=function(){close();resetHistory();};
   root.refreshQuotationLanguage=function() {
-    const history=document.getElementById('profile-quotations-button');
+    const historyButton=document.getElementById('profile-quotations-button');
     const label=t('Quotations','عروض الأسعار');
-    if(history){history.querySelector('span').textContent=label;history.setAttribute('aria-label',label);history.title=label;}
+    if(historyButton){historyButton.querySelector('span').textContent=label;historyButton.setAttribute('aria-label',label);historyButton.title=label;}
+    const tab=document.querySelector('[data-patient-workspace-tab="quotations"]');
+    if(tab){tab.querySelector('span').textContent=label;tab.setAttribute('aria-label',label);tab.title=label;}
+    historyLabels();
+    if(historyVisible()&&canUse())renderPatientQuotations({quiet:true});
     if(typeof selectedFindingIds!=='undefined'&&typeof chartInvoiceStateLoading!=='undefined')renderSelection([],selectedFindingIds.size,chartInvoiceStateLoading);
     if(typeof adminActiveTab!=='undefined'&&adminActiveTab==='print-forms'&&currentUserAccess?.isAdmin)renderSettings();
   };

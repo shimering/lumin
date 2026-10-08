@@ -151,31 +151,50 @@ test('the same token follows form logo changes, prices and completion, then clea
   assert.deepEqual(errors,[]);
 });
 
-test('selection actions stay adjacent; mixed selections quote only planned procedures, and history and settings remain accessible',async t=>{
+test('patient Quotations tab supports editing, deletion, pagination and patient switching in bilingual responsive layouts',async t=>{
   const {page,base,errors}=await setup(t);
   const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
   const head=html.slice(0,html.indexOf('</head>')+7).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'');
   const group=html.match(/<div id="findings-selection-actions"[\s\S]*?<\/div>/)[0];
-  const source=name=>{const start=html.indexOf('    function '+name+'(');return html.slice(start,html.indexOf('\n    }',start)+6);};
-  await page.route(base+'/staff',route=>route.fulfill({contentType:'text/html',body:`${head}<body><main>${group}<button id="history" onclick="openPatientQuotations()">History</button><div id="admin-quotation-settings"></div><form id="admin-prescription-print-form"><section><input id="prescription-print-logo-file" type="file"/></section></form></main></body>`}));
+  const quotationSection=html.match(/<section id="view-patient-quotations"[\s\S]*?<\/section>/)[0];
+  const workspaceHeader=html.match(/<header id="patient-workspace-header"[\s\S]*?<\/header>/)[0];
+  const source=name=>{let start=html.indexOf('    function '+name+'(');if(start<0)start=html.indexOf('    async function '+name+'(');assert.ok(start>=0,name);return html.slice(start,html.indexOf('\n    }',start)+6);};
+  await page.route(base+'/staff',route=>route.fulfill({contentType:'text/html',body:`${head}<body class="lumin-raised"><div id="app-shell"><main id="app-main" class="w-full p-4 sm:p-6">${workspaceHeader}<div id="chart-selection-fixture">${group}</div><button id="history" onclick="openPatientQuotations()">History</button>${quotationSection}<div id="admin-quotation-settings"></div><form id="admin-prescription-print-form" class="hidden"><section><input id="prescription-print-logo-file" type="file"/></section></form></main></div></body>`}));
   await page.goto(base+'/staff');
   await page.addScriptTag({path:path.join(root,'vendor/lucide.min.js')});
   for(const filename of ['lumin-quotation-model.js','lumin-tooth-anatomy.js','lumin-quotation-view.js'])await page.addScriptTag({path:path.join(root,filename)});
   await page.addScriptTag({content:`
-    let currentUiLanguage='en',currentSession={user:{id:'staff'}},currentUserAccess={isAdmin:true},activePatientId='${id(90)}';
+    let currentUiLanguage='en',currentSession={user:{id:'staff'}},currentUserAccess={isAdmin:true},activePatientId='${id(90)}',activeWorkspacePatientId=activePatientId,patientWorkspaceReturnView='patients';
     let selectedFindingIds=new Set(['${id(1)}','${id(2)}']),invoicedFindingIds=new Set(),chartInvoiceStateLoading=false;
     const chart=${JSON.stringify(chart)},dentalOperations=${JSON.stringify(operations)};
     const patient={id:activePatientId,name:'Omar Hassan',phone:'01001234567',chartState:chart};
     const settings={clinic_name:'Noura Dental',logo_data_url:'${formLogo}',whatsapp_phone:'201001234567'};
-    let savedQuote=null;window.payloads=[];
-    function getActivePatient(){return patient;} function patientWorkspaceId(){return activePatientId;} function hasPageAccess(){return true;}
+    let savedQuote=null;window.payloads=[];window.canChart=true;window.failHistory=false;window.delayHistory=false;
+    function getActivePatient(){return patient;} function patientWorkspaceId(){return activePatientId;} function hasPageAccess(page){return page!=='chart'||window.canChart;}
+    function rememberPatientWorkspaceOrigin(){} function currentPatientAge(){return null;} function formatPatientNumber(){return '001';}
+    function translateUiTree(){} function syncLoyaltyVisibility(){} function canViewPatientLoyalty(){return true;} function canViewPatientAppointments(){return true;} function canViewPatientPrescriptions(){return true;} function canViewPatientInvoices(){return true;}
+    async function switchView(name){window.openedView=name;resetQuotationUi();document.getElementById('chart-selection-fixture').classList.toggle('hidden',name!=='chart');document.getElementById('history').hidden=name==='patient-quotations';document.getElementById('view-patient-quotations').classList.toggle('hidden',name!=='patient-quotations');updatePatientWorkspaceNavigation(patient,name==='patient-quotations'?'quotations':'chart');if(name==='patient-quotations')await renderPatientQuotations();}
     async function saveActivePatientChart(){return true;} async function waitForPatientChartSaves(){}
     function setStableHtml(element,markup){element.innerHTML=markup;return true;} function renderChartFindingIcons(){lucide.createIcons();} function escapeHtml(value){return String(value);}
     function showAppointmentNotificationToast(){} function invoiceSelectedFindings(){window.invoiceSelection=[...selectedFindingIds];}
-    const db={from(table){const query={select(){return query},eq(){return query},single(){return Promise.resolve({data:{id:patient.id,name:patient.name,phone:patient.phone,chart_state:chart}})},then(resolve){return Promise.resolve({data:dentalOperations}).then(resolve)}};return query;},functions:{async invoke(name,{body}){window.payloads.push(body);if(body.action==='settings')return{data:{settings}};if(body.action==='list')return{data:{quotations:savedQuote?[savedQuote]:[]}};if(body.action==='create'||body.action==='update'){savedQuote={...body,id:'${id(99)}',token:'${'b'.repeat(64)}',patient_id:patient.id,revision:1};return{data:{quotation:savedQuote}};}return{data:{settings}};}}};
-    ${['chartFindingBillingMultiplier','chartFindingBatchTotal','chartFindingInvoiceAmounts','formatInvoiceMoney','renderFindingInvoiceToolbar'].map(source).join('\n')}
+    const db={from(table){const query={select(){return query},eq(){return query},single(){return Promise.resolve({data:{id:patient.id,name:patient.name,phone:patient.phone,chart_state:chart}})},then(resolve){return Promise.resolve({data:dentalOperations}).then(resolve)}};return query;},functions:{async invoke(name,{body}){
+      window.payloads.push(body);if(body.action==='settings')return{data:{settings}};
+      if(body.action==='list'){
+        if(window.failHistory)return{error:{}};
+        const rows=window.extraQuotes||(savedQuote&&savedQuote.patient_id===body.patient_id?[savedQuote]:[]),offset=body.offset||0;
+        const result={data:{quotations:rows.slice(offset,offset+50),has_more:rows.length>offset+50}};
+        if(window.delayHistory)return new Promise(resolve=>window.resolveHistory=()=>resolve(result));return result;
+      }
+      if(body.action==='get')return{data:{quotation:savedQuote}};
+      if(body.action==='delete'){if(window.staleDelete)return{data:{error:'This quotation changed. Reopen it before saving.'}};const deleted_id=savedQuote.id;savedQuote=null;return{data:{deleted_id}};}
+      if(body.action==='revoke'){savedQuote={...savedQuote,revoked_at:new Date().toISOString(),revision:savedQuote.revision+1};return{data:{quotation:savedQuote}};}
+      if(body.action==='create'||body.action==='update'){savedQuote={...savedQuote,...body,id:'${id(99)}',token:'${'b'.repeat(64)}',patient_id:patient.id,revision:(savedQuote?.revision||0)+1,created_at:savedQuote?.created_at||new Date().toISOString()};return{data:{quotation:savedQuote}};}
+      return{data:{settings}};
+    }}};
+    ${['openPatientWorkspace','openPatientWorkspaceTab','updatePatientWorkspaceNavigation','chartFindingBillingMultiplier','chartFindingBatchTotal','chartFindingInvoiceAmounts','formatInvoiceMoney','renderFindingInvoiceToolbar'].map(source).join('\n')}
   `});
   await page.addScriptTag({path:path.join(root,'lumin-quotations.js')});
+  await page.evaluate(()=>{document.getElementById('patient-workspace-header').classList.remove('hidden');updatePatientWorkspaceNavigation(patient,'chart');});
   await page.evaluate(()=>renderFindingInvoiceToolbar([{id:patient.chartState[3].wholeOperations[0].id,price:3500},{id:patient.chartState[3].wholeOperations[1].id,price:5500}]));
   for(const viewport of [{width:390,height:844},{width:834,height:1112},{width:1440,height:900}]) {
     await page.setViewportSize(viewport);
@@ -193,8 +212,77 @@ test('selection actions stay adjacent; mixed selections quote only planned proce
   assert.match(await page.locator('.q-link-field input').inputValue(),/quotation\.html#[b]{64}$/);
   await page.keyboard.press('Escape');assert.equal(await page.locator('.q-overlay').count(),0);
   await page.locator('#history').click();await page.waitForSelector('.q-history-card');
+  assert.equal(await page.evaluate(()=>window.openedView),'patient-quotations');
+  assert.equal(await page.locator('[data-patient-workspace-tab=quotations]').getAttribute('aria-selected'),'true');
+  assert.equal(await page.locator('.q-overlay').count(),0);
   await page.locator('[data-quote-action=edit]').click();await page.waitForSelector('#quotation-expiry');
+  await page.locator('[data-quote-procedure][value="'+id(4)+'"]').check();
+  await page.locator('[data-quote-procedure][value="'+id(2)+'"]').uncheck();
+  assert.equal(await page.locator('#quotation-preview .q-procedure').count(),1);
+  assert.match(await page.locator('#quotation-preview .q-procedure').textContent(),/Scaling/);
+  await page.locator('[data-quote-action=save]').click();
+  await page.waitForFunction(()=>window.payloads.some(body=>body.action==='update'));
+  const edited=await page.evaluate(()=>window.payloads.find(body=>body.action==='update'));
+  assert.deepEqual(edited.selected_ids,[id(4)]);assert.equal(edited.revision,1);
+  await page.waitForFunction(()=>document.querySelector('.q-history-value')?.textContent.includes('900'));
   await page.keyboard.press('Escape');
+  assert.equal(await page.locator('[data-patient-workspace-tab=quotations]').evaluate(node=>node===document.activeElement),true);
+  await page.evaluate(()=>{savedQuote.expires_at=new Date(Date.now()-864e5).toISOString();renderPatientQuotations();});
+  await page.waitForFunction(()=>document.querySelector('.q-history-card .q-badge')?.textContent==='Expired');
+  await page.locator('.q-history-card [data-quote-action=edit]').click();await page.waitForSelector('#quotation-expiry');
+  assert.equal(await page.locator('.q-link-field').count(),0);
+  await page.locator('[data-quote-action=save]').click();await page.waitForSelector('.q-link-field');
+  assert.match(await page.locator('.q-link-field input').inputValue(),/quotation\.html#[b]{64}$/);
+  await page.waitForFunction(()=>document.querySelector('.q-history-card .q-badge')?.textContent==='Active');
+  await page.keyboard.press('Escape');
+  for(const viewport of [{width:390,height:844},{width:834,height:1112},{width:1440,height:900}]){
+    await page.setViewportSize(viewport);
+    for(const language of ['en','ar']){
+      await page.evaluate(lang=>{currentUiLanguage=lang;refreshQuotationLanguage();},language);
+      await page.waitForFunction(()=>!document.querySelector('#patient-quotations-content').hasAttribute('aria-busy'));
+      assert.equal(await page.locator('#view-patient-quotations').getAttribute('dir'),language==='ar'?'rtl':'ltr');
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+      const targets=await page.locator('.q-history-actions .q-button,[data-patient-workspace-tab=quotations]').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return [r.width,r.height];}));
+      assert.ok(targets.every(([w,h])=>w>=43.9&&h>=43.9));
+      if(process.env.LUMIN_QUOTATION_SCREENSHOTS&&language==='en'&&viewport.width!==834)await page.screenshot({path:path.join(process.env.LUMIN_QUOTATION_SCREENSHOTS,viewport.width===390?'quotations-tab-mobile.png':'quotations-tab-desktop.png'),fullPage:true});
+    }
+  }
+  await page.locator('.q-history-card [data-quote-action=delete]').click();
+  assert.equal(await page.locator('.q-confirm-dialog').count(),1);
+  await page.locator('.q-confirm-dialog [data-quote-action=close]').last().click();
+  assert.equal(await page.evaluate(()=>window.payloads.filter(body=>body.action==='delete').length),0);
+  await page.locator('.q-history-card [data-quote-action=revoke]').click();
+  await page.locator('.q-confirm-dialog [data-quote-action=revoke]').click();
+  await page.waitForFunction(()=>document.querySelector('.q-history-card .q-badge')?.textContent==='معطل');
+  await page.locator('.q-history-card [data-quote-action=edit]').click();await page.waitForSelector('#quotation-expiry');
+  assert.equal(await page.locator('.q-link-field').count(),0);
+  assert.equal(await page.locator('[data-quote-action=whatsapp]').count(),0);
+  await page.keyboard.press('Escape');
+  await page.evaluate(()=>window.staleDelete=true);
+  await page.locator('.q-history-card [data-quote-action=delete]').click();await page.locator('.q-confirm-dialog [data-quote-action=delete]').click();
+  await page.waitForSelector('[data-quote-feedback]:not([hidden])');
+  assert.match(await page.locator('[data-quote-feedback]').textContent(),/تغيّر/);
+  await page.keyboard.press('Escape');await page.evaluate(()=>window.staleDelete=false);
+  await page.locator('.q-history-card [data-quote-action=delete]').click();await page.locator('.q-confirm-dialog [data-quote-action=delete]').click();
+  await page.waitForFunction(()=>!document.querySelector('.q-history-card')&&!document.querySelector('.q-overlay'));
+  assert.match(await page.locator('#patient-quotations-content').textContent(),/لا توجد عروض أسعار/);
+  await page.evaluate(()=>{window.extraQuotes=Array.from({length:51},(_,i)=>({id:'00000000-0000-4000-8000-'+String(100+i).padStart(12,'0'),patient_id:activePatientId,selected_ids:['${id(4)}'],expires_at:new Date(Date.now()+864e5).toISOString(),token:'b'.repeat(64)}));renderPatientQuotations();});
+  await page.waitForFunction(()=>document.querySelectorAll('.q-history-card').length===50);
+  await page.locator('[data-quote-action=more]').click();await page.waitForFunction(()=>document.querySelectorAll('.q-history-card').length===51);
+  assert.equal(await page.locator('[data-quote-action=more]').count(),0);
+  await page.evaluate(()=>{window.extraQuotes=null;savedQuote=null;});
+  await page.evaluate(()=>{window.failHistory=true;renderPatientQuotations();});await page.waitForSelector('[data-quote-action=refresh]');
+  await page.evaluate(()=>window.failHistory=false);await page.locator('[data-quote-action=refresh]').click();
+  await page.waitForSelector('#patient-quotations-content [data-quote-action=chart]');
+  await page.evaluate(()=>{savedQuote={id:'${id(99)}',patient_id:activePatientId,selected_ids:['${id(4)}'],expires_at:new Date(Date.now()+864e5).toISOString(),token:'b'.repeat(64)};window.delayHistory=true;renderPatientQuotations();});await page.waitForFunction(()=>Boolean(window.resolveHistory));
+  await page.evaluate(()=>{activePatientId='${id(91)}';patient.id=activePatientId;window.delayHistory=false;renderPatientQuotations();});
+  await page.waitForSelector('#patient-quotations-content [data-quote-action=chart]');
+  await page.evaluate(()=>window.resolveHistory());
+  assert.equal(await page.locator('.q-history-card').count(),0);
+  await page.evaluate(()=>{window.canChart=false;resetQuotationUi();updatePatientWorkspaceNavigation(patient,'profile');});
+  assert.equal(await page.locator('[data-patient-workspace-tab=quotations]').isVisible(),false);
+  assert.equal(await page.locator('#patient-quotations-content').textContent(),'');
+  await page.evaluate(()=>window.canChart=true);
   await page.evaluate(()=>{selectedFindingIds=new Set();renderFindingInvoiceToolbar([]);});
   assert.equal(await page.locator('#findings-selection-actions').isVisible(),false);
   await page.evaluate(()=>{currentUiLanguage='ar';renderQuotationSettings();});await page.waitForSelector('#admin-quotation-settings form');

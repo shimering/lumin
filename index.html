@@ -101,7 +101,7 @@
   <script src="lumin-quotation-model.js?v=1"></script>
   <script src="lumin-tooth-anatomy.js?v=2"></script>
   <script src="lumin-quotation-view.js?v=3"></script>
-  <script src="lumin-quotations.js?v=2"></script>
+  <script src="lumin-quotations.js?v=3"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <link rel="stylesheet" href="lumin-tooth-images.css?v=1" />
   
@@ -5304,7 +5304,7 @@
   <link rel="stylesheet" href="lumin-chart-appointments.css?v=1" />
   <link rel="stylesheet" href="lumin-clinical-actions.css?v=4" />
   <link rel="stylesheet" href="lumin-media-teeth.css?v=1" />
-  <link rel="stylesheet" href="lumin-quotations.css?v=3" />
+  <link rel="stylesheet" href="lumin-quotations.css?v=4" />
   <style id="finance-ledger-styles">
     #finance-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     #finance-summary-cards > div { min-width: 0; }
@@ -6414,6 +6414,7 @@
           <button type="button" role="tab" aria-controls="view-patient-scans" data-patient-workspace-tab="scans" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('scans')" aria-label="3D Scans" title="3D Scans"><i data-lucide="box" class="h-4 w-4"></i><span>3D Scans</span></button>
           <button type="button" role="tab" aria-controls="view-patient-appointments" data-patient-workspace-tab="appointments" data-workspace-requires="appointments" onclick="openPatientWorkspaceTab('appointments')" aria-label="Appointments" title="Appointments"><i data-lucide="calendar-days" class="h-4 w-4"></i><span>Appointments</span></button>
           <button type="button" role="tab" aria-controls="view-prescriptions" data-patient-workspace-tab="prescriptions" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('prescriptions')" aria-label="Prescriptions" title="Prescriptions"><i data-lucide="notebook-tabs" class="h-4 w-4"></i><span>Prescriptions</span></button>
+          <button type="button" role="tab" aria-controls="view-patient-quotations" data-patient-workspace-tab="quotations" data-workspace-requires="chart" onclick="openPatientWorkspaceTab('quotations')" aria-label="Quotations" title="Quotations" translate="no"><i data-lucide="file-text" class="h-4 w-4"></i><span>Quotations</span></button>
           <button type="button" role="tab" aria-controls="view-invoices" data-patient-workspace-tab="invoices" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('invoices')" aria-label="Invoices" title="Invoices"><i data-lucide="receipt-text" class="h-4 w-4"></i><span>Invoices</span></button>
           <button type="button" role="tab" aria-controls="view-payments" data-patient-workspace-tab="payments" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('payments')" aria-label="Payments" title="Payments"><i data-lucide="wallet-cards" class="h-4 w-4"></i><span>Payments</span></button>
           <button type="button" role="tab" hidden aria-controls="view-loyalty" data-patient-workspace-tab="loyalty" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('loyalty')" aria-label="Loyalty" title="Loyalty"><i data-lucide="badge-check" class="h-4 w-4"></i><span>Loyalty</span></button>
@@ -6483,6 +6484,14 @@
         <button id="patient-new-appointment-button" type="button" onclick="openNewPatientAppointment()" aria-label="New appointment" title="New appointment" class="hidden inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-sm font-bold text-white transition hover:bg-blue-700"><i data-lucide="plus" class="h-4 w-4"></i><span class="hidden sm:inline">New appointment</span></button>
       </div>
       <div id="patient-appointments-content" class="space-y-3" aria-live="polite"></div>
+    </section>
+
+    <section id="view-patient-quotations" role="tabpanel" class="hidden space-y-4" translate="no">
+      <div class="app-page-bar">
+        <div class="app-page-heading"><span class="app-page-icon" aria-hidden="true"><i data-lucide="file-text"></i></span><h2 class="app-page-title">Quotations</h2></div>
+        <button type="button" onclick="openPatientWorkspaceTab('chart')" class="q-button"><i data-lucide="layout-grid" aria-hidden="true"></i><span data-quotation-chart-label>Open dental chart</span></button>
+      </div>
+      <div id="patient-quotations-content" aria-live="polite"></div>
     </section>
 
     <section id="view-prescriptions" role="tabpanel" class="hidden space-y-4">
@@ -18910,7 +18919,7 @@
     const REALTIME_PRESCRIPTION_TABLES = new Set(['prescription_print_settings', 'medication_catalog', 'prescription_templates', 'prescriptions', 'prescription_items']);
     const REALTIME_IMPLANT_TABLES = new Set(['implant_progress']);
     const REALTIME_WHATSAPP_TABLES = new Set(['whatsapp_conversations', 'whatsapp_messages']);
-    const REALTIME_APP_TABLES = new Set(['patients', 'appointments', 'message_templates', 'clinic_settings', 'payment_methods', ...REALTIME_PRESCRIPTION_TABLES, ...REALTIME_LOYALTY_TABLES, ...REALTIME_APPOINTMENT_CONFIGURATION_TABLES, ...REALTIME_EXPENSE_TABLES, ...REALTIME_HR_TABLES, ...REALTIME_INVOICE_TABLES, ...REALTIME_DENTAL_CUSTOMIZATION_TABLES, ...REALTIME_ACCESS_TABLES, ...REALTIME_IMPLANT_TABLES, ...REALTIME_WHATSAPP_TABLES]);
+    const REALTIME_APP_TABLES = new Set(['patients', 'patient_quotations', 'appointments', 'message_templates', 'clinic_settings', 'payment_methods', ...REALTIME_PRESCRIPTION_TABLES, ...REALTIME_LOYALTY_TABLES, ...REALTIME_APPOINTMENT_CONFIGURATION_TABLES, ...REALTIME_EXPENSE_TABLES, ...REALTIME_HR_TABLES, ...REALTIME_INVOICE_TABLES, ...REALTIME_DENTAL_CUSTOMIZATION_TABLES, ...REALTIME_ACCESS_TABLES, ...REALTIME_IMPLANT_TABLES, ...REALTIME_WHATSAPP_TABLES]);
 
     function setRealtimeIndicator(status) {
       const indicator = document.getElementById('sync-status');
@@ -18988,6 +18997,7 @@
       if (patientsLoaded || patientDetailFreshness.size) realtimePendingTables.add('patients');
       if (appointmentsLoaded || realtimeViewIsVisible('dashboard') || realtimeViewIsVisible('chart')) realtimePendingTables.add('appointments');
       if (realtimeViewIsVisible('patient-appointments')) realtimePendingTables.add('appointments');
+      if (realtimeViewIsVisible('patient-quotations')) ['patients', 'patient_quotations', 'dental_operations'].forEach(tableName => realtimePendingTables.add(tableName));
       if (realtimeViewIsVisible('patient-prescriptions')) {
         ['prescription_print_settings', 'medication_catalog', 'prescription_templates', 'prescriptions', 'prescription_items']
           .forEach(tableName => realtimePendingTables.add(tableName));
@@ -19042,7 +19052,7 @@
         renderAuthorizedNavigation();
         refreshWhatsAppTemplatePickerAnchor();
         const currentView = window.location.hash.slice(1);
-        const permissionView = ['invoices', 'payments', 'patient-profile', 'loyalty', 'patient-appointments', 'patient-prescriptions'].includes(currentView) ? 'patients' : currentView;
+        const permissionView = currentView === 'patient-quotations' ? 'chart' : ['invoices', 'payments', 'patient-profile', 'loyalty', 'patient-appointments', 'patient-prescriptions'].includes(currentView) ? 'patients' : currentView;
         syncLoyaltyVisibility();
         if (!(currentView === 'patients' ? canOpenPatientsPage() : hasPageAccess(permissionView)) || (currentView === 'patient-appointments' && !canViewPatientAppointments()) || (currentView === 'patient-prescriptions' && !canViewPatientPrescriptions())) {
           resetPatientAppointmentsState();
@@ -19141,7 +19151,7 @@
               await ensurePatientDirectoryPageLoaded();
             }
           }
-          if (activeWorkspacePatientId && ['patient-profile','chart','invoices','payments','loyalty','patient-appointments','patient-media','patient-scans','patient-prescriptions'].some(realtimeViewIsVisible)) {
+          if (activeWorkspacePatientId && ['patient-profile','chart','invoices','payments','loyalty','patient-appointments','patient-media','patient-scans','patient-prescriptions','patient-quotations'].some(realtimeViewIsVisible)) {
             const patientId = activeWorkspacePatientId;
             const token = workspaceNavigationToken;
             const patient = await ensureKnownPatient(patientId, { force: true, throwOnError: true });
@@ -19180,6 +19190,9 @@
         }
         if ((refreshLoadedResourcesForAccess || changedTables.has('message_templates')) && whatsappTemplatesLoaded && canUseWhatsAppTemplates()) {
           await fetchWhatsAppTemplates();
+        }
+        if ((accessChanged || ['patient_quotations', 'patients', 'dental_operations'].some(table => changedTables.has(table))) && realtimeViewIsVisible('patient-quotations') && hasPageAccess('chart')) {
+          await renderPatientQuotations({ quiet: true });
         }
         const dentalCustomizationChanged = [...changedTables].some(table => REALTIME_DENTAL_CUSTOMIZATION_TABLES.has(table));
         if ((refreshLoadedResourcesForAccess || dentalCustomizationChanged) && dentalCustomizationLoaded && (hasPageAccess('patients') || hasPageAccess('chart') || hasPageAccess('hr') || hasPageAccess('implants'))) {
@@ -26550,6 +26563,10 @@
         if (canViewPatientPrescriptions()) await switchView('patient-prescriptions');
         return;
       }
+      if (tabName === 'quotations') {
+        if (hasPageAccess('chart')) await switchView('patient-quotations');
+        return;
+      }
       if (tabName === 'loyalty') {
         if (canViewPatientLoyalty()) await switchView('loyalty');
         return;
@@ -29766,6 +29783,7 @@
         ? canViewPatientInvoices()
         : viewName === 'patient-appointments' ? canViewPatientAppointments()
         : viewName === 'patient-prescriptions' ? canViewPatientPrescriptions()
+        : viewName === 'patient-quotations' ? hasPageAccess('chart')
         : viewName === 'loyalty' ? canViewPatientLoyalty()
         : hasPageAccess(['payments', 'patient-profile', 'patient-media', 'patient-scans'].includes(viewName) ? 'patients' : viewName);
       if (!canOpenRequestedView) {
@@ -29776,7 +29794,7 @@
 
       const navigationToken = ++workspaceNavigationToken;
       const navigationUserId = currentSession?.user?.id;
-      const workspaceView = ['patient-profile', 'chart', 'invoices', 'payments', 'loyalty', 'patient-appointments', 'patient-prescriptions', 'patient-media', 'patient-scans'].includes(viewName);
+      const workspaceView = ['patient-profile', 'chart', 'invoices', 'payments', 'loyalty', 'patient-appointments', 'patient-prescriptions', 'patient-quotations', 'patient-media', 'patient-scans'].includes(viewName);
       const requestedPatientId = workspaceView ? patientWorkspaceId() : null;
       const navigationIsCurrent = () => navigationToken === workspaceNavigationToken && currentSession?.user?.id === navigationUserId
         && (!workspaceView || patientWorkspaceId() === requestedPatientId);
@@ -29787,7 +29805,7 @@
       }
 
       // Synchronously update navigation rail & mobile bottom bar highlights immediately (zero delay)
-      const primaryNavTarget = ['invoices', 'patient-profile', 'payments', 'loyalty', 'patient-appointments', 'patient-prescriptions', 'patient-media', 'patient-scans'].includes(viewName)
+      const primaryNavTarget = ['invoices', 'patient-profile', 'payments', 'loyalty', 'patient-appointments', 'patient-prescriptions', 'patient-quotations', 'patient-media', 'patient-scans'].includes(viewName)
         ? 'patients'
         : viewName;
       const activeNavClass = 'flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition bg-white text-blue-700 shadow-xs';
@@ -29844,12 +29862,14 @@
       viewAnalytics.classList.add('hidden');
       viewHr.classList.add('hidden');
       viewImplants?.classList.add('hidden');
-      patientWorkspaceHeader.classList.toggle('hidden', !['patient-profile', 'chart', 'invoices', 'payments', 'loyalty', 'patient-appointments', 'patient-prescriptions', 'patient-media', 'patient-scans'].includes(viewName));
+      patientWorkspaceHeader.classList.toggle('hidden', !['patient-profile', 'chart', 'invoices', 'payments', 'loyalty', 'patient-appointments', 'patient-prescriptions', 'patient-quotations', 'patient-media', 'patient-scans'].includes(viewName));
       document.getElementById('patient-workspace-sheet').classList.toggle('hidden', patientWorkspaceHeader.classList.contains('hidden'));
       document.getElementById('view-patient-appointments').classList.add('hidden');
       if (viewName !== 'patient-appointments') resetPatientAppointmentsState();
       viewPrescriptions.classList.add('hidden');
       if (viewName !== 'patient-prescriptions') resetPatientPrescriptionsState();
+      document.getElementById('view-patient-quotations').classList.add('hidden');
+      if (typeof resetQuotationUi === 'function') resetQuotationUi();
       document.getElementById('view-loyalty').classList.add('hidden');
       activePatientScans?.dispose();
       activePatientScans = null;
@@ -29961,6 +29981,9 @@
       } else if (viewName === 'patient-prescriptions') {
         viewPrescriptions.classList.remove('hidden');
         await renderPatientPrescriptions();
+      } else if (viewName === 'patient-quotations') {
+        document.getElementById('view-patient-quotations').classList.remove('hidden');
+        await renderPatientQuotations();
       } else if (viewName === 'patient-scans') {
         document.getElementById('view-patient-scans').classList.remove('hidden');
         await renderPatientScans();

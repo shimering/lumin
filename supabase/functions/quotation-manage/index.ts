@@ -50,19 +50,28 @@ Deno.serve(async (request: Request) => {
     const {data:patient,error:patientError} = await userClient.from("patients").select("id,chart_state").eq("id",body.patient_id).maybeSingle();
     if (patientError || !patient) return respond({error:"Patient unavailable."},404);
     if (body.action === "list") {
-      const result = await userClient.from("patient_quotations").select(quoteColumns).eq("patient_id",patient.id).order("created_at",{ascending:false}).limit(100);
+      const offset = body.offset ?? 0;
+      if (!Number.isSafeInteger(offset) || offset < 0 || offset > 1000000) return respond({error:"Invalid page."},400);
+      const result = await userClient.from("patient_quotations").select(quoteColumns).eq("patient_id",patient.id).order("created_at",{ascending:false}).order("id",{ascending:false}).range(offset,offset+50);
       if (result.error) return respond({error:"Could not load quotations."},503);
-      return respond({quotations:result.data});
+      return respond({quotations:result.data.slice(0,50),has_more:result.data.length>50});
     }
-    if (!["create","update","revoke"].includes(body.action)) return respond({error:"Invalid action."},400);
+    if (!["create","get","update","revoke","delete"].includes(body.action)) return respond({error:"Invalid action."},400);
     let previous: any = null;
     if (body.action !== "create") {
       if (!model.validId(body.id)) return respond({error:"Invalid quotation."},400);
       const result = await userClient.from("patient_quotations").select(quoteColumns).eq("id",body.id).eq("patient_id",patient.id).maybeSingle();
       if (result.error || !result.data) return respond({error:"Quotation unavailable."},404);
       previous = result.data;
+      if (body.action === "get") return respond({quotation:previous});
       if (!Number.isSafeInteger(body.revision) || Number(previous.revision) !== body.revision) return respond({error:"This quotation changed. Reopen it before saving."},409);
-      if (previous.revoked_at) return respond({error:"This quotation was disabled. Create a new link."},409);
+      if (body.action === "delete") {
+        const deleted = await admin.from("patient_quotations").delete().eq("id",previous.id).eq("patient_id",patient.id).eq("revision",body.revision).select("id").maybeSingle();
+        if (deleted.error) return respond({error:"Could not delete quotation."},503);
+        if (!deleted.data) return respond({error:"This quotation changed. Reopen it before saving."},409);
+        return respond({deleted_id:deleted.data.id});
+      }
+      if (previous.revoked_at && body.action === "revoke") return respond({error:"This quotation was disabled. Create a new link."},409);
     }
     let changes: any = {updated_at:new Date().toISOString()};
     if (body.action === "revoke") changes.revoked_at = new Date().toISOString();
@@ -87,7 +96,9 @@ Deno.serve(async (request: Request) => {
       const token = [...crypto.getRandomValues(new Uint8Array(32))].map(byte => byte.toString(16).padStart(2,"0")).join("");
       result = await admin.from("patient_quotations").insert({...changes,patient_id:patient.id,token,created_by:auth.user.id}).select(quoteColumns).single();
     } else {
-      result = await admin.from("patient_quotations").update({...changes,revision:Number(previous.revision)+1}).eq("id",previous.id).eq("patient_id",patient.id).eq("revision",body.revision).is("revoked_at",null).select(quoteColumns).maybeSingle();
+      let update = admin.from("patient_quotations").update({...changes,revision:Number(previous.revision)+1}).eq("id",previous.id).eq("patient_id",patient.id).eq("revision",body.revision);
+      update = previous.revoked_at ? update.eq("revoked_at",previous.revoked_at) : update.is("revoked_at",null);
+      result = await update.select(quoteColumns).maybeSingle();
     }
     if (result.error) return respond({error:"Could not save quotation."},503);
     if (!result.data) return respond({error:"This quotation changed. Reopen it before saving."},409);

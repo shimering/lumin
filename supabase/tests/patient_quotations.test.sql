@@ -15,6 +15,7 @@ begin
   if has_table_privilege('anon','public.patient_quotations','SELECT') then raise exception 'Anonymous quotation table access'; end if;
   if has_table_privilege('anon','public.quotation_settings','SELECT') then raise exception 'Anonymous settings table access'; end if;
   if has_table_privilege('authenticated','public.patient_quotations','INSERT') or has_table_privilege('authenticated','public.patient_quotations','UPDATE') then raise exception 'Staff writes must pass the management endpoint'; end if;
+  if has_table_privilege('authenticated','public.patient_quotations','DELETE') then raise exception 'Staff deletion must pass the management endpoint'; end if;
   if has_function_privilege('anon','public.quotation_source(text)','EXECUTE') or has_function_privilege('authenticated','public.quotation_source(text)','EXECUTE') then raise exception 'Private source RPC exposed'; end if;
   perform set_config('request.jwt.claims',json_build_object('sub',actor,'role','authenticated')::text,true);
 end;
@@ -50,6 +51,14 @@ update public.prescription_print_settings set logo_data_url=null where id=1;
 set local role service_role;
 do $$ begin
   if public.quotation_source(repeat('a',64))#>>'{clinic,logo}' is distinct from '' then raise exception 'Removed form logo fell back to the legacy quotation logo'; end if;
+end; $$;
+reset role;
+set local role service_role;
+delete from public.patient_quotations where id='22222222-2222-4222-8222-222222222222' and patient_id='11111111-1111-4111-8111-111111111111' and revision=1;
+do $$ begin
+  if public.quotation_source(repeat('a',64)) is not null then raise exception 'Deleted quotation link remains available'; end if;
+  if not exists(select 1 from public.patients where id='11111111-1111-4111-8111-111111111111' and chart_state#>>'{1,wholeOperations,0,status}'='P') then raise exception 'Quotation deletion changed patient treatments'; end if;
+  if (select count(*) from public.patient_quotations where patient_id='11111111-1111-4111-8111-111111111111') <> 2 then raise exception 'Quotation deletion changed other quotations'; end if;
 end; $$;
 reset role;
 delete from public.patients where id='11111111-1111-4111-8111-111111111111';
