@@ -18,6 +18,7 @@ lumin-server-setup/.build-cache/
 storage-server/Storage
 storage-server/Storage/
 supabase/*
+!supabase/config.toml
 !supabase/migrations/
 !supabase/migrations/*.sql
 !supabase/functions/

@@ -17,6 +17,18 @@ A modern, high-performance Progressive Web Application (PWA) for comprehensive d
 - **Backend-as-a-Service**: Supabase (PostgreSQL, Auth, Edge Functions, Row-Level Security)
 - **Notifications**: OneSignal Web Push
 
+## Patient quotations
+
+Set the clinic name, optional logo, and international WhatsApp number in **Admin → Print forms → Quotation settings**. Select planned procedures on a patient's chart and use the small quotation button beside **Add invoice**. Preview the dental chart and item prices, choose an expiry date (30 days by default), create the link, then copy it or open a prepared WhatsApp message. Sending the message remains a staff action in WhatsApp.
+
+**Patient Info → Quotations** lists that patient's links. Staff can extend expiry, replace the included procedures with the current planned selection, or disable a link. The same link follows saved prices, tooth/surface changes, and Plan/In Progress statuses; completed, deleted, and Existed procedures disappear. New procedures are included only when staff update the selection. Patients can switch English/Arabic, inspect the chart, print, and contact the clinic.
+
+Deploy migration `20261008163914_patient_quotations.sql` and both Edge Functions before publishing the frontend. Deploy `quotation-manage` with JWT verification enabled, and `quotation-view` with JWT verification disabled because it authenticates the unguessable 256-bit quotation token itself. Include the root `lumin-quotation-model.js` dependency when deploying either function. The public page uses the project's public anon key, exposes only the quotation display projection, requires no patient login, and does not store patient information offline. Anyone with the private link can view it until expiry or revocation; share it directly with the intended patient.
+
+Publish `quotation.html` and all `lumin-quotation*`, `lumin-quotations*`, `lumin-tooth-anatomy.js`, and `lumin-public-config.js` files with the existing frontend. Preserve direct access to `/quotation.html` through the host's routing rules. The service worker intentionally uses a network-only route for the public page.
+
+Run `node --test tests/quotations-model.test.cjs tests/quotations-edge.test.cjs tests/quotations-browser.test.cjs` using Node 24+ and Playwright (set `NODE_PATH` if needed and `LUMIN_TEST_BROWSER_CHANNEL=chrome` for system Chrome). Edge tests execute the actual handlers with isolated database/auth clients. Run `supabase/tests/patient_quotations.test.sql` for rolled-back live permission, expiry, revocation, and deletion checks.
+
 ## Hosting & Deployment
 This application is a static Single-Page Application (PWA). It is ready to be hosted on:
 - **Cloudflare Pages**: Set build directory to `public`

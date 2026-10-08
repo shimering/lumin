@@ -1,0 +1,5 @@
+[functions.quotation-view]
+verify_jwt = false
+
+[functions.quotation-manage]
+verify_jwt = true

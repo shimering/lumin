@@ -1,4 +1,4 @@
-const LUMIN_CACHE = "lumin-dental-shell-v204";
+const LUMIN_CACHE = "lumin-dental-shell-v205";
 const LUMIN_SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -44,6 +44,11 @@ const LUMIN_SHELL = [
   "/lumin-tooth-notes.css?v=4",
   "/lumin-chart-appointments.js?v=3",
   "/lumin-clinical-actions.js?v=4",
+  "/lumin-quotation-model.js?v=1",
+  "/lumin-tooth-anatomy.js?v=1",
+  "/lumin-quotation-view.js?v=1",
+  "/lumin-quotations.js?v=1",
+  "/lumin-quotations.css?v=1",
   "/lumin-clinical-actions.css?v=4",
   "/lumin-specialty-picker.js?v=3",
   "/assets/specialties-3d/dental-general.webp?v=2",
@@ -106,6 +111,15 @@ self.addEventListener("fetch", (event) => {
     url.pathname.endsWith("OneSignalSDKWorker.js") ||
     url.pathname.includes("OneSignal")
   ) return;
+
+  // Public quotation navigations must never fall back to the clinic login or an offline copy.
+  if (url.pathname.endsWith("/quotation.html")) {
+    event.respondWith(fetch(request, { cache: "no-store" }).catch(() => new Response(
+      '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Quotation unavailable</title><p>Connect to the internet to open this quotation. / اتصل بالإنترنت لفتح عرض الأسعار.</p>',
+      { status: 503, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } }
+    )));
+    return;
+  }
 
   if (url.pathname === "/app-version.json") {
     event.respondWith(fetch(request, { cache: "no-store" }));

@@ -9,3 +9,8 @@
 /manifest.webmanifest
   Cache-Control: public, max-age=86400
 
+
+/quotation.html
+  Cache-Control: no-cache, no-store, must-revalidate
+  Referrer-Policy: no-referrer
+  X-Robots-Tag: noindex, nofollow, noarchive
