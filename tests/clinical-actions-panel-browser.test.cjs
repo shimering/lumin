@@ -16,6 +16,7 @@ function source(name) {
 const head = html.slice(0, html.indexOf('</head>') + 7).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
 const chartStart = html.indexOf('    <section id="view-chart"');
 const chart = html.slice(chartStart, html.indexOf('</section>', chartStart) + 10).replace('class="hidden space-y-6"', 'class="space-y-6"');
+const iconRegistry = html.slice(html.indexOf('    const SPECIALTY_ICON_OPTIONS = '), html.indexOf('    const DENTAL_VISUAL_PRESETS = '));
 
 test('clinical rail preserves selection, applies correct scopes and fits desktop, tablet and phone layouts', { skip: !chromium, timeout: 120000 }, async t => {
   const server = http.createServer((request, response) => {
@@ -43,9 +44,11 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
   const functions = ['escapeHtml', 'emptyChartSelection', 'chartSelectionTargets', 'setChartSelectionTargets', 'toggleSelectedChartTooth',
     'toggleSurface', 'updateSelectionUI', 'activeDentalSpecialties', 'closeChartProcedureMenu', 'renderChartSpecialtyRail',
     'renderChartProcedureMenu', 'renderClinicalActionSelectors', 'setClinicalOperationStatus', 'renderClinicalOperationStatusSelector',
-    'renderChartOperationOptions', 'updateClinicalOperationPreview', 'applySelectedDentalOperation', 'applySurfaceCondition',
+    'renderChartOperationOptions', 'updateClinicalOperationPreview', 'normaliseSpecialtyIconName', 'normaliseSpecialtyAccentColor',
+    'specialtyIconMarkup', 'applySelectedDentalOperation', 'applySurfaceCondition',
     'applyToothStatus', 'applyMouthOperation', 'bindGlobalClickEvents', 'updateAppViewportDimensions'].map(source).join('\n');
   await page.addScriptTag({ content: `
+    ${iconRegistry}
     let currentUiLanguage='en', activePatientId='patient-1', activeClinicalOperationStatus='P';
     let activeSelection={tooth:null,slot:null,surfaces:[],targets:[]};
     const CHART_SURFACES=['center','top','bottom','left','right'], SLOT_BY_PRIMARY_TOOTH={};
@@ -223,7 +226,7 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
       await trigger.click();
       assert.equal(await trigger.getAttribute('aria-expanded'),'true');
       assert.equal(await menu.getAttribute('dir'),language==='ar'?'rtl':'ltr');
-      assert.equal(await menu.locator('[role="option"] .chart-specialty-icon').count(),3);
+      assert.equal(await menu.locator('[role="option"] .dental-specialty-icon').count(),3);
       assert.match(await menu.locator('[data-clinical-specialty="endo"] img').getAttribute('src'),/specialties-3d\/dental-endodontics.webp/);
       assert.deepEqual(await menu.locator('img').evaluateAll(async images=>Promise.all(images.map(async img=>{img.loading='eager';await img.decode();return [img.naturalWidth,img.naturalHeight];}))),[[64,64],[64,64],[64,64]],'The menu loads the optimized generated assets');
       const box=await menu.boundingBox();
@@ -324,6 +327,51 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
     await page.keyboard.press('Escape');
     assert.equal(await page.locator('#action-palette-card').isVisible(),false);
     await page.evaluate(()=>{document.documentElement.style.removeProperty('zoom');updateAppViewportDimensions();});
+  });
+  await t.test('catalog, pricing and previews share the standard assets, including saved legacy choices', async () => {
+    await page.addScriptTag({content: `
+      let selectedAdminDentalSpecialtyId='', pricesPageLanguage='en', selectedPricesCategory='all';
+      function hasPageAccess(){return true;}
+      function applySavedPricesSpecialtiesOrder(){}
+      function initPricesCategoryDrag(){}
+      function updateDentalOperationCodePreview(){}
+      function renderDentalVisualPresetOptions(){}
+      function dentalTranslate(value){return value;}
+      ${['renderDentalSpecialtyIconOptions','updateDentalSpecialtyIconPreview','renderAdminDentalCustomization','renderPricesCategoryTabs'].map(source).join('\n')}
+    `});
+    await page.evaluate(() => {
+      const fixture=document.createElement('section');
+      fixture.id='standard-icons-fixture';
+      fixture.style.cssText='padding:24px;background:#fff;max-width:100%;overflow:hidden';
+      fixture.innerHTML='<h3>Standard dental icons</h3><div id="prices-category-tabs" style="display:flex;overflow-x:auto"></div><div id="admin-dental-specialties-list" style="display:flex;overflow-x:auto"></div><div id="admin-dental-selected-specialty"></div><div id="admin-dental-selected-count"></div><div id="admin-dental-operations-list"></div><select id="admin-operation-specialty" hidden></select><select id="admin-specialty-icon" hidden></select><input id="admin-specialty-accent-color" type="color" value="#2563eb" hidden><div id="admin-specialty-icon-preview" style="display:flex;align-items:center;gap:16px;padding:16px"></div>';
+      document.body.append(fixture);
+      dentalOperations=[];
+      dentalSpecialties=SPECIALTY_ICON_OPTIONS.map((option,index)=>({id:'standard-'+index,name:option.label,iconName:option.value==='dental-pediatric'?'baby':option.value,accentColor:'#2563eb',active:true,sortOrder:index}));
+    });
+    const expected=JSON.parse(fs.readFileSync(path.join(root,'assets/specialties-3d/generation.json'),'utf8')).icons.map(icon=>'assets/specialties-3d/'+icon.file+'?v=2');
+    for(const viewport of [{width:1440,height:900},{width:390,height:844}])for(const language of ['en','ar']){
+      await page.setViewportSize(viewport);
+      await page.evaluate(language=>{
+        currentUiLanguage=pricesPageLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';
+        renderAdminDentalCustomization();renderPricesCategoryTabs();renderDentalSpecialtyIconOptions('baby');
+      },language);
+      const catalog=page.locator('#admin-dental-specialties-list .dental-specialty-icon');
+      const pricing=page.locator('#prices-category-tabs .dental-specialty-icon');
+      assert.deepEqual(await catalog.evaluateAll(images=>images.map(img=>img.getAttribute('src'))),expected);
+      assert.deepEqual(await pricing.evaluateAll(images=>images.map(img=>img.getAttribute('src'))),expected);
+      assert.equal(await page.locator('#admin-specialty-icon').inputValue(),'dental-pediatric','Saved legacy choices map to the matching standard asset');
+      const preview=page.locator('#admin-specialty-icon-preview img');
+      assert.match(await preview.getAttribute('src'),/dental-pediatric.webp/);
+      assert.equal((await preview.boundingBox()).width,48);
+      assert.deepEqual(await catalog.evaluateAll(async images=>Promise.all(images.map(async img=>{await img.decode();return [img.naturalWidth,img.naturalHeight];}))),expected.map(()=>[64,64]));
+      assert.deepEqual(await pricing.evaluateAll(async images=>Promise.all(images.map(async img=>{await img.decode();return [img.naturalWidth,img.naturalHeight];}))),expected.map(()=>[64,64]));
+      const original=await preview.getAttribute('src');
+      await page.evaluate(()=>{document.getElementById('admin-specialty-accent-color').value='#e11d48';updateDentalSpecialtyIconPreview();});
+      assert.equal(await preview.getAttribute('src'),original,'Accent colors do not alter the standard artwork');
+      assert.equal(await page.locator('#standard-icons-fixture .dental-specialty-mark').count(),0);
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'Standard icons fit narrow RTL and LTR screens');
+      await page.locator('#standard-icons-fixture').screenshot({path:path.join(screenshots,`standard-icons-${viewport.width}-${language}.png`)});
+    }
   });
   assert.deepEqual(await page.evaluate(()=>window.alerts),[]);
   assert.deepEqual(errors,[]);

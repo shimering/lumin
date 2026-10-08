@@ -89,7 +89,7 @@
   <script src="lumin-tooth-notes.js?v=3"></script>
   <script src="lumin-chart-appointments.js?v=3"></script>
   <script src="lumin-chart-dates.js?v=1"></script>
-  <script src="lumin-specialty-picker.js?v=2"></script>
+  <script src="lumin-specialty-picker.js?v=3"></script>
   <script src="lumin-clinical-actions.js?v=4"></script>
   <link rel="stylesheet" href="lumin-chart-dates.css?v=1" />
   <script src="lumin-media-teeth.js?v=2"></script>
@@ -422,119 +422,17 @@
       box-shadow: 0 0 0 3px white, 0 0 0 5px var(--operation-status-color), 0 8px 14px rgba(15, 23, 42, 0.16);
     }
 
-    /* Original dental specialty pictograms: tooth silhouettes plus a clinical detail. */
-    .dental-specialty-mark {
-      --dental-accent: #2563eb;
-      --dental-soft: rgba(37, 99, 235, 0.08);
-      position: relative;
-      display: inline-flex;
-      width: 3.25rem;
-      height: 2.85rem;
+    /* Shared transparent 3D dental icons used throughout Lumin. */
+    .dental-specialty-icon {
+      display: inline-block;
+      width: 32px;
+      height: 32px;
       flex: 0 0 auto;
-      align-items: center;
-      justify-content: center;
-      color: var(--dental-accent);
-      filter: drop-shadow(0 4px 5px rgba(15, 23, 42, 0.08));
+      object-fit: contain;
+      vertical-align: middle;
+      pointer-events: none;
     }
-    .dental-specialty-teeth {
-      position: absolute;
-      inset: 0.24rem 0.5rem 0.18rem;
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      gap: 0.08rem;
-    }
-    .dental-specialty-tooth {
-      position: relative;
-      display: block;
-      width: 1.78rem;
-      height: 2.12rem;
-      overflow: hidden;
-      border: 1.6px solid currentColor;
-      border-radius: 43% 43% 32% 32% / 29% 29% 68% 68%;
-      background: linear-gradient(145deg, #fff 8%, var(--dental-soft) 100%);
-      clip-path: polygon(14% 0, 86% 0, 100% 18%, 91% 58%, 77% 100%, 51% 73%, 27% 100%, 9% 58%, 0 18%);
-    }
-    .dental-specialty-tooth::after {
-      content: '';
-      position: absolute;
-      inset: 0 0 auto;
-      height: 0.4rem;
-      border-bottom: 1px solid rgba(190, 24, 93, 0.45);
-      background: linear-gradient(180deg, rgba(251, 113, 133, 0.78), rgba(251, 113, 133, 0.36));
-    }
-    .dental-specialty-detail {
-      position: absolute;
-      right: 0;
-      top: 0;
-      z-index: 3;
-      display: flex;
-      width: 1.22rem;
-      height: 1.22rem;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid;
-      border-radius: 0.45rem;
-      color: var(--dental-accent);
-      box-shadow: 0 2px 5px rgba(15, 23, 42, 0.08);
-    }
-    .dental-specialty-detail svg { width: 0.78rem; height: 0.78rem; stroke-width: 2.15; }
-    .dental-specialty-mark.is-preview { width: 3.7rem; height: 3.1rem; }
-    .dental-specialty-mark.is-preview .dental-specialty-tooth { width: 1.94rem; height: 2.35rem; }
-    .dental-specialty-mark.is-compact {
-      margin: -0.42rem -0.48rem;
-      transform: scale(0.68);
-      transform-origin: center;
-      filter: drop-shadow(0 2px 3px rgba(15, 23, 42, 0.07));
-    }
-    .dental-specialty-mark.motif-bridge .dental-specialty-teeth,
-    .dental-specialty-mark.motif-orthodontics .dental-specialty-teeth { left: 0.25rem; right: 0.25rem; gap: 0.02rem; }
-    .dental-specialty-mark.motif-bridge .dental-specialty-tooth,
-    .dental-specialty-mark.motif-orthodontics .dental-specialty-tooth { width: 1.03rem; height: 1.72rem; }
-    .dental-specialty-mark.motif-orthodontics::after {
-      content: '';
-      position: absolute;
-      z-index: 2;
-      left: 0.28rem;
-      right: 0.28rem;
-      top: 1.52rem;
-      height: 0.36rem;
-      border: 1.5px solid var(--dental-accent);
-      border-top: 0;
-      border-radius: 0 0 50% 50%;
-    }
-    .dental-specialty-mark.motif-endodontics .dental-specialty-tooth::before {
-      content: '';
-      position: absolute;
-      z-index: 1;
-      left: 50%;
-      top: 0.5rem;
-      width: 0.16rem;
-      height: 1.18rem;
-      border-radius: 999px;
-      background: #f43f5e;
-      box-shadow: -0.28rem 0.22rem 0 -0.045rem rgba(244, 63, 94, 0.82), 0.28rem 0.22rem 0 -0.045rem rgba(244, 63, 94, 0.82);
-      transform: translateX(-50%);
-    }
-    .dental-specialty-mark.motif-periodontics .dental-specialty-tooth::after { height: 0.7rem; border-bottom-width: 2px; }
-    .dental-specialty-mark.motif-implantology .dental-specialty-tooth { height: 1.23rem; align-self: flex-start; }
-    .dental-specialty-mark.motif-implantology::after {
-      content: '';
-      position: absolute;
-      left: 50%;
-      bottom: 0.18rem;
-      width: 0.48rem;
-      height: 1.28rem;
-      border: 1.5px solid var(--dental-accent);
-      border-radius: 0.12rem 0.12rem 0.32rem 0.32rem;
-      background: repeating-linear-gradient(0deg, var(--dental-soft) 0 0.12rem, var(--dental-accent) 0.13rem 0.16rem);
-      clip-path: polygon(0 0, 100% 0, 84% 86%, 50% 100%, 16% 86%);
-      transform: translateX(-50%);
-    }
-    .dental-specialty-mark.motif-pediatric .dental-specialty-tooth { width: 1.42rem; height: 1.7rem; }
-    .dental-specialty-mark.motif-crown .dental-specialty-detail { left: 50%; right: auto; top: -0.1rem; transform: translateX(-50%); }
-    .dental-specialty-mark.motif-diagnosis .dental-specialty-tooth,
-    .dental-specialty-mark.motif-imaging .dental-specialty-tooth { background: linear-gradient(145deg, rgba(255,255,255,.98), var(--dental-soft)); }
+    .dental-specialty-icon.is-preview { width: 48px; height: 48px; }
 
     /* Compact clinical action workflow: Dentolize-style category rail and procedure menu. */
     #action-palette-card .operation-status-choice.is-selected {
@@ -5517,7 +5415,7 @@
   <link rel="stylesheet" href="lumin-xray-rotation.css?v=1" />
   <link rel="stylesheet" href="lumin-tooth-notes.css?v=4" />
   <link rel="stylesheet" href="lumin-chart-appointments.css?v=1" />
-  <link rel="stylesheet" href="lumin-clinical-actions.css?v=3" />
+  <link rel="stylesheet" href="lumin-clinical-actions.css?v=4" />
   <link rel="stylesheet" href="lumin-media-teeth.css?v=1" />
   <style id="finance-ledger-styles">
     #finance-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -6623,7 +6521,7 @@
         </button>
         <div role="tablist" aria-label="Patient record sections" class="patient-workspace-tabs flex min-w-0 flex-1 gap-1 overflow-x-auto p-1">
           <button type="button" role="tab" aria-controls="view-patient-profile" data-patient-workspace-tab="profile" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('profile')"><span class="patient-workspace-identity"><span class="patient-workspace-name" dir="auto">Patient</span><span id="patient-workspace-meta" class="patient-workspace-meta">—</span></span></button>
-          <button type="button" role="tab" aria-controls="view-chart" data-patient-workspace-tab="chart" data-workspace-requires="chart" onclick="openPatientWorkspaceTab('chart')" aria-label="Dental chart" title="Dental chart"><img src="icons/dental-chart-icon.webp" alt="" aria-hidden="true" class="dental-chart-button-icon h-5 w-5 shrink-0 object-contain" /><span>Dental chart</span></button>
+          <button type="button" role="tab" aria-controls="view-chart" data-patient-workspace-tab="chart" data-workspace-requires="chart" onclick="openPatientWorkspaceTab('chart')" aria-label="Dental chart" title="Dental chart"><img src="assets/specialties-3d/dental-general.webp?v=2" width="32" height="32" decoding="async" alt="" aria-hidden="true" class="dental-specialty-icon" /><span>Dental chart</span></button>
           <button type="button" role="tab" aria-controls="view-patient-media" data-patient-workspace-tab="media" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('media')" aria-label="X-Rays & Media" title="X-Rays & Media"><i data-lucide="images" class="h-4 w-4"></i><span>X-Rays & Media</span></button>
           <button type="button" role="tab" aria-controls="view-patient-scans" data-patient-workspace-tab="scans" data-workspace-requires="patients" onclick="openPatientWorkspaceTab('scans')" aria-label="3D Scans" title="3D Scans"><i data-lucide="box" class="h-4 w-4"></i><span>3D Scans</span></button>
           <button type="button" role="tab" aria-controls="view-patient-appointments" data-patient-workspace-tab="appointments" data-workspace-requires="appointments" onclick="openPatientWorkspaceTab('appointments')" aria-label="Appointments" title="Appointments"><i data-lucide="calendar-days" class="h-4 w-4"></i><span>Appointments</span></button>
@@ -10637,21 +10535,21 @@
     };
 
     const SPECIALTY_ICON_OPTIONS = Object.freeze([
-      Object.freeze({ value: 'dental-general', label: 'General dentistry', detailIcon: 'stethoscope', motif: 'general', teeth: 1 }),
-      Object.freeze({ value: 'dental-diagnosis', label: 'Diagnosis', detailIcon: 'scan-search', motif: 'diagnosis', teeth: 1 }),
-      Object.freeze({ value: 'dental-preventive', label: 'Preventive care', detailIcon: 'shield-check', motif: 'preventive', teeth: 1 }),
-      Object.freeze({ value: 'dental-restorative', label: 'Restorative dentistry', detailIcon: 'paintbrush', motif: 'restorative', teeth: 1 }),
-      Object.freeze({ value: 'dental-endodontics', label: 'Endodontics', detailIcon: 'syringe', motif: 'endodontics', teeth: 1 }),
-      Object.freeze({ value: 'dental-crown', label: 'Crowns', detailIcon: 'crown', motif: 'crown', teeth: 1 }),
-      Object.freeze({ value: 'dental-prosthodontics', label: 'Prosthodontics', detailIcon: 'panels-top-left', motif: 'bridge', teeth: 3 }),
-      Object.freeze({ value: 'dental-implantology', label: 'Implant dentistry', detailIcon: 'drill', motif: 'implantology', teeth: 1 }),
-      Object.freeze({ value: 'dental-periodontics', label: 'Periodontics', detailIcon: 'activity', motif: 'periodontics', teeth: 1 }),
-      Object.freeze({ value: 'dental-cosmetics', label: 'Cosmetic dentistry', detailIcon: 'sparkles', motif: 'cosmetics', teeth: 1 }),
-      Object.freeze({ value: 'dental-surgery', label: 'Oral surgery', detailIcon: 'scissors', motif: 'surgery', teeth: 1 }),
-      Object.freeze({ value: 'dental-orthodontics', label: 'Orthodontics', detailIcon: 'align-horizontal-space-around', motif: 'orthodontics', teeth: 3 }),
-      Object.freeze({ value: 'dental-pediatric', label: 'Paediatric dentistry', detailIcon: 'baby', motif: 'pediatric', teeth: 1 }),
-      Object.freeze({ value: 'dental-imaging', label: 'Dental imaging', detailIcon: 'scan-line', motif: 'imaging', teeth: 1 }),
-      Object.freeze({ value: 'dental-oral-medicine', label: 'Oral medicine', detailIcon: 'bone', motif: 'diagnosis', teeth: 1 })
+      Object.freeze({ value: 'dental-general', label: 'General dentistry' }),
+      Object.freeze({ value: 'dental-diagnosis', label: 'Diagnosis' }),
+      Object.freeze({ value: 'dental-preventive', label: 'Preventive care' }),
+      Object.freeze({ value: 'dental-restorative', label: 'Restorative dentistry' }),
+      Object.freeze({ value: 'dental-endodontics', label: 'Endodontics' }),
+      Object.freeze({ value: 'dental-crown', label: 'Crowns' }),
+      Object.freeze({ value: 'dental-prosthodontics', label: 'Prosthodontics' }),
+      Object.freeze({ value: 'dental-implantology', label: 'Implant dentistry' }),
+      Object.freeze({ value: 'dental-periodontics', label: 'Periodontics' }),
+      Object.freeze({ value: 'dental-cosmetics', label: 'Cosmetic dentistry' }),
+      Object.freeze({ value: 'dental-surgery', label: 'Oral surgery' }),
+      Object.freeze({ value: 'dental-orthodontics', label: 'Orthodontics' }),
+      Object.freeze({ value: 'dental-pediatric', label: 'Paediatric dentistry' }),
+      Object.freeze({ value: 'dental-imaging', label: 'Dental imaging' }),
+      Object.freeze({ value: 'dental-oral-medicine', label: 'Oral medicine' })
     ]);
     const SPECIALTY_ICON_ALIASES = Object.freeze({
       stethoscope: 'dental-general',
@@ -14599,17 +14497,11 @@
       return SPECIALTY_ICON_OPTIONS.some(option => option.value === iconName) ? iconName : DEFAULT_SPECIALTY_ICON;
     }
 
-    function specialtyIconDefinition(value) {
+    function specialtyIconMarkup(value, accentValue, displaySize = 'rail', lazy = false) {
       const iconName = normaliseSpecialtyIconName(value);
-      return SPECIALTY_ICON_OPTIONS.find(option => option.value === iconName) || SPECIALTY_ICON_OPTIONS[0];
-    }
-
-    function specialtyIconMarkup(value, accentValue, displaySize = 'rail') {
-      const definition = specialtyIconDefinition(value);
-      const accentColor = normaliseSpecialtyAccentColor(accentValue);
-      const teethMarkup = Array.from({ length: definition.teeth || 1 }, () => '<span class="dental-specialty-tooth"></span>').join('');
-      const sizeClass = displaySize === 'preview' ? ' is-preview' : displaySize === 'compact' ? ' is-compact' : '';
-      return `<span class="dental-specialty-mark motif-${escapeHtml(definition.motif)}${sizeClass}" style="--dental-accent:${accentColor};--dental-soft:${accentColor}16" aria-hidden="true"><span class="dental-specialty-teeth">${teethMarkup}</span><span class="dental-specialty-detail" style="border-color:${accentColor}48;background:${accentColor}16"><i data-lucide="${escapeHtml(definition.detailIcon)}"></i></span></span>`;
+      const size = displaySize === 'preview' ? 48 : 32;
+      const sizeClass = displaySize === 'preview' ? ' is-preview' : '';
+      return `<img class="dental-specialty-icon${sizeClass}" src="assets/specialties-3d/${iconName}.webp?v=2" width="${size}" height="${size}" alt="" aria-hidden="true" decoding="async"${lazy ? ' loading="lazy"' : ''} />`;
     }
 
     function normaliseSpecialtyAccentColor(value) {
@@ -23832,7 +23724,7 @@
                   <i data-lucide="pencil" class="patient-edit-icon h-4 w-4"></i><span class="patient-action-label patient-edit-label">${currentUiLanguage === 'ar' ? 'تعديل' : 'Edit'}</span>
                 </button>
                 ${chartAllowed
-                  ? `<button type="button" onclick="event.stopPropagation(); openPatientChart('${p.id}')" aria-label="${currentUiLanguage === 'ar' ? 'فتح مخطط' : 'Open chart for'} ${escapeHtml(p.name)}" title="${currentUiLanguage === 'ar' ? 'المخطط' : 'Chart'}" class="patient-row-action-button patient-open-chart inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-600 transition hover:bg-blue-600 hover:text-white"><img src="icons/dental-chart-icon.webp" alt="" aria-hidden="true" class="dental-chart-button-icon h-5 w-5 shrink-0 object-contain" /><span class="patient-action-label patient-open-label">${currentUiLanguage === 'ar' ? 'المخطط' : 'Chart'}</span></button>`
+                  ? `<button type="button" onclick="event.stopPropagation(); openPatientChart('${p.id}')" aria-label="${currentUiLanguage === 'ar' ? 'فتح مخطط' : 'Open chart for'} ${escapeHtml(p.name)}" title="${currentUiLanguage === 'ar' ? 'المخطط' : 'Chart'}" class="patient-row-action-button patient-open-chart inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-600 transition hover:bg-blue-600 hover:text-white"><img src="assets/specialties-3d/dental-general.webp?v=2" width="32" height="32" decoding="async" alt="" aria-hidden="true" class="dental-specialty-icon" /><span class="patient-action-label patient-open-label">${currentUiLanguage === 'ar' ? 'المخطط' : 'Chart'}</span></button>`
                   : ''}
                 <button type="button" onclick="event.stopPropagation(); deletePatient('${p.id}')" aria-label="${currentUiLanguage === 'ar' ? 'حذف' : 'Delete'} ${escapeHtml(p.name)}" title="${currentUiLanguage === 'ar' ? 'حذف' : 'Delete'}" class="patient-row-action-button patient-delete-button inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 transition hover:border-red-600 hover:bg-red-600 hover:text-white">
                   <i data-lucide="trash-2" class="patient-delete-icon h-4 w-4"></i><span class="patient-action-label patient-delete-label">${currentUiLanguage === 'ar' ? 'حذف' : 'Delete'}</span>
@@ -35111,7 +35003,7 @@
                 <button type="button" onclick="openPatientInvoices('${entry.patientId}')" class="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-black text-violet-700 transition hover:bg-violet-100">
                   <i data-lucide="receipt-text" class="h-3.5 w-3.5"></i> Invoice
                 </button>
-                ${canOpenChart ? `<button type="button" onclick="openPatientChart('${entry.patientId}')" class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-black text-indigo-700 transition hover:bg-indigo-100"><img src="icons/dental-chart-icon.webp" alt="" aria-hidden="true" class="dental-chart-button-icon h-5 w-5 shrink-0 object-contain" /> Chart</button>` : ''}
+                ${canOpenChart ? `<button type="button" onclick="openPatientChart('${entry.patientId}')" class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-black text-indigo-700 transition hover:bg-indigo-100"><img src="assets/specialties-3d/dental-general.webp?v=2" width="32" height="32" decoding="async" alt="" aria-hidden="true" class="dental-specialty-icon" /> Chart</button>` : ''}
               </div>`}
             </div>
           </article>

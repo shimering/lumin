@@ -1,12 +1,8 @@
-// The specialty picker uses newly generated, transparent 3D assets.
-const clinicalSpecialtyIcons = new Set(['general', 'diagnosis', 'preventive', 'restorative', 'endodontics', 'crown',
-  'prosthodontics', 'implantology', 'periodontics', 'cosmetics', 'surgery', 'orthodontics', 'pediatric', 'imaging', 'oral-medicine']);
+// Use Lumin's shared specialty icon renderer, including saved legacy icon aliases.
 const clinicalSpecialtyPicker = { open: false, signature: '', typeahead: '', typedAt: 0 };
 
 function clinicalSpecialtyIconMarkup(specialty, lazy = false) {
-  const name = String(specialty?.iconName || '').replace(/^dental-/, '');
-  const icon = clinicalSpecialtyIcons.has(name) ? name : 'general';
-  return `<img class="chart-specialty-icon" src="assets/specialties-3d/dental-${icon}.webp?v=2" width="32" height="32" alt="" aria-hidden="true" decoding="async"${lazy ? ' loading="lazy"' : ''} />`;
+  return specialtyIconMarkup(specialty?.iconName, null, 'compact', lazy);
 }
 
 function renderClinicalSpecialtyPicker(specialties = activeDentalSpecialties()) {

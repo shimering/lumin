@@ -32,7 +32,6 @@
 .chart-specialty-trigger > svg { width: 14px; height: 14px; flex: none; color: #94a3b8; }
 .chart-specialty-trigger[aria-expanded="true"] { border-color: #93c5fd; background: #f8fafc; }
 .chart-specialty-trigger:active { transform: scale(.98); }
-.chart-specialty-icon { display: block; width: 32px; height: 32px; object-fit: contain; flex: 0 0 32px; pointer-events: none; }
 .chart-specialty-menu { position: fixed; z-index: 92; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 6px; border: 1px solid #e2e8f0; border-radius: 16px; background: var(--lumin-face, #fff); box-shadow: 0 12px 36px #0f172a26; }
 .chart-specialty-menu[hidden] { display: none; }
 .chart-specialty-option { display: flex; align-items: center; gap: 12px; width: 100%; min-height: calc(48px / var(--lumin-app-scale, 1)); padding: 6px 10px; border: 0; border-radius: 10px; background: transparent; color: #334155; font-size: 13px; text-align: start; cursor: pointer; transition: background 150ms ease-out, transform 150ms ease-out; }
