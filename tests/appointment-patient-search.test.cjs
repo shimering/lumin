@@ -192,7 +192,7 @@ test('appointment patient search opens immediately and only fetches five summari
     }
     await page.evaluate(() => {currentSession={user:{id:'staff'}};targetedLoadingGeneration=0});
   });
-  await t.test('errors offer a bounded retry; empty and composition input do not bulk load', async () => {
+  await t.test('errors offer a bounded retry and empty input does not bulk load', async () => {
     await open();await input.fill('missing');await page.clock.runFor(250);let index=(await count())-1;
     await respond(index,null,{message:'Offline'});await finish();
     const retry=page.locator('.appointment-patient-search-retry');
@@ -201,10 +201,48 @@ test('appointment patient search opens immediately and only fetches five summari
     await respond(index,[]);await finish();
     assert.match(await page.locator('#appointment-patient-results').textContent(),/No patients match/);
     const before=await count();
-    await page.evaluate(()=>{document.getElementById('appointment-patient-search').value='أ';filterAppointmentPatients({isComposing:true})});
-    await page.clock.runFor(1000);assert.equal(await count(),before);
-    await page.evaluate(()=>filterAppointmentPatients({isComposing:false}));await page.clock.runFor(250);
-    await respond((await count())-1,[]);await finish();
+    await input.fill('');await page.clock.runFor(1000);assert.equal(await count(),before);
+    assert.equal(await page.evaluate(()=>fixture.bulkReads),0);
+  });
+  await t.test('Android tablet composition fetches five live matches before committing the word', async st => {
+    await page.setViewportSize({width:800,height:1280});
+    const keyboard=await page.context().newCDPSession(page);
+    st.after(()=>keyboard.detach());
+    await keyboard.send('Network.setUserAgentOverride',{userAgent:'Mozilla/5.0 (Linux; Android 14; SM-X610) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'});
+    await page.evaluate(()=>{
+      window.composingInputEvents=[];
+      document.getElementById('appointment-patient-search').addEventListener('input',event=>composingInputEvents.push(event.isComposing));
+    });
+    for(const [dir,first,second] of [['ltr','A','Ahmed'],['rtl','أ','أحمد']]) {
+      await page.evaluate(dir=>{document.documentElement.dir=dir;currentUiLanguage=dir==='rtl'?'ar':'en'},dir);
+      await open();await input.tap();const before=await count();
+      await keyboard.send('Input.imeSetComposition',{text:first,selectionStart:first.length,selectionEnd:first.length});
+      assert.equal(await page.evaluate(()=>composingInputEvents.at(-1)),true,'Exercise actual composing input events');
+      await page.clock.runFor(249);assert.equal(await count(),before);
+      await page.clock.runFor(1);assert.equal(await count(),before+1,'Fetch while the keyboard is still composing');
+      await keyboard.send('Input.imeSetComposition',{text:second,selectionStart:second.length,selectionEnd:second.length});
+      await page.clock.runFor(250);assert.equal(await count(),before+2);
+      assert.equal(await page.evaluate(index=>fixture.requests[index].signal.aborted,before),true);
+      assert.equal(await page.evaluate(index=>fixture.requests[index].query,before+1),second);
+      await respond(before+1,Array.from({length:6},(_,i)=>patient('ime-'+i,second+' '+i)));await finish();
+      assert.equal(await options.count(),5);
+      await respond(before,[patient('ime-stale')]);await finish();
+      assert.match(await options.first().textContent(),new RegExp(second));
+      await input.dispatchEvent('keydown',{key:'Enter',isComposing:true});
+      assert.equal(await page.locator('#appointment-patient-id').inputValue(),'','Composing Enter does not select or submit');
+      await options.first().tap();
+      assert.equal(await page.locator('#appointment-patient-id').inputValue(),'ime-0');
+      await input.dispatchEvent('input',{isComposing:true,inputType:'insertCompositionText'});
+      await input.dispatchEvent('compositionend',{data:second});
+      await input.dispatchEvent('input',{isComposing:false,inputType:'insertText'});
+      await page.clock.runFor(1000);
+      assert.equal(await page.locator('#appointment-patient-id').inputValue(),'ime-0','Composition completion retains the chosen patient');
+      assert.equal(await count(),before+2);
+      assert.equal(await page.locator('#btn-save-appointment').isEnabled(),true);
+      await keyboard.send('Input.insertText',{text:''});
+    }
+    await keyboard.send('Network.setUserAgentOverride',{userAgent:''});
+    assert.equal(await page.evaluate(()=>fixture.bulkReads),0);
   });
   await t.test('editing and new-patient registration retain the selected patient without bulk requests', async () => {
     await page.evaluate(() => openAppointmentModal('existing'));

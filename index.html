@@ -35610,7 +35610,7 @@
         return;
       }
       const selected = appointmentPatientRecord(selectedInput.value);
-      if (selected && input.value === appointmentPatientDisplayValue(selected) && !event?.isComposing) {
+      if (selected && input.value === appointmentPatientDisplayValue(selected)) {
         closeAppointmentPatientResults();
         syncAppointmentSaveButton();
         return;
@@ -35620,7 +35620,9 @@
       input.setCustomValidity(currentUiLanguage === 'ar' ? 'اختر مريضًا من نتائج البحث.' : 'Select a patient from the search results.');
       syncAppointmentSaveButton();
       const query = input.value.trim();
-      if (!query || event?.isComposing || !currentSession || !canModifyAppointments()) return;
+      // Android keyboards can keep a whole word in composition. Search its current
+      // value after the normal debounce instead of waiting for a commit or blur.
+      if (!query || !currentSession || !canModifyAppointments()) return;
       appointmentPatientSearchQuery = query;
       appointmentPatientSearchStatus = 'loading';
       renderAppointmentPatientMatches();
