@@ -11,14 +11,14 @@
 .chart-tooth-note-indicator:active { transform: scale(.98); }
 .chart-tooth-note-indicator:focus-visible { outline: 2px solid #93c5fd; outline-offset: -2px; }
 .chart-tooth-note-indicator:disabled { opacity: .5; pointer-events: none; }
-#chart-finding-note-popover.is-tooth-notes { display: flex; flex-direction: column; max-height: calc(var(--lumin-app-viewport-height, 100dvh) - 24px); border-color: #e2e8f0; background: var(--lumin-face, #fff); text-align: start; }
-#chart-finding-note-popover.is-tooth-notes.hidden { display: none; }
+.chart-tooth-notes-panel, .tooth-notes-preview, .tooth-notes-editor-host { display: flex; flex-direction: column; min-height: 0; height: 100%; overflow: hidden; text-align: start; }
+.chart-media-panel-body[hidden], .chart-tooth-notes-panel[hidden], .chart-tooth-notes-panel [hidden] { display: none !important; }
 .tooth-notes-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: none; padding: 12px 16px; border-bottom: 1px solid #f1f5f9; }
 .tooth-notes-header > div { min-width: 0; }
 .tooth-notes-header h3 { font-size: 14px; font-weight: 600; color: #0f172a; }
 .tooth-notes-header p { margin-top: 4px; overflow-wrap: anywhere; font-size: 12px; color: #64748b; }
-.tooth-notes-header button { padding: 0; flex: 0 0 44px; }
-.tooth-notes-content { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px; }
+.tooth-notes-header button { flex: none; padding-inline: 10px; }
+.tooth-notes-content { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 12px; }
 .tooth-notes-finding { padding: 12px; border: 1px solid #e2e8f0; border-radius: 16px; }
 .tooth-notes-finding + .tooth-notes-finding { margin-top: 12px; }
 .tooth-notes-finding-heading { display: grid; gap: 4px; margin-bottom: 12px; }
@@ -37,9 +37,43 @@
 .tooth-notes-empty { display: grid; justify-items: center; gap: 12px; padding: 16px 4px; text-align: center; font-size: 12px; color: #64748b; }
 .tooth-notes-empty > svg { width: 40px; height: 40px; padding: 10px; border-radius: 50%; background: #fffbeb; color: #b45309; }
 .tooth-notes-empty strong { font-size: 14px; font-weight: 600; color: #334155; }
-@media (max-width: 767px) {
-  #chart-finding-note-popover.is-tooth-notes { inset-inline: 0 !important; top: auto !important; bottom: 0; width: 100%; max-height: calc(var(--lumin-app-viewport-height, 100dvh) * .9); border-radius: 20px 20px 0 0; }
+.tooth-notes-editor-host > div { width: 100%; height: 100%; max-height: none; border: 0; border-radius: 0; box-shadow: none; animation: none; }
+.tooth-notes-editor-host > div > div:first-child { padding: 12px; gap: 8px; }
+.tooth-notes-editor-host > div > div:first-child > div > span { display: none; }
+.tooth-notes-editor-host h3 { display: none; }
+.tooth-notes-editor-host #chart-finding-notes-form { overflow: hidden; }
+.tooth-notes-editor-host #chart-finding-notes-form > div:first-child { padding: 12px; }
+.tooth-notes-editor-host #chart-finding-notes-form > div:first-child > div:first-child { display: none; }
+.tooth-notes-editor-host #chart-finding-notes-form > div:first-child > div:last-child { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+.tooth-notes-editor-host #chart-finding-notes-form > div:first-child button { padding-inline: 8px; font-weight: 600; }
+.tooth-notes-editor-host #chart-finding-notes-editor { padding: 12px; scrollbar-width: thin; }
+.tooth-notes-editor-host [data-chart-note-root] { grid-template-columns: minmax(0, 1fr); }
+.tooth-notes-editor-host button, .tooth-notes-editor-host input, .tooth-notes-editor-host select { min-height: 44px; }
+.tooth-notes-editor-host button { min-width: 44px; border: 0; border-radius: 12px; }
+.tooth-notes-editor-host button:active { transform: scale(.98); }
+.tooth-notes-editor-host button:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+.tooth-notes-editor-host button:disabled { opacity: .5; pointer-events: none; }
+.tooth-notes-editor-host input, .tooth-notes-editor-host select, .tooth-notes-editor-host textarea { min-width: 0; max-width: 100%; border-color: #e2e8f0; font-weight: 500; }
+.tooth-notes-editor-host #chart-finding-notes-form > div:last-child { padding: 12px; }
+.tooth-notes-editor-host #chart-finding-notes-form > div:last-child > div > p { display: none; }
+.tooth-notes-editor-host #chart-finding-notes-form > div:last-child > div > div { width: 100%; }
+.tooth-notes-editor-host #chart-finding-notes-form > div:last-child button { flex: 1 1 0; padding-inline: 10px; }
+.tooth-notes-editor-host #add-endo-chart-note, .tooth-notes-editor-host #save-chart-finding-notes { background: #f5f3ff; color: #6d28d9; box-shadow: none; }
+.tooth-notes-editor-host #add-endo-chart-note:hover, .tooth-notes-editor-host #save-chart-finding-notes:hover { background: #ede9fe; }
+@media (min-width: 768px) and (orientation: landscape) {
+  .chart-media-panel.is-tooth-notes { height: calc(var(--lumin-app-viewport-height, 100dvh) - var(--chart-media-sticky-top, 144px) - 20px - env(safe-area-inset-bottom)); }
+  .is-media-collapsed .chart-media-panel.is-tooth-notes { height: auto; }
+}
+/* Short chairside screens keep both boxes usable through normal page scrolling. */
+@media (min-width: 768px) and (orientation: landscape) and (max-height: 700px) {
+  html.chart-media-landscape .has-chart-appointments:not(.is-media-collapsed):not(.is-appointments-collapsed) .chart-side-panels:has(.chart-media-panel.is-tooth-notes) {
+    position: static; height: 620px; grid-template-rows: minmax(0, 1fr) 264px;
+  }
+}
+html.chart-media-sheet-open .chart-media-panel.is-tooth-notes { height: min(760px, calc(var(--lumin-app-viewport-height, 100dvh) * .9)); }
+@media (max-width: 767px), (orientation: portrait) {
   .tooth-notes-content { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  .tooth-notes-editor-host #chart-finding-notes-form > div:last-child { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
 }
 @media (prefers-reduced-motion: reduce) {
   .chart-tooth-note-indicator { transition: none; }

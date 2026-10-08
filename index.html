@@ -84,9 +84,9 @@
   <script src="lumin-patient-swipe.js?v=1"></script>
   <script src="lumin-patients.js?v=4"></script>
   <script src="lumin-chart-sync.js?v=1"></script>
-  <script src="lumin-chart-media.js?v=13"></script>
+  <script src="lumin-chart-media.js?v=14"></script>
   <script src="lumin-xray-rotation.js?v=1"></script>
-  <script src="lumin-tooth-notes.js?v=1"></script>
+  <script src="lumin-tooth-notes.js?v=2"></script>
   <script src="lumin-chart-appointments.js?v=1"></script>
   <script src="lumin-chart-dates.js?v=1"></script>
   <link rel="stylesheet" href="lumin-chart-dates.css?v=1" />
@@ -5509,7 +5509,7 @@
   <link rel="stylesheet" href="lumin-mobile-nav.css?v=2" />
   <link rel="stylesheet" href="lumin-chart-media.css?v=7" />
   <link rel="stylesheet" href="lumin-xray-rotation.css?v=1" />
-  <link rel="stylesheet" href="lumin-tooth-notes.css?v=2" />
+  <link rel="stylesheet" href="lumin-tooth-notes.css?v=3" />
   <link rel="stylesheet" href="lumin-chart-appointments.css?v=1" />
   <link rel="stylesheet" href="lumin-media-teeth.css?v=1" />
   <style id="finance-ledger-styles">
@@ -6967,7 +6967,7 @@
       <div id="chart-side-panels" class="chart-side-panels">
       <aside id="chart-media-panel" class="chart-media-panel" aria-labelledby="chart-media-panel-title">
         <header class="chart-media-panel-header"><h3><i data-lucide="scan-line" aria-hidden="true"></i><span id="chart-media-panel-title">X-rays</span></h3><button id="chart-media-collapse" type="button" class="chart-media-button" onclick="toggleChartMediaPanel()" aria-controls="chart-media-panel-body" aria-expanded="false" aria-label="Expand X-ray viewer"><i data-lucide="panel-right-open"></i></button></header>
-        <div class="chart-media-panel-content"><div class="chart-media-panel-scroll"><div id="chart-media-panel-body" class="chart-media-panel-body" aria-live="polite"></div></div></div>
+        <div class="chart-media-panel-content"><div class="chart-media-panel-scroll"><div id="chart-media-panel-body" class="chart-media-panel-body" aria-live="polite"></div><div id="chart-tooth-notes-panel" class="chart-tooth-notes-panel" role="region" aria-labelledby="chart-media-panel-title" hidden></div></div></div>
       </aside>
       <aside id="chart-appointments-panel" class="chart-appointments-panel" aria-labelledby="chart-appointments-title" hidden>
         <header class="chart-appointments-header">
@@ -10391,6 +10391,7 @@
     let editingChartFindingNoteIds = [];
     let editingChartFindingNoteToothIds = [];
     let chartFindingNotesDraft = [];
+    let chartFindingNotesEditorSession = 0;
     let appointmentNotificationHostState = {
       ready: false,
       supported: false,
@@ -19027,7 +19028,7 @@
       const hasFinding = chartToothHasFinding(getActivePatient(), id);
       const notesLabel = currentUiLanguage === 'ar' ? 'ملاحظات السن' : 'Tooth notes';
       const xraySlot = `<div class="chart-tooth-xray-slot" data-tooth-xray-slot="${id}"></div>`;
-      const notesButton = `<button type="button" class="chart-tooth-note-indicator" data-tooth-note-trigger="${id}" data-finding-note-trigger aria-haspopup="dialog" aria-expanded="false" aria-controls="chart-finding-note-popover" aria-label="${escapeHtml(notesLabel)} · ${escapeHtml(chartToothLabel(id))}" title="${escapeHtml(notesLabel)} · ${escapeHtml(chartToothLabel(id))}" onpointerdown="event.stopPropagation()" onclick="toggleChartFindingNotePreview(event, this)"><span><i data-lucide="sticky-note" aria-hidden="true"></i></span></button>`;
+      const notesButton = `<button type="button" class="chart-tooth-note-indicator" data-tooth-note-trigger="${id}" aria-expanded="false" aria-controls="chart-tooth-notes-panel" aria-label="${escapeHtml(notesLabel)} · ${escapeHtml(chartToothLabel(id))}" title="${escapeHtml(notesLabel)} · ${escapeHtml(chartToothLabel(id))}" onpointerdown="event.stopPropagation()" onclick="openChartToothNotesPanel(event, this)"><span><i data-lucide="sticky-note" aria-hidden="true"></i></span></button>`;
       const toothActions = `<div class="chart-tooth-actions">${isUpper ? notesButton + xraySlot : xraySlot + notesButton}</div>`;
 
       return `
@@ -32076,12 +32077,18 @@
       const addDisabled = chartFindingNotesDraft.length >= 20;
       document.getElementById('add-general-chart-note').disabled = addDisabled;
       document.getElementById('add-endo-chart-note').disabled = addDisabled;
+      if (typeof localiseChartToothNoteEditor === 'function') localiseChartToothNoteEditor();
       lucide.createIcons();
     }
 
     function openChartFindingNoteEditor(control = openChartFindingNoteTrigger) {
       const finding = chartFindingGroupFromControl(control);
       if (!finding) return;
+      if (typeof unmountChartToothNoteEditor === 'function') unmountChartToothNoteEditor();
+      chartFindingNotesEditorSession++;
+      const saveButton = document.getElementById('save-chart-finding-notes');
+      saveButton.disabled = false;
+      saveButton.innerHTML = '<i data-lucide="save" class="h-4 w-4"></i>Save notes';
       const findingIds = chartFindingIdsFromControl(control);
       const toothIds = chartFindingToothIdsFromControl(control);
       const sourceNotes = normaliseChartOperationNotes(finding.notes);
@@ -32094,12 +32101,17 @@
       renderChartFindingNotesEditor();
       closeChartFindingNotePreview();
       const modal = document.getElementById('modal-chart-finding-notes');
+      if (typeof mountChartToothNoteEditor === 'function' && mountChartToothNoteEditor(control)) {
+        requestAnimationFrame(() => document.querySelector('#chart-tooth-notes-panel [data-chart-note-text]')?.focus());
+        return;
+      }
       modal.classList.remove('hidden');
       modal.classList.add('flex');
       requestAnimationFrame(() => modal.querySelector('[data-chart-note-text]')?.focus());
     }
 
     function closeChartFindingNoteEditor() {
+      chartFindingNotesEditorSession++;
       const modal = document.getElementById('modal-chart-finding-notes');
       modal?.classList.add('hidden');
       modal?.classList.remove('flex');
@@ -32107,6 +32119,10 @@
       editingChartFindingNoteToothIds = [];
       chartFindingNotesDraft = [];
       setChartFindingNotesMessage('');
+      const saveButton = document.getElementById('save-chart-finding-notes');
+      saveButton.disabled = false;
+      saveButton.innerHTML = '<i data-lucide="save" class="h-4 w-4"></i>Save notes';
+      if (typeof unmountChartToothNoteEditor === 'function') unmountChartToothNoteEditor();
     }
 
     function addChartFindingNote(type) {
@@ -32201,6 +32217,11 @@
       event.preventDefault();
       const patient = getActivePatient();
       if (!patient || !editingChartFindingNoteIds.length) return;
+      const button = document.getElementById('save-chart-finding-notes');
+      if (button.disabled) return;
+      const findingIds = [...editingChartFindingNoteIds], updatedTeeth = [...editingChartFindingNoteToothIds];
+      const editorSession = chartFindingNotesEditorSession;
+      const isCurrentEditor = () => editorSession === chartFindingNotesEditorSession && getActivePatient()?.id === patient.id;
       let notes;
       try {
         notes = validatedChartFindingNotesDraft();
@@ -32209,32 +32230,34 @@
         return;
       }
 
-      const button = document.getElementById('save-chart-finding-notes');
       button.disabled = true;
       button.innerHTML = '<i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i>Saving notes…';
       lucide.createIcons();
       try {
         const { data, error } = await db.rpc('set_patient_chart_finding_notes', {
           p_patient_id: patient.id,
-          p_finding_ids: editingChartFindingNoteIds,
+          p_finding_ids: findingIds,
           p_notes: notes
         });
         if (error) throw error;
         if (data && typeof data === 'object' && !Array.isArray(data)) {
           patient.chartState = data;
         } else {
-          updateChartFindingsByIds(patient, editingChartFindingNoteIds, finding => ({ ...finding, notes }));
+          updateChartFindingsByIds(patient, findingIds, finding => ({ ...finding, notes }));
         }
-        const updatedTeeth = [...editingChartFindingNoteToothIds];
+        if (!isCurrentEditor()) return;
         closeChartFindingNoteEditor();
         renderChartFindingTeeth(updatedTeeth);
         renderFindingsList();
         showAppointmentNotificationToast('Operation notes saved', `${notes.length} note${notes.length === 1 ? '' : 's'} saved.`);
       } catch (error) {
-        setChartFindingNotesMessage('Could not save the operation notes: ' + (error.message || 'Unknown error'));
+        if (isCurrentEditor()) setChartFindingNotesMessage('Could not save the operation notes: ' + (error.message || 'Unknown error'));
       } finally {
-        button.disabled = false;
-        button.innerHTML = '<i data-lucide="save" class="h-4 w-4"></i>Save notes';
+        if (isCurrentEditor()) {
+          button.disabled = false;
+          button.innerHTML = '<i data-lucide="save" class="h-4 w-4"></i>Save notes';
+          if (typeof localiseChartToothNoteEditor === 'function') localiseChartToothNoteEditor();
+        }
         lucide.createIcons();
       }
     }

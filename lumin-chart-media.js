@@ -118,6 +118,7 @@ function renderChartToothXrayIndicators() {
 function showChartToothXrays(toothId, trigger = document.activeElement) {
   const id = normalizePatientMediaTeeth([toothId])[0];
   if (!id || chartPatientMedia.patientId !== activePatientId || !hasPageAccess('patients')) return;
+  if (typeof closeChartToothNotesPanel === 'function') closeChartToothNotesPanel({ render: false });
   chartMediaPreviousFocus = trigger;
   const selected = chartPatientMedia.filterToothIds;
   chartPatientMedia.filterToothIds = selected.includes(id) ? selected.filter(tooth => tooth !== id) : [...selected, id];
@@ -201,6 +202,7 @@ async function loadChartPatientMedia(patientId = activePatientId) {
   const request = ++chartPatientMedia.request;
   const patient = getKnownPatient(patientId);
   if (chartPatientMedia.patientId !== patientId) {
+    if (typeof closeChartToothNotesPanel === 'function') closeChartToothNotesPanel({ render: false });
     chartPatientMedia.selectedPath = '';
     chartPatientMedia.filterToothIds = [];
     chartPatientMedia.collapsed = !(typeof chartAppointmentsCanView === 'function' && chartAppointmentsCanView() && chartMediaIsLandscape());
@@ -266,18 +268,25 @@ function renderChartMediaPanel() {
     backdrop.addEventListener('click', () => { if (!chartPatientMedia.collapsed) toggleChartMediaPanel(); });
     document.body.appendChild(backdrop);
   }
-  body.inert = chartPatientMedia.collapsed;
-  body.setAttribute('aria-hidden', String(chartPatientMedia.collapsed));
+  const notesActive = typeof chartToothNotesPanelIsActive === 'function' && chartToothNotesPanelIsActive();
+  panel.classList.toggle('is-tooth-notes', notesActive);
+  body.hidden = notesActive;
+  body.inert = chartPatientMedia.collapsed || notesActive;
+  body.setAttribute('aria-hidden', String(body.inert));
+  const viewerName = notesActive ? chartMediaText('tooth notes', 'ملاحظات السن') : chartMediaText('X-ray viewer', 'عارض الأشعة');
   const sharedSidebar = chartMediaIsLandscape() && typeof chartAppointmentsCanView === 'function' && chartAppointmentsCanView();
-  const expand = sharedSidebar ? chartMediaText('Expand X-rays and appointments', 'توسيع الأشعة والمواعيد') : chartMediaText('Expand X-ray viewer', 'توسيع عارض الأشعة');
-  const collapse = sharedSidebar ? chartMediaText('Collapse X-rays and appointments', 'طي الأشعة والمواعيد') : sheetOpen ? chartMediaText('Close X-ray viewer', 'إغلاق عارض الأشعة') : chartMediaText('Collapse X-ray viewer', 'طي عارض الأشعة');
+  const expand = sharedSidebar ? notesActive ? chartMediaText('Expand notes and appointments', 'توسيع الملاحظات والمواعيد') : chartMediaText('Expand X-rays and appointments', 'توسيع الأشعة والمواعيد') : chartMediaText('Expand ', 'توسيع ') + viewerName;
+  const collapse = sharedSidebar ? notesActive ? chartMediaText('Collapse notes and appointments', 'طي الملاحظات والمواعيد') : chartMediaText('Collapse X-rays and appointments', 'طي الأشعة والمواعيد') : chartMediaText(sheetOpen ? 'Close ' : 'Collapse ', sheetOpen ? 'إغلاق ' : 'طي ') + viewerName;
   const panelToggle = document.getElementById('chart-media-collapse');
-  panelToggle.setAttribute('aria-controls', sharedSidebar ? 'chart-media-panel-body chart-appointments-body' : 'chart-media-panel-body');
+  const controlledBody = notesActive ? 'chart-tooth-notes-panel' : 'chart-media-panel-body';
+  panelToggle.setAttribute('aria-controls', sharedSidebar ? controlledBody + ' chart-appointments-body' : controlledBody);
   panelToggle.setAttribute('aria-expanded', String(!chartPatientMedia.collapsed));
   panelToggle.setAttribute('aria-label', chartPatientMedia.collapsed ? expand : collapse);
   panelToggle.title = chartPatientMedia.collapsed ? expand : collapse;
   panelToggle.innerHTML = `<i data-lucide="${sheetOpen ? 'x' : chartPatientMedia.collapsed ? 'panel-right-open' : 'panel-right-close'}"></i>`;
-  document.getElementById('chart-media-panel-title').textContent = chartMediaText('X-rays', 'الأشعة');
+  const title = document.getElementById('chart-media-panel-title');
+  title.textContent = notesActive ? chartMediaText('Tooth notes', 'ملاحظات السن') : chartMediaText('X-rays', 'الأشعة');
+  title.previousElementSibling?.setAttribute('data-lucide', notesActive ? 'sticky-note' : 'scan-line');
   const xrays = chartPatientXrays();
   if (chartPatientMedia.status === 'loading') {
     body.innerHTML = `<div class="chart-media-skeleton"></div><p class="chart-media-summary" style="margin-top:16px" role="status">${chartMediaText('Loading patient files…', 'جارٍ تحميل ملفات المريض…')}</p>`;
@@ -316,6 +325,8 @@ function renderChartMediaPanel() {
     body.insertAdjacentHTML('afterbegin', `<div class="chart-media-tools"><div class="chart-media-add"><button type="button" class="chart-media-button" data-chart-add-xray onclick="openChartPatientMediaUpload()"><i data-lucide="plus" aria-hidden="true"></i>${chartMediaText('Add X-ray', 'إضافة أشعة')}</button></div>${chartMediaFilterMarkup()}</div>`);
   }
   renderChartToothXrayIndicators();
+  if (typeof renderChartToothNotesPanel === 'function') renderChartToothNotesPanel();
+  document.querySelectorAll('[data-tooth-note-trigger]').forEach(button => button.setAttribute('aria-expanded', String(notesActive && button.dataset.toothNoteTrigger === chartToothNotesPanel.toothId && !chartPatientMedia.collapsed)));
   if (typeof fitPatientMediaRotations === 'function') fitPatientMediaRotations(panel);
   if (typeof renderPatientMediaRotationControls === 'function') renderPatientMediaRotationControls();
   updateChartMediaSheetVisibility(panel, sheetOpen, chartActive);
@@ -476,6 +487,7 @@ async function openPatientMediaFile(file, patientId) {
 }
 
 function resetChartPatientMedia() {
+  if (typeof closeChartToothNotesPanel === 'function') closeChartToothNotesPanel({ render: false });
   closePatientMediaToothPicker(false);
   if (typeof patientMediaUploadContext !== 'undefined' && patientMediaUploadContext?.fromChart) closePatientMediaUploadModal();
   chartPatientMedia.request++;
@@ -541,7 +553,7 @@ document.addEventListener('keydown', event => {
     || patientMediaToothPicker || document.querySelector('#patient-media-lightbox:not(.hidden), #patient-media-upload-modal:not(.hidden)')) return;
   if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); toggleChartMediaPanel(); return; }
   if (event.key !== 'Tab') return;
-  const buttons = [...document.querySelectorAll('#chart-media-panel button:not(:disabled)')].filter(button => button.getClientRects().length);
+  const buttons = [...document.querySelectorAll('#chart-media-panel button:not(:disabled), #chart-media-panel input:not([type="hidden"]):not(:disabled), #chart-media-panel select:not(:disabled), #chart-media-panel textarea:not(:disabled), #chart-media-panel [tabindex="0"]')].filter(button => button.getClientRects().length);
   const first = buttons[0], last = buttons[buttons.length - 1];
   if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
   else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
