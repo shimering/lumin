@@ -36,6 +36,7 @@
 .chart-media-panel-header h3 svg { width: 18px; height: 18px; color: #2563eb; }
 .chart-media-panel-header .chart-media-button { padding: 0; background: transparent; }
 .chart-media-panel-header .chart-media-button:hover { background: #f1f5f9; }
+.chart-media-sheet-handle, .chart-media-tabs { display: none; }
 .chart-media-panel-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px; }
 .chart-media-panel-content { min-height: 0; flex: 1 1 auto; }
 .chart-media-panel-scroll { min-height: 0; height: 100%; overflow: hidden; }
@@ -130,11 +131,29 @@ html[dir="rtl"] .chart-media-panel { direction: rtl; }
 @media (min-width: 768px) and (max-width: 1023px) and (orientation: landscape) {
   .chart-media-panel { max-height: calc(var(--lumin-app-viewport-height, 100dvh) - var(--chart-media-sticky-top, 144px) - var(--mobile-nav-height, 88px) - 12px); }
 }
-#chart-media-backdrop { position: fixed; inset: 0; z-index: 84; background: rgba(15,23,42,.4); backdrop-filter: blur(6px); }
+#chart-media-backdrop { position: fixed; inset: 0; z-index: 84; background: rgba(15,23,42,.4); backdrop-filter: blur(6px); touch-action: none; overscroll-behavior: contain; }
 #chart-media-backdrop[hidden] { display: none; }
 body.chart-media-sheet-open { overflow: hidden !important; }
-html.chart-media-sheet-open .chart-media-panel { display: flex; flex-direction: column; position: fixed; inset-inline: 0; bottom: 0; top: auto; z-index: 85; width: 100%; max-height: calc(var(--lumin-app-viewport-height, 100dvh) * .9); border-radius: 20px 20px 0 0; }
-html.chart-media-sheet-open .chart-media-panel-body { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+html.chart-media-sheet-open .chart-media-panel { display: flex; flex-direction: column; position: fixed; inset-inline: 0; bottom: 0; top: auto; z-index: 85; width: 100%; height: min(760px, calc(var(--lumin-app-viewport-height, 100dvh) * .9)); max-height: calc(var(--lumin-app-viewport-height, 100dvh) * .9); border-radius: 20px 20px 0 0; overscroll-behavior: contain; }
+html.chart-media-sheet-open .chart-media-panel-body { height: 100%; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+html.chart-media-sheet-open .chart-media-sheet-handle { display: grid; place-items: center; flex: 0 0 28px; user-select: none; }
+html.chart-media-sheet-open .chart-media-sheet-handle, html.chart-media-sheet-open .chart-media-panel-header { touch-action: pan-y; }
+.chart-media-sheet-handle span { width: 36px; height: 4px; border-radius: 999px; background: #cbd5e1; }
+html.chart-media-sheet-open .chart-clinical-workspace .chart-media-panel .chart-media-panel-header { height: 44px; flex: 0 0 44px; padding: 0 12px; }
+html.chart-media-sheet-open .chart-media-tabs { display: flex; flex: none; gap: 4px; margin: 8px 12px 12px; padding: 4px; border-radius: 16px; background: #f1f5f9; }
+.chart-media-tabs button { display: flex; flex: 1 1 0; align-items: center; justify-content: center; gap: 8px; min-height: 44px; min-width: 44px; padding: 8px 12px; border: 0; border-radius: 12px; background: transparent; color: #64748b; font-size: 13px; font-weight: 600; transition: background 150ms ease-out, color 150ms ease-out, transform 150ms ease-out; }
+.chart-media-tabs button svg { width: 16px; height: 16px; }
+.chart-media-tabs button[aria-selected="true"] { background: var(--lumin-face, #fff); color: #1d4ed8; box-shadow: 0 2px 6px rgba(15,23,42,.07); }
+.chart-media-tabs button:hover { background: #e2e8f0; }
+.chart-media-tabs button:active { transform: scale(.98); }
+.chart-media-tabs button:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+.chart-media-tabs button:disabled { opacity: .5; pointer-events: none; }
+.chart-media-panel.is-sheet-dragging { will-change: transform; user-select: none; }
+@media (max-height: 500px) and (orientation: landscape) {
+  html.chart-media-sheet-open .chart-clinical-workspace .chart-media-panel .chart-media-panel-header { height: 60px; flex-basis: 60px; }
+  html.chart-media-sheet-open .chart-media-panel-header h3 { max-width: 24%; font-size: 13px; }
+  html.chart-media-sheet-open .chart-media-tabs { position: absolute; top: 32px; inset-inline: 26%; margin: 0; }
+}
 @media (prefers-reduced-motion: reduce) {
   #patient-media-upload-modal [role="dialog"] { animation: none !important; }
   .chart-media-panel, .chart-media-panel * { transition: none !important; animation: none !important; }

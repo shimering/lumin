@@ -24,7 +24,7 @@ function chartToothNotePreviewMarkup(toothId) {
       <button type="button" class="chart-media-button tooth-notes-edit" onclick="openChartFindingNoteEditor(this)"><i data-lucide="${notes.length ? 'notebook-pen' : 'message-square-plus'}" aria-hidden="true"></i>${notes.length ? toothNotesText('Add or edit notes', 'إضافة الملاحظات أو تعديلها') : toothNotesText('Add note', 'إضافة ملاحظة')}</button>
     </section>`;
   }).join('');
-  return `<header class="tooth-notes-header"><div><h3 dir="auto">${escapeHtml(chartToothLabel(toothId))}</h3><p>${escapeHtml(toothNotesText(`${count} notes`, `${count} ملاحظات`))}</p></div><button type="button" class="chart-media-button is-neutral" onclick="closeChartToothNotesPanel({showXrays:true})"><i data-lucide="scan-line" aria-hidden="true"></i>${toothNotesText('X-rays', 'الأشعة')}</button></header>
+  return `<header class="tooth-notes-header"><div><h3 dir="auto">${escapeHtml(chartToothLabel(toothId))}</h3><p>${escapeHtml(toothNotesText(`${count} notes`, `${count} ملاحظات`))}</p></div><button type="button" class="chart-media-button is-neutral" onclick="switchChartMediaTab('xrays')"><i data-lucide="scan-line" aria-hidden="true"></i>${toothNotesText('X-rays', 'الأشعة')}</button></header>
     <div class="tooth-notes-content">${groups || `<div class="tooth-notes-empty"><i data-lucide="sticky-note" aria-hidden="true"></i><strong>${toothNotesText('No findings on this tooth', 'لا توجد نتائج على هذا السن')}</strong><p>${toothNotesText('Add a diagnostic finding to attach notes to it.', 'أضف نتيجة تشخيصية لإرفاق الملاحظات بها.')}</p><button type="button" class="chart-media-button" data-note-tooth="${escapeHtml(toothId)}" onclick="selectToothForFindingNotes(this)"><i data-lucide="plus" aria-hidden="true"></i>${toothNotesText('Add a finding', 'إضافة نتيجة')}</button></div>`}</div>`;
 }
 
@@ -58,7 +58,7 @@ function renderChartToothNoteIndicators() {
       chartMediaPreviousFocus = button;
     }
   });
-  if (chartToothNotesPanel.patientId && !chartToothNotesPanelIsActive()) {
+  if (chartToothNotesPanel.patientId && !chartToothNotesPanelHasContext()) {
     closeChartToothNotesPanel();
   } else {
     renderChartToothNotesPanel();
@@ -66,6 +66,10 @@ function renderChartToothNoteIndicators() {
 }
 
 function chartToothNotesPanelIsActive() {
+  return chartPatientMedia.activeTab === 'notes' && chartToothNotesPanelHasContext();
+}
+
+function chartToothNotesPanelHasContext() {
   return Boolean(chartToothNotesPanel.toothId && chartToothNotesPanel.patientId === getActivePatient()?.id && hasPageAccess('chart'));
 }
 
@@ -77,6 +81,7 @@ function openChartToothNotesPanel(event, button) {
   if (chartToothNotesPanel.editor && (chartToothNotesPanel.patientId !== patient.id || chartToothNotesPanel.toothId !== toothId)) closeChartFindingNoteEditor();
   closeChartFindingNotePreview();
   Object.assign(chartToothNotesPanel, { patientId: patient.id, toothId, trigger: button });
+  chartPatientMedia.activeTab = 'notes';
   chartMediaPreviousFocus = button;
   chartPatientMedia.collapsed = false;
   renderChartMediaPanel();
@@ -88,6 +93,7 @@ function openChartToothNotesPanel(event, button) {
 function closeChartToothNotesPanel(options = {}) {
   const trigger = chartToothNotesPanel.trigger;
   Object.assign(chartToothNotesPanel, { patientId: null, toothId: '', trigger: null });
+  chartPatientMedia.activeTab = 'xrays';
   if (chartToothNotesPanel.editor) closeChartFindingNoteEditor();
   if (options.restoreFocus && !chartMediaIsLandscape()) chartPatientMedia.collapsed = true;
   if (options.render !== false) {
@@ -101,12 +107,18 @@ function closeChartToothNotesPanel(options = {}) {
 function renderChartToothNotesPanel() {
   const panel = document.getElementById('chart-tooth-notes-panel');
   if (!panel) return;
-  const active = chartToothNotesPanelIsActive();
+  const hasContext = chartToothNotesPanelHasContext();
+  const active = chartPatientMedia.activeTab === 'notes' && hasPageAccess('chart');
   panel.hidden = !active;
   panel.inert = !active || chartPatientMedia.collapsed;
   panel.setAttribute('aria-hidden', String(panel.inert));
   panel.dir = currentUiLanguage === 'ar' ? 'rtl' : 'ltr';
-  if (!active) { panel.replaceChildren(); return; }
+  if (!hasContext) {
+    if (active) panel.innerHTML = `<div class="tooth-notes-empty"><i data-lucide="sticky-note" aria-hidden="true"></i><strong>${toothNotesText('Choose a tooth', 'اختر سنًا')}</strong><p>${toothNotesText('Tap a tooth’s notes icon to view or add diagnostic notes.', 'اضغط على أيقونة ملاحظات السن لعرض الملاحظات التشخيصية أو إضافتها.')}</p><button type="button" class="chart-media-button" onclick="toggleChartMediaPanel()">${toothNotesText('Choose tooth', 'اختيار السن')}</button></div>`;
+    else panel.replaceChildren();
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
   if (!panel.querySelector('.tooth-notes-preview')) {
     panel.innerHTML = '<div class="tooth-notes-preview"></div><div class="tooth-notes-editor-host" hidden></div>';
   }

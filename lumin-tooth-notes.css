@@ -71,6 +71,7 @@
   }
 }
 html.chart-media-sheet-open .chart-media-panel.is-tooth-notes { height: min(760px, calc(var(--lumin-app-viewport-height, 100dvh) * .9)); }
+html.chart-media-sheet-open .tooth-notes-header > button { display: none; }
 @media (max-width: 767px), (orientation: portrait) {
   .tooth-notes-content { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
   .tooth-notes-editor-host #chart-finding-notes-form > div:last-child { padding-bottom: max(12px, env(safe-area-inset-bottom)); }

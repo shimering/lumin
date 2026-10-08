@@ -84,7 +84,7 @@ test('tooth notes open and edit in the sidebar, stay live, and fit expanded, col
   t.after(()=>new Promise(resolve=>{server.close(resolve);server.closeAllConnections();}));
   const browser=await chromium.launch({headless:true,channel:process.env.LUMIN_TEST_BROWSER_CHANNEL||undefined});
   t.after(()=>browser.close());
-  const page=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'}), errors=[];
+  const page=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce',hasTouch:true}), errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   await page.route('**/api/thumbnail/**',route=>route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#334155"/></svg>'}));
   const base=`http://127.0.0.1:${server.address().port}`;
@@ -137,6 +137,7 @@ test('tooth notes open and edit in the sidebar, stay live, and fit expanded, col
       return {data:next};
     }};
   `});
+  await page.addScriptTag({path:path.join(root,'lumin-mobile-nav.js')});
   await page.addScriptTag({path:path.join(root,'lumin-chart-media.js')});
   await page.addScriptTag({path:path.join(root,'lumin-tooth-notes.js')});
   await page.addScriptTag({path:path.join(root,'lumin-chart-appointments.js')});
@@ -242,7 +243,7 @@ test('tooth notes open and edit in the sidebar, stay live, and fit expanded, col
       }
       await page.screenshot({path:path.join(screenshots,`notes-editor-${viewport.width}-${language}.png`)});
       await page.evaluate(()=>closeChartFindingNoteEditor());
-      await notesPanel.locator('.tooth-notes-header button').click();
+      await page.locator(landscape ? '.tooth-notes-header button' : '#chart-media-tab-xrays').click();
       assert.ok(await page.locator('#chart-media-panel-body').isVisible(),'The X-ray button switches back inside the same sidebar');
       assert.equal(await trigger.getAttribute('aria-expanded'),'false');
       assert.deepEqual(await page.evaluate(()=>chartPatientMedia.filterToothIds),['3','4'],'Notes preserve the multiple-tooth X-ray filter');
@@ -250,6 +251,127 @@ test('tooth notes open and edit in the sidebar, stay live, and fit expanded, col
       if(!landscape) await page.locator('#chart-media-collapse').click();
     }
   }
+  await t.test('phone tabs retain drafts and X-ray selections; downward swipes dismiss without stealing scrolling', async st => {
+    const touch=await page.context().newCDPSession(page);
+    st.after(()=>touch.detach());
+    await touch.send('Network.setUserAgentOverride',{userAgent:'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36'});
+    const swipe=async(selector,dx,dy,cancel=false)=>{
+      const box=await page.locator(selector).boundingBox(), x=box.x+box.width/2, y=box.y+Math.min(12,box.height/2);
+      await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+      for(let step=1;step<=4;step++)await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+dx*step/4,y:y+dy*step/4}]});
+      const transform=await page.locator('#chart-media-panel').evaluate(node=>getComputedStyle(node).transform);
+      await touch.send('Input.dispatchTouchEvent',{type:cancel?'touchCancel':'touchEnd',touchPoints:[]});
+      return transform;
+    };
+    for(const viewport of [{width:390,height:844},{width:320,height:568},{width:844,height:390}])for(const language of ['en','ar']){
+      await page.setViewportSize(viewport);
+      await page.evaluate(language=>{
+        currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';
+        closeChartToothNotesPanel({render:false});chartPatientMedia.collapsed=true;renderChartMediaPanel();
+      },language);
+      await trigger.scrollIntoViewIfNeeded();await trigger.click();
+      assert.equal(await page.locator('.chart-clinical-column').evaluate(node=>node.inert),true,'The expanded panel locks the background chart');
+      await trigger.evaluate(node=>node.focus());
+      assert.equal(await page.evaluate(()=>document.getElementById('chart-media-panel').contains(document.activeElement)),true,'Focus stays in the expanded panel');
+      assert.equal(await page.locator('#chart-media-tabs').isVisible(),true);
+      assert.equal(await page.locator('#chart-media-tab-notes').getAttribute('aria-selected'),'true');
+      for(const tab of ['xrays','notes']){
+        const box=await page.locator('#chart-media-tab-'+tab).boundingBox();assert.ok(box.width>=44&&box.height>=44);
+      }
+      await notesPanel.locator('[data-finding-id="crown"] button').click();
+      await page.locator('[data-chart-note-text]').fill('Mobile unsaved draft '+language);
+      const editor=await page.locator('#chart-finding-notes-editor').boundingBox();assert.ok(editor.height>=40,JSON.stringify({viewport,language,editor}));
+      const save=await page.locator('#save-chart-finding-notes').boundingBox();assert.ok(save.y>=0&&save.y+save.height<=viewport.height+1,'Save stays inside the phone viewport');
+      const xray=await page.evaluate(()=>({path:chartPatientMedia.selectedPath,teeth:[...chartPatientMedia.filterToothIds]}));
+      await page.locator('#chart-media-tab-xrays').tap();
+      assert.equal(await notesPanel.isVisible(),false);
+      assert.equal(await page.locator('#chart-media-panel-body').isVisible(),true);
+      await page.locator('#chart-media-tab-xrays').press(language==='ar'?'ArrowLeft':'ArrowRight');
+      assert.equal(await page.locator('#chart-media-tab-notes').getAttribute('aria-selected'),'true');
+      assert.equal(await page.locator('[data-chart-note-text]').inputValue(),'Mobile unsaved draft '+language);
+      assert.deepEqual(await page.evaluate(()=>({path:chartPatientMedia.selectedPath,teeth:[...chartPatientMedia.filterToothIds]})),xray);
+      const panelBox=await page.locator('#chart-media-panel').boundingBox();
+      const outsideY=Math.max(3,panelBox.y/2), outsideX=viewport.width/2;
+      const beforeOutside=await page.evaluate(()=>({x:scrollX,y:scrollY}));
+      await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:outsideX,y:outsideY}]});
+      await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:outsideX+80,y:outsideY}]});
+      await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+      assert.equal(await page.evaluate(()=>chartPatientMedia.collapsed),false,'Swiping outside does not dismiss or navigate');
+      assert.deepEqual(await page.evaluate(()=>({x:scrollX,y:scrollY})),beforeOutside,'Swiping outside cannot scroll the chart');
+      await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:outsideX,y:outsideY}]});
+      await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:outsideX,y:outsideY+100}]});
+      await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+      assert.equal(await page.evaluate(()=>chartPatientMedia.collapsed),false,'Dragging from the backdrop into the panel is ignored');
+      await page.touchscreen.tap(outsideX,outsideY);
+      await page.waitForFunction(()=>chartPatientMedia.collapsed);
+      assert.equal(await page.locator('.chart-clinical-column').evaluate(node=>node.inert),false,'Tapping outside unlocks the chart');
+      await trigger.click();
+      assert.equal(await page.locator('[data-chart-note-text]').inputValue(),'Mobile unsaved draft '+language,'Outside dismissal retains the draft');
+      await swipe('.chart-media-sheet-handle',0,20);
+      assert.equal(await page.evaluate(()=>chartPatientMedia.collapsed),false,'A short pull returns the sheet');
+      await swipe('.chart-media-sheet-handle',65,10);
+      assert.equal(await page.evaluate(()=>chartPatientMedia.collapsed),false,'Horizontal gestures do not dismiss');
+      await swipe('.chart-media-sheet-handle',0,100,true);
+      assert.equal(await page.evaluate(()=>chartPatientMedia.collapsed),false,'Cancelled touches do not dismiss');
+      await page.screenshot({path:path.join(screenshots,`mobile-tabs-${viewport.width}-${language}.png`)});
+      const transform=await swipe('.chart-media-sheet-handle',0,140);
+      assert.notEqual(transform,'none','The panel follows the downward drag');
+      assert.equal(await page.evaluate(()=>chartPatientMedia.collapsed),true);
+      assert.equal(await page.locator('#chart-media-backdrop').isVisible(),false);
+      assert.equal(await page.evaluate(()=>document.body.classList.contains('chart-media-sheet-open')),false);
+      assert.equal(await page.locator('.chart-clinical-column').evaluate(node=>node.inert),false);
+      assert.equal(await page.evaluate(()=>document.activeElement.dataset.toothNoteTrigger),'3','Swipe dismissal returns focus to the tooth');
+      await trigger.click();
+      assert.equal(await page.locator('[data-chart-note-text]').inputValue(),'Mobile unsaved draft '+language,'Swiping down keeps the unsaved draft');
+      await page.evaluate(()=>closeChartFindingNoteEditor());
+      const content=notesPanel.locator('.tooth-notes-content');
+      await content.evaluate(node=>node.scrollTop=50);
+      assert.ok(await content.evaluate(node=>node.scrollTop)>0);
+      await swipe('.tooth-notes-content',0,60);
+      assert.equal(await page.evaluate(()=>chartPatientMedia.collapsed),false,'Scrolling a note list never dismisses from an existing scroll position');
+      await content.evaluate(node=>node.scrollTop=0);
+      await swipe('.tooth-notes-content',0,-70);
+      assert.equal(await page.evaluate(()=>chartPatientMedia.collapsed),false,'Upward swipes scroll normally');
+      // A native fling consumes a tap to stop scrolling; wait for it to settle.
+      await content.evaluate(node=>new Promise(resolve=>{
+        let previous=node.scrollTop,stable=0;
+        const frame=()=>{const next=node.scrollTop;stable=next===previous?stable+1:0;previous=next;if(stable>=8)resolve();else requestAnimationFrame(frame);};
+        requestAnimationFrame(frame);
+      }));
+      await page.locator('#chart-media-tab-xrays').tap();
+      await page.locator('#chart-media-panel-body').waitFor({state:'visible',timeout:3000});
+      await page.locator('#chart-media-panel-body').evaluate(node=>node.scrollTop=100);
+      await swipe('#chart-media-panel-body',0,60);
+      assert.equal(await page.evaluate(()=>chartPatientMedia.collapsed),false,'X-ray scrolling stays independent of dismissal');
+      await page.locator('#chart-media-collapse').click();
+    }
+    await page.setViewportSize({width:390,height:844});
+    await page.emulateMedia({reducedMotion:'no-preference'});
+    await trigger.click();
+    await page.evaluate(async()=>{await chartMediaSheetAnimation?.finished.catch(()=>{});});
+    await swipe('.chart-media-sheet-handle',0,20);
+    assert.equal(await page.evaluate(()=>chartMediaSheetAnimation?.playState),'running','A short pull animates back into place');
+    await page.evaluate(async()=>{await chartMediaSheetAnimation?.finished.catch(()=>{});});
+    await swipe('.chart-media-sheet-handle',0,140);
+    assert.equal(await page.evaluate(()=>chartMediaSheetAnimation?.playState),'running','Swipe dismissal animates from the dragged position');
+    await page.evaluate(async()=>{await chartMediaSheetAnimation?.finished.catch(()=>{});});
+    assert.equal(await page.evaluate(()=>document.body.classList.contains('chart-media-sheet-open')),false,'Animated dismissal restores scrolling');
+    await page.emulateMedia({reducedMotion:'reduce'});
+    await page.evaluate(()=>{
+      closeChartToothNotesPanel({render:false});chartPatientMedia.lastToothId='4';chartPatientMedia.collapsed=false;renderChartMediaPanel();
+    });
+    await page.locator('#chart-media-tab-notes').tap();
+    assert.equal(await page.evaluate(()=>chartToothNotesPanel.toothId),'4','Notes follows the most recently opened X-ray tooth');
+    await page.locator('#chart-media-collapse').click();
+    await page.evaluate(()=>{
+      closeChartToothNotesPanel({render:false});chartPatientMedia.lastToothId='';chartPatientMedia.filterToothIds=[];chartPatientMedia.collapsed=false;renderChartMediaPanel();
+    });
+    await page.locator('#chart-media-tab-notes').tap();
+    assert.equal(await notesPanel.locator('.tooth-notes-empty button').isVisible(),true,'Notes offers tooth selection when there is no tooth context');
+    await page.locator('#chart-media-collapse').click();
+    await page.evaluate(()=>{chartPatientMedia.filterToothIds=['3','4'];chartPatientMedia.selectedPath=chartPatientMedia.files[1].relativePath;});
+    await touch.send('Network.setUserAgentOverride',{userAgent:''});
+  });
   await page.setViewportSize({width:1440,height:1000});
   await trigger.click();
   await page.locator('[data-tooth-xray-slot="4"] button').click();

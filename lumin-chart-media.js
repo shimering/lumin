@@ -1,5 +1,5 @@
 // Patient media stays beside the chart; requests are isolated from gallery navigation.
-const chartPatientMedia = { patientId: null, files: [], status: 'idle', detailsError: false, request: 0, selectedPath: '', filterToothIds: [], collapsed: true };
+const chartPatientMedia = { patientId: null, files: [], status: 'idle', detailsError: false, request: 0, selectedPath: '', filterToothIds: [], collapsed: true, activeTab: 'xrays', lastToothId: '' };
 let chartMediaPreviousFocus = null;
 let patientAttachmentState = null;
 let patientAttachmentRequest = 0;
@@ -8,6 +8,8 @@ const chartMediaReducedMotion = window.matchMedia('(prefers-reduced-motion: redu
 let chartMediaSheetAnimation = null;
 let chartMediaSheetTargetOpen = false;
 let chartMediaSheetPatientId = null;
+let chartMediaSheetGesture = null;
+const chartMediaBackgroundInert = new Map();
 
 function chartMediaText(english, arabic) {
   return currentUiLanguage === 'ar' ? arabic : english;
@@ -24,10 +26,54 @@ function chartXrayUploadDateMarkup(file) {
   return `<p class="chart-media-upload-date"><i data-lucide="calendar-days" aria-hidden="true"></i><span>${chartMediaText('Uploaded', 'تاريخ الرفع')}</span> <time datetime="${date.toISOString()}">${escapeHtml(label)}</time></p>`;
 }
 
+function setChartMediaBackgroundInert(panel, locked) {
+  if (!locked) {
+    chartMediaBackgroundInert.forEach((inert, element) => { element.inert = inert; });
+    chartMediaBackgroundInert.clear();
+    return;
+  }
+  const lock = element => {
+    if (!chartMediaBackgroundInert.has(element)) chartMediaBackgroundInert.set(element, element.inert);
+    element.inert = true;
+  };
+  // Keep separate upload/lightbox dialogs under body available above the sheet.
+  for (let branch = panel; branch.parentElement && branch.parentElement !== document.body; branch = branch.parentElement) {
+    [...branch.parentElement.children].filter(element => element !== branch).forEach(lock);
+  }
+  const dock = document.getElementById('lumin-mobile-nav');
+  if (dock) lock(dock);
+}
+
+function setupChartMediaBackdrop(backdrop) {
+  let tap = null;
+  backdrop.addEventListener('pointerdown', event => {
+    tap = event.isPrimary && event.button === 0 ? { x: event.clientX, y: event.clientY, moved: false } : null;
+    event.stopPropagation();
+  });
+  backdrop.addEventListener('pointermove', event => {
+    if (tap && Math.hypot(event.clientX - tap.x, event.clientY - tap.y) > 8) tap.moved = true;
+    event.stopPropagation();
+  });
+  backdrop.addEventListener('pointerup', event => event.stopPropagation());
+  backdrop.addEventListener('pointercancel', event => { tap = null; event.stopPropagation(); });
+  for (const type of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) backdrop.addEventListener(type, event => {
+    if (type === 'touchmove' && event.cancelable) event.preventDefault();
+    event.stopPropagation();
+  }, { passive: type !== 'touchmove' });
+  backdrop.addEventListener('click', event => {
+    event.stopPropagation();
+    const tapped = (tap && !tap.moved) || event.detail === 0;
+    tap = null;
+    if (tapped && !chartPatientMedia.collapsed) toggleChartMediaPanel();
+  });
+}
+
 function updateChartMediaSheetVisibility(panel, open, chartActive) {
   const root = document.documentElement;
   const wasVisible = root.classList.contains('chart-media-sheet-open');
   const samePatient = chartMediaSheetPatientId === chartPatientMedia.patientId;
+  if (chartMediaSheetGesture && (!open || !samePatient || !chartActive || chartMediaIsLandscape())) clearChartMediaSheetGesture();
+  if (chartMediaSheetGesture?.dragging) return;
   const animate = !chartMediaReducedMotion.matches && typeof panel.animate === 'function' && chartActive && !chartMediaIsLandscape()
     && (open || (wasVisible && samePatient));
   if (chartMediaSheetAnimation && animate && samePatient && chartMediaSheetTargetOpen === open) return;
@@ -38,12 +84,16 @@ function updateChartMediaSheetVisibility(panel, open, chartActive) {
   chartMediaSheetTargetOpen = open;
   chartMediaSheetPatientId = chartPatientMedia.patientId;
   const show = visible => {
+    const entering = visible && !root.classList.contains('chart-media-sheet-open');
     root.classList.toggle('chart-media-sheet-open', visible);
     document.body.classList.toggle('chart-media-sheet-open', visible);
+    setChartMediaBackgroundInert(panel, visible);
     const backdrop = document.getElementById('chart-media-backdrop');
     if (backdrop) backdrop.hidden = !visible;
     if (visible) { panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true'); }
     else { panel.removeAttribute('role'); panel.removeAttribute('aria-modal'); }
+    if (entering) document.getElementById('chart-media-collapse')?.focus({ preventScroll: true });
+    if (!visible && wasVisible && chartActive && chartPatientMedia.collapsed && chartMediaPreviousFocus?.isConnected) chartMediaPreviousFocus.focus({ preventScroll: true });
   };
   show(open || (animate && wasVisible));
   if (!animate || (wasVisible === open && oldTransform === 'none')) return;
@@ -118,7 +168,9 @@ function renderChartToothXrayIndicators() {
 function showChartToothXrays(toothId, trigger = document.activeElement) {
   const id = normalizePatientMediaTeeth([toothId])[0];
   if (!id || chartPatientMedia.patientId !== activePatientId || !hasPageAccess('patients')) return;
-  if (typeof closeChartToothNotesPanel === 'function') closeChartToothNotesPanel({ render: false });
+  if (typeof closeChartToothNotesPanel === 'function' && (chartMediaIsLandscape() || chartToothNotesPanel.toothId !== id)) closeChartToothNotesPanel({ render: false });
+  chartPatientMedia.activeTab = 'xrays';
+  chartPatientMedia.lastToothId = id;
   chartMediaPreviousFocus = trigger;
   const selected = chartPatientMedia.filterToothIds;
   chartPatientMedia.filterToothIds = selected.includes(id) ? selected.filter(tooth => tooth !== id) : [...selected, id];
@@ -198,6 +250,102 @@ function toggleChartMediaPanel() {
   }
 }
 
+function switchChartMediaTab(tab, focus = false) {
+  if (!['xrays', 'notes'].includes(tab) || chartPatientMedia.collapsed) return;
+  if (tab === 'notes') {
+    if (typeof chartToothNotesPanelHasContext !== 'function' || !hasPageAccess('chart')) return;
+    if (!chartToothNotesPanelHasContext()) {
+      const tooth = chartPatientMedia.lastToothId || chartPatientMedia.filterToothIds.at(-1)
+        || (typeof chartSelectionTargets === 'function' ? chartSelectionTargets().at(-1)?.tooth : '');
+      const trigger = [...document.querySelectorAll('[data-tooth-note-trigger]')].find(button => button.dataset.toothNoteTrigger === tooth);
+      if (trigger) openChartToothNotesPanel({ preventDefault() {}, stopPropagation() {} }, trigger);
+    }
+  } else if (chartMediaIsLandscape() && typeof closeChartToothNotesPanel === 'function') {
+    closeChartToothNotesPanel({ render: false });
+  }
+  chartPatientMedia.activeTab = tab;
+  renderChartMediaPanel();
+  if (focus) document.getElementById('chart-media-tab-' + tab)?.focus({ preventScroll: true });
+}
+
+function handleChartMediaTabKeydown(event) {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+  const tabs = [...event.currentTarget.querySelectorAll('[role="tab"]')].filter(tab => !tab.disabled);
+  if (!tabs.length) return;
+  const index = tabs.indexOf(document.activeElement);
+  const direction = (event.key === 'ArrowRight' ? 1 : -1) * (document.documentElement.dir === 'rtl' ? -1 : 1);
+  const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + direction + tabs.length) % tabs.length;
+  event.preventDefault();
+  tabs[next].click();
+}
+
+function clearChartMediaSheetGesture() {
+  chartMediaSheetGesture = null;
+  const panel = document.getElementById('chart-media-panel');
+  panel?.style.removeProperty('transform');
+  panel?.classList.remove('is-sheet-dragging');
+  document.getElementById('chart-media-backdrop')?.style.removeProperty('opacity');
+}
+
+function setupChartMediaSheetSwipe() {
+  const panel = document.getElementById('chart-media-panel');
+  if (!panel || panel.dataset.swipeReady) return;
+  panel.dataset.swipeReady = 'true';
+  panel.addEventListener('touchstart', event => {
+    clearChartMediaSheetGesture();
+    if (event.touches.length !== 1 || chartMediaIsLandscape() || chartPatientMedia.collapsed
+      || !document.documentElement.classList.contains('chart-media-sheet-open')
+      || event.target.closest('button, a, input, textarea, select, [contenteditable], iframe, video, audio')) return;
+    // A downward pull dismisses only at the top of each nested scroll box.
+    for (let node = event.target; node && node !== panel; node = node.parentElement) {
+      if (node.scrollTop > 0 && /auto|scroll/.test(getComputedStyle(node).overflowY)) return;
+    }
+    const touch = event.touches[0];
+    chartMediaSheetGesture = { id: touch.identifier, x: touch.clientX, y: touch.clientY, time: event.timeStamp, distance: 0, dragging: false };
+  }, { passive: true });
+  panel.addEventListener('touchmove', event => {
+    const gesture = chartMediaSheetGesture;
+    if (!gesture) return;
+    if (event.touches.length !== 1) { clearChartMediaSheetGesture(); return; }
+    const touch = [...event.touches].find(touch => touch.identifier === gesture.id);
+    if (!touch) return;
+    const dx = touch.clientX - gesture.x, dy = touch.clientY - gesture.y;
+    if (!gesture.dragging) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 8) return;
+      if (dy <= 0 || Math.abs(dx) > dy * .8) { chartMediaSheetGesture = null; return; }
+      chartMediaSheetAnimation?.cancel();
+      chartMediaSheetAnimation = null;
+      gesture.dragging = true;
+      panel.classList.add('is-sheet-dragging');
+    }
+    if (event.cancelable) event.preventDefault();
+    gesture.distance = Math.max(0, dy);
+    const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+    panel.style.transform = `translateY(${gesture.distance / zoom}px)`;
+    const backdrop = document.getElementById('chart-media-backdrop');
+    if (backdrop) backdrop.style.opacity = String(1 - Math.min(.65, gesture.distance / panel.getBoundingClientRect().height));
+  }, { passive: false });
+  const finish = event => {
+    const gesture = chartMediaSheetGesture;
+    if (!gesture) return;
+    if (!gesture.dragging) { clearChartMediaSheetGesture(); return; }
+    const close = event.type !== 'touchcancel' && (gesture.distance >= Math.min(120, panel.getBoundingClientRect().height * .22)
+      || (gesture.distance >= 40 && gesture.distance / Math.max(1, event.timeStamp - gesture.time) > .55));
+    if (event.cancelable) event.preventDefault();
+    chartMediaSheetGesture = null;
+    if (close) toggleChartMediaPanel();
+    else updateChartMediaSheetVisibility(panel, true, true);
+    clearChartMediaSheetGesture();
+  };
+  panel.addEventListener('touchend', finish, { passive: false });
+  panel.addEventListener('touchcancel', finish, { passive: false });
+  window.addEventListener('resize', () => {
+    if (!chartMediaSheetGesture) return;
+    clearChartMediaSheetGesture();
+    renderChartMediaPanel();
+  }, { passive: true });
+}
+
 async function loadChartPatientMedia(patientId = activePatientId) {
   const request = ++chartPatientMedia.request;
   const patient = getKnownPatient(patientId);
@@ -205,6 +353,8 @@ async function loadChartPatientMedia(patientId = activePatientId) {
     if (typeof closeChartToothNotesPanel === 'function') closeChartToothNotesPanel({ render: false });
     chartPatientMedia.selectedPath = '';
     chartPatientMedia.filterToothIds = [];
+    chartPatientMedia.lastToothId = '';
+    chartPatientMedia.activeTab = 'xrays';
     chartPatientMedia.collapsed = !(typeof chartAppointmentsCanView === 'function' && chartAppointmentsCanView() && chartMediaIsLandscape());
     chartMediaPreviousFocus = null;
     if (typeof patientMediaUploadContext !== 'undefined' && patientMediaUploadContext?.fromChart) closePatientMediaUploadModal();
@@ -265,10 +415,11 @@ function renderChartMediaPanel() {
   if (sheetOpen && !backdrop) {
     backdrop = document.createElement('div');
     backdrop.id = 'chart-media-backdrop';
-    backdrop.addEventListener('click', () => { if (!chartPatientMedia.collapsed) toggleChartMediaPanel(); });
+    setupChartMediaBackdrop(backdrop);
     document.body.appendChild(backdrop);
   }
-  const notesActive = typeof chartToothNotesPanelIsActive === 'function' && chartToothNotesPanelIsActive();
+  const notesActive = typeof chartToothNotesPanelIsActive === 'function' && (chartToothNotesPanelIsActive()
+    || (!chartMediaIsLandscape() && chartPatientMedia.activeTab === 'notes' && hasPageAccess('chart')));
   panel.classList.toggle('is-tooth-notes', notesActive);
   body.hidden = notesActive;
   body.inert = chartPatientMedia.collapsed || notesActive;
@@ -287,6 +438,20 @@ function renderChartMediaPanel() {
   const title = document.getElementById('chart-media-panel-title');
   title.textContent = notesActive ? chartMediaText('Tooth notes', 'ملاحظات السن') : chartMediaText('X-rays', 'الأشعة');
   title.previousElementSibling?.setAttribute('data-lucide', notesActive ? 'sticky-note' : 'scan-line');
+  const tabs = document.getElementById('chart-media-tabs');
+  if (tabs) {
+    tabs.setAttribute('aria-label', chartMediaText('Dental chart panel', 'لوحة مخطط الأسنان'));
+    for (const [tab, label] of [['xrays', chartMediaText('X-rays', 'الأشعة')], ['notes', chartMediaText('Notes', 'الملاحظات')]]) {
+      const button = document.getElementById('chart-media-tab-' + tab), selected = (tab === 'notes') === notesActive;
+      button.setAttribute('aria-selected', String(selected));
+      button.tabIndex = selected ? 0 : -1;
+      button.disabled = tab === 'notes' && (typeof chartToothNotesPanelIsActive !== 'function' || !hasPageAccess('chart'));
+      button.querySelector('span').textContent = label;
+      const content = document.getElementById(button.getAttribute('aria-controls'));
+      content?.setAttribute('role', sheetOpen ? 'tabpanel' : 'region');
+      content?.setAttribute('aria-labelledby', sheetOpen ? button.id : 'chart-media-panel-title');
+    }
+  }
   const xrays = chartPatientXrays();
   if (chartPatientMedia.status === 'loading') {
     body.innerHTML = `<div class="chart-media-skeleton"></div><p class="chart-media-summary" style="margin-top:16px" role="status">${chartMediaText('Loading patient files…', 'جارٍ تحميل ملفات المريض…')}</p>`;
@@ -495,6 +660,8 @@ function resetChartPatientMedia() {
   chartPatientMedia.files = [];
   chartPatientMedia.selectedPath = '';
   chartPatientMedia.filterToothIds = [];
+  chartPatientMedia.lastToothId = '';
+  chartPatientMedia.activeTab = 'xrays';
   chartPatientMedia.collapsed = true;
   chartPatientMedia.detailsError = false;
   chartMediaPreviousFocus = null;
@@ -528,7 +695,15 @@ document.addEventListener('keydown', event => {
   else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
 }, true);
 
+document.addEventListener('focusin', event => {
+  const panel = document.getElementById('chart-media-panel');
+  if (!document.documentElement.classList.contains('chart-media-sheet-open') || chartPatientMedia.collapsed || panel?.contains(event.target)
+    || patientAttachmentState || patientMediaToothPicker || document.querySelector('#patient-media-lightbox:not(.hidden), #patient-media-upload-modal:not(.hidden), #modal-chart-finding-notes:not(.hidden)')) return;
+  document.getElementById('chart-media-collapse')?.focus({ preventScroll: true });
+}, true);
+
 document.addEventListener('DOMContentLoaded', () => {
+  setupChartMediaSheetSwipe();
   const observer = new ResizeObserver(updateChartMediaStickyTop);
   ['app-header', 'patient-workspace-header'].forEach(id => { const element = document.getElementById(id); if (element) observer.observe(element); });
   chartMediaLandscape.addEventListener('change', () => renderChartMediaPanel());
