@@ -17,7 +17,7 @@ const helpers = ['compareWhatsAppMessages','mergeWhatsAppMessages','getWhatsAppM
   'syncNewWhatsAppMessages','renderWhatsAppMessages','selectWhatsAppConversation','renderWhatsAppView',
   'initWhatsAppSwipeGestures','initWhatsAppChatSwipeToClose','handleWhatsAppInputFocus','handleWhatsAppInputBlur'].map(source).join('\n');
 
-test('WhatsApp chat opens without composer focus; long press, dismissal, deletion, and refresh work across layouts', { skip: !chromium && 'Playwright unavailable' }, async t => {
+test('WhatsApp chat opens without composer focus; long press, emoji picker, deletion, and refresh work across layouts', { skip: !chromium && 'Playwright unavailable' }, async t => {
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
     if (url.pathname === '/') { res.setHeader('Content-Type','text/html'); res.end(html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'')); return; }
@@ -65,7 +65,7 @@ test('WhatsApp chat opens without composer focus; long press, dismissal, deletio
       async rpc(name,params){window.deleteCalls.push({name,params});if(window.delayDelete)await new Promise(resolve=>window.finishDelete=resolve);if(window.failDelete)return {error:Error('Offline')};window.rows=window.rows.filter(row=>row.id!==params.p_message_id);return {data:{message_id:params.p_message_id,conversation_id:params.p_conversation_id,scope:'lumin'}};}};
     ${helpers}
   `});
-  await page.addScriptTag({url:base+'/lumin-whatsapp-actions.js?v=1'});
+  await page.addScriptTag({url:base+'/lumin-whatsapp-actions.js?v=2'});
   await page.evaluate(async()=>{
     document.getElementById('auth-gate').classList.add('hidden');
     document.getElementById('app-shell').classList.remove('hidden');
@@ -100,6 +100,22 @@ test('WhatsApp chat opens without composer focus; long press, dismissal, deletio
       assert.equal(await page.locator('#whatsapp-msg-message-7 p').first().evaluate(el=>getComputedStyle(el).userSelect),'none');
       assert.ok(await page.locator('#whatsapp-msg-message-7').evaluate(el=>el.classList.contains('wa-message-selected')));
       assert.match(await page.locator('#whatsapp-msg-message-7 .whatsapp-msg-bubble-track').evaluate(el=>getComputedStyle(el).boxShadow),/167, 243, 208/,'selection glow remains visible in both themes');
+      assert.equal(await page.locator('[data-wa-reaction="👍"]').evaluate(el=>getComputedStyle(el).userSelect),'none','quick emojis cannot be selected as text');
+      await page.locator('[data-wa-action="more-emojis"]').click();
+      const picker=await page.locator('.wa-message-menu').evaluate(el=>{
+        const r=el.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:innerWidth,height:innerHeight,
+          overflow:el.scrollWidth>el.clientWidth,targets:[...el.querySelectorAll('button')].map(b=>{const r=b.getBoundingClientRect();return {width:r.width,height:r.height,selection:getComputedStyle(b).userSelect};})};
+      });
+      assert.ok(picker.x>=0 && picker.y>=0 && picker.right<=picker.width+1 && picker.bottom<=picker.height+1,JSON.stringify({viewport,language,picker}));
+      assert.equal(picker.overflow,false,'emoji picker does not overflow horizontally');
+      assert.ok(picker.targets.every(r=>r.width>=44 && r.height>=44 && r.selection==='none'),'emoji picker preserves touch targets and suppresses selection');
+      assert.notEqual(await page.evaluate(()=>document.activeElement.id),'whatsapp-reply-input','opening more emojis keeps the composer unfocused');
+      assert.equal(await page.locator('.wa-message-emoji-header h3').textContent(),language==='ar'?'المزيد من الرموز التعبيرية':'More emojis');
+      await page.locator('[data-wa-category="6"]').click();
+      assert.equal(await page.locator('.wa-message-emoji-grid [data-wa-reaction="🪥"]').count(),1,'category switches expose more reactions');
+      if (viewport.width===800 || viewport.width===390) await page.screenshot({path:path.join(screenshots,viewport.width+'-'+language+'-emojis.png')});
+      await page.locator('[data-wa-action="back"]').click();
+      assert.equal(await page.locator('[data-wa-action="delete"]').count(),1,'back restores message actions');
       await page.locator('[data-wa-action="delete"]').click();
       assert.equal(await page.locator('.wa-message-delete-body').isVisible(),true);
       assert.equal(await page.locator('[data-wa-action="confirm-delete"]').count(),1);
@@ -135,6 +151,24 @@ test('WhatsApp chat opens without composer focus; long press, dismissal, deletio
     await page.waitForTimeout(450);
     assert.equal(await page.locator('.wa-message-menu').count(),0,action+' cancels hold');
   }
+  // Exercise native touch holds on both quick reactions and the extended picker.
+  await page.locator('#whatsapp-msg-message-7 .wa-message-more').click();
+  for (const expanded of [false,true]) {
+    if (expanded) await page.locator('[data-wa-action="more-emojis"]').click();
+    const emoji=page.locator(expanded?'.wa-message-emoji-grid [data-wa-reaction="😮"]':'.wa-message-reactions [data-wa-reaction="👍"]');
+    const prevented=await emoji.evaluate(el=>['selectstart','contextmenu','dragstart'].every(type=>!el.dispatchEvent(new Event(type,{bubbles:true,cancelable:true}))));
+    assert.equal(prevented,true,'emoji selection, callouts and dragging are cancelled');
+    const emojiBox=await emoji.boundingBox();
+    await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:emojiBox.x+emojiBox.width/2,y:emojiBox.y+emojiBox.height/2}]});
+    await page.waitForTimeout(750);
+    assert.equal(await page.evaluate(()=>window.getSelection().toString()),'','holding an emoji never selects its text');
+    await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    await page.evaluate(()=>closeWhatsAppMessageMenu());
+    await page.locator('#whatsapp-msg-message-7 .wa-message-more').click();
+  }
+  await page.locator('[data-wa-action="more-emojis"]').click();
+  await page.locator('.wa-message-emoji-grid [data-wa-reaction="😮"]').click();
+  assert.deepEqual(await page.evaluate(()=>window.reaction),{id:'message-7',emoji:'😮'},'extended emoji reacts to the selected message');
   await page.locator('#whatsapp-msg-message-7 .wa-message-more').click();
   await page.locator('[data-wa-action="copy"]').click();
   await page.waitForFunction(()=>window.toast?.message);

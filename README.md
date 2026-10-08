@@ -44,7 +44,9 @@ Dashboard appointment saves update the selected-day caches immediately. Reads st
 Opening the WhatsApp page or a conversation leaves the composer unfocused on every device.
 Hold a message bubble or use its visible ellipsis button to react, reply, copy text, or delete
 from the shared Lumin chat. Long presses show a bubble effect and suppress native text selection;
-moving or scrolling cancels the hold. Phones use a bottom sheet; larger screens use a bounded menu.
+moving or scrolling cancels the hold. The reaction row's plus button opens more emojis grouped
+by category. Emoji buttons and menus also suppress native long-press selection and callouts.
+Phones use a bottom sheet; larger screens use a bounded menu.
 All new actions support Arabic, English, keyboard navigation, and both appearance themes.
 
 Apply `delete_whatsapp_message_from_lumin` before frontend rollout. The authenticated RPC checks

@@ -1,7 +1,9 @@
-.whatsapp-msg-bubble-track, .whatsapp-msg-bubble-track * {
+.whatsapp-msg-bubble-track, .whatsapp-msg-bubble-track *,
+.wa-message-menu-overlay, .wa-message-menu-overlay * {
   -webkit-user-select: none !important;
   user-select: none !important;
   -webkit-touch-callout: none;
+  -webkit-user-drag: none;
 }
 .whatsapp-msg-bubble-track { min-width: 100px; transition: scale 160ms ease-out, box-shadow 160ms ease-out; overflow-wrap: anywhere; }
 .whatsapp-msg-bubble-track > div:first-of-type { padding-inline-end: 32px; }
@@ -22,6 +24,16 @@ body.lumin-raised .wa-message-selected .whatsapp-msg-bubble-track { box-shadow: 
 .wa-message-menu svg { width: 18px; height: 18px; flex-shrink: 0; }
 .wa-message-reactions { display: flex; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid #f1f5f9; }
 .wa-message-reactions button { justify-content: center; padding: 8px; font-size: 22px; }
+.wa-message-reactions .wa-message-emoji-plus { color: #64748b; background: #f1f5f9; border-radius: 50%; }
+.wa-message-emoji-header { display: flex; align-items: center; gap: 8px; }
+.wa-message-emoji-header h3 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -.02em; color: #0f172a; }
+.wa-message-emoji-categories { display: flex; gap: 4px; overflow-x: auto; overscroll-behavior-x: contain; padding-block: 8px; border-bottom: 1px solid #f1f5f9; }
+.wa-message-emoji-categories button { flex: 0 0 44px; justify-content: center; padding: 8px; color: #64748b; }
+.wa-message-emoji-categories button[aria-pressed="true"] { color: #047857; background: #ecfdf5; }
+.wa-message-emoji-category-label { margin: 12px 8px 8px; font-size: 12px; font-weight: 600; color: #64748b; }
+.wa-message-emoji-grid { display: grid; grid-template-columns: repeat(6, minmax(44px, 1fr)); max-height: min(264px, 40dvh); overflow-y: auto; overscroll-behavior-y: contain; }
+.wa-message-emoji-grid button { justify-content: center; padding: 8px; font-size: 24px; }
+.wa-message-emoji-footer { display: flex; justify-content: flex-end; margin-top: 8px; padding-top: 8px; border-top: 1px solid #f1f5f9; }
 .wa-message-menu-options { display: grid; gap: 4px; padding-top: 8px; }
 .wa-message-menu .wa-message-danger { color: #be123c; background: #fff1f2; }
 .wa-message-menu .wa-message-danger:hover { background: #ffe4e6; }

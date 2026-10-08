@@ -2,6 +2,15 @@ let waMessageMenu = null;
 let waMessagePress = null;
 let waMessageSuppressClickUntil = 0;
 const waDeletedMessageIds = new Set();
+const WHATSAPP_REACTION_CATEGORIES = [
+  { en: 'Faces & people', ar: 'الوجوه والأشخاص', icon: 'smile', emojis: '😀 😃 😄 😁 😆 😅 😂 🤣 😊 🙂 🙃 😉 😍 🥰 😘 😋 😎 🤩 🥳 😇 🤗 🤔 🤭 🤫 😮 😲 😳 🥺 😢 😭 😔 😴 🤒 🤕 😷 👨‍⚕️ 👩‍⚕️ 🧑‍⚕️' },
+  { en: 'Hands & gestures', ar: 'الأيدي والإشارات', icon: 'hand', emojis: '👍 👎 👏 🙌 👐 🤲 🙏 🤝 💪 ✌️ 🤞 🤟 🤘 👌 🤌 🤏 👈 👉 👆 👇 ☝️ ✋ 🤚 🖐️ 👋 🤙 ✊ 👊 🤛 🤜 🫶 👍🏻 👍🏼 👍🏽 👍🏾 👍🏿 🙏🏻 🙏🏽 🙏🏿' },
+  { en: 'Hearts & feelings', ar: 'القلوب والمشاعر', icon: 'heart', emojis: '❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 🩷 🩵 🩶 💔 ❤️‍🩹 ❤️‍🔥 💕 💞 💓 💗 💖 💘 💝 💟 💌 💯 💢 💤' },
+  { en: 'Celebrations', ar: 'الاحتفالات', icon: 'party-popper', emojis: '🎉 🎊 🎈 🎁 🎂 🧁 🥂 🎀 🎗️ 🏆 🥇 🥈 🥉 🏅 🎖️ ⭐ 🌟 ✨ 💫 🌈 🎆 🎇 🪄 🎯 ✅ ☑️ ✔️' },
+  { en: 'Animals & nature', ar: 'الحيوانات والطبيعة', icon: 'cat', emojis: '🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐸 🐵 🐧 🐦 🦋 🐝 🐢 🐬 🌷 🌹 🌻 🌼 🌸 🌺 🍀 🌿 🌱 🌳 ☀️ 🌙' },
+  { en: 'Food & drink', ar: 'الطعام والشراب', icon: 'utensils', emojis: '🍎 🍏 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍒 🍑 🥭 🍍 🥑 🥕 🥦 🍞 🥐 🥨 🧀 🍕 🍔 🍟 🍿 🍫 🍪 🍩 🍦 🍯 🥛 ☕ 🍵 🧃 🥤 💧' },
+  { en: 'Objects & symbols', ar: 'الأشياء والرموز', icon: 'lightbulb', emojis: '🦷 🪥 🩺 💊 💉 🩹 🧼 🧴 🏥 🚑 📅 🗓️ ⏰ ⏳ 📍 📌 📝 📋 📞 📱 💬 🔔 💡 🔍 🔑 🔒 🛡️ ⚠️ ❗ ❓ ➕ ➖ 🔄 🚀 🌍 🏠' }
+];
 
 function whatsappMessageActionText(key) {
   const ar = currentUiLanguage === 'ar';
@@ -13,7 +22,9 @@ function whatsappMessageActionText(key) {
     unavailable: ['Deleting from the recipient’s chat is unavailable with this WhatsApp connection.', 'حذف الرسالة من محادثة المستلم غير متاح عبر اتصال واتساب الحالي.'],
     deleting: ['Deleting…', 'جارٍ الحذف…'], failed: ['Could not delete the message. Please try again.', 'تعذر حذف الرسالة. حاول مرة أخرى.'],
     copied: ['Text copied', 'تم نسخ النص'], copyFailed: ['Could not copy the text.', 'تعذر نسخ النص.'],
-    reactions: ['React to message', 'التفاعل مع الرسالة']
+    reactions: ['React to message', 'التفاعل مع الرسالة'],
+    moreEmojis: ['More emojis', 'المزيد من الرموز التعبيرية'], back: ['Back', 'رجوع'],
+    emojiCategories: ['Emoji categories', 'فئات الرموز التعبيرية']
   };
   return labels[key]?.[ar ? 1 : 0] || key;
 }
@@ -77,7 +88,7 @@ function openWhatsAppMessageMenu(event, messageId, trigger = null) {
   const root = document.createElement('div');
   root.className = 'wa-message-menu-overlay';
   root.innerHTML = `<section class="wa-message-menu" role="dialog" aria-modal="true" aria-label="${whatsappMessageActionText('actions')}" dir="${currentUiLanguage === 'ar' ? 'rtl' : 'ltr'}" tabindex="-1">
-    <div class="wa-message-reactions" role="group" aria-label="${whatsappMessageActionText('reactions')}">${['👍','❤️','😂','😮','🙏','🦷'].map(emoji => `<button type="button" data-wa-reaction="${emoji}" aria-label="${emoji}">${emoji}</button>`).join('')}</div>
+    <div class="wa-message-reactions" role="group" aria-label="${whatsappMessageActionText('reactions')}">${['👍','❤️','😂','🙏','🦷'].map(emoji => `<button type="button" data-wa-reaction="${emoji}" aria-label="${emoji}">${emoji}</button>`).join('')}<button type="button" data-wa-action="more-emojis" class="wa-message-emoji-plus" aria-label="${whatsappMessageActionText('moreEmojis')}" title="${whatsappMessageActionText('moreEmojis')}"><i data-lucide="plus"></i></button></div>
     <div class="wa-message-menu-options">
       <button type="button" data-wa-action="reply"><i data-lucide="reply"></i><span>${whatsappMessageActionText('reply')}</span></button>
       ${message.content ? `<button type="button" data-wa-action="copy"><i data-lucide="copy"></i><span>${whatsappMessageActionText('copy')}</span></button>` : ''}
@@ -87,6 +98,8 @@ function openWhatsAppMessageMenu(event, messageId, trigger = null) {
   document.body.append(root);
   const panel = root.querySelector('.wa-message-menu');
   waMessageMenu = { root, panel, messageId, conversationId: activeWhatsAppConversationId, trigger: trigger || row.querySelector('.wa-message-more'), busy: false };
+  // The menu is outside the bubble: suppress native selection and callouts here too.
+  ['selectstart', 'contextmenu', 'dragstart'].forEach(type => root.addEventListener(type, e => e.preventDefault()));
   root.addEventListener('pointerdown', e => { if (e.target === root) closeWhatsAppMessageMenu({ restoreFocus: true }); });
   root.addEventListener('click', async e => {
     const button = e.target.closest('button');
@@ -96,6 +109,12 @@ function openWhatsAppMessageMenu(event, messageId, trigger = null) {
       const emoji = button.dataset.waReaction;
       closeWhatsAppMessageMenu({ restoreFocus: true });
       void sendWhatsAppReaction(messageId, emoji);
+    } else if (action === 'more-emojis') {
+      showWhatsAppEmojiPicker();
+    } else if (action === 'emoji-category') {
+      showWhatsAppEmojiPicker(Number(button.dataset.waCategory));
+    } else if (action === 'back') {
+      openWhatsAppMessageMenu(e, messageId, waMessageMenu.trigger);
     } else if (action === 'reply') {
       closeWhatsAppMessageMenu();
       triggerWhatsAppReplyById(messageId);
@@ -116,6 +135,26 @@ function openWhatsAppMessageMenu(event, messageId, trigger = null) {
   if (window.lucide) lucide.createIcons();
   positionWhatsAppMessageMenu();
   panel.focus({ preventScroll: true });
+}
+
+function showWhatsAppEmojiPicker(categoryIndex = 0) {
+  if (!waMessageMenu) return;
+  const category = WHATSAPP_REACTION_CATEGORIES[categoryIndex] || WHATSAPP_REACTION_CATEGORIES[0];
+  const language = currentUiLanguage === 'ar' ? 'ar' : 'en';
+  const { panel } = waMessageMenu;
+  panel.innerHTML = `<div class="wa-message-emoji-header">
+    <button type="button" data-wa-action="back" aria-label="${whatsappMessageActionText('back')}"><i data-lucide="${language === 'ar' ? 'arrow-right' : 'arrow-left'}"></i></button>
+    <h3 id="wa-message-emoji-title">${whatsappMessageActionText('moreEmojis')}</h3>
+  </div>
+  <div class="wa-message-emoji-categories" role="group" aria-label="${whatsappMessageActionText('emojiCategories')}">${WHATSAPP_REACTION_CATEGORIES.map((item, index) => `<button type="button" data-wa-action="emoji-category" data-wa-category="${index}" aria-pressed="${item === category}" aria-label="${item[language]}" title="${item[language]}"><i data-lucide="${item.icon}"></i></button>`).join('')}</div>
+  <h4 class="wa-message-emoji-category-label" id="wa-message-emoji-category-label">${category[language]}</h4>
+  <div class="wa-message-emoji-grid" role="group" aria-labelledby="wa-message-emoji-category-label">${category.emojis.split(' ').map(emoji => `<button type="button" data-wa-reaction="${emoji}" aria-label="${emoji}">${emoji}</button>`).join('')}</div>
+  <div class="wa-message-emoji-footer"><button type="button" data-wa-action="cancel">${whatsappMessageActionText('cancel')}</button></div>`;
+  panel.setAttribute('aria-labelledby', 'wa-message-emoji-title');
+  if (window.lucide) lucide.createIcons();
+  positionWhatsAppMessageMenu();
+  panel.querySelector(`[data-wa-category="${WHATSAPP_REACTION_CATEGORIES.indexOf(category)}"]`).focus({ preventScroll: true });
+  panel.querySelector('[aria-pressed="true"]').scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
 function showWhatsAppMessageDeleteConfirmation() {
