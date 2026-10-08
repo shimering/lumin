@@ -1,0 +1,45 @@
+/* Buttons keep their places; only this noninteractive surface moves. */
+.lumin-nav-motion { isolation: isolate; }
+.lumin-nav-highlight {
+  position: absolute; top: 0; left: 0; z-index: 1; pointer-events: none; border: 0;
+  background: linear-gradient(145deg, #eff6ff, #dbeafe); box-shadow: 0 8px 18px rgba(37, 99, 235, .16);
+}
+.lumin-nav-highlight[hidden] { display: none !important; }
+#app-primary-nav.lumin-nav-motion > button:not(#nav-btn-quick-create) { transform: none !important; }
+#app-primary-nav.lumin-nav-motion > button[aria-current="page"] {
+  border-color: transparent !important; background: transparent !important; box-shadow: none !important;
+}
+#app-primary-nav.lumin-nav-motion > button > svg,
+#lumin-mobile-nav .lumin-nav-motion > button > svg,
+#lumin-mobile-nav .lumin-nav-motion > button > span:not(.lumin-mobile-nav-badge) { position: relative; z-index: 2; }
+#app-primary-nav.lumin-nav-motion #nav-whatsapp-unread-badge { z-index: 3; }
+#lumin-mobile-nav .lumin-nav-motion .lumin-mobile-nav-badge { z-index: 3; }
+#app-primary-nav.lumin-nav-motion > button:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+#app-primary-nav.lumin-nav-motion > button:disabled { opacity: .5; pointer-events: none; }
+html body.lumin-raised #app-primary-nav.lumin-nav-motion > button[aria-current="page"] {
+  border-color: #fff !important; background: var(--lumin-face, #fff) !important; box-shadow: var(--lumin-small-raised) !important;
+}
+body.lumin-raised #app-primary-nav > .lumin-nav-highlight {
+  background: linear-gradient(145deg, hsl(var(--lumin-hue, 215) calc(70% * var(--lumin-chroma, 1)) 36%), hsl(var(--lumin-hue, 215) calc(68% * var(--lumin-chroma, 1)) 28%));
+  box-shadow: 0 5px 2px hsl(var(--lumin-hue, 215) calc(79.3% * var(--lumin-chroma, 1)) 71.6% / .36), 0 10px 15px hsl(var(--lumin-hue, 215) calc(55.7% * var(--lumin-chroma, 1)) 70.8% / .5);
+}
+@media (min-width: 1024px) {
+  #app-primary-nav.lumin-nav-motion { position: relative; }
+}
+@media (max-width: 1023px) {
+  #app-primary-nav > .lumin-nav-highlight {
+    background: linear-gradient(145deg, #2563eb, #1d4ed8); box-shadow: 0 4px 14px rgba(37, 99, 235, .42), inset 0 1px 1px rgba(255, 255, 255, .35);
+  }
+  html body.lumin-raised #app-primary-nav.lumin-nav-motion > button[aria-current="page"] { background: transparent !important; box-shadow: none !important; }
+  .lumin-mobile-nav-bar.lumin-nav-motion { position: relative; }
+  #lumin-mobile-nav .lumin-nav-motion > .lumin-nav-highlight { background: rgba(37, 99, 235, .1); box-shadow: none; }
+  #lumin-mobile-nav .lumin-nav-motion > button[aria-current="page"] { background: transparent !important; }
+  #lumin-mobile-nav .lumin-nav-motion > button { transform: none; }
+  #lumin-mobile-nav .lumin-nav-motion > button:active { background: rgba(148, 163, 184, .12); }
+  body.lumin-raised #lumin-mobile-nav .lumin-nav-motion > .lumin-nav-highlight { background: hsl(var(--lumin-hue, 215) calc(80% * var(--lumin-chroma, 1)) 58% / .1); }
+  html.dark #lumin-mobile-nav .lumin-nav-motion > .lumin-nav-highlight { background: rgba(96, 165, 250, .16); }
+}
+@media (forced-colors: active) {
+  .lumin-nav-highlight { background: Highlight !important; box-shadow: none !important; forced-color-adjust: none; }
+  #app-primary-nav.lumin-nav-motion > button[aria-current="page"], #lumin-mobile-nav .lumin-nav-motion > button[aria-current="page"] { color: HighlightText !important; }
+}

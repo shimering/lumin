@@ -52,7 +52,8 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
   await page.addScriptTag({ url: `http://127.0.0.1:${server.address().port}/vendor/lucide.min.js` });
   await page.addScriptTag({ url: `http://127.0.0.1:${server.address().port}/lumin-chart-dates.js?v=1` });
-  await page.addScriptTag({ url: `http://127.0.0.1:${server.address().port}/lumin-mobile-nav.js?v=1` });
+  await page.addScriptTag({ url: `http://127.0.0.1:${server.address().port}/lumin-nav-motion.js?v=1` });
+  await page.addScriptTag({ url: `http://127.0.0.1:${server.address().port}/lumin-mobile-nav.js?v=2` });
   await page.addScriptTag({ content: `
     let appointmentCalendarResizeFrame = null, patientQueryResizeFrame = null, dashboardResizeFrame = null;
     let currentUiTheme = 'flat', currentUiTint = 'blue', currentUiScale = 100;
@@ -66,7 +67,7 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
     let dashboardSelectedDate = new Date(appointmentToday);
     const appointmentDayFormatter = new Intl.DateTimeFormat('en-GB', { dateStyle: 'long' });
     let currentUserAccess = { isAdmin: false, isDoctor: false, permissions: new Set(['dashboard_invoices']) };
-    let workspaceNavigationToken = 0, currentSession = {user:{id:'fixture'}}, patientWorkspaceLoadingId = null;
+    let workspaceNavigationToken = 0, currentSession = {user:{id:'fixture'}}, patientWorkspaceLoadingId = null, activePatientScans = null;
     const dashboardDayCache = new Map();
     let appointmentsLoaded = true;
     function dashboardDayContext() {return 'fixture-day'}
@@ -125,6 +126,7 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
     ${dashboardPermission}
     ${dashboardRenderer}
     ${dashboardDateHelpers}
+    LuminNavHighlight.create(document.getElementById('app-primary-nav'));
     setupMobileNavigation();
     setupAppViewportDimensions();
     setupAppointmentCalendarViewport();

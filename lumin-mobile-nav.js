@@ -29,6 +29,7 @@
     document.body.appendChild(dock);
     const bar = dock.firstElementChild;
     const menu = dock.lastElementChild;
+    const highlight = window.LuminNavHighlight?.create(bar);
     menu.setAttribute('role', 'group');
     let frame = 0, snapshot = '', geometry = '', menuOpen = false, activeView = '';
     let keyboardBaselineWidth = innerWidth, keyboardBaselineHeight = innerHeight;
@@ -71,7 +72,7 @@
       if (snapshot === next) return;
       snapshot = next;
       const focused = dock.contains(document.activeElement) ? document.activeElement.id : '';
-      bar.replaceChildren();
+      bar.replaceChildren(...(highlight ? [highlight.element] : []));
       menu.replaceChildren();
       dock.dir = ar ? 'rtl' : 'ltr';
       dock.setAttribute('aria-label', ar ? 'التنقل الرئيسي' : 'Main navigation');
@@ -141,6 +142,7 @@
       const sideGap = Math.max(12, Number.parseFloat(style.getPropertyValue('--nav-safe-left')) || 0, Number.parseFloat(style.getPropertyValue('--nav-safe-right')) || 0);
       const dockWidth = Math.min(480, width - sideGap * 2);
       dock.style.width = dockWidth / zoom + 'px';
+      highlight?.refresh();
       const dockHeight = bar.getBoundingClientRect().height;
       // Explicit visible-viewport coordinates avoid standalone browser bottom/height races.
       const dockTop = Math.max(top, top + height - bottomGap - dockHeight);
