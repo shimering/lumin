@@ -410,6 +410,7 @@ function renderChartMediaPanel() {
   document.body.classList.toggle('chart-media-active', chartActive);
   workspace.classList.toggle('is-media-collapsed', chartPatientMedia.collapsed);
   if (typeof updateChartSidePanelLayout === 'function') updateChartSidePanelLayout();
+  if (typeof updateClinicalActionsRailLayout === 'function') updateClinicalActionsRailLayout();
   const sheetOpen = chartActive && !chartMediaIsLandscape() && !chartPatientMedia.collapsed;
   let backdrop = document.getElementById('chart-media-backdrop');
   if (sheetOpen && !backdrop) {

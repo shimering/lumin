@@ -1,0 +1,104 @@
+/* Selection-aware clinical rail. Physical right placement keeps the odontogram's anatomy stable in RTL. */
+.chart-actions-panel { display: flex; flex-direction: column; min-width: 0; overflow: hidden; border: 1px solid #e2e8f0; border-radius: 20px; background: var(--lumin-face, #fff); box-shadow: var(--lumin-raised, 0 8px 24px -18px #64748b); text-align: start; }
+.chart-actions-panel[hidden] { display: none; }
+.chart-actions-header { display: flex; align-items: center; gap: 4px; min-height: 56px; padding: 6px 8px 6px 16px; border-bottom: 1px solid #f1f5f9; flex: none; }
+.chart-actions-header h3 { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; color: #0f172a; font-size: 14px; font-weight: 600; }
+.chart-actions-header h3 > svg { width: 18px; height: 18px; color: #2563eb; flex: none; }
+#chart-actions-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chart-actions-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; min-width: 44px; padding: 10px 12px; border: 0; border-radius: 12px; background: #eff6ff; color: #1d4ed8; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 150ms ease-out, transform 150ms ease-out; }
+.chart-actions-button svg { width: 16px; height: 16px; flex: none; }
+.chart-actions-button:hover { background: #dbeafe; }
+.chart-actions-button:active, .chart-actions-operation:active { transform: scale(.98); }
+.chart-actions-button:focus-visible, .chart-actions-operation:focus-visible, .chart-actions-select:focus-visible { outline: 2px solid #93c5fd; outline-offset: -2px; }
+.chart-actions-button:disabled, .chart-actions-operation:disabled, .chart-actions-select:disabled { opacity: .5; pointer-events: none; }
+.chart-actions-icon-button { flex: 0 0 44px; width: 44px; padding: 0; background: transparent; color: #64748b; }
+.chart-actions-icon-button:hover { background: #f1f5f9; }
+#chart-actions-clear-findings:hover { background: #fff1f2; color: #be123c; }
+#chart-actions-body { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+#chart-actions-body[hidden] { display: none; }
+.chart-actions-selection { display: flex; align-items: center; gap: 4px; padding: 8px 12px; flex: none; }
+.chart-actions-selection-badge { display: inline-flex; flex: 1; min-width: 0; gap: 8px; align-items: center; border: 0; border-radius: 12px; background: #eff6ff; color: #1d4ed8; padding: 10px 12px; font-size: 12px; line-height: 1.5; font-weight: 600; overflow-wrap: anywhere; }
+.chart-actions-filters { display: grid; gap: 8px; padding: 0 16px 12px; flex: none; }
+.chart-actions-search { display: flex; align-items: center; gap: 8px; padding-inline: 12px; min-height: 44px; border-radius: 12px; border: 1px solid #e2e8f0; background: #f8fafc; }
+.chart-actions-search:focus-within { border-color: #2563eb; box-shadow: 0 0 0 3px #dbeafe; }
+.chart-actions-search > svg { width: 16px; height: 16px; color: #94a3b8; flex: none; }
+.chart-actions-search input { width: 100%; min-width: 0; padding-block: 10px; border: 0; background: transparent; outline: none; font-size: 14px; color: #334155; }
+.chart-actions-select { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 12px; background: var(--lumin-face, #fff); color: #475569; font-size: 12px; cursor: pointer; transition: border-color 150ms ease-out; }
+.chart-actions-select:hover { border-color: #cbd5e1; }
+#chart-actions-operations { flex: 1 1 auto; min-height: 96px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 0 8px 8px; }
+.chart-actions-operation { display: flex; align-items: center; width: 100%; gap: 10px; min-height: 64px; padding: 10px 8px; border: 0; border-radius: 12px; background: transparent; color: #334155; text-align: start; cursor: pointer; transition: background 150ms ease-out, transform 150ms ease-out; }
+.chart-actions-operation:hover { background: #f8fafc; }
+.chart-actions-operation[aria-pressed="true"] { background: #eff6ff; color: #1d4ed8; }
+.chart-actions-operation-symbol { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border: 0; border-radius: 9px; background: #f1f5f9; color: #64748b; }
+.chart-actions-operation[aria-pressed="true"] .chart-actions-operation-symbol { background: #dbeafe; color: #1d4ed8; }
+.chart-actions-operation-symbol > svg { width: 16px; height: 16px; }
+.chart-actions-operation-copy { min-width: 0; flex: 1; }
+.chart-actions-operation-copy strong { display: block; overflow-wrap: anywhere; font-size: 13px; line-height: 1.5; font-weight: 600; }
+.chart-actions-operation-copy small { display: block; margin-top: 3px; color: #64748b; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.chart-actions-price { padding: 4px 7px; border: 0; border-radius: 8px; background: #f1f5f9; color: #64748b; font-size: 11px; overflow-wrap: anywhere; max-width: 28%; }
+.chart-actions-footer { display: flex; flex-direction: column; gap: 10px; padding: 12px 16px max(16px, env(safe-area-inset-bottom)); border-top: 1px solid #e2e8f0; background: var(--lumin-face, #fff); flex: none; }
+.chart-actions-preview { color: #64748b; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.chart-actions-preview strong { display: block; color: #0f172a; font-weight: 600; }
+.chart-actions-preview .chart-actions-validation { color: #b45309; }
+.chart-actions-footer-row { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1fr); gap: 8px; align-items: end; }
+.chart-actions-footer-row label { display: grid; gap: 5px; color: #64748b; font-size: 11px; }
+#chart-operation-status-select { border: 0; background: #fff7ed; color: #9a3412; font-weight: 600; }
+#chart-operation-status-select[data-status="In"] { background: #eff6ff; color: #1d4ed8; }
+#chart-operation-status-select[data-status="C"] { background: #ecfdf5; color: #047857; }
+#chart-operation-status-select[data-status="E"] { background: #f1f5f9; color: #475569; }
+#chart-apply-operation-button { width: 100%; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; box-shadow: 0 3px 9px #2563eb26; }
+#action-palette-card #chart-apply-operation-button { min-height: 44px; }
+#chart-apply-operation-button:hover { background: linear-gradient(135deg, #1d4ed8, #1e40af); }
+.chart-actions-empty { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; padding: 24px 12px; text-align: center; color: #64748b; font-size: 12px; }
+.chart-actions-empty > span { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: #f1f5f9; color: #94a3b8; }
+.chart-actions-empty strong { font-size: 13px; color: #334155; }
+.chart-actions-loading { display: grid; gap: 10px; padding: 12px; color: #64748b; font-size: 12px; }
+.chart-actions-loading span { height: 46px; border-radius: 12px; background: #e2e8f0; animation: chart-actions-pulse 1.5s ease-in-out infinite; }
+@keyframes chart-actions-pulse { 50% { opacity: .45; } }
+@media (min-width: 768px) {
+  #chart-clinical-workspace.has-clinical-actions-panel { grid-template-columns: minmax(0, 1fr) clamp(292px, 28vw, 360px); align-items: start; direction: ltr; }
+  #chart-clinical-workspace.has-clinical-actions-panel.is-chart-rail-collapsed { grid-template-columns: minmax(0, 1fr) 56px; }
+  #chart-clinical-workspace.has-clinical-actions-panel .chart-side-panels { display: flex; flex-direction: column; gap: 12px; min-width: 0; position: sticky; top: var(--chart-media-sticky-top, 144px); height: max(320px, calc(var(--lumin-app-viewport-height, 100dvh) - var(--chart-media-sticky-top, 144px) - 20px - env(safe-area-inset-bottom))); }
+  #chart-clinical-workspace.has-clinical-actions-panel .chart-actions-panel { flex: 1 1 auto; min-height: 0; }
+  #chart-clinical-workspace.has-clinical-actions-panel .chart-actions-panel.is-collapsed { flex: 0 0 56px; }
+  #chart-clinical-workspace.has-clinical-actions-panel .chart-media-panel { position: static; flex: 1 1 0; height: auto; min-height: 0; max-height: none; }
+  #chart-clinical-workspace.has-clinical-actions-panel .chart-appointments-panel { flex: 1 1 0; height: auto; min-height: 0; }
+  #chart-clinical-workspace.has-clinical-actions-panel.is-media-collapsed .chart-media-panel,
+  #chart-clinical-workspace.has-clinical-actions-panel.is-appointments-collapsed .chart-appointments-panel { flex: 0 0 56px; }
+  #chart-clinical-workspace.has-clinical-actions-panel .chart-media-panel-header,
+  #chart-clinical-workspace.has-clinical-actions-panel .chart-appointments-header { height: 56px; flex-basis: 56px; position: relative; padding: 0 8px; }
+  #chart-clinical-workspace.has-clinical-actions-panel .chart-media-panel-header h3,
+  #chart-clinical-workspace.has-clinical-actions-panel .chart-appointments-header h3 { position: static; width: auto; max-width: none; transform: none; font-size: 13px; }
+  #chart-clinical-workspace.has-clinical-actions-panel .chart-media-panel-header .chart-media-button,
+  #chart-clinical-workspace.has-clinical-actions-panel .chart-appointments-header .chart-media-button { position: static; transform: none; margin-inline-start: auto; }
+  #chart-clinical-workspace.has-clinical-actions-panel.is-chart-rail-collapsed .chart-side-panels { height: auto; }
+  #chart-clinical-workspace.is-chart-rail-collapsed .chart-actions-header { flex-direction: column-reverse; gap: 8px; padding: 6px 0 16px; border: 0; }
+  #chart-clinical-workspace.is-chart-rail-collapsed .chart-actions-header h3 { flex: none; writing-mode: vertical-rl; min-height: 140px; }
+  #chart-clinical-workspace.is-chart-rail-collapsed #chart-actions-clear-findings { display: none; }
+  #chart-clinical-workspace.has-clinical-actions-panel.is-chart-rail-collapsed .chart-media-panel,
+  #chart-clinical-workspace.has-clinical-actions-panel.is-chart-rail-collapsed .chart-appointments-panel { flex-basis: auto; }
+  #chart-clinical-workspace.has-clinical-actions-panel.is-chart-rail-collapsed .chart-media-panel-header,
+  #chart-clinical-workspace.has-clinical-actions-panel.is-chart-rail-collapsed .chart-appointments-header { display: flex; flex-direction: column-reverse; height: auto; padding: 6px 0 16px; gap: 8px; }
+  #chart-clinical-workspace.has-clinical-actions-panel.is-chart-rail-collapsed .chart-media-panel-header h3,
+  #chart-clinical-workspace.has-clinical-actions-panel.is-chart-rail-collapsed .chart-appointments-header h3 { writing-mode: vertical-rl; min-height: 80px; }
+  #chart-clinical-workspace.has-clinical-actions-panel.is-chart-rail-collapsed .chart-media-button { margin-inline-start: 0; }
+}
+@media (min-width: 768px) and (max-height: 700px) {
+  #chart-clinical-workspace.has-clinical-actions-panel .chart-side-panels { position: sticky; height: auto; max-height: none; }
+  #chart-clinical-workspace.has-clinical-actions-panel .chart-actions-panel:not(.is-collapsed) { height: max(420px, calc(var(--lumin-app-viewport-height, 100dvh) - var(--chart-media-sticky-top, 144px) - 16px)); flex: none; }
+}
+@media (max-width: 767px) {
+  #view-chart:has(.chart-actions-panel) { padding-bottom: 80px; }
+  .chart-actions-panel { position: fixed; z-index: 73; inset-inline: 0; bottom: 0; border-radius: 20px 20px 0 0; height: min(600px, 70dvh); max-height: calc(var(--lumin-app-viewport-height, 100dvh) - 64px); box-shadow: 0 -8px 32px #0f172a1f; }
+  .chart-actions-panel.is-collapsed { inset-inline: 12px; bottom: calc(var(--mobile-nav-height, 0px) + max(12px, env(safe-area-inset-bottom))); height: 56px; border-radius: 16px; }
+  .chart-actions-panel.is-collapsed #chart-actions-clear-findings { display: none; }
+  #view-chart.hidden .chart-actions-panel { display: none; }
+  .chart-actions-filters { grid-template-columns: minmax(0, 1fr) minmax(0, .8fr); padding-bottom: 8px; }
+  .chart-actions-search input { font-size: 16px; }
+  .chart-actions-selection { padding-block: 2px; }
+  .chart-actions-footer { padding-top: 8px; gap: 6px; }
+  #chart-actions-operations { min-height: 48px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chart-actions-panel *, #chart-clinical-workspace.has-clinical-actions-panel { transition: none !important; animation: none !important; }
+}

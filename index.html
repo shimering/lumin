@@ -84,11 +84,12 @@
   <script src="lumin-patient-swipe.js?v=1"></script>
   <script src="lumin-patients.js?v=4"></script>
   <script src="lumin-chart-sync.js?v=1"></script>
-  <script src="lumin-chart-media.js?v=15"></script>
+  <script src="lumin-chart-media.js?v=16"></script>
   <script src="lumin-xray-rotation.js?v=1"></script>
   <script src="lumin-tooth-notes.js?v=3"></script>
-  <script src="lumin-chart-appointments.js?v=1"></script>
+  <script src="lumin-chart-appointments.js?v=2"></script>
   <script src="lumin-chart-dates.js?v=1"></script>
+  <script src="lumin-clinical-actions.js?v=1"></script>
   <link rel="stylesheet" href="lumin-chart-dates.css?v=1" />
   <script src="lumin-media-teeth.js?v=2"></script>
   <script src="lumin-nav-motion.js?v=1"></script>
@@ -5515,6 +5516,7 @@
   <link rel="stylesheet" href="lumin-xray-rotation.css?v=1" />
   <link rel="stylesheet" href="lumin-tooth-notes.css?v=4" />
   <link rel="stylesheet" href="lumin-chart-appointments.css?v=1" />
+  <link rel="stylesheet" href="lumin-clinical-actions.css?v=1" />
   <link rel="stylesheet" href="lumin-media-teeth.css?v=1" />
   <style id="finance-ledger-styles">
     #finance-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -6856,90 +6858,6 @@
           </div>
         </div>
 
-        <!-- Full-Width Action Palette -->
-        <div class="order-1 space-y-5 xl:col-span-12">
-
-          <!-- Action Palette Card -->
-          <div id="action-palette-card" class="relative overflow-visible rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div class="rounded-t-[0.7rem] bg-slate-900 px-3 py-1.5 text-white">
-              <div class="flex items-center justify-between gap-3">
-                <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
-                  <div class="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.18em] text-cyan-300">
-                    <i data-lucide="wand-sparkles" class="h-4 w-4"></i> Clinical actions
-                  </div>
-                  <div id="selection-target-container" class="flex min-w-0 items-center gap-2">
-                    <span id="selection-badge" class="flex min-w-0 items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-2 py-0.5 text-[11px] font-bold text-slate-200">
-                      <span id="selection-target-text">Select one or more teeth or surfaces</span>
-                    </span>
-                  </div>
-                </div>
-                <div class="flex items-center gap-2 shrink-0">
-                  <button onclick="clearSelectedTooth()" class="shrink-0 rounded-lg p-1.5 text-slate-300 transition hover:bg-red-500/20 hover:text-red-200" style="border: 1px solid rgba(255, 255, 255, 0.1);" title="Clear all findings from the selected tooth" aria-label="Clear selected tooth findings">
-                    <i data-lucide="trash-2" class="h-4 w-4"></i>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div class="p-2">
-              <select id="chart-specialty-select" onchange="renderChartOperationOptions()" class="sr-only" tabindex="-1" aria-hidden="true">
-                <option value="">Loading specialties...</option>
-              </select>
-              <div id="chart-specialty-menu-shell" class="relative">
-                <div class="mb-1 flex items-center justify-between gap-2 px-1">
-                  <p class="text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">Dental specialties</p>
-                  <span class="inline-flex items-center gap-1 text-[8px] font-bold text-cyan-700"><i data-lucide="mouse-pointer-click" class="h-2.5 w-2.5"></i> Tap a category to choose a procedure</span>
-                </div>
-                <div id="chart-specialty-rail" role="tablist" aria-label="Dental specialties" class="flex snap-x gap-1.5 overflow-x-auto rounded-xl border border-slate-100 bg-slate-50/70 p-1.5"></div>
-                <div id="chart-procedure-menu" class="chart-procedure-menu-popover hidden absolute inset-x-0 top-full z-[70] mt-1.5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/20" role="dialog" aria-label="Choose a dental procedure">
-                  <div class="flex items-center gap-2 border-b border-slate-100 bg-slate-50/90 px-2.5 py-2">
-                    <div id="chart-procedure-menu-specialty" class="flex min-w-0 flex-1 items-center gap-2"></div>
-                    <button type="button" onclick="closeChartProcedureMenu({ restoreFocus: true })" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-800" aria-label="Close procedure menu"><i data-lucide="x" class="h-4 w-4"></i></button>
-                  </div>
-                  <div class="border-b border-slate-100 p-2">
-                    <label class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
-                      <i data-lucide="search" class="h-3.5 w-3.5 shrink-0 text-slate-400"></i>
-                      <input id="chart-procedure-menu-search" type="search" oninput="filterChartProcedureMenu(this.value)" placeholder="Search procedures" autocomplete="off" class="min-w-0 flex-1 bg-transparent py-2 text-xs font-semibold text-slate-700 outline-none placeholder:text-slate-400" />
-                    </label>
-                  </div>
-                  <div id="chart-procedure-menu-items" role="menu" class="max-h-64 overflow-y-auto p-1.5"></div>
-                </div>
-              </div>
-
-              <div class="mt-2 grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1.35fr)_minmax(19rem,1fr)] lg:items-start">
-                <div class="space-y-1">
-                  <div class="flex min-w-0 items-center"><span class="shrink-0 text-[9px] font-black uppercase tracking-wider text-slate-500">Selected procedure</span></div>
-                  <select id="chart-operation-select" onchange="updateClinicalOperationPreview()" class="sr-only" tabindex="-1" aria-hidden="true">
-                    <option value="">Choose a specialty first</option>
-                  </select>
-                  <div id="chart-operation-preview" class="min-h-[2.55rem] rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-1.5 text-[9px] leading-4 text-slate-500">Tap a category above, then choose a procedure.</div>
-                </div>
-
-                <div class="space-y-1 rounded-xl border border-slate-100 bg-slate-50/55 p-1.5">
-                  <p class="text-[9px] font-black uppercase tracking-wider text-slate-500">Operation status</p>
-                  <div id="chart-operation-status-selector" class="grid grid-cols-4 gap-1" aria-label="Operation status">
-                  <button id="operation-status-p" type="button" onclick="setClinicalOperationStatus('P')" class="operation-status-choice operation-status-p flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-1.5 py-1 text-left transition" aria-pressed="true">
-                    <span class="text-xs font-black">P</span><span class="text-[10px] font-bold">Planned</span>
-                  </button>
-                  <button id="operation-status-in" type="button" onclick="setClinicalOperationStatus('In')" class="operation-status-choice operation-status-in flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-1.5 py-1 text-left transition" aria-pressed="false">
-                    <span class="text-xs font-black">In</span><span class="text-[10px] font-bold">In progress</span>
-                  </button>
-                  <button id="operation-status-c" type="button" onclick="setClinicalOperationStatus('C')" class="operation-status-choice operation-status-c flex items-center gap-1 rounded-md border border-green-200 bg-green-50 px-1.5 py-1 text-left transition" aria-pressed="false">
-                    <span class="text-xs font-black">C</span><span class="text-[10px] font-bold">Completed</span>
-                  </button>
-                  <button id="operation-status-e" type="button" onclick="setClinicalOperationStatus('E')" class="operation-status-choice operation-status-e flex items-center gap-1 rounded-md border border-slate-300 bg-slate-100 px-1.5 py-1 text-left transition" aria-pressed="false">
-                    <span class="text-xs font-black">E</span><span class="text-[10px] font-bold">Existed</span>
-                  </button>
-                </div>
-                  <button id="chart-apply-operation-button" type="button" onclick="applySelectedDentalOperation()" disabled class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-[10px] font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300">
-                    <i data-lucide="check" class="h-4 w-4"></i> Apply
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-        </div>
       </div>
       <!-- Full-Width Documented Findings -->
       <div class="mt-6 bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
@@ -6969,6 +6887,35 @@
       </div>
       </div>
       <div id="chart-side-panels" class="chart-side-panels">
+      <aside id="action-palette-card" class="chart-actions-panel is-collapsed" aria-labelledby="chart-actions-title" hidden>
+        <header class="chart-actions-header">
+          <h3><i data-lucide="wand-sparkles" aria-hidden="true"></i><span id="chart-actions-title">Clinical actions</span></h3>
+          <button id="chart-actions-clear-findings" type="button" class="chart-actions-button chart-actions-icon-button" onclick="clearSelectedTooth()" disabled aria-label="Clear selected tooth findings"><i data-lucide="trash-2" aria-hidden="true"></i></button>
+          <button id="chart-actions-toggle" type="button" class="chart-actions-button chart-actions-icon-button" onclick="toggleClinicalActionsPanel()" aria-controls="chart-actions-body" aria-expanded="false" aria-label="Expand clinical actions"><i data-lucide="panel-right-open" aria-hidden="true"></i></button>
+        </header>
+        <div id="chart-actions-body" hidden inert>
+          <div class="chart-actions-selection" id="selection-target-container">
+            <span id="selection-badge" class="chart-actions-selection-badge"><span id="selection-target-text">Select one or more teeth or surfaces</span></span>
+            <button id="chart-actions-clear-selection" type="button" class="chart-actions-button chart-actions-icon-button" onclick="clearClinicalActionsSelection()" aria-label="Clear tooth selection"><i data-lucide="x" aria-hidden="true"></i></button>
+          </div>
+          <div hidden>
+            <select id="chart-specialty-select" onchange="renderChartOperationOptions()" aria-label="Dental specialty"><option value="">Loading specialties...</option></select>
+            <select id="chart-operation-select" onchange="updateClinicalOperationPreview()" aria-label="Selected procedure"><option value="">Choose an operation...</option></select>
+          </div>
+          <div class="chart-actions-filters">
+            <label class="chart-actions-search"><i data-lucide="search" aria-hidden="true"></i><input id="chart-actions-search" type="search" oninput="filterClinicalActionsOperations(this.value)" placeholder="Search procedures" aria-label="Search procedures" autocomplete="off" /></label>
+            <select id="chart-actions-specialty-filter" class="chart-actions-select" onchange="filterClinicalActionsSpecialty(this.value)" aria-label="Filter procedures by specialty"><option value="">All specialties</option></select>
+          </div>
+          <div id="chart-actions-operations" aria-label="Dental procedures"></div>
+          <footer class="chart-actions-footer">
+            <div id="chart-operation-preview" class="chart-actions-preview" aria-live="polite">Choose a procedure to apply.</div>
+            <div class="chart-actions-footer-row">
+              <label><span id="chart-actions-status-label">Operation status</span><select id="chart-operation-status-select" class="chart-actions-select" onchange="setClinicalOperationStatus(this.value)" aria-label="Operation status"><option value="P">Planned</option><option value="In">In progress</option><option value="C">Completed</option><option value="E">Existed</option></select></label>
+              <button id="chart-apply-operation-button" type="button" class="chart-actions-button" onclick="applySelectedDentalOperation()" disabled><i data-lucide="check" aria-hidden="true"></i>Apply</button>
+            </div>
+          </footer>
+        </div>
+      </aside>
       <aside id="chart-media-panel" class="chart-media-panel" aria-labelledby="chart-media-panel-title">
         <div class="chart-media-sheet-handle" aria-hidden="true"><span></span></div>
         <header class="chart-media-panel-header"><h3><i data-lucide="scan-line" aria-hidden="true"></i><span id="chart-media-panel-title">X-rays</span></h3><button id="chart-media-collapse" type="button" class="chart-media-button" onclick="toggleChartMediaPanel()" aria-controls="chart-media-panel-body" aria-expanded="false" aria-label="Expand X-ray viewer"><i data-lucide="panel-right-open"></i></button></header>
@@ -11766,6 +11713,7 @@
       translateUiTree(document.body, currentUiLanguage);
       if (typeof renderChartMediaPanel === 'function') renderChartMediaPanel();
       if (typeof renderChartAppointmentsPanel === 'function') renderChartAppointmentsPanel();
+      if (typeof syncClinicalActionsPanel === 'function') { syncClinicalActionsPanel(); updateClinicalOperationPreview(); }
       if (typeof renderChartToothNoteIndicators === 'function') renderChartToothNoteIndicators();
       if (typeof renderPatientMediaRotationControls === 'function') renderPatientMediaRotationControls();
       if (typeof renderPatientAttachmentList === 'function') renderPatientAttachmentList();
@@ -15507,6 +15455,8 @@
     }
 
     function renderClinicalOperationStatusSelector() {
+      const statusSelect = document.getElementById('chart-operation-status-select');
+      if (statusSelect) statusSelect.value = activeClinicalOperationStatus;
       Object.keys(OPERATION_STATUSES).forEach(status => {
         const button = document.getElementById(`operation-status-${status.toLowerCase()}`);
         if (!button) return;
@@ -15534,30 +15484,33 @@
     }
 
     function updateClinicalOperationPreview() {
+      if (typeof syncClinicalActionsPanel === 'function') syncClinicalActionsPanel();
       const operationId = document.getElementById('chart-operation-select')?.value;
       const operation = dentalOperations.find(item => item.id === operationId);
       const preview = document.getElementById('chart-operation-preview');
       const button = document.getElementById('chart-apply-operation-button');
       if (!preview || !button) return;
       if (!operation) {
-        preview.innerHTML = 'Tap a category above, then choose a procedure.';
+        preview.textContent = typeof clinicalActionsText === 'function' ? clinicalActionsText('Choose a procedure to apply.', 'اختر إجراءً لتطبيقه.') : 'Choose a procedure to apply.';
         button.disabled = true;
         button.style.backgroundColor = '';
-        button.innerHTML = '<i data-lucide="check" class="h-4 w-4"></i> Apply operation';
+        button.innerHTML = `<i data-lucide="check" aria-hidden="true"></i>${typeof clinicalActionsText === 'function' ? clinicalActionsText('Apply', 'تطبيق') : 'Apply'}`;
         lucide.createIcons();
         return;
       }
-      const selectedTargetCount = chartSelectionTargets().length;
+      const targets = chartSelectionTargets();
+      const text = typeof clinicalActionsText === 'function' ? clinicalActionsText : english => english;
+      const surfaceTargets = targets.filter(target => target.surfaces.length > 0);
+      const applicableTargets = operation.actionScope === 'surface' ? surfaceTargets : targets;
+      const canApply = operation.active && (operation.actionScope === 'mouth' || applicableTargets.length > 0);
       const targetLabel = operation.actionScope === 'mouth'
-        ? selectedTargetCount ? 'Whole mouth · selected teeth will be ignored' : 'Whole mouth · no tooth selection needed'
-        : operation.actionScope === 'surface'
-          ? selectedTargetCount > 1 ? `Selected surfaces on ${selectedTargetCount} teeth` : 'Selected surfaces'
-          : selectedTargetCount > 1 ? `${selectedTargetCount} selected teeth` : 'Whole tooth';
-      const status = operationStatusDefinition(activeClinicalOperationStatus);
-      preview.innerHTML = `<div class="flex flex-wrap items-center gap-1.5"><span class="rounded-md border px-1.5 py-0.5 text-[9px] font-black ${dentalOperationBadgeClass(operation.code, operation.actionScope)}">${escapeHtml(operation.name)}</span><span class="rounded-md border px-1.5 py-0.5 text-[9px] font-black ${status.badgeClass}">${status.key} · ${status.label}</span><span class="font-bold text-slate-600">${targetLabel}</span><span class="rounded-md bg-violet-100 px-1.5 py-0.5 font-black text-violet-700">${escapeHtml(formatInvoiceMoney(operation.price))}</span></div>`;
-      button.disabled = false;
-      button.style.backgroundColor = status.color;
-      button.innerHTML = `<i data-lucide="check" class="h-4 w-4"></i> Apply`;
+        ? text('Whole mouth · selected teeth will be ignored', 'الفم كاملاً · لن يُستخدم تحديد الأسنان')
+        : canApply ? `${applicableTargets.map(target => chartToothLabel(target.tooth)).join(', ')} · ${typeof clinicalActionsScopeText === 'function' ? clinicalActionsScopeText(operation.actionScope) : operation.actionScope}`
+          : operation.actionScope === 'surface' ? text('Select a tooth surface to apply.', 'حدد سطحاً من السن لتطبيق الإجراء.') : text('Select one or more teeth to apply.', 'حدد سناً أو أكثر لتطبيق الإجراء.');
+      preview.innerHTML = `<strong>${escapeHtml(operation.name)}</strong><span class="${canApply ? '' : 'chart-actions-validation'}">${escapeHtml(targetLabel)}</span>`;
+      button.disabled = !canApply;
+      button.style.backgroundColor = '';
+      button.innerHTML = `<i data-lucide="check" aria-hidden="true"></i>${text('Apply', 'تطبيق')}`;
       lucide.createIcons();
     }
 
@@ -30737,8 +30690,8 @@
 
       const targets = chartSelectionTargets();
       if (!targets.length) {
-        targetText.textContent = 'Select one or more teeth or surfaces';
-        selectionBadge.className = 'flex min-w-0 items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-2 py-0.5 text-[11px] font-bold text-slate-200';
+        targetText.textContent = typeof clinicalActionsText === 'function' ? clinicalActionsText('Select one or more teeth or surfaces', 'حدد سناً أو أكثر أو أسطح الأسنان') : 'Select one or more teeth or surfaces';
+        selectionBadge.className = 'chart-actions-selection-badge';
         updateClinicalOperationPreview();
         return;
       }
@@ -30754,16 +30707,18 @@
 
       if (targets.length > 1) {
         const surfaceCount = targets.reduce((sum, target) => sum + target.surfaces.length, 0);
-        targetText.textContent = `${targets.length} teeth selected${surfaceCount ? ` · ${surfaceCount} surface selection${surfaceCount === 1 ? '' : 's'}` : ''}`;
-        selectionBadge.className = 'flex min-w-0 items-center gap-1.5 rounded-lg border border-blue-400/40 bg-blue-500/25 px-2 py-0.5 text-[11px] font-bold text-blue-100';
+        targetText.textContent = typeof clinicalActionsText === 'function' && clinicalActionsText('en', 'ar') === 'ar'
+          ? `${targets.length} أسنان محددة${surfaceCount ? ` · ${surfaceCount} أسطح محددة` : ''}`
+          : `${targets.length} teeth selected${surfaceCount ? ` · ${surfaceCount} surface selection${surfaceCount === 1 ? '' : 's'}` : ''}`;
+        selectionBadge.className = 'chart-actions-selection-badge';
       } else if (targets[0].surfaces.length > 0) {
         const target = targets[0];
         const abbrs = target.surfaces.map(surface => surfaceAbbreviation(target.tooth, surface)).join('-');
-        targetText.textContent = `${chartToothLabel(target.tooth)} · ${abbrs} · ${target.surfaces.length} surface${target.surfaces.length > 1 ? 's' : ''}`;
-        selectionBadge.className = 'flex min-w-0 items-center gap-1.5 rounded-lg border border-blue-400/40 bg-blue-500/25 px-2 py-0.5 text-[11px] font-bold text-blue-100';
+        targetText.textContent = `${chartToothLabel(target.tooth)} · ${abbrs} · ${target.surfaces.length} ${typeof clinicalActionsText === 'function' && clinicalActionsText('en', 'ar') === 'ar' ? 'أسطح' : `surface${target.surfaces.length > 1 ? 's' : ''}`}`;
+        selectionBadge.className = 'chart-actions-selection-badge';
       } else {
-        targetText.textContent = `${chartToothLabel(targets[0].tooth)} · choose surfaces`;
-        selectionBadge.className = 'flex min-w-0 items-center gap-1.5 rounded-lg border border-cyan-400/30 bg-cyan-500/15 px-2 py-0.5 text-[11px] font-bold text-cyan-100';
+        targetText.textContent = `${chartToothLabel(targets[0].tooth)} · ${typeof clinicalActionsText === 'function' ? clinicalActionsText('choose surfaces', 'اختر الأسطح') : 'choose surfaces'}`;
+        selectionBadge.className = 'chart-actions-selection-badge';
       }
       updateClinicalOperationPreview();
     }

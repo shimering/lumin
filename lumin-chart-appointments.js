@@ -35,6 +35,7 @@ function updateChartSidePanelLayout() {
   workspace.classList.toggle('is-appointments-collapsed', chartAppointments.collapsed);
   workspace.classList.toggle('is-side-panels-collapsed', allowed && chartAppointments.collapsed
     && typeof chartPatientMedia !== 'undefined' && chartPatientMedia.collapsed);
+  if (typeof updateClinicalActionsRailLayout === 'function') updateClinicalActionsRailLayout();
 }
 
 function toggleChartAppointmentsPanel() {
