@@ -6,7 +6,7 @@ const clinicalSpecialtyPicker = { open: false, signature: '', typeahead: '', typ
 function clinicalSpecialtyIconMarkup(specialty, lazy = false) {
   const name = String(specialty?.iconName || '').replace(/^dental-/, '');
   const icon = clinicalSpecialtyIcons.has(name) ? name : 'general';
-  return `<img class="chart-specialty-icon" src="assets/specialties-3d/dental-${icon}.webp" width="32" height="32" alt="" aria-hidden="true" decoding="async"${lazy ? ' loading="lazy"' : ''} />`;
+  return `<img class="chart-specialty-icon" src="assets/specialties-3d/dental-${icon}.webp?v=2" width="32" height="32" alt="" aria-hidden="true" decoding="async"${lazy ? ' loading="lazy"' : ''} />`;
 }
 
 function renderClinicalSpecialtyPicker(specialties = activeDentalSpecialties()) {

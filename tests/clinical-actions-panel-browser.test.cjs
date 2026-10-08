@@ -225,7 +225,7 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
       assert.equal(await menu.getAttribute('dir'),language==='ar'?'rtl':'ltr');
       assert.equal(await menu.locator('[role="option"] .chart-specialty-icon').count(),3);
       assert.match(await menu.locator('[data-clinical-specialty="endo"] img').getAttribute('src'),/specialties-3d\/dental-endodontics.webp/);
-      assert.deepEqual(await menu.locator('img').evaluateAll(async images=>Promise.all(images.map(async img=>{img.loading='eager';await img.decode();return [img.naturalWidth,img.naturalHeight];}))),[[96,96],[96,96],[96,96]],'The menu loads the optimized generated assets');
+      assert.deepEqual(await menu.locator('img').evaluateAll(async images=>Promise.all(images.map(async img=>{img.loading='eager';await img.decode();return [img.naturalWidth,img.naturalHeight];}))),[[64,64],[64,64],[64,64]],'The menu loads the optimized generated assets');
       const box=await menu.boundingBox();
       assert.ok(box.x>=0&&box.x+box.width<=viewport.width+1&&box.y>=0&&box.y+box.height<=viewport.height+1,JSON.stringify({viewport,language,box}));
       if(viewport.width<768){const sheet=await page.locator('#action-palette-card').boundingBox();assert.ok(box.y>=sheet.y&&box.y+box.height<=sheet.y+sheet.height+1,'The menu stays in the half-screen sheet');}

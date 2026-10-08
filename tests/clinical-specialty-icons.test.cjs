@@ -6,7 +6,7 @@ const root = path.resolve(__dirname, '..');
 const folder = path.join(root, 'assets/specialties-3d');
 const generation = JSON.parse(fs.readFileSync(path.join(folder, 'generation.json'), 'utf8'));
 
-test('all fresh specialty icons retain alpha at 3x UI resolution within a small download budget', () => {
+test('all fresh specialty icons retain alpha within a 64px maximum and a small download budget', () => {
   let total = 0;
   assert.equal(generation.icons.length, 15);
   for (const icon of generation.icons) {
@@ -15,8 +15,8 @@ test('all fresh specialty icons retain alpha at 3x UI resolution within a small 
     assert.equal(file.toString('ascii', 8, 12), 'WEBP', icon.file);
     assert.equal(file.toString('ascii', 12, 16), 'VP8X', icon.file);
     assert.ok(file[20] & 0x10, `${icon.file} keeps its alpha channel`);
-    assert.equal(file.readUIntLE(24, 3) + 1, 96, icon.file);
-    assert.equal(file.readUIntLE(27, 3) + 1, 96, icon.file);
+    assert.equal(file.readUIntLE(24, 3) + 1, 64, icon.file);
+    assert.equal(file.readUIntLE(27, 3) + 1, 64, icon.file);
     assert.ok(file.length < 8000, `${icon.file} stays below 8 KB`);
     total += file.length;
   }

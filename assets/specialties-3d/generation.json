@@ -52,7 +52,8 @@
     },
     {
       "file": "dental-pediatric.webp",
-      "subject": "Paediatric dentistry: one small rounded white baby molar and one small solid pale-yellow five-point star beside its upper right. Two objects only, no face or eyes."
+      "subject": "Paediatric dentistry: the same white porcelain two-root molar as the general-dentistry icon, with a small friendly baby's head beside its lower right. The tooth remains the main object; the baby's round warm-beige face, tiny brown hair curl, two simple dark eyes and subtle smile form one compact secondary object. Tooth plus baby head only, no body, neck, clothing, star, props or extra symbols.",
+      "promptOverride": "Use case: precise-object-edit. Create the replacement production paediatric-dentistry icon for Lumin. Reference 1 is the tooth from the existing newly generated icon set: keep this exact visual family, molar shape, white porcelain material, pale dental-blue side shading, orthographic three-quarter view and soft upper-left lighting. Reference 2 supplies the friendly clay-rendered head style, but simplify it into a baby with a round face and one tiny brown hair curl. Paediatric dentistry: the same white porcelain two-root molar as the general-dentistry icon, with a small friendly baby's head beside its lower right. The tooth remains the main object; the baby's round warm-beige face, tiny brown hair curl, two simple dark eyes and subtle smile form one compact secondary object. Tooth plus baby head only, no body, neck, clothing, star, props or extra symbols. Arrange both side by side as one compact icon, with the tooth on the left taking approximately 60% of the combined width and the baby head on the right taking 40%, aligned slightly lower; a very small overlap is acceptable but keep the entire face and the two tooth roots visible. Both must remain unmistakable when the finished square is exported to 64px and displayed at 32px. Center the combined silhouette, filling about 86% of the square. Soft satin 3D porcelain/clay, minimal details, transparent alpha background. No floor, cast shadow outside the objects, base, badge, circle, tile, text, outlines or decorative elements. Exactly two objects: a tooth and a baby's head."
     },
     {
       "file": "dental-imaging.webp",
@@ -64,8 +65,8 @@
     }
   ],
   "export": {
-    "width": 96,
-    "height": 96,
+    "width": 64,
+    "height": 64,
     "format": "webp",
     "quality": 82,
     "alphaQuality": 90,
