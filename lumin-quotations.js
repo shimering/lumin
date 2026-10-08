@@ -226,6 +226,17 @@
     const label=projection?.eligibleIds.length?t('Create quotation for selected planned procedures','إنشاء عرض أسعار للإجراءات المخططة المحددة'):t('Select a planned procedure to create a quotation','حدد إجراءً مخططاً لإنشاء عرض أسعار');
     trigger.setAttribute('aria-label',label);trigger.title=label;
   }
+  function renderFormLogo(value) {
+    const container=document.querySelector('#admin-quotation-settings .q-shared-logo');
+    if(!container)return;
+    const logo=view().logoDataUrl(value);
+    container.innerHTML=`<strong>${t('Clinic logo','شعار العيادة')}</strong><p>${t('Uses the logo saved in the prescription form settings.','يستخدم الشعار المحفوظ في إعدادات نموذج الوصفة الطبية.')}</p>${logo?`<img class="q-logo-preview" alt="${t('Clinic logo','شعار العيادة')}" src="${e(logo)}"/>`:`<p>${t('No form logo saved yet.','لم يُحفظ شعار للنموذج بعد.')}</p>`}<button type="button" class="q-button" data-form-logo>${icon('image')}${t('Manage form logo','إدارة شعار النموذج')}</button>`;
+    container.querySelector('[data-form-logo]').addEventListener('click',()=>{
+      const target=document.getElementById('prescription-print-logo-file')?.closest('section')||document.getElementById('admin-prescription-print-form');
+      target?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'center'});
+    });
+    if(root.lucide)lucide.createIcons();
+  }
   async function renderSettings() {
     const container=document.getElementById('admin-quotation-settings');
     if(!container||!currentUserAccess?.isAdmin)return;
@@ -234,24 +245,14 @@
     try {
       const {settings}=await api({action:'settings'});
       if(before!==sessionId()||!currentUserAccess?.isAdmin)return;
-      let logo=settings.logo_data_url||'';
       container.dir=language()==='ar'?'rtl':'ltr';
-      container.innerHTML=`<h3>${t('Quotation settings','إعدادات عروض الأسعار')}</h3><p>${t('Clinic identity and contact details shown on patient quotations.','اسم العيادة وبيانات التواصل التي تظهر في عروض أسعار المرضى.')}</p><form><div class="q-form-row"><label class="q-field">${t('Clinic name','اسم العيادة')}<input name="clinic_name" maxlength="120" required value="${e(settings.clinic_name)}"/></label><label class="q-field">${t('Clinic WhatsApp number','رقم واتساب العيادة')}<input name="whatsapp_phone" type="tel" inputmode="tel" placeholder="+20…" required value="${e(settings.whatsapp_phone)}" dir="ltr"/></label></div><label class="q-field">${t('Clinic logo (optional)','شعار العيادة (اختياري)')}<input name="logo" type="file" accept="image/png,image/jpeg,image/webp"/></label><img class="q-logo-preview" alt="" ${logo?`src="${e(logo)}"`:'hidden'}/><div class="q-form-row"><button type="button" class="q-button" data-remove-logo>${icon('image-off')}${t('Remove logo','إزالة الشعار')}</button><button type="submit" class="q-button q-primary">${icon('save')}${t('Save quotation settings','حفظ إعدادات عروض الأسعار')}</button></div><p class="q-feedback" role="status" data-settings-feedback hidden></p></form>`;
-      const form=container.querySelector('form'),image=container.querySelector('img'),status=container.querySelector('[data-settings-feedback]');
+      container.innerHTML=`<h3>${t('Quotation settings','إعدادات عروض الأسعار')}</h3><p>${t('Clinic identity and contact details shown on patient quotations.','اسم العيادة وبيانات التواصل التي تظهر في عروض أسعار المرضى.')}</p><form><div class="q-form-row"><label class="q-field">${t('Clinic name','اسم العيادة')}<input name="clinic_name" maxlength="120" required value="${e(settings.clinic_name)}"/></label><label class="q-field">${t('Clinic WhatsApp number','رقم واتساب العيادة')}<input name="whatsapp_phone" type="tel" inputmode="tel" placeholder="+20…" required value="${e(settings.whatsapp_phone)}" dir="ltr"/></label></div><div class="q-shared-logo"></div><div class="q-form-row"><button type="submit" class="q-button q-primary">${icon('save')}${t('Save quotation settings','حفظ إعدادات عروض الأسعار')}</button></div><p class="q-feedback" role="status" data-settings-feedback hidden></p></form>`;
+      const form=container.querySelector('form'),status=container.querySelector('[data-settings-feedback]');
       const show=message=>{status.textContent=message;status.hidden=false;};
-      form.logo.addEventListener('change',async()=>{
-        const file=form.logo.files[0];if(!file)return;
-        try {
-          if(file.size>5*1024*1024||!['image/png','image/jpeg','image/webp'].includes(file.type))throw new Error('image');
-          logo=await optimisePrescriptionLogo(file);
-          if(!/^data:image\/(png|jpeg|webp);base64,/.test(logo)||logo.length>300000)throw new Error('image');
-          image.src=logo;image.hidden=false;
-        } catch(_){show(t('Choose a PNG, JPEG, or WebP logo up to 5 MB.','اختر شعاراً بصيغة PNG أو JPEG أو WebP بحجم لا يتجاوز ٥ ميجابايت.'));}
-      });
-      container.querySelector('[data-remove-logo]').addEventListener('click',()=>{logo='';form.logo.value='';image.removeAttribute('src');image.hidden=true;});
+      renderFormLogo(settings.logo_data_url);
       form.addEventListener('submit',async event=>{
         event.preventDefault();const submit=form.querySelector('[type=submit]');submit.disabled=true;
-        try{await api({action:'save_settings',clinic_name:form.clinic_name.value,whatsapp_phone:form.whatsapp_phone.value,logo_data_url:logo});show(t('Quotation settings saved.','تم حفظ إعدادات عروض الأسعار.'));}
+        try{await api({action:'save_settings',clinic_name:form.clinic_name.value,whatsapp_phone:form.whatsapp_phone.value});show(t('Quotation settings saved.','تم حفظ إعدادات عروض الأسعار.'));}
         catch(_){show(t('Could not save. Check the clinic name and international WhatsApp number.','تعذر الحفظ. تحقق من اسم العيادة ورقم واتساب الدولي.'));}
         finally{submit.disabled=false;}
       });
@@ -262,6 +263,7 @@
   root.openPatientQuotations=openHistory;
   root.renderQuotationSelectionActions=renderSelection;
   root.renderQuotationSettings=renderSettings;
+  root.refreshQuotationFormLogo=renderFormLogo;
   root.resetQuotationUi=close;
   root.refreshQuotationLanguage=function() {
     const history=document.getElementById('profile-quotations-button');

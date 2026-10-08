@@ -100,8 +100,8 @@
   <script src="lumin-whatsapp-actions.js?v=2"></script>
   <script src="lumin-quotation-model.js?v=1"></script>
   <script src="lumin-tooth-anatomy.js?v=2"></script>
-  <script src="lumin-quotation-view.js?v=2"></script>
-  <script src="lumin-quotations.js?v=1"></script>
+  <script src="lumin-quotation-view.js?v=3"></script>
+  <script src="lumin-quotations.js?v=2"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <link rel="stylesheet" href="lumin-tooth-images.css?v=1" />
   
@@ -5304,7 +5304,7 @@
   <link rel="stylesheet" href="lumin-chart-appointments.css?v=1" />
   <link rel="stylesheet" href="lumin-clinical-actions.css?v=4" />
   <link rel="stylesheet" href="lumin-media-teeth.css?v=1" />
-  <link rel="stylesheet" href="lumin-quotations.css?v=2" />
+  <link rel="stylesheet" href="lumin-quotations.css?v=3" />
   <style id="finance-ledger-styles">
     #finance-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     #finance-summary-cards > div { min-width: 0; }
@@ -16127,6 +16127,7 @@
       if (catalogResult.error) throw catalogResult.error;
       if (templatesResult.error) throw templatesResult.error;
       prescriptionPrintSettings = normalisePrescriptionPrintSettings(settingsResult.data || DEFAULT_PRESCRIPTION_PRINT_SETTINGS);
+      if (typeof refreshQuotationFormLogo === 'function') refreshQuotationFormLogo(prescriptionPrintSettings.logoDataUrl);
       medicationCatalog = (catalogResult.data || []).map(normaliseMedicationCatalogEntry);
       prescriptionPrintSettingsLoaded = true;
       medicationCatalogLoaded = true;
@@ -16390,6 +16391,7 @@
         if (error) throw error;
         prescriptionPrintSettings = normalisePrescriptionPrintSettings(data);
         prescriptionPrintSettingsLoaded = true;
+        if (typeof refreshQuotationFormLogo === 'function') refreshQuotationFormLogo(prescriptionPrintSettings.logoDataUrl);
         renderAdminPrescriptionPrintSettings();
         setAdminMessage('admin-prescription-print-message', 'Prescription print form saved for the clinic.');
       } catch (error) {

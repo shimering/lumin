@@ -8,6 +8,7 @@ const {chromium}=require('playwright');
 const model=require('../lumin-quotation-model.js');
 const root=path.resolve(__dirname,'..');
 const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+const formLogo='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 const operations=[{code:'rct',name:'Root canal treatment',price:3500,action_scope:'whole',visual_code:'rct'},{code:'crown',name:'Zirconia crown',price:5500,action_scope:'whole',visual_code:'zirconia_crown'},{code:'composite',name:'Composite restoration',price:1400,action_scope:'surface',visual_code:'composite'},{code:'scaling',name:'Scaling and polishing',price:900,action_scope:'mouth',visual_code:'none'}];
 const chart={3:{wholeOperations:[{id:id(1),code:'rct',price:3500,status:'In'},{id:id(2),code:'crown',price:5500,status:'P'}]},19:{surfaces:{center:[{id:id(3),code:'composite',price:1400,status:'P'}],right:[{id:id(3),code:'composite',price:1400,status:'P'}]}},_meta:{mouthOperations:[{id:id(4),code:'scaling',price:900,status:'P'}]}};
 const sample=()=>({reference:'QT-12345678',patientName:'Omar Hassan',language:'en',expiresAt:new Date(Date.now()+30*864e5).toISOString(),clinic:{name:'Noura Dental',logo:'',whatsapp:'201001234567'},...model.publicProjection(chart,operations,[1,2,3,4].map(id))});
@@ -124,15 +125,22 @@ test('quotation uses the clinic tooth images and orientations for permanent and 
   assert.deepEqual(errors,[]);
 });
 
-test('the same token refreshes prices and completion, then removes patient information on revocation or a network failure',async t=>{
+test('the same token follows form logo changes, prices and completion, then clears patient information on revocation or network failure',async t=>{
   const {page,base,errors}=await setup(t);
   let response=sample(),status=200,offline=false;
+  response.clinic.logo=formLogo;
   await page.route('**/functions/v1/quotation-view',route=>offline?route.abort('failed'):route.fulfill({status,json:status===200?response:{error:'Quotation unavailable.'}}));
   await page.goto(base+'/quotation.html#'+'a'.repeat(64));await page.waitForSelector('.q-procedure');
+  assert.equal(await page.locator('.q-clinic-logo').getAttribute('src'),formLogo);
+  const updatedLogo=await page.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=canvas.height=2;const ctx=canvas.getContext('2d');ctx.fillStyle='#2563eb';ctx.fillRect(0,0,2,2);return canvas.toDataURL('image/png');});
+  response.clinic.logo=updatedLogo;
   response.items=response.items.filter(item=>item.visualCode!=='rct');response.total=7800;
   await page.evaluate(()=>window.dispatchEvent(new Event('online')));
   await page.waitForFunction(()=>document.querySelectorAll('.q-procedure').length===3);
   assert.match(await page.locator('.q-total').textContent(),/7,800/);
+  assert.equal(await page.locator('.q-clinic-logo').getAttribute('src'),updatedLogo);
+  response.clinic.logo='';await page.evaluate(()=>window.dispatchEvent(new Event('online')));
+  await page.waitForFunction(()=>!document.querySelector('.q-clinic-logo'));
   status=404;await page.evaluate(()=>window.dispatchEvent(new Event('online')));await page.waitForSelector('.q-page-status h1');
   assert.doesNotMatch(await page.locator('main').textContent(),/Omar|7,800|Noura/);
   assert.equal(await page.locator('.q-procedure').count(),0);
@@ -149,7 +157,7 @@ test('selection actions stay adjacent; mixed selections quote only planned proce
   const head=html.slice(0,html.indexOf('</head>')+7).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'');
   const group=html.match(/<div id="findings-selection-actions"[\s\S]*?<\/div>/)[0];
   const source=name=>{const start=html.indexOf('    function '+name+'(');return html.slice(start,html.indexOf('\n    }',start)+6);};
-  await page.route(base+'/staff',route=>route.fulfill({contentType:'text/html',body:`${head}<body><main>${group}<button id="history" onclick="openPatientQuotations()">History</button><div id="admin-quotation-settings"></div></main></body>`}));
+  await page.route(base+'/staff',route=>route.fulfill({contentType:'text/html',body:`${head}<body><main>${group}<button id="history" onclick="openPatientQuotations()">History</button><div id="admin-quotation-settings"></div><form id="admin-prescription-print-form"><section><input id="prescription-print-logo-file" type="file"/></section></form></main></body>`}));
   await page.goto(base+'/staff');
   await page.addScriptTag({path:path.join(root,'vendor/lucide.min.js')});
   for(const filename of ['lumin-quotation-model.js','lumin-tooth-anatomy.js','lumin-quotation-view.js'])await page.addScriptTag({path:path.join(root,filename)});
@@ -158,7 +166,7 @@ test('selection actions stay adjacent; mixed selections quote only planned proce
     let selectedFindingIds=new Set(['${id(1)}','${id(2)}']),invoicedFindingIds=new Set(),chartInvoiceStateLoading=false;
     const chart=${JSON.stringify(chart)},dentalOperations=${JSON.stringify(operations)};
     const patient={id:activePatientId,name:'Omar Hassan',phone:'01001234567',chartState:chart};
-    const settings={clinic_name:'Noura Dental',logo_data_url:'',whatsapp_phone:'201001234567'};
+    const settings={clinic_name:'Noura Dental',logo_data_url:'${formLogo}',whatsapp_phone:'201001234567'};
     let savedQuote=null;window.payloads=[];
     function getActivePatient(){return patient;} function patientWorkspaceId(){return activePatientId;} function hasPageAccess(){return true;}
     async function saveActivePatientChart(){return true;} async function waitForPatientChartSaves(){}
@@ -177,6 +185,7 @@ test('selection actions stay adjacent; mixed selections quote only planned proce
   await page.locator('#findings-invoice-button').click();assert.deepEqual(await page.evaluate(()=>window.invoiceSelection),[id(1),id(2)]);
   await page.locator('#findings-quotation-button').click();await page.waitForSelector('#quotation-expiry');
   assert.equal(await page.locator('#quotation-preview .q-procedure').count(),1);
+  assert.equal(await page.locator('#quotation-preview .q-clinic-logo').getAttribute('src'),formLogo);
   assert.match(await page.locator('.q-feedback:not([hidden])').textContent(),/Only selected/);
   await page.locator('[data-quote-action=save]').click();await page.waitForSelector('.q-link-field');
   const payload=await page.evaluate(()=>window.payloads.find(body=>body.action==='create'));
@@ -191,9 +200,19 @@ test('selection actions stay adjacent; mixed selections quote only planned proce
   await page.evaluate(()=>{currentUiLanguage='ar';renderQuotationSettings();});await page.waitForSelector('#admin-quotation-settings form');
   assert.match(await page.locator('#admin-quotation-settings h3').textContent(),/إعدادات/);
   assert.equal(await page.locator('#admin-quotation-settings').getAttribute('dir'),'rtl');
+  assert.equal(await page.locator('#admin-quotation-settings .q-logo-preview').getAttribute('src'),formLogo);
+  assert.equal(await page.locator('#admin-quotation-settings input[type=file]').count(),0);
+  await page.locator('[data-form-logo]').click();
+  assert.match(await page.locator('[data-form-logo]').textContent(),/إدارة شعار النموذج/);
   await page.locator('[name=clinic_name]').fill('Updated clinic');
+  await page.evaluate(()=>refreshQuotationFormLogo(''));
+  assert.equal(await page.locator('#admin-quotation-settings .q-logo-preview').count(),0);
+  assert.match(await page.locator('.q-shared-logo').textContent(),/لم يُحفظ شعار/);
+  assert.equal(await page.locator('[name=clinic_name]').inputValue(),'Updated clinic');
+  await page.evaluate(logo=>refreshQuotationFormLogo(logo),formLogo);
   await page.locator('[name=whatsapp_phone]').fill('+20 1001234567');
   await page.locator('#admin-quotation-settings [type=submit]').click();
   await page.waitForFunction(()=>window.payloads.some(body=>body.action==='save_settings'&&body.clinic_name==='Updated clinic'));
+  assert.equal(await page.evaluate(()=>Object.hasOwn(window.payloads.find(body=>body.action==='save_settings'),'logo_data_url')),false);
   assert.deepEqual(errors,[]);
 });

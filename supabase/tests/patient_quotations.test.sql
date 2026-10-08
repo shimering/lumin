@@ -1,4 +1,6 @@
 begin;
+update public.prescription_print_settings set logo_data_url='data:image/png;base64,Zm9ybWxvZ28=' where id=1;
+update public.quotation_settings set logo_data_url='data:image/png;base64,bGVnYWN5' where id=1;
 do $$
 declare actor uuid;
 begin
@@ -32,9 +34,22 @@ reset role;
 set local role service_role;
 do $$ begin
   if public.quotation_source(repeat('a',64))->>'patient_name' <> 'Quotation test patient' then raise exception 'Valid source unavailable'; end if;
+  if public.quotation_source(repeat('a',64))#>>'{clinic,logo}' is distinct from 'data:image/png;base64,Zm9ybWxvZ28=' then raise exception 'Quotation did not use the form logo'; end if;
   if public.quotation_source(repeat('b',64)) is not null then raise exception 'Expired source available'; end if;
   if public.quotation_source(repeat('c',64)) is not null then raise exception 'Revoked source available'; end if;
   if public.quotation_source(repeat('d',64)) is not null then raise exception 'Invalid source available'; end if;
+end; $$;
+reset role;
+update public.prescription_print_settings set logo_data_url='data:image/webp;base64,dXBkYXRlZA==' where id=1;
+set local role service_role;
+do $$ begin
+  if public.quotation_source(repeat('a',64))#>>'{clinic,logo}' is distinct from 'data:image/webp;base64,dXBkYXRlZA==' then raise exception 'Existing link did not follow form logo changes'; end if;
+end; $$;
+reset role;
+update public.prescription_print_settings set logo_data_url=null where id=1;
+set local role service_role;
+do $$ begin
+  if public.quotation_source(repeat('a',64))#>>'{clinic,logo}' is distinct from '' then raise exception 'Removed form logo fell back to the legacy quotation logo'; end if;
 end; $$;
 reset role;
 delete from public.patients where id='11111111-1111-4111-8111-111111111111';

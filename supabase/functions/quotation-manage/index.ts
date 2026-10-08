@@ -4,7 +4,7 @@ import "../../../lumin-quotation-model.js";
 const headers = {"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, apikey, content-type, x-client-info","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json","Cache-Control":"no-store, private"};
 const respond = (body: unknown,status=200) => new Response(JSON.stringify(body),{status,headers});
 const model = (globalThis as any).LuminQuotationModel;
-const settingColumns = "id,clinic_name,logo_data_url,whatsapp_phone,updated_at";
+const settingColumns = "id,clinic_name,whatsapp_phone,updated_at";
 const quoteColumns = "id,patient_id,selected_ids,token,language,expires_at,revoked_at,revision,created_at,updated_at";
 
 Deno.serve(async (request: Request) => {
@@ -25,20 +25,25 @@ Deno.serve(async (request: Request) => {
     const raw = await request.text();
     if (raw.length > 350000) return respond({error:"Request too large."},413);
     const body = JSON.parse(raw);
+    async function settingsResponse(result: any) {
+      if (result.error) return respond({error:"Could not load quotation settings."},503);
+      // Expose only the logo to authorized chart staff, never the complete print settings.
+      const form = await admin.from("prescription_print_settings").select("logo_data_url").eq("id",1).maybeSingle();
+      if (form.error) return respond({error:"Could not load the clinic form logo."},503);
+      return respond({settings:{...result.data,logo_data_url:form.data?.logo_data_url || ""}});
+    }
     if (body.action === "settings") {
       const result = await userClient.from("quotation_settings").select(settingColumns).eq("id",1).single();
-      if (result.error) return respond({error:"Could not load quotation settings."},503);
-      return respond({settings:result.data});
+      return await settingsResponse(result);
     }
     if (body.action === "save_settings") {
       if (!role?.is_admin) return respond({error:"Administrator access required."},403);
       const name = String(body.clinic_name || "").trim();
-      const logo = String(body.logo_data_url || "");
       const phone = String(body.whatsapp_phone || "").replace(/[\s+()-]/g,"");
-      if (!name || name.length > 120 || !/^[1-9][0-9]{6,14}$/.test(phone) || logo.length > 300000 || (logo && !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(logo))) return respond({error:"Enter a clinic name, an international WhatsApp number, and a valid PNG, JPEG, or WebP logo."},400);
-      const result = await admin.from("quotation_settings").update({clinic_name:name,logo_data_url:logo,whatsapp_phone:phone,updated_at:new Date().toISOString()}).eq("id",1).select(settingColumns).single();
+      if (!name || name.length > 120 || !/^[1-9][0-9]{6,14}$/.test(phone)) return respond({error:"Enter a clinic name and an international WhatsApp number."},400);
+      const result = await admin.from("quotation_settings").update({clinic_name:name,whatsapp_phone:phone,updated_at:new Date().toISOString()}).eq("id",1).select(settingColumns).single();
       if (result.error) return respond({error:"Could not save quotation settings."},503);
-      return respond({settings:result.data});
+      return await settingsResponse(result);
     }
     if (!model.validId(body.patient_id)) return respond({error:"Invalid patient."},400);
     // Read through the caller's RLS, even though writes below use the service role.

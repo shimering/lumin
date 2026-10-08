@@ -17,7 +17,7 @@ function fixture(name,options={}) {
   const settings={id:1,clinic_name:'Fixture clinic',whatsapp_phone:'201001234567',logo_data_url:''};
   const operations=[{code:'crown',name:'Crown',action_scope:'whole',visual_code:'zirconia_crown',price:500}];
   const source={...record,patient_name:'Fixture patient',chart_state:patient.chart_state,operations,clinic:{name:settings.clinic_name,whatsapp:settings.whatsapp_phone,logo:''}};
-  const state={patient,record,settings,operations,source};
+  const state={patient,record,settings,operations,source,printSettings:{logo_data_url:'data:image/png;base64,Zm9ybWxvZ28=',footer_text:'PRIVATE FORM CONTENT'}};
   function client(service) {
     return {
       auth:{getUser:async()=>({data:{user:options.badSession?null:{id:id(80)}},error:options.badSession?'bad':null})},
@@ -27,7 +27,7 @@ function fixture(name,options={}) {
       },
       from(table) {
         const filters=[],query={operation:'read',payload:null,
-          select(){return query;},eq(key,value){filters.push([key,value]);return query;},is(key,value){filters.push([key,value]);return query;},order(){return query;},limit(){return query;},
+          select(columns){query.columns=columns;return query;},eq(key,value){filters.push([key,value]);return query;},is(key,value){filters.push([key,value]);return query;},order(){return query;},limit(){return query;},
           insert(payload){query.operation='insert';query.payload=payload;return query;},update(payload){query.operation='update';query.payload=payload;return query;},
           single(){return Promise.resolve(result());},maybeSingle(){return Promise.resolve(result());},then(resolve,reject){return Promise.resolve(result()).then(resolve,reject);}
         };
@@ -41,6 +41,7 @@ function fixture(name,options={}) {
           if(table==='user_profiles')return {data:{active:!options.inactive,access_roles:{is_admin:options.admin!==false,role_permissions:options.noChart?[]:[{page_key:'chart',can_view:true}]}},error:null};
           if(table==='patients')return {data:options.patientDenied?null:patient,error:null};
           if(table==='quotation_settings')return {data:settings,error:null};
+          if(table==='prescription_print_settings') {assert.ok(service);assert.equal(query.columns,'logo_data_url');return {data:state.printSettings,error:options.logoError?'failed':null};}
           if(table==='dental_operations')return {data:operations,error:null};
           if(table==='patient_quotations')return {data:filters.every(([key,value])=>record[key]===value)?record:null,error:null};
           throw new Error(table);
@@ -115,7 +116,24 @@ test('revocation and administrator branding validate their writes',async()=>{
   const result=await app.call({action:'revoke',patient_id:id(90),id:id(99),revision:1});
   assert.equal(result.status,200);assert.ok(result.body.quotation.revoked_at);assert.equal(result.body.quotation.revision,2);
   assert.equal((await app.call({action:'save_settings',clinic_name:'Clinic',whatsapp_phone:'bad'})).status,400);
-  assert.equal((await app.call({action:'save_settings',clinic_name:'Clinic',whatsapp_phone:'+20 100 1234567',logo_data_url:'data:image/svg+xml;base64,abcd'})).status,400);
   assert.equal((await app.call({action:'save_settings',clinic_name:'Clinic',whatsapp_phone:'+20 100 1234567',logo_data_url:''})).status,200);
   assert.equal(app.writes.at(-1).payload.whatsapp_phone,'201001234567');
+  assert.equal(Object.hasOwn(app.writes.at(-1).payload,'logo_data_url'),false);
+});
+
+test('staff branding follows the current form logo and legacy quotation writes cannot change it',async()=>{
+  const app=fixture('quotation-manage',{admin:false});
+  app.state.settings.logo_data_url='LEGACY QUOTATION LOGO';
+  const first=await app.call({action:'settings'});
+  assert.equal(first.status,200);assert.equal(first.body.settings.logo_data_url,app.state.printSettings.logo_data_url);
+  assert.doesNotMatch(JSON.stringify(first.body),/PRIVATE FORM CONTENT|footer_text|LEGACY/);
+  app.state.printSettings.logo_data_url='data:image/webp;base64,dXBkYXRlZA==';
+  assert.equal((await app.call({action:'settings'})).body.settings.logo_data_url,app.state.printSettings.logo_data_url);
+  app.state.printSettings.logo_data_url=null;
+  assert.equal((await app.call({action:'settings'})).body.settings.logo_data_url,'');
+  const admin=fixture('quotation-manage');
+  const saved=await admin.call({action:'save_settings',clinic_name:'Clinic',whatsapp_phone:'+20 1001234567',logo_data_url:'data:image/svg+xml;base64,abcd'});
+  assert.equal(saved.status,200);assert.equal(saved.body.settings.logo_data_url,admin.state.printSettings.logo_data_url);
+  assert.equal(Object.hasOwn(admin.writes[0].payload,'logo_data_url'),false);
+  assert.equal((await fixture('quotation-manage',{logoError:true}).call({action:'settings'})).status,503);
 });
