@@ -1,0 +1,74 @@
+{
+  "tool": "Built-in image_gen",
+  "stylePrompt": "Use case: stylized-concept. Asset type: a single production UI icon for Lumin, a refined dental clinic app. Render a fresh minimal 3D clay/porcelain icon, designed to remain clear at 28-32 CSS pixels. Centered isolated object, orthographic three-quarter front view, compact bold silhouette, soft satin ceramic materials, white porcelain plus one restrained pastel accent, gentle light from upper left, subtle object self-shadow. Real transparent alpha background. Object fills approximately 82% of the square canvas with clean transparent padding. Maximum two simple visual elements. No floor, base, badge, circle, tile, backdrop, cast shadow outside object, lettering, numbers, watermarks, outlines, tiny tools, or fine decorative details. ",
+  "icons": [
+    {
+      "file": "dental-general.webp",
+      "subject": "General dentistry: one friendly anatomical white porcelain molar with a very pale dental-blue shaded side; two short distinct roots, simple rounded crown. Only the tooth."
+    },
+    {
+      "file": "dental-diagnosis.webp",
+      "subject": "Diagnosis: one white porcelain molar and one small thick navy-blue magnifying glass overlapping its lower right. Two objects only."
+    },
+    {
+      "file": "dental-preventive.webp",
+      "subject": "Preventive dentistry: one white porcelain molar with one small solid pastel-mint shield overlapping its lower right. No symbols or extra objects."
+    },
+    {
+      "file": "dental-restorative.webp",
+      "subject": "Restorative dentistry: a single white porcelain molar viewed slightly from above, with one clearly visible turquoise-blue inlay filling on its chewing surface. Tooth plus filling, no instruments."
+    },
+    {
+      "file": "dental-endodontics.webp",
+      "subject": "Endodontics: one white porcelain molar in a simplified cutaway view with one bold coral-red root-canal path visible inside the two roots. Single tooth cutaway; no tools."
+    },
+    {
+      "file": "dental-crown.webp",
+      "subject": "Crowns: one elegant simple tooth-shaped ceramic crown cap with a warm pale-gold exterior and a subtle white porcelain lower rim. A single crown, no tooth underneath and no royal crown."
+    },
+    {
+      "file": "dental-prosthodontics.webp",
+      "subject": "Prosthodontics: a compact two-unit porcelain dental bridge, two adjacent simple white tooth crowns joined by a short pale-blue connector. Two crowns only; no roots, tools, or gum."
+    },
+    {
+      "file": "dental-implantology.webp",
+      "subject": "Implant dentistry: a simple white porcelain tooth crown seated on a short titanium-silver threaded dental implant screw. Crown and screw only; thick readable threads."
+    },
+    {
+      "file": "dental-periodontics.webp",
+      "subject": "Periodontics: one clean white porcelain molar seated in one small soft coral-pink curved gum segment. Tooth and gum only, no bone or instruments."
+    },
+    {
+      "file": "dental-cosmetics.webp",
+      "subject": "Cosmetic dentistry: one beautifully smooth white porcelain front incisor and one small solid lavender four-point sparkle near its upper right. Two elements only."
+    },
+    {
+      "file": "dental-surgery.webp",
+      "subject": "Oral surgery: one white porcelain tooth beside one compact silver dental extraction forceps with soft steel-blue handles. Two clear simple objects, chunky shapes, no blood."
+    },
+    {
+      "file": "dental-orthodontics.webp",
+      "subject": "Orthodontics: one white porcelain front incisor with one simple silver-blue orthodontic bracket centered on its face. Tooth and bracket only; a short thick blue horizontal wire integrated into the bracket."
+    },
+    {
+      "file": "dental-pediatric.webp",
+      "subject": "Paediatric dentistry: one small rounded white baby molar and one small solid pale-yellow five-point star beside its upper right. Two objects only, no face or eyes."
+    },
+    {
+      "file": "dental-imaging.webp",
+      "subject": "Dental imaging: one small translucent deep-blue radiograph plate containing a single bright white simplified tooth silhouette. A single rectangular plate with softly rounded corners; no frame, lettering or plus symbols."
+    },
+    {
+      "file": "dental-oral-medicine.webp",
+      "subject": "Oral medicine: one small white porcelain molar beside one simple mint-and-white medicine capsule. Tooth and capsule only, clearly separated silhouettes."
+    }
+  ],
+  "export": {
+    "width": 96,
+    "height": 96,
+    "format": "webp",
+    "quality": 82,
+    "alphaQuality": 90,
+    "effort": 6
+  }
+}

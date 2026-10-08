@@ -33,6 +33,7 @@ function updateClinicalActionsRailLayout() {
   workspace.classList.toggle('is-clinical-actions-open', clinicalActionsPanel.open);
   workspace.classList.toggle('is-chart-rail-collapsed', !clinicalActionsPanel.open && !mediaOpen && !appointmentsOpen);
   panel.classList.toggle('is-collapsed', !clinicalActionsPanel.open);
+  if (!clinicalActionsPanel.open && typeof closeClinicalSpecialtyPicker === 'function') closeClinicalSpecialtyPicker();
   panel.inert = mobile && !clinicalActionsPanel.open;
   if (mobile && clinicalActionsPanel.open) panel.setAttribute('role', 'dialog');
   else panel.removeAttribute('role');
@@ -192,6 +193,7 @@ function filterClinicalActionsOperations(value) {
 
 function filterClinicalActionsSpecialty(value) {
   clinicalActionsPanel.specialty = String(value || '');
+  renderClinicalSpecialtyPicker();
   renderClinicalActionsOperationList();
 }
 
@@ -199,7 +201,7 @@ function resetClinicalActionsFilters() {
   clinicalActionsPanel.query = '';
   clinicalActionsPanel.specialty = '';
   document.getElementById('chart-actions-search').value = '';
-  document.getElementById('chart-actions-specialty-filter').value = '';
+  renderClinicalSpecialtyPicker();
   renderClinicalActionsOperationList();
 }
 
@@ -250,13 +252,9 @@ function syncClinicalActionsPanel() {
   statusSelect.innerHTML = statuses.map(([value, english, arabic]) => `<option value="${value}">${clinicalActionsText(english, arabic)}</option>`).join('');
   statusSelect.value = activeClinicalOperationStatus;
   statusSelect.dataset.status = activeClinicalOperationStatus;
-  const specialtyFilter = document.getElementById('chart-actions-specialty-filter');
   document.getElementById('chart-actions-operations').setAttribute('aria-label', clinicalActionsText('Dental procedures', 'إجراءات الأسنان'));
   const specialties = activeDentalSpecialties();
-  if (!specialties.some(specialty => specialty.id === clinicalActionsPanel.specialty)) clinicalActionsPanel.specialty = '';
-  specialtyFilter.innerHTML = `<option value="">${clinicalActionsText('All specialties', 'كل التخصصات')}</option>${specialties.map(specialty => `<option value="${escapeHtml(specialty.id)}">${escapeHtml(specialty.name)}</option>`).join('')}`;
-  specialtyFilter.value = clinicalActionsPanel.specialty;
-  specialtyFilter.setAttribute('aria-label', clinicalActionsText('Filter procedures by specialty', 'تصفية الإجراءات حسب التخصص'));
+  renderClinicalSpecialtyPicker(specialties);
   const clear = document.getElementById('chart-actions-clear-selection');
   clear.disabled = !targets.length;
   clear.setAttribute('aria-label', clinicalActionsText('Clear tooth selection', 'إلغاء تحديد الأسنان'));

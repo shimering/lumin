@@ -27,6 +27,23 @@
 .chart-actions-search input { width: 100%; min-width: 0; padding-block: 10px; border: 0; background: transparent; outline: none; font-size: 14px; color: #334155; }
 .chart-actions-select { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 12px; background: var(--lumin-face, #fff); color: #475569; font-size: 12px; cursor: pointer; transition: border-color 150ms ease-out; }
 .chart-actions-select:hover { border-color: #cbd5e1; }
+.chart-specialty-trigger { display: flex; align-items: center; gap: 8px; padding: 5px 10px; text-align: start; }
+.chart-specialty-trigger > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chart-specialty-trigger > svg { width: 14px; height: 14px; flex: none; color: #94a3b8; }
+.chart-specialty-trigger[aria-expanded="true"] { border-color: #93c5fd; background: #f8fafc; }
+.chart-specialty-trigger:active { transform: scale(.98); }
+.chart-specialty-icon { display: block; width: 32px; height: 32px; object-fit: contain; flex: 0 0 32px; pointer-events: none; }
+.chart-specialty-menu { position: fixed; z-index: 92; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 6px; border: 1px solid #e2e8f0; border-radius: 16px; background: var(--lumin-face, #fff); box-shadow: 0 12px 36px #0f172a26; }
+.chart-specialty-menu[hidden] { display: none; }
+.chart-specialty-option { display: flex; align-items: center; gap: 12px; width: 100%; min-height: calc(48px / var(--lumin-app-scale, 1)); padding: 6px 10px; border: 0; border-radius: 10px; background: transparent; color: #334155; font-size: 13px; text-align: start; cursor: pointer; transition: background 150ms ease-out, transform 150ms ease-out; }
+.chart-specialty-option > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.chart-specialty-option > svg { width: 16px; height: 16px; flex: none; color: #2563eb; opacity: 0; }
+.chart-specialty-option[aria-selected="true"] { background: #eff6ff; color: #1d4ed8; }
+.chart-specialty-option[aria-selected="true"] > svg { opacity: 1; }
+.chart-specialty-option:hover { background: #f1f5f9; }
+.chart-specialty-option:active { transform: scale(.98); }
+.chart-specialty-option:focus-visible { outline: 2px solid #93c5fd; outline-offset: -2px; background: #eff6ff; }
+.chart-specialty-option:disabled { opacity: .5; pointer-events: none; }
 #chart-actions-operations { flex: 1 1 auto; min-height: 96px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 0 8px 8px; }
 .chart-actions-operation { display: flex; align-items: center; width: 100%; gap: 10px; min-height: 64px; padding: 10px 8px; border: 0; border-radius: 12px; background: transparent; color: #334155; text-align: start; cursor: pointer; transition: background 150ms ease-out, transform 150ms ease-out; }
 .chart-actions-operation:hover { background: #f8fafc; }
@@ -120,5 +137,5 @@ html.chart-actions-mobile .chart-actions-panel.is-sheet-dragging { transition: n
   html.chart-actions-mobile .chart-actions-footer { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .chart-actions-panel, .chart-actions-panel *, #chart-clinical-workspace.has-clinical-actions-panel { transition: none !important; animation: none !important; }
+  .chart-actions-panel, .chart-actions-panel *, .chart-specialty-option, #chart-clinical-workspace.has-clinical-actions-panel { transition: none !important; animation: none !important; }
 }

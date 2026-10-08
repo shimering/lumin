@@ -52,7 +52,7 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
     const OPERATION_STATUSES={P:{color:'#dc2626'},In:{color:'#2563eb'},C:{color:'#16a34a'},E:{color:'#000'}};
     const chartPatientMedia={collapsed:true}, chartAppointments={collapsed:true};
     let openChartSpecialtyMenuId='', chartProcedureMenuFilter='', dentalCustomizationLoaded=true;
-    let dentalSpecialties=[{id:'restoration',name:'Restoration',active:true},{id:'endo',name:'Endo',active:true}];
+    let dentalSpecialties=[{id:'restoration',name:'Restoration',iconName:'dental-restorative',active:true},{id:'endo',name:'Endo',iconName:'dental-endodontics',active:true}];
     let dentalOperations=[
       {id:'composite',name:'Composite filling',specialtyId:'restoration',active:true,actionScope:'surface',code:'composite',price:500,steps:[]},
       {id:'crown',name:'Crown',specialtyId:'restoration',active:true,actionScope:'tooth',code:'crown',price:1500,steps:[]},
@@ -102,6 +102,7 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
     renderClinicalActionSelectors();renderChartMediaPanel();renderChartAppointmentsPanel();
   ` });
   await page.addScriptTag({ path: path.join(root, 'lumin-mobile-nav.js') });
+  await page.addScriptTag({ path: path.join(root, 'lumin-specialty-picker.js') });
   await page.addScriptTag({ path: path.join(root, 'lumin-clinical-actions.js') });
   await page.evaluate(() => { document.dispatchEvent(new Event('DOMContentLoaded')); updateSelectionUI(); });
   const screenshots = path.join(os.tmpdir(), 'lumin-clinical-actions-panel');
@@ -191,7 +192,8 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
   assert.match(await page.locator('#chart-actions-operations').textContent(),/No matching procedures/);
   await page.locator('#chart-actions-operations button').click();
   assert.equal(await page.locator('[data-clinical-operation]').count(),4);
-  await page.locator('#chart-actions-specialty-filter').selectOption('endo');
+  await page.locator('#chart-actions-specialty-trigger').click();
+  await page.locator('[data-clinical-specialty="endo"]').click();
   assert.equal(await page.locator('[data-clinical-operation]').count(),2);
   await page.evaluate(()=>{resetClinicalActionsFilters();toggleSelectedChartTooth('4',4);});
   await page.locator('[data-clinical-operation="crown"] svg').click();
@@ -210,6 +212,45 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
   assert.equal(await page.locator('#chart-actions-search').inputValue(),'');
   assert.equal(await page.locator('#chart-actions-specialty-filter').inputValue(),'');
   assert.equal(await page.evaluate(()=>Object.keys(getActivePatient().chartState).length),0,'Patient change does not carry draft work into another chart');
+  await t.test('specialty icon menu supports keyboard selection and stays inside mobile and RTL bounds', async () => {
+    for(const viewport of [{width:1440,height:900},{width:800,height:600},{width:390,height:844},{width:320,height:568}])for(const language of ['en','ar']){
+      await page.setViewportSize(viewport);
+      await page.evaluate(language=>{
+        currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';
+        activeSelection=emptyChartSelection();resetClinicalActionsFilters();updateSelectionUI();toggleSelectedChartTooth('1',1);
+      },language);
+      const trigger=page.locator('#chart-actions-specialty-trigger'),menu=page.locator('#chart-actions-specialty-menu');
+      await trigger.click();
+      assert.equal(await trigger.getAttribute('aria-expanded'),'true');
+      assert.equal(await menu.getAttribute('dir'),language==='ar'?'rtl':'ltr');
+      assert.equal(await menu.locator('[role="option"] .chart-specialty-icon').count(),3);
+      assert.match(await menu.locator('[data-clinical-specialty="endo"] img').getAttribute('src'),/specialties-3d\/dental-endodontics.webp/);
+      assert.deepEqual(await menu.locator('img').evaluateAll(async images=>Promise.all(images.map(async img=>{img.loading='eager';await img.decode();return [img.naturalWidth,img.naturalHeight];}))),[[96,96],[96,96],[96,96]],'The menu loads the optimized generated assets');
+      const box=await menu.boundingBox();
+      assert.ok(box.x>=0&&box.x+box.width<=viewport.width+1&&box.y>=0&&box.y+box.height<=viewport.height+1,JSON.stringify({viewport,language,box}));
+      if(viewport.width<768){const sheet=await page.locator('#action-palette-card').boundingBox();assert.ok(box.y>=sheet.y&&box.y+box.height<=sheet.y+sheet.height+1,'The menu stays in the half-screen sheet');}
+      const option=await menu.locator('[data-clinical-specialty="endo"]').boundingBox();
+      assert.ok(option.height>=44,'Specialty choices are touch sized');
+      if(viewport.width===1440||viewport.width===390)await page.screenshot({path:path.join(screenshots,`specialty-menu-${viewport.width}-${language}.png`)});
+      await page.keyboard.press('End');await page.keyboard.press('Enter');
+      assert.equal(await menu.isVisible(),false);
+      assert.match(await trigger.textContent(),/Endo/);
+      assert.match(await trigger.locator('img').getAttribute('src'),/dental-endodontics.webp/);
+      assert.equal(await page.locator('[data-clinical-operation]').count(),2,'The illustrated menu filters procedures');
+      assert.deepEqual(await page.evaluate(()=>chartSelectionTargets().map(target=>target.tooth)),['1'],'Filtering preserves selected teeth');
+      assert.equal(await page.locator('#chart-actions-toggle').getAttribute('aria-expanded'),'true','Filtering keeps Clinical Actions open');
+      await trigger.press('ArrowDown');
+      await page.keyboard.press('Escape');
+      assert.equal(await menu.isVisible(),false);
+      assert.equal(await page.locator('#chart-actions-toggle').getAttribute('aria-expanded'),'true','Escape closes the specialty menu first');
+      await trigger.click();
+      await menu.locator('[data-clinical-specialty=""]').click();
+      assert.equal(await page.locator('[data-clinical-operation]').count(),4);
+      await trigger.click();
+      await page.evaluate(()=>setClinicalActionsPanelOpen(false));
+      assert.equal(await menu.isVisible(),false,'Closing the sheet removes the portal menu');
+    }
+  });
   await t.test('mobile half-screen sheet supports multiple teeth and native swipe dismissal without a floating bar', async st => {
     const touch=await page.context().newCDPSession(page);
     st.after(()=>touch.detach());

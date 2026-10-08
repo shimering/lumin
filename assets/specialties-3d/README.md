@@ -1,0 +1,15 @@
+# Clinical specialty icons
+
+Fifteen fresh icons generated with the built-in `image_gen` tool. Each design uses one or two simple elements on a transparent background. Existing Lumin illustrations were not used as references.
+
+The UI displays the icons at 32px. The shipped WebP assets are 96 x 96px for high-density displays, retain alpha transparency, and are cached with the offline shell. Each icon has an 8 KB budget; the whole set has a 64 KB budget.
+
+The exact style prompt, individual subjects and export settings are saved in [generation.json](generation.json). Full prompts are the style prompt followed by the subject of each icon.
+
+To reproduce the optimized exports, supply a JSON object mapping icon names (without extension) to their generated PNG source paths:
+
+```sh
+node scripts/optimize-specialty-icons.cjs /path/to/source-map.json
+```
+
+The export script uses `sharp` from the configured Node dependency runtime. Original generated images remain in Codex's generated-images folder.

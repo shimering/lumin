@@ -89,7 +89,8 @@
   <script src="lumin-tooth-notes.js?v=3"></script>
   <script src="lumin-chart-appointments.js?v=3"></script>
   <script src="lumin-chart-dates.js?v=1"></script>
-  <script src="lumin-clinical-actions.js?v=3"></script>
+  <script src="lumin-specialty-picker.js?v=1"></script>
+  <script src="lumin-clinical-actions.js?v=4"></script>
   <link rel="stylesheet" href="lumin-chart-dates.css?v=1" />
   <script src="lumin-media-teeth.js?v=2"></script>
   <script src="lumin-nav-motion.js?v=1"></script>
@@ -5516,7 +5517,7 @@
   <link rel="stylesheet" href="lumin-xray-rotation.css?v=1" />
   <link rel="stylesheet" href="lumin-tooth-notes.css?v=4" />
   <link rel="stylesheet" href="lumin-chart-appointments.css?v=1" />
-  <link rel="stylesheet" href="lumin-clinical-actions.css?v=2" />
+  <link rel="stylesheet" href="lumin-clinical-actions.css?v=3" />
   <link rel="stylesheet" href="lumin-media-teeth.css?v=1" />
   <style id="finance-ledger-styles">
     #finance-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -6906,7 +6907,9 @@
           </div>
           <div class="chart-actions-filters">
             <label class="chart-actions-search"><i data-lucide="search" aria-hidden="true"></i><input id="chart-actions-search" type="search" oninput="filterClinicalActionsOperations(this.value)" placeholder="Search procedures" aria-label="Search procedures" autocomplete="off" /></label>
-            <select id="chart-actions-specialty-filter" class="chart-actions-select" onchange="filterClinicalActionsSpecialty(this.value)" aria-label="Filter procedures by specialty"><option value="">All specialties</option></select>
+            <button id="chart-actions-specialty-trigger" type="button" class="chart-actions-select chart-specialty-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="chart-actions-specialty-menu" aria-label="Filter procedures by specialty"><span>All specialties</span><i data-lucide="chevron-down" aria-hidden="true"></i></button>
+            <select id="chart-actions-specialty-filter" onchange="filterClinicalActionsSpecialty(this.value)" tabindex="-1" aria-hidden="true" hidden><option value="">All specialties</option></select>
+            <div id="chart-actions-specialty-menu" class="chart-specialty-menu" role="listbox" aria-label="Filter procedures by specialty" hidden></div>
           </div>
           <div id="chart-actions-operations" aria-label="Dental procedures"></div>
           </div>
@@ -30072,6 +30075,7 @@
     }
 
     async function switchView(viewName) {
+      if (typeof closeClinicalSpecialtyPicker === 'function') closeClinicalSpecialtyPicker();
       closeChartFindingDateDialog({ force: true, restoreFocus: false });
       patientWorkspaceSwipe?.cancel();
       closeMobileHeaderOverlay();
