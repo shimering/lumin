@@ -175,6 +175,7 @@ function updateChartMediaStickyTop() {
     stickyTop = Math.max(stickyTop, top + bounds.height / zoom + 16);
   });
   panel.style.setProperty('--chart-media-sticky-top', `${Math.ceil(stickyTop)}px`);
+  document.getElementById('chart-side-panels')?.style.setProperty('--chart-media-sticky-top', `${Math.ceil(stickyTop)}px`);
 }
 
 function toggleChartMediaPanel() {
@@ -193,7 +194,7 @@ async function loadChartPatientMedia(patientId = activePatientId) {
   if (chartPatientMedia.patientId !== patientId) {
     chartPatientMedia.selectedPath = '';
     chartPatientMedia.filterToothIds = [];
-    chartPatientMedia.collapsed = true;
+    chartPatientMedia.collapsed = !(typeof chartAppointmentsCanView === 'function' && chartAppointmentsCanView() && chartMediaIsLandscape());
     chartMediaPreviousFocus = null;
     if (typeof patientMediaUploadContext !== 'undefined' && patientMediaUploadContext?.fromChart) closePatientMediaUploadModal();
     if (patientMediaToothPicker?.prefix === 'chart-filter') closePatientMediaToothPicker(false);
@@ -247,6 +248,7 @@ function renderChartMediaPanel() {
   document.documentElement.classList.toggle('chart-media-active', chartActive);
   document.body.classList.toggle('chart-media-active', chartActive);
   workspace.classList.toggle('is-media-collapsed', chartPatientMedia.collapsed);
+  if (typeof updateChartSidePanelLayout === 'function') updateChartSidePanelLayout();
   const sheetOpen = chartActive && !chartMediaIsLandscape() && !chartPatientMedia.collapsed;
   let backdrop = document.getElementById('chart-media-backdrop');
   if (sheetOpen && !backdrop) {
@@ -292,7 +294,7 @@ function renderChartMediaPanel() {
   }
   if (chartPatientMedia.detailsError) body.insertAdjacentHTML('afterbegin', `<p class="chart-media-summary" role="status">${chartMediaText('Saved names, tooth assignments, and notes could not be loaded.', 'تعذر تحميل الأسماء وتحديد الأسنان والملاحظات المحفوظة.')}</p>`);
   if (chartPatientMedia.patientId === activePatientId && hasPageAccess('patients')) {
-    body.insertAdjacentHTML('afterbegin', `<div class="chart-media-add"><button type="button" class="chart-media-button" data-chart-add-xray onclick="openChartPatientMediaUpload()"><i data-lucide="plus" aria-hidden="true"></i>${chartMediaText('Add X-ray', 'إضافة أشعة')}</button></div>${chartMediaFilterMarkup()}`);
+    body.insertAdjacentHTML('afterbegin', `<div class="chart-media-tools"><div class="chart-media-add"><button type="button" class="chart-media-button" data-chart-add-xray onclick="openChartPatientMediaUpload()"><i data-lucide="plus" aria-hidden="true"></i>${chartMediaText('Add X-ray', 'إضافة أشعة')}</button></div>${chartMediaFilterMarkup()}</div>`);
   }
   renderChartToothXrayIndicators();
   updateChartMediaSheetVisibility(panel, sheetOpen, chartActive);

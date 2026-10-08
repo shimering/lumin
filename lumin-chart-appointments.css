@@ -1,0 +1,88 @@
+.chart-side-panels { display: contents; }
+.chart-appointments-panel { display: flex; flex-direction: column; min-width: 0; height: 270px; overflow: hidden; border: 1px solid #e2e8f0; border-radius: 20px; background: var(--lumin-face, #fff); box-shadow: 0 8px 24px -18px #64748b; text-align: start; }
+.chart-appointments-panel[hidden], .chart-appointments-body[hidden], .chart-appointments-feedback[hidden] { display: none; }
+.chart-appointments-header { display: flex; align-items: center; justify-content: space-between; gap: 4px; height: 44px; flex: 0 0 44px; padding-inline: 12px 4px; border-bottom: 1px solid #f1f5f9; }
+.chart-appointments-header h3 { display: flex; align-items: center; gap: 6px; min-width: 0; color: #0f172a; font-size: 12px; font-weight: 600; }
+.chart-appointments-header h3 > svg { width: 16px; height: 16px; flex: none; color: #2563eb; }
+#chart-appointments-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chart-appointments-count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; padding: 2px 5px; border: 0; border-radius: 999px; background: #eff6ff; color: #1d4ed8; font-size: 10px; line-height: 16px; }
+.chart-appointments-header .chart-media-button { flex: 0 0 44px; padding: 0; background: transparent; }
+.chart-appointments-header .chart-media-button:hover { background: #f1f5f9; }
+.chart-appointments-body { flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 12px; }
+.chart-appointments-list { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.chart-appointment-card {
+  display: flex; align-items: center; gap: 12px; flex: 0 0 auto; width: 100%; height: 44px; min-height: 44px; min-width: 0; padding: 8px 12px;
+  border: 0; border-radius: 16px; background: linear-gradient(115deg, rgba(var(--chart-appointment-rgb), .09), rgba(var(--chart-appointment-rgb), .035)), var(--lumin-face, #fff);
+  color: #334155; box-shadow: 0 4px 9px -5px rgba(var(--chart-appointment-rgb), .48), 0 1px 3px rgba(var(--chart-appointment-rgb), .14);
+  text-align: start; cursor: pointer; transition: background 150ms ease-out, box-shadow 180ms ease-out, transform 150ms ease-out;
+}
+.chart-appointment-card:hover { background: rgba(var(--chart-appointment-rgb), .12); box-shadow: 0 5px 12px -4px rgba(var(--chart-appointment-rgb), .4); }
+.chart-appointment-card:active { transform: scale(.98); }
+.chart-appointment-card:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+.chart-appointment-card:disabled { opacity: .5; pointer-events: none; }
+.chart-appointment-card[aria-current="true"] .chart-appointment-name { color: #0f172a; font-weight: 700; }
+.chart-appointment-time { flex: 0 0 auto; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; color: #475569; }
+.chart-appointment-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 500; }
+.chart-appointments-empty { display: grid; justify-items: center; gap: 8px; padding: 12px 0; text-align: center; color: #64748b; font-size: 12px; }
+.chart-appointments-empty > svg { width: 36px; height: 36px; padding: 8px; border: 0; border-radius: 50%; background: #eff6ff; color: #2563eb; }
+.chart-appointments-empty strong { color: #334155; font-size: 13px; font-weight: 600; }
+.chart-appointments-empty .chart-media-button { margin-top: 4px; }
+.chart-appointments-feedback { margin-bottom: 12px; padding: 8px; border-radius: 12px; background: #fffbeb; color: #92400e; font-size: 12px; }
+.chart-appointments-skeleton { height: 44px; flex: none; border-radius: 16px; background: #e2e8f0; animation: chart-media-pulse 1.5s ease-in-out infinite; }
+.is-appointments-collapsed .chart-appointments-panel { height: 44px; }
+
+/* Keep four 44px cards visible. On short viewports the X-ray box yields space first. */
+@media (min-width: 768px) and (orientation: landscape) {
+  html.chart-media-landscape .has-chart-appointments.chart-clinical-workspace { grid-template-columns: minmax(0, 1fr) clamp(272px, 24vw, 320px); }
+  html.chart-media-landscape .has-chart-appointments .chart-side-panels {
+    display: grid; grid-template-rows: minmax(0, 2fr) minmax(264px, 1fr); gap: 12px; min-width: 0;
+    position: sticky; top: var(--chart-media-sticky-top, 144px);
+    height: max(320px, calc(var(--lumin-app-viewport-height, 100dvh) - var(--chart-media-sticky-top, 144px) - 20px - env(safe-area-inset-bottom)));
+  }
+  html.chart-media-landscape .has-chart-appointments .chart-media-panel { position: static; height: 100%; min-height: 0; max-height: none; }
+  html.chart-media-landscape .has-chart-appointments .chart-media-panel-header { height: 44px; flex-basis: 44px; }
+  html.chart-media-landscape .has-chart-appointments .chart-media-panel-header h3 { top: 22px; inset-inline-start: 12px; transform: translateY(-50%); }
+  html.chart-media-landscape .has-chart-appointments .chart-media-panel-header .chart-media-button { top: 0; inset-inline-end: 4px; }
+  html.chart-media-landscape .has-chart-appointments .chart-appointments-panel { height: 100%; min-height: 0; }
+  html.chart-media-landscape .has-chart-appointments.is-media-collapsed .chart-side-panels { grid-template-rows: 44px minmax(264px, 1fr); }
+  html.chart-media-landscape .has-chart-appointments.is-appointments-collapsed .chart-side-panels { grid-template-rows: minmax(0, 1fr) 44px; }
+  html.chart-media-landscape .has-chart-appointments.is-media-collapsed .chart-media-panel-content { display: none; }
+  html.chart-media-landscape .has-chart-appointments.is-side-panels-collapsed { grid-template-columns: minmax(0, 1fr) 56px; }
+  html.chart-media-landscape .has-chart-appointments.is-side-panels-collapsed .chart-side-panels { height: auto; grid-template-rows: 148px 196px; }
+  html.chart-media-landscape .has-chart-appointments.is-side-panels-collapsed .chart-media-panel-header { height: 148px; flex-basis: 148px; }
+  html.chart-media-landscape .has-chart-appointments.is-side-panels-collapsed .chart-media-panel-header h3 { top: 96px; inset-inline-start: 50%; transform: translate(-50%, -50%) rotate(90deg); }
+  html[dir="rtl"].chart-media-landscape .has-chart-appointments.is-side-panels-collapsed .chart-media-panel-header h3 { transform: translate(50%, -50%) rotate(-90deg); }
+  html.chart-media-landscape .has-chart-appointments.is-side-panels-collapsed .chart-appointments-header { position: relative; height: 196px; flex-basis: 196px; padding: 0; border: 0; }
+  html.chart-media-landscape .has-chart-appointments.is-side-panels-collapsed .chart-appointments-header h3 { position: absolute; inset-inline-start: 50%; top: 118px; width: max-content; max-width: 148px; transform: translate(-50%, -50%) rotate(90deg); }
+  html[dir="rtl"].chart-media-landscape .has-chart-appointments.is-side-panels-collapsed .chart-appointments-header h3 { transform: translate(50%, -50%) rotate(-90deg); }
+  html.chart-media-landscape .has-chart-appointments.is-side-panels-collapsed .chart-appointments-header .chart-media-button { position: absolute; top: 0; inset-inline-end: 5px; }
+}
+@media (min-width: 768px) and (max-width: 1023px) and (orientation: landscape) {
+  html.chart-media-landscape .has-chart-appointments .chart-side-panels { height: max(320px, calc(var(--lumin-app-viewport-height, 100dvh) - var(--chart-media-sticky-top, 144px) - var(--mobile-nav-height, 88px) - 12px)); }
+}
+
+/* Compact the viewer's controls without shrinking their touch targets. */
+.has-chart-appointments .chart-media-panel-body { padding: 12px; scrollbar-width: thin; }
+.has-chart-appointments .chart-media-tools { display: flex; flex-wrap: wrap; align-items: start; gap: 8px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #f1f5f9; }
+.has-chart-appointments .chart-media-add { flex: 1 1 auto; margin-bottom: 0; }
+.has-chart-appointments .chart-media-filter { display: contents; }
+.has-chart-appointments .chart-media-filter-heading { flex: 1 1 auto; }
+.has-chart-appointments .chart-media-filter-chips, .has-chart-appointments [data-chart-clear-filter] { flex-basis: 100%; }
+.has-chart-appointments .chart-media-filter-heading > span { display: none; }
+.has-chart-appointments .chart-media-filter-heading .chart-media-button { width: 100%; }
+.has-chart-appointments .chart-media-filter .chart-media-summary { display: none; }
+.has-chart-appointments .chart-media-summary { margin-bottom: 8px; }
+.has-chart-appointments .chart-media-preview { min-height: 120px; height: clamp(120px, 18vh, 200px); }
+.has-chart-appointments .chart-media-caption, .has-chart-appointments .chart-media-nav { margin-top: 8px; }
+.has-chart-appointments .chart-media-upload-date { margin-top: 4px; }
+.has-chart-appointments .chart-media-panel-actions { margin-top: 8px; padding-top: 8px; }
+.has-chart-appointments .chart-media-empty { gap: 8px; padding: 12px 4px; }
+.has-chart-appointments .chart-media-empty > svg { width: 36px; height: 36px; padding: 8px; }
+
+@media (max-width: 767px), (orientation: portrait) {
+  .chart-appointments-body { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chart-appointment-card { transition: none; }
+  .chart-appointments-skeleton { animation: none; }
+}

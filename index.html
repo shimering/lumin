@@ -84,7 +84,8 @@
   <script src="lumin-patient-swipe.js?v=1"></script>
   <script src="lumin-patients.js?v=4"></script>
   <script src="lumin-chart-sync.js?v=1"></script>
-  <script src="lumin-chart-media.js?v=9"></script>
+  <script src="lumin-chart-media.js?v=10"></script>
+  <script src="lumin-chart-appointments.js?v=1"></script>
   <script src="lumin-chart-dates.js?v=1"></script>
   <link rel="stylesheet" href="lumin-chart-dates.css?v=1" />
   <script src="lumin-media-teeth.js?v=2"></script>
@@ -5504,7 +5505,8 @@
   <link rel="stylesheet" href="lumin-patients.css?v=3" />
   <link rel="stylesheet" href="lumin-finance-sync.css?v=2" />
   <link rel="stylesheet" href="lumin-mobile-nav.css?v=2" />
-  <link rel="stylesheet" href="lumin-chart-media.css?v=6" />
+  <link rel="stylesheet" href="lumin-chart-media.css?v=7" />
+  <link rel="stylesheet" href="lumin-chart-appointments.css?v=1" />
   <link rel="stylesheet" href="lumin-media-teeth.css?v=1" />
   <style id="finance-ledger-styles">
     #finance-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -6958,10 +6960,23 @@
         <div id="findings-container" class="clinical-findings-list space-y-2 bg-slate-50/60 p-3" role="tabpanel" tabindex="0" aria-label="Documented findings; scroll horizontally on smaller screens"></div>
       </div>
       </div>
+      <div id="chart-side-panels" class="chart-side-panels">
       <aside id="chart-media-panel" class="chart-media-panel" aria-labelledby="chart-media-panel-title">
         <header class="chart-media-panel-header"><h3><i data-lucide="scan-line" aria-hidden="true"></i><span id="chart-media-panel-title">X-rays</span></h3><button id="chart-media-collapse" type="button" class="chart-media-button" onclick="toggleChartMediaPanel()" aria-controls="chart-media-panel-body" aria-expanded="false" aria-label="Expand X-ray viewer"><i data-lucide="panel-right-open"></i></button></header>
         <div class="chart-media-panel-content"><div class="chart-media-panel-scroll"><div id="chart-media-panel-body" class="chart-media-panel-body" aria-live="polite"></div></div></div>
       </aside>
+      <aside id="chart-appointments-panel" class="chart-appointments-panel" aria-labelledby="chart-appointments-title" hidden>
+        <header class="chart-appointments-header">
+          <h3><i data-lucide="calendar-clock" aria-hidden="true"></i><span id="chart-appointments-title">Today’s appointments</span><span id="chart-appointments-count" class="chart-appointments-count">0</span></h3>
+          <button id="chart-appointments-collapse" type="button" class="chart-media-button is-neutral" onclick="toggleChartAppointmentsPanel()" aria-controls="chart-appointments-body" aria-expanded="true" aria-label="Collapse today’s appointments"><i data-lucide="chevron-down" aria-hidden="true"></i></button>
+        </header>
+        <div id="chart-appointments-body" class="chart-appointments-body" role="region" aria-labelledby="chart-appointments-title">
+          <p id="chart-appointments-feedback" class="chart-appointments-feedback" role="status" hidden></p>
+          <div id="chart-appointments-list" class="chart-appointments-list"></div>
+        </div>
+        <span id="chart-appointments-announcement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></span>
+      </aside>
+      </div>
       </div>
       <button id="findings-invoice-button" type="button" onclick="invoiceSelectedFindings()" disabled aria-hidden="true" class="hidden">
         <i data-lucide="receipt-text" class="h-4 w-4"></i>
@@ -11735,6 +11750,7 @@
       }));
       translateUiTree(document.body, currentUiLanguage);
       if (typeof renderChartMediaPanel === 'function') renderChartMediaPanel();
+      if (typeof renderChartAppointmentsPanel === 'function') renderChartAppointmentsPanel();
       if (typeof renderPatientAttachmentList === 'function') renderPatientAttachmentList();
       renderStorageConnectionStatus();
       if (typeof renderStorageServerPresets === 'function') renderStorageServerPresets();
@@ -12720,6 +12736,7 @@
       appointmentStatusColors = nextColors;
       renderAdminAppointmentStatusColors();
       if (!changed || !refreshViews || !currentUserAccess) return;
+      if (typeof renderChartAppointmentsPanel === 'function') renderChartAppointmentsPanel();
       if (hasPageAccess('appointments') && !document.getElementById('view-appointments').classList.contains('hidden')) renderAppointments();
     }
 
@@ -19313,7 +19330,7 @@
       realtimePendingTables.add('loyalty_settings');
       if (realtimeViewIsVisible('loyalty')) REALTIME_LOYALTY_TABLES.forEach(tableName => realtimePendingTables.add(tableName));
       if (patientsLoaded || patientDetailFreshness.size) realtimePendingTables.add('patients');
-      if (appointmentsLoaded || realtimeViewIsVisible('dashboard')) realtimePendingTables.add('appointments');
+      if (appointmentsLoaded || realtimeViewIsVisible('dashboard') || realtimeViewIsVisible('chart')) realtimePendingTables.add('appointments');
       if (realtimeViewIsVisible('patient-appointments')) realtimePendingTables.add('appointments');
       if (realtimeViewIsVisible('patient-prescriptions')) {
         ['prescription_print_settings', 'medication_catalog', 'prescription_templates', 'prescriptions', 'prescription_items']
@@ -19497,6 +19514,12 @@
         }
         if ((accessChanged || changedTables.has('appointments') || changedTables.has('patients') || appointmentVisitTypesChanged) && realtimeViewIsVisible('patient-appointments') && canViewPatientAppointments()) {
           await renderPatientAppointments({ throwOnError: true });
+        }
+        if (accessChanged || changedTables.has('appointments') || changedTables.has('patients') || appointmentVisitTypesChanged) {
+          if (typeof invalidateChartAppointments === 'function') invalidateChartAppointments();
+          if (realtimeViewIsVisible('chart') && typeof loadChartAppointments === 'function') {
+            await loadChartAppointments({ refresh: true, throwOnError: true });
+          }
         }
         if ((refreshLoadedResourcesForAccess || changedTables.has('message_templates')) && whatsappTemplatesLoaded && canUseWhatsAppTemplates()) {
           await fetchWhatsAppTemplates();
@@ -26803,6 +26826,7 @@
       dashboardDayCache.clear();
       appointmentSavedRecords.clear();
       appointmentWriteRevision = 0;
+      if (typeof resetChartAppointments === 'function') resetChartAppointments();
       targetedLoadingGeneration += 1;
       patientWorkspaceLoadingId = null;
       financeDebtGroups = [];
@@ -30193,6 +30217,7 @@
       if (whatsAppActive) resetWhatsAppWindowScroll();
 
       document.getElementById(`view-${viewName}`)?.classList.remove('hidden');
+      if (typeof setChartAppointmentsActive === 'function') setChartAppointmentsActive(viewName === 'chart');
       if (workspaceView) {
         const cachedPatient = getKnownPatient(requestedPatientId);
         if (cachedPatient && cachedPatient.recordComplete !== false) {
@@ -35234,6 +35259,7 @@
       const index = appointments.findIndex(appointment => appointment.id === normalized.id);
       if (index === -1) appointments.push(normalized);
       else appointments[index] = normalized;
+      if (typeof updateChartAppointmentRecord === 'function') updateChartAppointmentRecord(normalized);
       return normalized;
     }
 
@@ -38464,6 +38490,7 @@
         if (entry.data) entry.data = entry.data.filter(record => record.id !== appointmentId);
       });
       appointments = appointments.filter(appointment => appointment.id !== appointmentId);
+      if (typeof removeChartAppointmentRecord === 'function') removeChartAppointmentRecord(appointmentId);
       selectedAppointmentId = null;
       if (editingAppointmentId === appointmentId) closeAppointmentModal();
       renderAppointments();

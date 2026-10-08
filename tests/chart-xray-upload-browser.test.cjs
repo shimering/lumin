@@ -66,11 +66,7 @@ test('chart X-ray filters prefill uploads, allow multiple teeth, and save withou
     function renderPatientMedia() { window.galleryRefreshes++; }
     function openMediaLightbox() {}
     window.galleryRefreshes=0; window.uploads=[]; window.savedDetails=[]; window.mediaFiles=[];
-    const db={from() { let record=null, patientId=''; return {
-      upsert(value) { record=value; return this; }, select() { return this; }, eq(key,value) { if(key==='patient_id')patientId=value; return this; },
-      single() { if(failDetails)return Promise.resolve({error:Error('Save failed')}); window.savedDetails.push(record); return Promise.resolve({data:record,error:null}); },
-      then(resolve,reject) { return Promise.resolve({data:window.savedDetails.filter(row=>row.patient_id===patientId),error:null}).then(resolve,reject); }
-    };}};
+    const db={from() { throw Error('Clinical metadata must use the local storage server'); }};
     window.XMLHttpRequest=class {
       upload={}; status=200;
       open() {} setRequestHeader() {}
@@ -83,7 +79,17 @@ test('chart X-ray filters prefill uploads, allow multiple teeth, and save withou
       }
     };
     const nativeFetch=window.fetch.bind(window);
-    window.fetch=async (url,options)=>String(url).includes('/api/patient/') ? {ok:true,json:async()=>({files:window.mediaFiles.filter(file=>file.relativePath.startsWith(activePatientId+'/'))})} : nativeFetch(url,options);
+    window.fetch=async (url,options)=>{
+      if(String(url).includes('/api/patient/') && String(url).endsWith('/media-details')) {
+        if(failDetails)return {ok:false,json:async()=>({error:'Save failed'})};
+        const patientId=decodeURIComponent(String(url).split('/api/patient/')[1].split('/')[0]);
+        const payload=JSON.parse(options.body), record={patient_id:patientId,relative_path:payload.relativePath,...payload.details};
+        window.savedDetails.push(record);
+        return {ok:true,json:async()=>({metadataSource:'local',details:record})};
+      }
+      if(String(url).includes('/api/patient/'))return {ok:true,json:async()=>({metadataSource:'local',files:window.mediaFiles.filter(file=>file.relativePath.startsWith(activePatientId+'/')).map(file=>({...file,mediaDetails:window.savedDetails.find(record=>record.relative_path===file.relativePath)||null}))})};
+      return nativeFetch(url,options);
+    };
     ${dictionary}
     ${helpers}
   ` });
