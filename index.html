@@ -95,6 +95,7 @@
   <script src="lumin-mobile-nav.js?v=2"></script>
   <script src="lumin-appointment-status.js?v=2"></script>
   <script src="lumin-dashboard-motion.js?v=3"></script>
+  <script src="lumin-whatsapp-actions.js?v=1"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   
   <style>
@@ -5503,6 +5504,7 @@
     }
   </style>
   <link rel="stylesheet" href="lumin-theme.css?v=21" />
+  <link rel="stylesheet" href="lumin-whatsapp-actions.css?v=1" />
   <link rel="stylesheet" href="lumin-dashboard-motion.css?v=1" />
   <link rel="stylesheet" href="lumin-appointment-status.css?v=2" />
   <link rel="stylesheet" href="lumin-patients.css?v=3" />
@@ -13090,6 +13092,7 @@
 
     async function applyAuthSession(session) {
       if (!session) {
+        closeWhatsAppMessageMenu();
         closeChartFindingDateDialog({ force: true, restoreFocus: false });
         resetChartPatientMedia();
         closeWhatsAppTemplatePicker();
@@ -34556,7 +34559,6 @@
             if (input) {
               input.value = initialMessage;
               autoResizeWhatsAppInput(input);
-              input.focus();
             }
           }
         }
@@ -38714,19 +38716,7 @@
         waIsSwiping = false;
         waSwipeIsOutgoing = row.classList.contains('justify-end');
 
-        // Long-press detection for mobile reactions
-        if (waLongPressTimer) clearTimeout(waLongPressTimer);
-        waLongPressTimer = setTimeout(() => {
-          if (waSwipedRow && !waIsSwiping) {
-            document.querySelectorAll('.whatsapp-msg-row.show-actions').forEach(el => {
-              if (el !== waSwipedRow) el.classList.remove('show-actions');
-            });
-            waSwipedRow.classList.toggle('show-actions');
-            if (navigator.vibrate) {
-              try { navigator.vibrate(25); } catch (_) {}
-            }
-          }
-        }, 420);
+        // Long press is handled by initWhatsAppMessageActions for touch, mouse and pen.
       }, { passive: true });
 
       container.addEventListener('touchmove', (e) => {
@@ -39352,6 +39342,8 @@
     }
 
     async function selectWhatsAppConversation(convId) {
+      closeWhatsAppMessageMenu();
+      document.getElementById('whatsapp-reply-input')?.blur();
       if (typeof isRecordingVoice !== 'undefined' && isRecordingVoice) {
         cancelWhatsAppVoiceRecording();
       }
@@ -39434,15 +39426,10 @@
       await loadWhatsAppMessages(convId, true);
       if (activeWhatsAppConversationId === convId) await markWhatsAppConversationRead();
       lucide.createIcons();
-      setTimeout(() => {
-        const input = document.getElementById('whatsapp-reply-input');
-        if (window.innerWidth >= 768) {
-          input?.focus();
-        }
-      }, 100);
     }
 
         function closeActiveWhatsAppChat() {
+      closeWhatsAppMessageMenu();
       closeActiveWhatsAppChatOnMobile();
       if (typeof cancelWhatsAppVoiceRecording === 'function') {
         cancelWhatsAppVoiceRecording();
@@ -39517,7 +39504,7 @@
     function mergeWhatsAppMessages(...messageGroups) {
       const byId = new Map();
       messageGroups.flat().forEach(message => {
-        if (!message?.id) return;
+        if (!message?.id || waDeletedMessageIds.has(message.id)) return;
         byId.set(message.id, { ...(byId.get(message.id) || {}), ...message });
       });
       return [...byId.values()].sort(compareWhatsAppMessages);
@@ -39547,7 +39534,7 @@
 
         if (error) throw error;
         if (requestToken !== whatsappMessagesRequestToken || activeWhatsAppConversationId !== convId) return;
-        whatsappMessages = (data || []).slice().sort(compareWhatsAppMessages);
+        whatsappMessages = mergeWhatsAppMessages(data || []);
         whatsappMessagesHasOlder = (data || []).length === WHATSAPP_MESSAGE_PAGE_SIZE;
         renderWhatsAppMessages(scrollToBottom);
       } catch (err) {
@@ -39638,18 +39625,24 @@
           }
         } while (fetchedCount === WHATSAPP_MESSAGE_SYNC_PAGE_SIZE);
 
-        const outgoingIds = whatsappMessages
-          .filter(message => message.sender === 'ai' || message.sender === 'staff')
-          .slice(-WHATSAPP_MESSAGE_SYNC_PAGE_SIZE)
-          .map(message => message.id);
-
-        if (outgoingIds.length) {
-          const { data: statuses, error: statusError } = await db
+        // Reconcile every loaded message so remote deletions, replies and reactions
+        // update without discarding the user's loaded history or scroll position.
+        const loadedIds = whatsappMessages.map(message => message.id);
+        for (let offset = 0; offset < loadedIds.length; offset += WHATSAPP_MESSAGE_SYNC_PAGE_SIZE) {
+          const ids = loadedIds.slice(offset, offset + WHATSAPP_MESSAGE_SYNC_PAGE_SIZE);
+          const { data: updates, error: updateError } = await db
             .from('whatsapp_messages')
-            .select('id,status')
-            .in('id', outgoingIds);
-          if (statusError) throw statusError;
-          whatsappMessages = mergeWhatsAppMessages(whatsappMessages, statuses || []);
+            .select('id,status,reaction,reply_to_id,reply_to_text,reply_to_sender')
+            .eq('conversation_id', convId)
+            .in('id', ids);
+          if (updateError) throw updateError;
+          if (activeWhatsAppConversationId !== convId || whatsappMessagesConversationId !== convId) return;
+          const remainingIds = new Set((updates || []).map(message => message.id));
+          ids.filter(id => !remainingIds.has(id)).forEach(id => waDeletedMessageIds.add(id));
+          whatsappMessages = mergeWhatsAppMessages(whatsappMessages, updates || []);
+        }
+        if (whatsappActiveReplyMessage && waDeletedMessageIds.has(whatsappActiveReplyMessage.id)) {
+          clearWhatsAppReplyMessage();
         }
 
         renderWhatsAppMessages(scrollToBottom || wasNearBottom);
@@ -39663,6 +39656,7 @@
     function renderWhatsAppMessages(scrollToBottom = true) {
       const container = document.getElementById('whatsapp-messages-container');
       if (!container) return;
+      if (waMessageMenu && !whatsappMessages.some(message => message.id === waMessageMenu.messageId)) closeWhatsAppMessageMenu();
 
       if (whatsappMessagesLoadingInitial) {
         container.innerHTML = `
@@ -39821,26 +39815,15 @@
         let reactionBadgeHtml = '';
         if (msg.reaction) {
           reactionBadgeHtml = `
-            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '${escapeHtml(msg.reaction)}')" class="absolute -bottom-3 ${alignClass === 'justify-end' ? 'right-3' : 'left-3'} inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-sm shadow-xs hover:scale-110 active:scale-95 transition z-10" title="Reaction: ${escapeHtml(msg.reaction)} (Click to remove)">
+            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '${escapeHtml(msg.reaction)}')" style="min-width:44px;min-height:44px" class="absolute -bottom-3 ${alignClass === 'justify-end' ? 'right-3' : 'left-3'} inline-flex items-center justify-center gap-1 rounded-full bg-white px-2 py-0.5 text-sm shadow-xs hover:scale-110 active:scale-95 transition z-10" title="Reaction: ${escapeHtml(msg.reaction)} (Click to remove)">
               <span>${escapeHtml(msg.reaction)}</span>
             </button>
           `;
         }
 
-        // Quick React & Reply Action Menu on hover / tap
+        // Always visible and keyboard accessible; long press opens the same menu.
         const actionMenuHtml = `
-          <div class="whatsapp-msg-actions hidden group-hover:flex items-center gap-1 absolute -top-4 ${alignClass === 'justify-end' ? 'left-3' : 'right-3'} rounded-full border border-slate-200 bg-white/95 px-2 py-0.5 shadow-sm text-sm backdrop-blur-xs z-20">
-            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '👍')" class="hover:scale-125 transition px-0.5 text-sm" title="Like">👍</button>
-            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '❤️')" class="hover:scale-125 transition px-0.5 text-sm" title="Love">❤️</button>
-            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '😂')" class="hover:scale-125 transition px-0.5 text-sm" title="Laugh">😂</button>
-            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '😮')" class="hover:scale-125 transition px-0.5 text-sm" title="Surprised">😮</button>
-            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '🙏')" class="hover:scale-125 transition px-0.5 text-sm" title="Thank you">🙏</button>
-            <button type="button" onclick="sendWhatsAppReaction('${msg.id}', '🦷')" class="hover:scale-125 transition px-0.5 text-sm" title="Dental">🦷</button>
-            <div class="h-3.5 w-px bg-slate-200 mx-0.5"></div>
-            <button type="button" onclick="triggerWhatsAppReplyById('${msg.id}')" class="hover:text-emerald-700 text-slate-500 p-0.5 transition" title="Reply / Quote">
-              <i data-lucide="reply" class="h-3.5 w-3.5"></i>
-            </button>
-          </div>
+          <button type="button" class="wa-message-more" onclick="openWhatsAppMessageMenu(event, '${msg.id}', this)" aria-haspopup="dialog" aria-label="${whatsappMessageActionText('more')}"><i data-lucide="ellipsis"></i></button>
         `;
 
         const swipeIconPos = (alignClass === 'justify-end') ? 'right-3' : 'left-3';
@@ -39863,7 +39846,7 @@
                   <span>Meta Template 🚀</span>
                 </div>
               ` : ''}
-              ${msg.message_type === 'location' ? '' : `<p class="text-sm sm:text-[15px] leading-relaxed whitespace-pre-wrap select-text tracking-normal" dir="auto">${escapeHtml(msg.content || '')}</p>`}
+              ${msg.message_type === 'location' ? '' : `<p class="text-sm sm:text-[15px] leading-relaxed whitespace-pre-wrap tracking-normal" dir="auto">${escapeHtml(msg.content || '')}</p>`}
               <div class="flex items-center justify-end gap-1.5 mt-1.5">
                 <span class="text-[11px] font-medium opacity-65">${timeStr}</span>
                 ${statusTickHtml}
@@ -39876,6 +39859,8 @@
 
       lucide.createIcons();
       initWhatsAppSwipeGestures();
+      initWhatsAppMessageActions();
+      positionWhatsAppMessageMenu();
 
       if (scrollToBottom) {
         container.scrollTop = container.scrollHeight;

@@ -39,6 +39,21 @@ Appointment forms fetch patients only after typing, with a 250 ms debounce and a
 
 Dashboard appointment saves update the selected-day caches immediately. Reads started before a save preserve that change, while later reads accept updates from other staff. Run `node --test tests/dashboard-appointment-sync.test.cjs tests/appointment-status-picker.test.cjs` for cache races, failed saves, and visible status continuity.
 
+## WhatsApp message actions
+
+Opening the WhatsApp page or a conversation leaves the composer unfocused on every device.
+Hold a message bubble or use its visible ellipsis button to react, reply, copy text, or delete
+from the shared Lumin chat. Long presses show a bubble effect and suppress native text selection;
+moving or scrolling cancels the hold. Phones use a bottom sheet; larger screens use a bounded menu.
+All new actions support Arabic, English, keyboard navigation, and both appearance themes.
+
+Apply `delete_whatsapp_message_from_lumin` before frontend rollout. The authenticated RPC checks
+active staff access, removes quoted copies, and repairs the conversation preview in one transaction.
+Deletion is local to the clinic chat: Meta Cloud API has no documented recipient-recall operation.
+Run `node --test tests/whatsapp-message-actions-browser.test.cjs tests/whatsapp-chat-swipe-close.test.cjs`
+with Playwright available and `LUMIN_TEST_BROWSER_CHANNEL=chrome`, plus the rolled-back database
+checks in `supabase/tests/whatsapp_message_deletion.test.sql`.
+
 ## Patient 3D scans
 
 Patients have a **3D Scans** tab beside **X-Rays & Media**, with multiple original
