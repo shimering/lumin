@@ -99,9 +99,10 @@
   <script src="lumin-dashboard-motion.js?v=3"></script>
   <script src="lumin-whatsapp-actions.js?v=2"></script>
   <script src="lumin-quotation-model.js?v=1"></script>
+  <script src="lumin-dental-i18n.js?v=1"></script>
   <script src="lumin-tooth-anatomy.js?v=2"></script>
-  <script src="lumin-quotation-view.js?v=3"></script>
-  <script src="lumin-quotations.js?v=3"></script>
+  <script src="lumin-quotation-view.js?v=4"></script>
+  <script src="lumin-quotations.js?v=5"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <link rel="stylesheet" href="lumin-tooth-images.css?v=1" />
   
@@ -4191,8 +4192,23 @@
       will-change: transform, filter;
     }
     #patient-workspace-header { position: sticky; top: max(0.5rem, env(safe-area-inset-top)); z-index: 35; }
-    .patient-workspace-tabs { overscroll-behavior-inline: contain; scroll-padding-inline: 0.25rem; scrollbar-width: none; }
-    .patient-workspace-tabs::-webkit-scrollbar { display: none; }
+    .patient-workspace-tabs { overscroll-behavior-inline: contain; scroll-padding-inline: 0.25rem; overflow-y: hidden; scrollbar-width: thin; scrollbar-color: #94a3b8 #e2e8f0; }
+    .patient-workspace-tabs::-webkit-scrollbar { display: block; height: 8px; }
+    .patient-workspace-tabs::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 999px; }
+    .patient-workspace-tabs::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 999px; }
+    .patient-workspace-tabs::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    @supports selector(::-webkit-scrollbar) {
+      .patient-workspace-tabs { scrollbar-width: auto; scrollbar-color: auto; }
+    }
+    @media (hover: hover) and (pointer: fine) {
+      #patient-workspace-header .patient-workspace-tabs [data-patient-workspace-tab]:hover:not(:disabled) { box-shadow: var(--lumin-small-raised, 0 3px 8px #0f172a12), 0 0 0 1px #93c5fd, 0 0 16px #3b82f640, inset 0 1px 0 #ffffffb3; transform: translateY(-1px); }
+      #patient-workspace-header .patient-workspace-tabs [data-patient-workspace-tab]:hover:not(:disabled):not([aria-selected="true"]) { background: linear-gradient(145deg, #ffffff, #e0f2fe); color: #1e40af; }
+      #patient-workspace-header .patient-workspace-tabs [data-patient-workspace-tab]:active:not(:disabled) { transform: scale(.98); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #patient-workspace-header .patient-workspace-tabs [data-patient-workspace-tab] { transition: none; }
+      #patient-workspace-header .patient-workspace-tabs [data-patient-workspace-tab]:hover:not(:disabled) { transform: none; }
+    }
     .patient-workspace-tab {
       height: 3.5rem;
       min-width: 5.5rem;
@@ -4208,19 +4224,21 @@
     .dental-chart-icon { color: #111111; }
     .patient-workspace-tab > img { width: calc(1.25rem + 2px); height: calc(1.25rem + 2px); }
     .patient-workspace-tab[data-patient-workspace-tab="profile"] {
-      width: clamp(9rem, 12vw, 11rem);
+      width: max-content;
+      max-width: min(24rem, calc(100vw - 7rem));
       min-width: 0;
+      min-height: 3.5rem;
+      height: auto;
       flex: 0 0 auto;
+      white-space: normal;
     }
     .patient-workspace-identity { display: block; width: 100%; min-width: 0; text-align: start; }
-    .patient-workspace-name { display: block; overflow: hidden; font-size: calc(1rem + 2px); font-weight: 700; line-height: 1.5rem; text-align: left; text-overflow: ellipsis; }
-    html[dir="rtl"] .patient-workspace-name { text-align: right; }
+    .patient-workspace-name { display: block; font-size: calc(1rem + 2px); font-weight: 700; line-height: 1.5rem; text-align: start; white-space: normal; overflow-wrap: anywhere; }
     .patient-workspace-meta { display: block; margin-top: 0.125rem; font-size: calc(0.6875rem + 2px); font-weight: 500; line-height: 1rem; opacity: 0.8; }
     html[dir="rtl"] [data-patient-workspace-back] svg { transform: rotate(180deg); }
     @media (max-width: 767px) {
       .patient-workspace-tab { width: 2.75rem; min-width: 2.75rem; height: 2.75rem; flex: 1 0 2.75rem; padding: 0.5rem; gap: 0; }
       .patient-workspace-tab[data-patient-workspace-tab="profile"] { width: max-content; max-width: min(16rem, calc(100vw - 7rem)); min-width: 6rem; min-height: 2.75rem; height: auto; flex: 0 0 auto; padding: 0.5rem 0.75rem; white-space: normal; }
-      .patient-workspace-name { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
       .patient-workspace-tab:not([data-patient-workspace-tab="profile"]) > span { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
       .patient-workspace-tab > :is(svg, img) { width: calc(1.25rem + 2px); height: calc(1.25rem + 2px); }
       .patient-workspace-meta { display: none; }
@@ -5305,7 +5323,7 @@
   <link rel="stylesheet" href="lumin-chart-appointments.css?v=1" />
   <link rel="stylesheet" href="lumin-clinical-actions.css?v=4" />
   <link rel="stylesheet" href="lumin-media-teeth.css?v=1" />
-  <link rel="stylesheet" href="lumin-quotations.css?v=4" />
+  <link rel="stylesheet" href="lumin-quotations.css?v=5" />
   <style id="finance-ledger-styles">
     #finance-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     #finance-summary-cards > div { min-width: 0; }
@@ -6545,7 +6563,7 @@
 
     <!-- ================= PATIENT WORKSPACE: PROFILE ================= -->
     <section id="view-patient-profile" class="hidden space-y-4">
-      <div class="app-page-bar"><div class="app-page-heading"><span class="app-page-icon" aria-hidden="true"><i data-lucide="contact-round"></i></span><h2 class="app-page-title">Patient Info</h2></div><button id="profile-quotations-button" type="button" onclick="openPatientQuotations()" class="q-button" hidden translate="no"><i data-lucide="file-text" aria-hidden="true"></i><span>Quotations</span></button><button id="profile-edit-patient-button" type="button" onclick="openEditPatientModal(activeWorkspacePatientId)" class="inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-blue-50 px-3 text-xs font-semibold text-blue-700 transition-all duration-150 ease-out hover:bg-blue-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50"><i data-lucide="user-pen" class="h-4 w-4"></i> Edit</button></div>
+      <div class="app-page-bar"><div class="app-page-heading"><span class="app-page-icon" aria-hidden="true"><i data-lucide="contact-round"></i></span><h2 class="app-page-title">Patient Info</h2></div><button id="profile-edit-patient-button" type="button" onclick="openEditPatientModal(activeWorkspacePatientId)" class="inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-blue-50 px-3 text-xs font-semibold text-blue-700 transition-all duration-150 ease-out hover:bg-blue-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50"><i data-lucide="user-pen" class="h-4 w-4"></i> Edit</button></div>
 
       <div class="grid gap-4 lg:grid-cols-3">
         <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs lg:col-span-2">
@@ -26331,6 +26349,24 @@
 
     let patientWorkspaceSwipe = null;
 
+    function setupPatientWorkspaceTabScrolling() {
+      const tabs = document.querySelector('.patient-workspace-tabs');
+      if (!tabs || tabs.dataset.wheelScrollingReady) return;
+      tabs.dataset.wheelScrollingReady = 'true';
+      tabs.addEventListener('wheel', event => {
+        if (event.ctrlKey || Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
+        const overflow = tabs.scrollWidth - tabs.clientWidth;
+        if (overflow <= 1) return;
+        const rtl = getComputedStyle(tabs).direction === 'rtl';
+        const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? tabs.clientWidth : 1;
+        const delta = event.deltaY * unit * (rtl ? -1 : 1);
+        const next = Math.max(rtl ? -overflow : 0, Math.min(rtl ? 0 : overflow, tabs.scrollLeft + delta));
+        if (Math.abs(next - tabs.scrollLeft) <= 1) return;
+        event.preventDefault();
+        tabs.scrollLeft = next;
+      }, { passive: false });
+    }
+
     function patientWorkspaceBackDestination() {
       const fallbackView = canOpenPatientsPage() ? 'patients' : firstAuthorizedView();
       return patientWorkspaceOriginView(patientWorkspaceReturnView) || fallbackView;
@@ -28980,8 +29016,6 @@
       }
       activeWorkspacePatientId = patient.id;
       updatePatientWorkspaceNavigation(patient, 'profile');
-      const quotationHistoryButton = document.getElementById('profile-quotations-button');
-      if (quotationHistoryButton) { const quotationLabel = currentUiLanguage === 'ar' ? 'عروض الأسعار' : 'Quotations'; quotationHistoryButton.hidden = !hasPageAccess('chart'); quotationHistoryButton.querySelector('span').textContent = quotationLabel; quotationHistoryButton.setAttribute('aria-label', quotationLabel); quotationHistoryButton.title = quotationLabel; }
       document.getElementById('profile-patient-phone').textContent = patient.phone || 'Not provided';
       document.getElementById('profile-patient-secondary-phone').textContent = patient.secondaryPhone || 'Not provided';
       document.getElementById('profile-patient-phone-actions').innerHTML = patientPhoneActionsMarkup(patient, 'primary');
@@ -29098,159 +29132,7 @@
     }
 
     // ================= PRICES & PROCEDURES CONTROLLER =================
-    const DENTAL_TRANSLATIONS_AR = Object.freeze({
-      // Specialties / Categories
-      'All': 'الكل',
-      'Cosmetics': 'تجميل الأسنان',
-      'Crown': 'تركيبات وتيجان',
-      'Dentolize historical import': 'إجراءات أخرى مستوردة',
-      'Diagnosis': 'كشف وفحوصات',
-      'Endo': 'علاج الجذور والعصب',
-      'Implantation': 'زراعة الأسنان',
-      'Orthodontics': 'تقويم الأسنان',
-      'Pedo': 'طب أسنان الأطفال',
-      'Perio': 'علاج اللثة وتنظيف الأسنان',
-      'Prosthesis': 'التركيبات المتحركة',
-      'Restoration': 'حشوات وترميم الأسنان',
-      'Surgery': 'جراحة الفم والأسنان',
-
-      // Operations - Cosmetics
-      'Chemical bleaching': 'تبييض كيميائي للأسنان',
-      'Emax veneers': 'فينير إيماكس',
-      'Light bleaching (egypt)': 'تبييض بالضوء (محلي)',
-      'Light bleaching (german)': 'تبييض بالضوء (ألماني)',
-      'Snap on smile': 'ابتسامة هوليوود المتحركة (سناب أون)',
-
-      // Operations - Crown
-      'E-Max Cementation': 'تثبيت تركيبة إيماكس',
-      'Emax crown (Emax cad)': 'تاج إيماكس (Emax CAD)',
-      'Emax veneer': 'فينير إيماكس',
-      'Endo-crown (Emax)': 'إندو كراون إيماكس',
-      'Inlay (Emax CAD)': 'إنلاي إيماكس',
-      'Overlay (Emax CAD)': 'أوفرلاي إيماكس',
-      'PFM Crown': 'تاج بورسلين مدمج بمعدن (PFM)',
-      'Re-cement crown': 'إعادة تثبيت تاج',
-      'Zircomax (cutback)': 'تاج زيركوماكس (كات باك)',
-      'Zirconium crown': 'تاج زركونيا',
-
-      // Operations - Diagnosis
-      'Bitewing X-Ray': 'أشعة بايت وينج (أشعة الأجنحة)',
-      'Blood test': 'تحليل دم',
-      'Cephalometric X-ray': 'أشعة سيفالومترية للرأس',
-      'ConeBeam CT X-ray (1 jaw)': 'أشعة مقطعية ثلاثية الأبعاد (فك واحد)',
-      'ConeBeam CT X-ray (2 jaw)': 'أشعة مقطعية ثلاثية الأبعاد (فكين)',
-      'Consultation and treatment Plan': 'استشارة وكشف وخطة علاجية',
-      'Diagnosis': 'كشف وتشخيص',
-      'Panoramic X-Ray': 'أشعة بانوراما للفكين',
-      'Periapical X-Ray': 'أشعة صغيرة للضرس (حول الذروة)',
-
-      // Operations - Endo
-      'Abscess drainage/Abscess treatment': 'علاج وتفريغ خراج',
-      'Direct Pulp capping': 'تغطية العصب المباشرة',
-      'Root canal re-treatment (anterior)': 'إعادة علاج جذور (أسنان أمامية)',
-      'Root canal re-treatment (molar)': 'إعادة علاج جذور (ضروس خلفية)',
-      'Root canal re-treatment (premolar)': 'إعادة علاج جذور (ضواحك)',
-      'Root canal treatment (anterior)': 'علاج جذور وعصب (أسنان أمامية)',
-      'Root canal treatment (molar)': 'علاج جذور وعصب (ضروس خلفية)',
-      'Root canal treatment (premolar)': 'علاج جذور وعصب (ضواحك)',
-
-      // Operations - Implantation
-      'Bone grafting': 'زراعة عظم للفك',
-      'Economic Implant (Dual)': 'زراعة أسنان اقتصادية (Dual)',
-      'Standard Implant b&b': 'زراعة أسنان قياسية (B&B)',
-
-      // Operations - Orthodontics
-      'Invisalign': 'تقويم شفاف (إنفزلاين)',
-      'Ortho Follow Up': 'جلسة متابعة تقويم',
-      'Orthodontic bracket': 'براكيت تقويم',
-      'Traditional ceramic braces - Complicated case: lost of molar, root treated teeth etc': 'تقويم سيراميك تقليدي - حالة معقدة',
-      'Traditional ceramic braces - Requires extraction (fee for extraction is not included': 'تقويم سيراميك تقليدي - يتطلب خلع',
-      'Traditional ceramic braces - Simple case: no extraction required': 'تقويم سيراميك تقليدي - حالة بسيطة (بدون خلع)',
-      'Traditional metal braces - Complicated case: lost of molar, root treated teeth, etc': 'تقويم معدني تقليدي - حالة معقدة',
-      'Traditional metal braces - requires extraction': 'تقويم معدني تقليدي - يتطلب خلع',
-      'Traditional metal braces - Simple case: no extraction required': 'تقويم معدني تقليدي - حالة بسيطة (بدون خلع)',
-
-      // Operations - Pedo
-      'Composite filling': 'حشو كومبوزيت تجميلي للأطفال',
-      'Deciduous tooth extraction': 'خلع سن لبني',
-      'floride varnish': 'تطبيق فلورايد فارنيش للأطفال',
-      'Pits & fissure sealant': 'سدادات الشقوق والميازيب الوقائية',
-      'Pulpectomy': 'استئصال عصب كامل للأطفال (علاج جذور لبني)',
-      'Pulpotomy': 'بتر العصب الجزئي للأطفال',
-      'Reinforced glass inomer (fugi)': 'حشو جلاس أينومر مقوى (فوجي)',
-      'SDF': 'تطبيق فلورايد الفضة الديامين (SDF)',
-      'Space Maintainer': 'حافظ مسافة لأسنان الأطفال',
-      'Stainless steal crown': 'تاج ستانلس ستيل للأطفال (SSC)',
-      'Zirconia crown': 'تاج زركونيا للأطفال',
-
-      // Operations - Perio
-      'Crown lengthening': 'تطويل التاج السريري',
-      'Florid application': 'تطبيق الفلورايد الوقائي',
-      'Gingivectomy': 'استئصال جزء من اللثة (قص لثة)',
-      'Gum grafting': 'طعم لثوي (زراعة لثة)',
-      'Operculectomy': 'إزالة الغطاء اللثوي فوق ضرس العقل',
-      'Periodontal Pocket treatment (non-surgical)': 'علاج الجيوب اللثوية (غير جراحي)',
-      'PRF': 'علاج بالصفائح الدموية الغنية بالفيبرين (PRF)',
-      'Scaling and polishing (promo)': 'تنظيف جير وتلميع الأسنان (عرض)',
-      'Teeth cleaning and Polishing (Minimal)': 'تنظيف وتلميع أسنان (بسيط)',
-      'Teeth cleaning and polishing (severe)': 'تنظيف وتلميع أسنان (جير متقدم)',
-
-      // Operations - Prosthesis
-      'Acrylic complete denture': 'طقم أسنان كامل أكريليك',
-      'Flexi Denture': 'طقم أسنان مرن (فليكسي)',
-      'Flexible complete denture': 'طقم أسنان كامل مرن',
-      'Night Guard one arch': 'واقي ليلي للأسنان (فك واحد)',
-      'Nightguard two arches': 'واقي ليلي للأسنان (فكين)',
-      'Removable Partial denture': 'طقم أسنان جزئي متحرك',
-      'Single tooth removable': 'تركيبة سن واحد متحرك',
-
-      // Operations - Restoration
-      'Amalgam restoration': 'حشو أملجم (فضي)',
-      'Composite filling (extensive)': 'حشو كومبوزيت ضوئي (كبير / ممتد)',
-      'Composite filling (minimal)': 'حشو كومبوزيت ضوئي (بسيط)',
-      'Composite inlay': 'إنلاي كومبوزيت',
-      'Composite onlay': 'أوفرلاي كومبوزيت',
-      'Composite veneer': 'فينير كومبوزيت مباشر',
-      'Post & Core': 'وتد وبناء السن (Post & Core)',
-      'Resin reinforced glass inomer': 'جلاس أينومر مدعم بالراتنج',
-      'Sealant': 'حشوة سادة وقائية للأسنان',
-
-      // Operations - Surgery
-      'Cyst removal': 'استئصال كيس فكي',
-      'Simple tooth extraction': 'خلع سن بسيط',
-      'Surgical tooth extraction': 'خلع سن جراحي',
-      'Surgical wisdom tooth extraction': 'خلع جراحي لضرس العقل',
-      'Tooth extraction with bone grafting': 'خلع سن مع زراعة عظم',
-      'Wisdom tooth extraction': 'خلع ضرس العقل',
-
-      // Operations - Historical Import
-      'Composite Compound': 'حشو كومبوزيت مركب',
-      'Endo One canal': 'علاج عصب (قناة واحدة)',
-      'Endo Two Canals': 'علاج عصب (قناتين)',
-      'Endo Three Canals': 'علاج عصب (3 قنوات)',
-      'Endo Four Canals': 'علاج عصب (4 قنوات)',
-      'Examination': 'فحص وكشف طبي',
-      'Excision': 'استئصال نسيجي',
-      'Extraction': 'خلع أسنان',
-      'Fiber Post & Core': 'وتد فايبر وبناء السن',
-      'Fixture 1': 'زرعة أسنان 1',
-      'G. Ionomer (fugi)': 'حشو جلاس أينومر (فوجي)',
-      'Initial Oral Examination': 'كشف وفحص فموي أولي',
-      'K-Line Ortho': 'تقويم كي لاين الشفاف',
-      'Metal Braces': 'تقويم معدني',
-      'Metal Bracket': 'براكيت معدني',
-      'Metal Post & Core': 'وتد معدني وبناء السن',
-      'Moderate Extraction': 'خلع سن متوسط الصعوبة',
-
-      // Scopes & General
-      'Surfaces': 'الأسطح',
-      'Selected surfaces': 'الأسطح المحددة',
-      'Whole tooth': 'السن بالكامل',
-      'Whole mouth': 'الفم بالكامل',
-      'surface': 'الأسطح',
-      'whole': 'السن بالكامل',
-      'mouth': 'الفم بالكامل'
-    });
+    const DENTAL_TRANSLATIONS_AR = LuminDentalI18n.arabic;
 
     let pricesPageLanguage = (() => {
       try {
@@ -29266,7 +29148,7 @@
     function dentalTranslate(term, lang = pricesPageLanguage) {
       if (!term) return '';
       if (lang !== 'ar') return term;
-      return DENTAL_TRANSLATIONS_AR[term] || ARABIC_UI_TEXT[term] || term;
+      return DENTAL_TRANSLATIONS_AR[term] || ARABIC_UI_TEXT[term] || LuminDentalI18n.translate(term, lang);
     }
 
     function formatPricesMoney(amount, lang = pricesPageLanguage) {
@@ -41648,6 +41530,7 @@
       setupStorageConnectionMonitor();
       setupMobileNavigation();
       setupPatientWorkspaceSwipeBack();
+      setupPatientWorkspaceTabScrolling();
       postToLuminHost({ type: 'lumin:request-host-state' });
       startUiTranslationObserver();
       setupAppointmentDaySwipeNavigation();

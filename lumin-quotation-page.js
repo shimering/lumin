@@ -1,17 +1,30 @@
 (function () {
   'use strict';
   const container=document.getElementById('patient-quotation');
-  let language='en',preferred=false,data=null,request=0,controller=null,loading=false,expiryTimer,retryState=false;
-  const token=()=>location.hash.slice(1);
+  let language='ar',data=null,request=0,controller=null,loading=false,expiryTimer,retryState=false;
+  const token=()=>new URL(location.href).searchParams.get('q')||location.hash.slice(1);
   const t=(en,ar)=>language==='ar'?ar:en;
+  function updateBranding() {
+    const clinic=data?.clinic;
+    const logo=LuminQuotationView.logoDataUrl(clinic?.logo);
+    document.title=t('Treatment quotation','عرض أسعار العلاج')+' · '+(clinic?.name||'Lumin');
+    const description=data?`عرض أسعار العلاج للمريض ${data.patientName}. الإجمالي ${LuminQuotationView.money(data.total,'ar')}.`:'خطة علاجك الشخصية والأسعار المقدمة من العيادة.';
+    for(const [property,content] of Object.entries({'og:title':document.title,'og:description':description,'og:site_name':clinic?.name||'Lumin','og:image:alt':`شعار ${clinic?.name||'Lumin'}`})) {
+      document.querySelector(`meta[property="${property}"]`)?.setAttribute('content',content);
+    }
+    const favicon=document.getElementById('quotation-favicon');
+    favicon.href=logo||'favicon.svg';
+    if(logo)favicon.type=logo.slice(5,logo.indexOf(';'));else favicon.removeAttribute('type');
+  }
   function setLanguage(value) {
-    language=value;preferred=true;
+    language=value;
     document.documentElement.lang=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';
     if(data)render();else unavailable(retryState);
   }
   function unavailable(retry) {
     retryState=retry;
     data=null;clearTimeout(expiryTimer);container.setAttribute('aria-busy','false');
+    updateBranding();
     container.classList.remove('q-document');container.dir=language==='ar'?'rtl':'ltr';
     container.innerHTML=`<section class="q-page-status" role="status"><i data-lucide="${retry?'wifi-off':'link-2-off'}" aria-hidden="true"></i><h1>${t(retry?'Could not load quotation':'Quotation unavailable',retry?'تعذر تحميل عرض الأسعار':'عرض الأسعار غير متاح')}</h1><p>${t(retry?'Check your connection and try again.':'This link may have expired or been disabled. Please contact your clinic.',retry?'تحقق من اتصالك بالإنترنت وحاول مجدداً.':'قد يكون الرابط منتهياً أو معطلاً. يرجى التواصل مع العيادة.')}</p>${retry?`<button type="button" class="q-button q-primary" data-retry>${t('Try again','حاول مجدداً')}</button>`:''}<button type="button" class="q-button" data-language>${language==='ar'?'English':'العربية'}</button></section>`;
     container.querySelector('[data-retry]')?.addEventListener('click',()=>load());
@@ -19,6 +32,7 @@
     if(window.lucide)lucide.createIcons();
   }
   function render() {
+    updateBranding();
     LuminQuotationView.render(container,data,language,{onLanguage:setLanguage});
     container.setAttribute('aria-busy','false');
     clearTimeout(expiryTimer);
@@ -44,7 +58,6 @@
       const next=await response.json();
       if(revision!==request)return;
       if(!Array.isArray(next.items)||!Array.isArray(next.teeth)||!Number.isFinite(next.total)||!Number.isFinite(new Date(next.expiresAt).getTime())||new Date(next.expiresAt)<=new Date())throw new Error('invalid');
-      if(!preferred){language=next.language==='ar'?'ar':'en';document.documentElement.lang=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';}
       const comparable=value=>JSON.stringify(value&&{...value,refreshedAt:undefined});
       if(comparable(data)!==comparable(next)){data=next;render();}
     } catch(_){if(revision===request)unavailable(true);}

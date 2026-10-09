@@ -2,9 +2,23 @@
   'use strict';
   const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   const text = (language,en,ar) => language === 'ar' ? ar : en;
-  const money = (amount,language) => new Intl.NumberFormat(language === 'ar' ? 'ar-EG' : 'en-GB',{style:'currency',currency:'EGP',maximumFractionDigits:2}).format(amount);
+  const money = (amount,language) => new Intl.NumberFormat(language === 'ar' ? 'ar-EG' : 'en-GB',{style:'currency',currency:'EGP',minimumFractionDigits:0,maximumFractionDigits:0}).format(amount);
   const date = (value,language) => new Intl.DateTimeFormat(language === 'ar' ? 'ar-EG' : 'en-GB',{dateStyle:'medium',timeZone:'Africa/Cairo'}).format(new Date(value));
   const icon = name => `<i data-lucide="${name}" aria-hidden="true"></i>`;
+  const procedureName = (item,language) => root.LuminDentalI18n.translate(item.name,language);
+  function procedureTeeth(item,language) {
+    if (item.scope === 'mouth') return `<span class="q-procedure-icon">${icon('sparkles')}</span>`;
+    const teeth = [...new Set(item.targets.map(target => target.toothId))];
+    return `<span class="q-procedure-teeth${teeth.length>1?' q-procedure-teeth-multiple':''}" dir="ltr">${teeth.map(id => {
+      const slot=LuminQuotationModel.slotForTooth(id);
+      const label=LuminQuotationModel.toothLabel(id);
+      const value=label.slice(2);
+      const left=slot>8&&slot<=24;
+      const x=left?7:33,y=slot<=16?23:5;
+      const description=text(language,`Tooth ${label}`,`السن ${label}`);
+      return `<svg class="q-palmer" viewBox="0 0 40 28" role="img" aria-label="${escape(description)}" focusable="false"><title>${escape(description)}</title><path d="M${x} ${slot<=16?4:24} V${y} H${left?36:4}"></path><text x="${left?23:17}" y="14.5">${escape(value)}</text></svg>`;
+    }).join('')}</span>`;
+  }
   const logoDataUrl = value => {
     const logo=typeof value==='string'?value.trim():'';
     return logo.length<=700000&&/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(logo)?logo:'';
@@ -27,7 +41,7 @@
       const id = tooth.toothId;
       const related = data.items.filter(item => item.targets.some(target => target.toothId === id));
       const label = LuminQuotationModel.toothLabel(id);
-      const name = `${label}${related.length ? ': '+related.map(item => item.name).join(', ') : ''}`;
+      const name = `${label}${related.length ? ': '+related.map(item => procedureName(item,language)).join(', ') : ''}`;
       const anatomy = LuminToothAnatomy.photo(id,tooth.slot,true).replaceAll('id="',`id="${prefix}-`);
       const surfaces = ['top','left','center','right','bottom'];
       const shapes = {top:'M3 3H37L29 11H11Z',left:'M3 3L11 11V29L3 37Z',center:'M11 11H29V29H11Z',right:'M37 3V37L29 29V11Z',bottom:'M3 37L11 29H29L37 37Z'};
@@ -51,7 +65,7 @@
     container.innerHTML = `<header class="q-brandbar"><div class="q-brand">${logo ? `<img class="q-clinic-logo" src="${escape(logo)}" alt=""/>` : `<span class="q-brand-icon">${icon('sparkles')}</span>`}<span>${escape(clinic.name)}</span></div>${!options.preview ? `<button type="button" class="q-button q-language" data-q-language>${icon('languages')}${language === 'ar' ? 'English' : 'العربية'}</button>` : ''}</header>
       <div class="q-heading"><div><span class="q-eyebrow">${text(language,'PERSONAL TREATMENT PLAN','خطة علاجك الشخصية')}</span><h1>${text(language,'Your treatment quotation','عرض أسعار علاجك')}</h1><p>${text(language,'Prepared for','أُعدّ من أجل')} <strong dir="auto">${escape(data.patientName)}</strong></p></div><div class="q-reference"><span class="q-badge q-live">${icon('refresh-cw')}${text(language,'Live quotation','عرض أسعار مباشر')}</span><span dir="ltr">${escape(data.reference || '')}</span>${data.expiresAt ? `<span>${text(language,'Valid until','صالح حتى')} ${date(data.expiresAt,language)}</span>` : ''}</div></div>
       <section class="q-panel"><div class="q-section-heading"><div><h2>${text(language,'Your smile, mapped out','خطة علاج ابتسامتك')}</h2><p>${text(language,'Tap a treatment or highlighted tooth to explore your plan.','اضغط على إجراء أو سن محدد لاستعراض خطة علاجك.')}</p></div><div class="q-legend"><span class="q-badge q-planned">${text(language,'Planned','مخطط')}</span><span class="q-badge q-in-progress">${text(language,'In progress','قيد التنفيذ')}</span></div></div>${chartMarkup(data,language,prefix)}</section>
-      <div class="q-details-grid"><section class="q-panel"><div class="q-section-heading"><h2>${text(language,'Included treatments','الإجراءات المشمولة')}</h2><span class="q-count">${data.items.length}</span></div><div class="q-procedures">${data.items.length ? data.items.map((item,index) => `<button type="button" class="q-procedure" data-q-item="${index}" aria-pressed="false"><span class="q-procedure-icon">${icon(item.scope === 'mouth' ? 'sparkles' : item.visualCode === 'rct' ? 'activity' : item.visualCode.includes('crown') ? 'gem' : 'layers')}</span><span class="q-procedure-copy"><strong dir="auto">${escape(item.name)}${item.visitNumber ? ` · ${text(language,'Visit','زيارة')} ${item.visitNumber}` : ''}</strong><span dir="auto">${escape(targetLabel(item,language))}</span><span class="q-badge ${item.status === 'In' ? 'q-in-progress' : 'q-planned'}">${item.status === 'In' ? text(language,'In progress','قيد التنفيذ') : text(language,'Planned','مخطط')}</span></span><strong class="q-price">${escape(money(item.amount,language))}</strong></button>`).join('') : `<div class="q-empty">${icon('circle-check')}<h3>${text(language,'No treatments remaining','لا توجد إجراءات متبقية')}</h3><p>${text(language,'All quoted treatments have been completed or removed from the plan.','اكتملت جميع الإجراءات المشمولة أو أُزيلت من الخطة.')}</p></div>`}</div></section>
+      <div class="q-details-grid"><section class="q-panel"><div class="q-section-heading"><h2>${text(language,'Included treatments','الإجراءات المشمولة')}</h2><span class="q-count">${data.items.length}</span></div><div class="q-procedures">${data.items.length ? data.items.map((item,index) => `<button type="button" class="q-procedure" data-q-item="${index}" aria-pressed="false">${procedureTeeth(item,language)}<span class="q-procedure-copy"><strong>${escape(procedureName(item,language))}${item.visitNumber ? ` · ${text(language,'Visit','زيارة')} ${item.visitNumber}` : ''}</strong><span>${escape(targetLabel(item,language))}</span><span class="q-badge ${item.status === 'In' ? 'q-in-progress' : 'q-planned'}">${item.status === 'In' ? text(language,'In progress','قيد التنفيذ') : text(language,'Planned','مخطط')}</span></span><strong class="q-price">${escape(money(item.amount,language))}</strong></button>`).join('') : `<div class="q-empty">${icon('circle-check')}<h3>${text(language,'No treatments remaining','لا توجد إجراءات متبقية')}</h3><p>${text(language,'All quoted treatments have been completed or removed from the plan.','اكتملت جميع الإجراءات المشمولة أو أُزيلت من الخطة.')}</p></div>`}</div></section>
       <aside class="q-panel q-total-panel"><span class="q-eyebrow">${text(language,'QUOTATION TOTAL','إجمالي عرض الأسعار')}</span><div class="q-total" aria-live="polite">${escape(money(data.total,language))}</div><p class="q-live-note">${icon('refresh-cw')}<span>${text(language,'Prices follow your current treatment plan. Completed treatments are removed automatically.','تتبع الأسعار خطة علاجك الحالية. تُحذف الإجراءات المكتملة تلقائياً.')}</span></p>${!options.preview && contact ? `<a class="q-button q-primary" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" href="https://wa.me/${clinic.whatsapp}?text=${encodeURIComponent(text(language,`Hello, I have a question about quotation ${data.reference}.`,`مرحباً، لدي سؤال عن عرض الأسعار ${data.reference}.`))}">${icon('message-circle')}${text(language,'Contact clinic','تواصل مع العيادة')}</a>` : ''}${!options.preview ? `<button type="button" class="q-button" data-q-print>${icon('printer')}${text(language,'Print quotation','طباعة عرض الأسعار')}</button>` : ''}</aside></div>
       <footer class="q-footer">${text(language,'Prepared with care','أُعدّ بعناية')} · Lumin</footer>`;
     for (const tooth of container.querySelectorAll('[data-q-tooth]')) {

@@ -4,6 +4,7 @@
   const history = {request:0,patientId:null,patient:null,operations:[],records:[],hasMore:false,busy:false};
   const view = () => root.LuminQuotationView;
   const language = () => typeof currentUiLanguage !== 'undefined' ? currentUiLanguage : 'en';
+  const quotationLanguage = 'ar';
   const t = (en,ar) => view().text(language(),en,ar);
   const e = value => view().escape(value);
   const icon = name => view().icon(name);
@@ -104,7 +105,7 @@
     return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
   }
   function quoteLink(record) {
-    const url=new URL('quotation.html',location.href);url.search='';url.hash=record.token;return url.href;
+    const url=new URL('quotation.html',location.href);url.search='';url.hash='';url.searchParams.set('q',record.token);return url.href;
   }
   function draftData() {
     return {patientName:ui.patient.name,reference:ui.saved?'QT-'+ui.saved.id.slice(0,8).toUpperCase():t('Preview','معاينة'),
@@ -130,14 +131,14 @@
     const expired=ui.saved && new Date(ui.saved.expires_at)<=new Date();
     const shareable=ui.saved&&!expired&&!ui.saved.revoked_at;
     body.innerHTML=`${excluded ? `<p class="q-feedback">${t('Only selected procedures in Plan status are included.','يتضمن العرض الإجراءات المحددة التي لا تزال في حالة التخطيط فقط.')}</p>` : ''}${!ui.settings?.whatsapp_phone ? `<p class="q-feedback">${t('Set the clinic WhatsApp number under Admin → Print forms → Quotation settings before creating a link.','اضبط رقم واتساب العيادة من المسؤول ← نماذج الطباعة ← إعدادات عروض الأسعار قبل إنشاء الرابط.')}</p>` : ''}<div class="q-form-row"><label class="q-field">${t('Expiry date','تاريخ الانتهاء')}<input type="date" id="quotation-expiry" min="${localDate(new Date())}" value="${ui.saved&&!expired?localDate(new Date(ui.saved.expires_at)):defaultExpiry()}" required/></label>${ui.saved?button('replace',t('Use selected planned procedures','استخدام الإجراءات المخططة المحددة'),'list-checks'):''}</div>${ui.saved&&!expired?`<div class="q-link-field"><input aria-label="${t('Quotation link','رابط عرض الأسعار')}" value="${e(quoteLink(ui.saved))}" readonly/>${button('copy',t('Copy link','نسخ الرابط'),'copy')}${button('preview',t('Open page','فتح الصفحة'),'external-link')}</div>`:''}<div id="quotation-preview"></div>`;
-    view().render(body.querySelector('#quotation-preview'),draftData(),language(),{preview:true});
+    view().render(body.querySelector('#quotation-preview'),draftData(),quotationLanguage,{preview:true});
     if(!shareable)body.querySelector('.q-link-field')?.remove();
     if(ui.saved?.revoked_at)body.insertAdjacentHTML('afterbegin',`<p class="q-feedback">${t('This link is disabled. Editing keeps it disabled.','هذا الرابط معطل. سيظل معطلاً بعد التعديل.')}</p>`);
     body.querySelector('#quotation-preview').insertAdjacentHTML('beforebegin',procedurePicker());
     body.querySelectorAll('[data-quote-procedure]').forEach(input=>input.addEventListener('change',()=>{
       ui.selectedIds=input.checked?[...new Set([...ui.selectedIds,input.value])]:ui.selectedIds.filter(id=>id!==input.value);
       body.querySelector('[data-quote-selected-count]').textContent=ui.selectedIds.length;
-      view().render(body.querySelector('#quotation-preview'),draftData(),language(),{preview:true});
+      view().render(body.querySelector('#quotation-preview'),draftData(),quotationLanguage,{preview:true});
     }));
     ui.overlay.querySelector('[data-quote-footer]').innerHTML=`${shareable?button('whatsapp',t('Open WhatsApp','فتح واتساب'),'message-circle'):''}${button('close',t('Close','إغلاق'),'x')}${button('save',ui.saved?t('Save changes','حفظ التغييرات'):t('Create quotation link','إنشاء رابط عرض الأسعار'),'link','q-primary')}`;
     if(root.lucide)lucide.createIcons();
@@ -276,7 +277,7 @@
         const phone=String(ui.patient.phone||'').replace(/\D/g,'');
         const international=phone.startsWith('00')?phone.slice(2):phone.startsWith('0')?'20'+phone.slice(1):phone;
         if(!/^[1-9][0-9]{6,14}$/.test(international))throw new Error(t('Add a valid patient phone number before opening WhatsApp.','أضف رقم هاتف صحيحاً للمريض قبل فتح واتساب.'));
-        const message=t(`Hello ${ui.patient.name}, here is your treatment quotation from ${ui.settings.clinic_name}:`,`مرحباً ${ui.patient.name}، إليك عرض أسعار علاجك من ${ui.settings.clinic_name}:`);
+        const message=view().text(quotationLanguage,`Hello ${ui.patient.name}, here is your treatment quotation from ${ui.settings.clinic_name}:`,`مرحباً ${ui.patient.name}، إليك عرض أسعار علاجك من ${ui.settings.clinic_name}:`);
         window.open(`https://wa.me/${international}?text=${encodeURIComponent(message+'\n'+quoteLink(record))}`,'_blank','noopener,noreferrer');return;
       }
       if(!['save','revoke','delete'].includes(name))return;
@@ -288,7 +289,7 @@
         const input=ui.overlay.querySelector('#quotation-expiry');
         const expiry=new Date(input.value+'T23:59:59');
         if(!input.value||!Number.isFinite(expiry.getTime())||expiry<=new Date())throw new Error('Choose a future expiry date.');
-        payload={action:ui.saved?'update':'create',patient_id:id,id:ui.saved?.id,revision:Number(ui.saved?.revision),selected_ids:ui.selectedIds,expires_at:expiry.toISOString(),language:language()};
+        payload={action:ui.saved?'update':'create',patient_id:id,id:ui.saved?.id,revision:Number(ui.saved?.revision),selected_ids:ui.selectedIds,expires_at:expiry.toISOString(),language:quotationLanguage};
       }
       const response=await api(payload);
       if(!isCurrent(request,id))return;
@@ -352,9 +353,7 @@
   root.refreshQuotationFormLogo=renderFormLogo;
   root.resetQuotationUi=function(){close();resetHistory();};
   root.refreshQuotationLanguage=function() {
-    const historyButton=document.getElementById('profile-quotations-button');
     const label=t('Quotations','عروض الأسعار');
-    if(historyButton){historyButton.querySelector('span').textContent=label;historyButton.setAttribute('aria-label',label);historyButton.title=label;}
     const tab=document.querySelector('[data-patient-workspace-tab="quotations"]');
     if(tab){tab.querySelector('span').textContent=label;tab.setAttribute('aria-label',label);tab.title=label;}
     historyLabels();

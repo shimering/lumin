@@ -1,0 +1,14 @@
+{
+  "name": "lumin",
+  "main": "workers/lumin.mjs",
+  "compatibility_date": "2026-10-09",
+  "build": { "command": "node scripts/build-web-assets.cjs" },
+  "assets": {
+    "directory": "./.cloudflare-assets",
+    "binding": "ASSETS",
+    "html_handling": "none",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/quotation", "/quotation/", "/quotation.html", "/quotation-logo"]
+  },
+  "observability": { "enabled": false }
+}

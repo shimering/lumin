@@ -1,4 +1,4 @@
-const LUMIN_CACHE = "lumin-dental-shell-v208";
+const LUMIN_CACHE = "lumin-dental-shell-v210";
 const LUMIN_SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -45,15 +45,16 @@ const LUMIN_SHELL = [
   "/lumin-chart-appointments.js?v=3",
   "/lumin-clinical-actions.js?v=4",
   "/lumin-quotation-model.js?v=1",
+  "/lumin-dental-i18n.js?v=1",
   "/lumin-tooth-anatomy.js?v=2",
   "/lumin-tooth-images.css?v=1",
   "/assets/teeth-3d/incisor.webp",
   "/assets/teeth-3d/canine.webp",
   "/assets/teeth-3d/premolar.webp",
   "/assets/teeth-3d/molar.webp",
-  "/lumin-quotation-view.js?v=3",
-  "/lumin-quotations.js?v=3",
-  "/lumin-quotations.css?v=4",
+  "/lumin-quotation-view.js?v=4",
+  "/lumin-quotations.js?v=5",
+  "/lumin-quotations.css?v=5",
   "/lumin-clinical-actions.css?v=4",
   "/lumin-specialty-picker.js?v=3",
   "/assets/specialties-3d/dental-general.webp?v=2",
@@ -118,7 +119,7 @@ self.addEventListener("fetch", (event) => {
   ) return;
 
   // Public quotation navigations must never fall back to the clinic login or an offline copy.
-  if (url.pathname.endsWith("/quotation.html")) {
+  if (["/quotation", "/quotation/", "/quotation.html", "/quotation-logo"].includes(url.pathname)) {
     event.respondWith(fetch(request, { cache: "no-store" }).catch(() => new Response(
       '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Quotation unavailable</title><p>Connect to the internet to open this quotation. / اتصل بالإنترنت لفتح عرض الأسعار.</p>',
       { status: 503, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } }
