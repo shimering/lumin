@@ -1,4 +1,4 @@
-const LUMIN_CACHE = "lumin-dental-shell-v210";
+const LUMIN_CACHE = "lumin-dental-shell-v212";
 const LUMIN_SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -42,8 +42,8 @@ const LUMIN_SHELL = [
   "/lumin-xray-rotation.css?v=1",
   "/lumin-tooth-notes.js?v=3",
   "/lumin-tooth-notes.css?v=4",
-  "/lumin-chart-appointments.js?v=3",
-  "/lumin-clinical-actions.js?v=4",
+  "/lumin-chart-appointments.js?v=4",
+  "/lumin-clinical-actions.js?v=5",
   "/lumin-quotation-model.js?v=1",
   "/lumin-dental-i18n.js?v=1",
   "/lumin-tooth-anatomy.js?v=2",
@@ -55,7 +55,7 @@ const LUMIN_SHELL = [
   "/lumin-quotation-view.js?v=4",
   "/lumin-quotations.js?v=5",
   "/lumin-quotations.css?v=5",
-  "/lumin-clinical-actions.css?v=4",
+  "/lumin-clinical-actions.css?v=5",
   "/lumin-specialty-picker.js?v=3",
   "/assets/specialties-3d/dental-general.webp?v=2",
   "/assets/specialties-3d/dental-diagnosis.webp?v=2",

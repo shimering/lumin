@@ -18,9 +18,17 @@
 #chart-actions-body { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 #chart-actions-body[hidden] { display: none; }
 .chart-actions-content { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.chart-actions-selection { display: flex; align-items: center; gap: 4px; padding: 8px 12px; flex: none; }
-.chart-actions-selection-badge { display: inline-flex; flex: 1; min-width: 0; gap: 8px; align-items: center; border: 0; border-radius: 12px; background: #eff6ff; color: #1d4ed8; padding: 10px 12px; font-size: 12px; line-height: 1.5; font-weight: 600; overflow-wrap: anywhere; }
-.chart-actions-filters { display: grid; gap: 8px; padding: 0 16px 12px; flex: none; }
+.chart-actions-selection { display: flex; align-items: center; gap: 4px; min-width: 0; flex: none; }
+.chart-actions-selected-teeth { display: flex; flex: 1; min-width: 0; gap: 8px; overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; padding-block: 2px; }
+.chart-actions-tooth { display: inline-flex; align-items: center; justify-content: center; gap: 4px; flex: none; min-width: 64px; min-height: calc(44px / var(--lumin-app-scale, 1)); padding: 8px; border: 0; border-radius: 12px; background: #eff6ff; color: #1d4ed8; cursor: pointer; transition: background 150ms ease-out, transform 150ms ease-out; }
+.chart-actions-tooth .palmer-symbol { width: 36px; height: 28px; direction: ltr; }
+.chart-actions-tooth > svg:last-child { width: 12px; height: 12px; color: #64748b; flex: none; }
+.chart-actions-tooth:hover { background: #dbeafe; }
+.chart-actions-tooth:active { transform: scale(.98); }
+.chart-actions-tooth:focus-visible { outline: 2px solid #93c5fd; outline-offset: -2px; }
+.chart-actions-tooth:disabled { opacity: .5; pointer-events: none; }
+.chart-actions-selection-empty { align-self: center; color: #94a3b8; font-size: 12px; overflow-wrap: anywhere; }
+.chart-actions-filters { display: grid; gap: 8px; padding: 12px 16px; flex: none; }
 .chart-actions-search { display: flex; align-items: center; gap: 8px; padding-inline: 12px; min-height: 44px; border-radius: 12px; border: 1px solid #e2e8f0; background: #f8fafc; }
 .chart-actions-search:focus-within { border-color: #2563eb; box-shadow: 0 0 0 3px #dbeafe; }
 .chart-actions-search > svg { width: 16px; height: 16px; color: #94a3b8; flex: none; }
@@ -55,8 +63,13 @@
 .chart-actions-operation-copy small { display: block; margin-top: 3px; color: #64748b; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
 .chart-actions-price { padding: 4px 7px; border: 0; border-radius: 8px; background: #f1f5f9; color: #64748b; font-size: 11px; overflow-wrap: anywhere; max-width: 28%; }
 .chart-actions-footer { display: flex; flex-direction: column; gap: 10px; padding: 12px 16px max(16px, env(safe-area-inset-bottom)); border-top: 1px solid #e2e8f0; background: var(--lumin-face, #fff); flex: none; }
+.chart-actions-summary { display: grid; gap: 8px; min-width: 0; max-height: 180px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 .chart-actions-preview { color: #64748b; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.chart-actions-procedure-badge { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; min-height: 40px; padding-block: 4px; padding-inline: 8px 12px; border: 0; border-radius: 16px; background: #eff6ff; color: #1d4ed8; }
+.chart-actions-procedure-badge .dental-specialty-icon { width: 32px; height: 32px; flex: none; }
 .chart-actions-preview strong { display: block; color: #0f172a; font-weight: 600; }
+.chart-actions-procedure-badge strong { min-width: 0; color: #1d4ed8; line-height: 1.4; }
+.chart-actions-preview > span { display: block; margin-top: 4px; }
 .chart-actions-preview .chart-actions-validation { color: #b45309; }
 .chart-actions-footer-row { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1fr); gap: 8px; align-items: end; }
 .chart-actions-footer-row label { display: grid; gap: 5px; color: #64748b; font-size: 11px; }
@@ -123,17 +136,23 @@ html.chart-actions-mobile #chart-clinical-workspace .chart-actions-header { flex
 html.chart-actions-mobile #chart-clinical-workspace .chart-actions-header h3 { writing-mode: horizontal-tb; min-height: 0; flex: 1; }
 html.chart-actions-mobile #chart-actions-body { overflow: hidden; }
 html.chart-actions-mobile .chart-actions-content { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
-html.chart-actions-mobile .chart-actions-filters { grid-template-columns: minmax(0, 1fr) minmax(0, .8fr); padding-bottom: 8px; }
+html.chart-actions-mobile .chart-actions-filters { grid-template-columns: minmax(0, 1fr) minmax(0, .8fr); padding-block: 8px; }
 html.chart-actions-mobile .chart-actions-search input { font-size: 16px; }
-html.chart-actions-mobile .chart-actions-selection { padding-block: 2px; }
 html.chart-actions-mobile .chart-actions-footer { padding-top: 8px; gap: 6px; }
-html.chart-actions-mobile .chart-actions-preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+html.chart-actions-mobile .chart-actions-summary { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; max-height: 88px; }
+html.chart-actions-mobile .chart-actions-preview .chart-actions-scope { display: none; }
+html.chart-actions-mobile .chart-actions-procedure-badge { padding-inline: 6px; gap: 6px; }
+html.chart-actions-mobile .chart-actions-procedure-badge strong { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 11px; }
 html.chart-actions-mobile #chart-actions-operations { overflow: visible; flex: none; min-height: 0; }
 html.chart-actions-mobile .chart-actions-panel.is-sheet-dragging { transition: none; will-change: transform; user-select: none; }
 @media (max-height: 500px) {
-  html.chart-actions-mobile .chart-actions-preview,
   html.chart-actions-mobile .chart-actions-footer-row label > span { display: none; }
+  html.chart-actions-mobile #chart-clinical-workspace.has-clinical-actions-panel .chart-actions-panel { height: min(calc(var(--lumin-app-viewport-height, 100dvh) * .9), 280px); max-height: min(calc(var(--lumin-app-viewport-height, 100dvh) * .9), 280px); }
+  html.chart-actions-mobile .chart-actions-preview > span { display: none; }
   html.chart-actions-mobile .chart-actions-footer { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+}
+@media (max-height: 650px) {
+  html.chart-actions-mobile .chart-actions-footer-row label > span { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .chart-actions-panel, .chart-actions-panel *, .chart-specialty-option, #chart-clinical-workspace.has-clinical-actions-panel { transition: none !important; animation: none !important; }

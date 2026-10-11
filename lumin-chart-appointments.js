@@ -1,7 +1,7 @@
-// A day-scoped queue: independent of the calendar's selected day and filters.
+// Today's assigned appointments, independent of the calendar's selected day and filters.
 const chartAppointments = {
   records: [], dateKey: '', userId: null, status: 'idle', error: null,
-  pending: null, expiresAt: 0, generation: 0, collapsed: true, timer: null,
+  pending: null, expiresAt: 0, generation: 0, collapsed: chartAppointmentsDefaultCollapsed(), timer: null,
   exits: new Map()
 };
 
@@ -13,8 +13,14 @@ function chartAppointmentsCanView() {
   return Boolean(currentSession && hasPageAccess('chart') && hasPageAccess('appointments'));
 }
 
+function chartAppointmentsDefaultCollapsed() {
+  return !window.matchMedia('(min-width: 768px) and (orientation: landscape)').matches
+    || Boolean(window.LuminMobileNav?.isPhone());
+}
+
 function chartAppointmentIsPending(entry, dateKey = appointmentDateKey(new Date())) {
-  return Boolean(entry.patientId && !entry.isNote && entry.date === dateKey
+  return Boolean(currentSession?.user?.id && entry.assignedUserId === currentSession.user.id
+    && entry.patientId && !entry.isNote && entry.date === dateKey
     && !['Completed', 'Cancelled', 'No-show'].includes(canonicalAppointmentStatus(entry.status)));
 }
 
@@ -49,6 +55,7 @@ function setChartAppointmentsActive(active) {
   chartAppointments.timer = null;
   if (!active) return;
   if (!chartAppointmentsCanView()) { resetChartAppointments(); return; }
+  chartAppointments.collapsed = chartAppointmentsDefaultCollapsed();
   void loadChartAppointments();
   chartAppointments.timer = window.setInterval(() => {
     if (document.visibilityState !== 'visible') return;
@@ -62,7 +69,7 @@ function invalidateChartAppointments() {
 
 function resetChartAppointments(options = {}) {
   const timer = options.keepTimer ? chartAppointments.timer : null;
-  const collapsed = options.keepTimer ? chartAppointments.collapsed : true;
+  const collapsed = options.keepTimer ? chartAppointments.collapsed : chartAppointmentsDefaultCollapsed();
   if (chartAppointments.timer && !options.keepTimer) window.clearInterval(chartAppointments.timer);
   chartAppointments.exits.forEach(animation => animation.cancel());
   chartAppointments.exits.clear();
@@ -103,6 +110,7 @@ function loadChartAppointments(options = {}) {
     const readRevision = appointmentWriteRevision, records = [];
     for (let offset = 0; ; offset += 1000) {
       const { data, error } = await db.from('appointments').select(APPOINTMENT_SELECT_FIELDS)
+        .eq('assigned_user_id', userId)
         .gte('appointment_at', start.toISOString()).lt('appointment_at', end.toISOString())
         .order('appointment_at', { ascending: true }).order('id', { ascending: true }).range(offset, offset + 999);
       if (error) throw error;
@@ -112,7 +120,8 @@ function loadChartAppointments(options = {}) {
   });
   const pending = request.then(({ records, readRevision }) => {
     if (!isCurrent()) return false;
-    chartAppointments.records = appointmentRecordsAfterLocalWrites(records, readRevision, dateKey).map(normaliseAppointmentRecord);
+    chartAppointments.records = appointmentRecordsAfterLocalWrites(records, readRevision, dateKey)
+      .map(normaliseAppointmentRecord).filter(entry => entry.assignedUserId === userId);
     chartAppointments.status = 'ready';
     chartAppointments.expiresAt = Date.now() + 15000;
     renderChartAppointmentsPanel();
@@ -134,7 +143,7 @@ function loadChartAppointments(options = {}) {
 function updateChartAppointmentRecord(entry) {
   if (!chartAppointmentsCanView() || chartAppointments.userId !== currentSession.user.id) return;
   chartAppointments.records = chartAppointments.records.filter(record => record.id !== entry.id);
-  if (entry.date === chartAppointments.dateKey) chartAppointments.records.push(entry);
+  if (entry.date === chartAppointments.dateKey && entry.assignedUserId === currentSession.user.id) chartAppointments.records.push(entry);
   renderChartAppointmentsPanel();
 }
 
@@ -207,7 +216,7 @@ function renderChartAppointmentsPlaceholder() {
     return;
   }
   const failed = chartAppointments.status === 'error';
-  list.innerHTML = `<div class="chart-appointments-empty"><i data-lucide="${failed ? 'cloud-off' : 'calendar-check-2'}" aria-hidden="true"></i><strong>${failed ? chartAppointmentsText('Appointments unavailable', 'المواعيد غير متاحة') : chartAppointmentsText('All clear for today', 'لا توجد مواعيد متبقية اليوم')}</strong><p>${failed ? chartAppointmentsText('Try loading today’s appointments again.', 'أعد محاولة تحميل مواعيد اليوم.') : chartAppointmentsText('No remaining patient appointments today.', 'لا توجد مواعيد مرضى متبقية اليوم.')}</p><button type="button" class="chart-media-button" onclick="${failed ? 'loadChartAppointments({refresh:true})' : "switchView('appointments')"}"><i data-lucide="${failed ? 'refresh-cw' : 'calendar-days'}" aria-hidden="true"></i>${failed ? chartAppointmentsText('Retry', 'إعادة المحاولة') : chartAppointmentsText('View calendar', 'عرض التقويم')}</button></div>`;
+  list.innerHTML = `<div class="chart-appointments-empty"><i data-lucide="${failed ? 'cloud-off' : 'calendar-check-2'}" aria-hidden="true"></i><strong>${failed ? chartAppointmentsText('Appointments unavailable', 'المواعيد غير متاحة') : chartAppointmentsText('All clear for today', 'لا توجد مواعيد متبقية اليوم')}</strong><p>${failed ? chartAppointmentsText('Try loading today’s appointments again.', 'أعد محاولة تحميل مواعيد اليوم.') : chartAppointmentsText('No remaining appointments assigned to you today.', 'لا توجد مواعيد متبقية مسندة إليك اليوم.')}</p><button type="button" class="chart-media-button" onclick="${failed ? 'loadChartAppointments({refresh:true})' : "switchView('appointments')"}"><i data-lucide="${failed ? 'refresh-cw' : 'calendar-days'}" aria-hidden="true"></i>${failed ? chartAppointmentsText('Retry', 'إعادة المحاولة') : chartAppointmentsText('View calendar', 'عرض التقويم')}</button></div>`;
   if (window.lucide) lucide.createIcons();
 }
 
@@ -217,7 +226,7 @@ function renderChartAppointmentsPanel() {
   if (!panel || !list) return;
   updateChartSidePanelLayout();
   if (panel.hidden) { list.replaceChildren(); return; }
-  document.getElementById('chart-appointments-title').textContent = chartAppointmentsText('Today’s appointments', 'مواعيد اليوم');
+  document.getElementById('chart-appointments-title').textContent = chartAppointmentsText('My appointments today', 'مواعيدي اليوم');
   const toggle = document.getElementById('chart-appointments-collapse');
   const action = chartAppointments.collapsed ? chartAppointmentsText('Expand today’s appointments', 'توسيع مواعيد اليوم') : chartAppointmentsText('Collapse today’s appointments', 'طي مواعيد اليوم');
   toggle.setAttribute('aria-expanded', String(!chartAppointments.collapsed));

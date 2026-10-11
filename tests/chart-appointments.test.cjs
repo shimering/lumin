@@ -16,20 +16,20 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
 const dateKey = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 const now = new Date(2026, 9, 8, 15).getTime();
 const at = (hour, day = 8) => new Date(2026, 9, day, hour).toISOString();
-const row = (id, status = 'Scheduled', hour = 16, extra = {}) => ({ id, patient_id: `patient-${id}`, appointment_at: at(hour), status, patients: { name: `Patient ${id}` }, ...extra });
-function fixture() {
+const row = (id, status = 'Scheduled', hour = 16, extra = {}) => ({ id, patient_id: `patient-${id}`, assigned_user_id: 'staff', appointment_at: at(hour), status, patients: { name: `Patient ${id}` }, ...extra });
+function fixture({ landscape = false, phone = false } = {}) {
   let timestamp = now;
   class Clock extends Date { constructor(...args) { super(...(args.length ? args : [timestamp])); } static now() { return timestamp; } }
   const reads = [], intervals = new Map();
   const ctx = vm.createContext({ Date: Clock, Intl, console, currentSession: { user: { id: 'staff' } }, currentUiLanguage: 'en',
     canView: true, hasPageAccess: () => ctx.canView, appointmentDateKey: dateKey, activePatientId: 'patient-a',
     canonicalAppointmentStatus: value => value, coalescedRefreshReads: new Map(), stableJsonStringify: JSON.stringify,
-    appointmentSavedRecords: new Map(), appointmentWriteRevision: 0, APPOINTMENT_SELECT_FIELDS: 'id,patient_id,appointment_at,status,patients(name)',
-    normaliseAppointmentRecord: record => ({ id: record.id, patientId: record.patient_id, isNote: !record.patient_id,
+    appointmentSavedRecords: new Map(), appointmentWriteRevision: 0, APPOINTMENT_SELECT_FIELDS: 'id,patient_id,assigned_user_id,appointment_at,status,patients(name)',
+    normaliseAppointmentRecord: record => ({ id: record.id, patientId: record.patient_id, assignedUserId: record.assigned_user_id, isNote: !record.patient_id,
       date: dateKey(new Date(record.appointment_at)), startAt: record.appointment_at, status: record.status, patient: record.patients?.name }),
-    window: { clearInterval: id => intervals.delete(id), setInterval: fn => { const id = intervals.size + 1; intervals.set(id, fn); return id; } },
+    window: { matchMedia: () => ({ matches: landscape }), LuminMobileNav: { isPhone: () => phone }, clearInterval: id => intervals.delete(id), setInterval: fn => { const id = intervals.size + 1; intervals.set(id, fn); return id; } },
     document: { addEventListener() {}, getElementById: () => null, visibilityState: 'visible' },
-    db: { from(table) { const query = { table, select(fields) { this.fields = fields; return this; }, gte(column, value) { this.start = value; return this; },
+    db: { from(table) { const query = { table, select(fields) { this.fields = fields; return this; }, eq(column, value) { this.filterColumn = column; this.filterValue = value; return this; }, gte(column, value) { this.start = value; return this; },
       lt(column, value) { this.end = value; return this; }, order() { return this; }, range(start, end) { const read = deferred(); reads.push({ ...this, startRow: start, endRow: end, ...read }); return read.promise; } }; return query; } }
   });
   ['coalesceRefreshRead', 'contentRefreshContext', 'appointmentRecordsAfterLocalWrites'].forEach(name => vm.runInContext(source(name), ctx));
@@ -38,27 +38,43 @@ function fixture() {
   return { ctx, reads, intervals, state, advance: value => { timestamp = value; } };
 }
 
-test('appointments start collapsed and data refreshes preserve manual expansion', async () => {
-  const { ctx, state, reads } = fixture();
-  assert.equal(state().collapsed, true);
-  ctx.toggleChartAppointmentsPanel();
+test('landscape appointments start open and data refreshes preserve manual collapse', async () => {
+  const { ctx, state, reads } = fixture({ landscape: true });
   assert.equal(state().collapsed, false);
+  ctx.toggleChartAppointmentsPanel();
+  assert.equal(state().collapsed, true);
   const pending = ctx.loadChartAppointments();
   await settle();
   reads[0].resolve({ data: [row('a')] });
   await pending;
-  assert.equal(state().collapsed, false, 'loading the daily queue keeps it manually expanded');
+  assert.equal(state().collapsed, true, 'loading the daily queue preserves a manual collapse');
   ctx.resetChartAppointments({ keepTimer: true });
-  assert.equal(state().collapsed, false, 'daily rollover preserves the user’s panel state');
+  assert.equal(state().collapsed, true, 'daily rollover preserves the user’s panel state');
   ctx.resetChartAppointments();
-  assert.equal(state().collapsed, true, 'a fresh session starts collapsed');
+  assert.equal(state().collapsed, false, 'a fresh landscape session starts expanded');
 });
 
-test('today queue includes overdue and active patients, excludes finished visits and notes, and sorts by time', () => {
+test('chart entry expands landscape appointments and keeps phones and portrait views collapsed', async () => {
+  for (const options of [{landscape:true,phone:false},{landscape:true,phone:true},{landscape:false,phone:false},{landscape:false,phone:true}]) {
+    const { ctx, reads, state } = fixture(options);
+    state().collapsed = options.landscape && !options.phone;
+    ctx.setChartAppointmentsActive(true);
+    assert.equal(state().collapsed, !options.landscape || options.phone);
+    await settle();reads[0].resolve({data:[row('a')]});await settle();
+    ctx.setChartAppointmentsActive(false);
+    state().collapsed = options.landscape && !options.phone;
+    ctx.setChartAppointmentsActive(true);
+    assert.equal(state().collapsed, !options.landscape || options.phone,'Returning to the chart restores the device default');
+    ctx.setChartAppointmentsActive(false);
+  }
+});
+
+test('today queue only includes this account’s pending patients, excludes finished visits and notes, and sorts by time', () => {
   const { ctx, state } = fixture();
   state().records = [row('future'), row('waiting', 'Checked in', 10), row('ongoing', 'In progress', 14), row('done', 'Completed'),
     row('cancelled', 'Cancelled'), row('absent', 'No-show'), row('note', 'Scheduled', 18, { patient_id: null }),
-    row('tomorrow', 'Confirmed', 18, { appointment_at: at(18, 9) })].map(ctx.normaliseAppointmentRecord);
+    row('tomorrow', 'Confirmed', 18, { appointment_at: at(18, 9) }), row('other', 'Scheduled', 9, { assigned_user_id: 'other' }),
+    row('unassigned', 'Scheduled', 11, { assigned_user_id: null })].map(ctx.normaliseAppointmentRecord);
   assert.deepEqual(Array.from(ctx.chartAppointmentsForToday(), entry => entry.id), ['waiting', 'ongoing', 'future']);
 });
 
@@ -67,16 +83,48 @@ test('reads only today with local-midnight boundaries and paginates beyond the A
   const pending = ctx.loadChartAppointments();
   await settle();
   assert.equal(reads[0].table, 'appointments');
+  assert.equal(reads[0].filterColumn, 'assigned_user_id');
+  assert.equal(reads[0].filterValue, 'staff');
   assert.equal(reads[0].start, at(0));
   assert.equal(reads[0].end, at(0, 9));
   reads[0].resolve({ data: Array.from({ length: 1000 }, (_, i) => row(String(i))) });
   await settle();
   assert.equal(reads[1].startRow, 1000);
+  assert.equal(reads[1].filterValue, 'staff','Every page is account filtered');
   reads[1].resolve({ data: [row('last')] });
   assert.equal(await pending, true);
   assert.equal(state().records.length, 1001);
   assert.equal(await ctx.loadChartAppointments(), true);
   assert.equal(reads.length, 2, 'patient navigation can reuse the day-scoped queue');
+});
+
+test('local writes and reassignment cannot introduce another account’s appointments into the queue', async () => {
+  const { ctx, reads, state } = fixture();
+  const pending = ctx.loadChartAppointments();await settle();
+  const reassigned = row('a', 'Scheduled', 16, { assigned_user_id: 'other' });
+  ctx.appointmentSavedRecords.set('a', { record: reassigned, revision: ++ctx.appointmentWriteRevision });
+  const foreign = row('foreign', 'Scheduled', 17, { assigned_user_id: 'other' });
+  ctx.appointmentSavedRecords.set('foreign', { record: foreign, revision: ++ctx.appointmentWriteRevision });
+  reads[0].resolve({data:[row('a'),row('own'),foreign]});await pending;
+  assert.deepEqual(Array.from(state().records, entry=>entry.id),['own']);
+  ctx.updateChartAppointmentRecord(ctx.normaliseAppointmentRecord(row('own','Scheduled',16,{assigned_user_id:'other'})));
+  assert.equal(state().records.length,0,'Reassigning an existing card removes it');
+  ctx.updateChartAppointmentRecord(ctx.normaliseAppointmentRecord(foreign));
+  assert.equal(state().records.length,0,'Unrelated local saves stay out of the queue');
+  ctx.updateChartAppointmentRecord(ctx.normaliseAppointmentRecord(row('own')));
+  assert.deepEqual(Array.from(ctx.chartAppointmentsForToday(), entry=>entry.id),['own'],'Assignments to this account appear immediately');
+});
+
+test('account switches discard cached records and ignore another account’s in-flight read', async () => {
+  const { ctx, reads, state } = fixture();
+  const old = ctx.loadChartAppointments();await settle();
+  ctx.currentSession={user:{id:'other'}};
+  const next=ctx.loadChartAppointments();await settle();
+  assert.equal(state().records.length,0);
+  assert.equal(reads[1].filterValue,'other');
+  reads[1].resolve({data:[row('theirs','Scheduled',16,{assigned_user_id:'other'}),row('ours')]});await next;
+  reads[0].resolve({data:[row('old')]});assert.equal(await old,false);
+  assert.deepEqual(Array.from(state().records, entry=>entry.id),['theirs']);
 });
 
 test('a stale read cannot resurrect a locally completed patient; a later read accepts another staff member’s edits', async () => {

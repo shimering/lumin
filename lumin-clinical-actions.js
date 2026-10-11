@@ -152,6 +152,37 @@ function clearClinicalActionsSelection() {
   updateSelectionUI();
 }
 
+function renderClinicalActionsSelectedTeeth(targets = chartSelectionTargets()) {
+  const list = document.getElementById('chart-actions-selected-teeth');
+  if (!list) return;
+  list.setAttribute('aria-label', clinicalActionsText('Selected teeth · press to remove', 'الأسنان المحددة · اضغط لإلغاء التحديد'));
+  const signature = JSON.stringify([targets, clinicalActionsText('en', 'ar')]);
+  if (list.dataset.signature === signature) return;
+  list.dataset.signature = signature;
+  list.innerHTML = targets.length ? targets.map(target => {
+    const label = palmerQuadrantLabel(target.tooth, target.slot);
+    const remove = clinicalActionsText(`Remove ${label} from selection`, `إلغاء تحديد ${label}`);
+    const surfaces = target.surfaces.map(surface => surfaceAbbreviation(target.tooth, surface)).join(' · ');
+    return `<button type="button" class="chart-actions-tooth" data-clinical-remove-tooth="${escapeHtml(target.tooth)}" aria-label="${escapeHtml(remove)}" title="${escapeHtml(remove + (surfaces ? ` · ${surfaces}` : ''))}">
+      ${palmerNotationSVG(target.tooth, target.slot)}<i data-lucide="x" aria-hidden="true"></i>
+    </button>`;
+  }).join('') : `<span class="chart-actions-selection-empty">${clinicalActionsText('Select teeth on the chart', 'حدد الأسنان من المخطط')}</span>`;
+  if (window.lucide) lucide.createIcons();
+}
+
+function removeClinicalActionsTooth(toothId) {
+  const targets = chartSelectionTargets();
+  const index = targets.findIndex(target => target.tooth === toothId);
+  if (index < 0) return;
+  targets.splice(index, 1);
+  setChartSelectionTargets(targets);
+  updateSelectionUI();
+  const next = targets[Math.min(index, targets.length - 1)];
+  if (next) document.querySelector(`[data-clinical-remove-tooth="${CSS.escape(next.tooth)}"]`)?.focus({ preventScroll: true });
+  else if (clinicalActionsIsMobile()) document.querySelector(`[data-tooth-card="${CSS.escape(toothId)}"]`)?.focus({ preventScroll: true });
+  else focusClinicalActionsTrigger();
+}
+
 function renderClinicalActionsOperationList() {
   const list = document.getElementById('chart-actions-operations');
   if (!list || typeof dentalOperations === 'undefined' || typeof dentalSpecialties === 'undefined') return;
@@ -234,6 +265,7 @@ function syncClinicalActionsPanel() {
     if (search) search.value = '';
   }
   const targets = chartSelectionTargets();
+  renderClinicalActionsSelectedTeeth(targets);
   const selectionKey = JSON.stringify(targets.map(target => [target.tooth, [...target.surfaces].sort()]));
   if (selectionKey !== clinicalActionsPanel.selectionKey) {
     clinicalActionsPanel.selectionKey = selectionKey;
@@ -269,6 +301,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const panel = document.getElementById('action-palette-card');
   if (!panel) return;
   panel.addEventListener('click', event => {
+    const tooth = event.target.closest('[data-clinical-remove-tooth]');
+    if (tooth) { removeClinicalActionsTooth(tooth.dataset.clinicalRemoveTooth); return; }
     const operation = event.target.closest('[data-clinical-operation]');
     if (operation) chooseClinicalActionsOperation(operation.dataset.clinicalOperation);
   });

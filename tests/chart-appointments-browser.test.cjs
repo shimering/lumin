@@ -16,7 +16,7 @@ function source(name) {
 const helpers = ['coalesceRefreshRead', 'contentRefreshContext', 'appointmentRecordsAfterLocalWrites', 'appointmentDateKey',
   'canonicalAppointmentStatus', 'normaliseHexColor', 'appointmentStatusColor', 'appointmentColorRgbChannels', 'openPatientChart'].map(source).join('\n');
 
-test('chart sidebar fits four cards, scrolls independently, collapses, navigates, and animates realtime removals in English and Arabic', { skip: !chromium && 'Playwright unavailable' }, async t => {
+test('account-specific chart appointments open only in landscape and preserve responsive navigation and realtime updates', { skip: !chromium && 'Playwright unavailable' }, async t => {
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
     if (url.pathname === '/') { res.setHeader('Content-Type', 'text/html'); res.end(html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')); return; }
@@ -44,7 +44,7 @@ test('chart sidebar fits four cards, scrolls independently, collapses, navigates
     const APPOINTMENT_STATUSES=['Scheduled','Confirmed','Checked in','In progress','Completed','Cancelled','No-show'];
     const DEFAULT_APPOINTMENT_STATUS_COLORS={Scheduled:'#2563eb',Confirmed:'#0891b2','Checked in':'#10b981','In progress':'#7c3aed',Completed:'#16a34a',Cancelled:'#e11d48','No-show':'#f59e0b'};
     let appointmentStatusColors={...DEFAULT_APPOINTMENT_STATUS_COLORS};
-    const APPOINTMENT_SELECT_FIELDS='id,patient_id,appointment_at,status,patients(name)';
+    const APPOINTMENT_SELECT_FIELDS='id,patient_id,assigned_user_id,appointment_at,status,patients(name)';
     let appointmentWriteRevision=0; const appointmentSavedRecords=new Map(), coalescedRefreshReads=new Map();
     const stableJsonStringify=JSON.stringify;
     function hasPageAccess(page) { return page==='appointments' ? canReadAppointments : true; }
@@ -58,14 +58,17 @@ test('chart sidebar fits four cards, scrolls independently, collapses, navigates
     function patientMediaDisplayName(file) { return file.mediaDetails?.display_name || file.filename; }
     function emptyChartSelection() { return {}; } function rememberPatientWorkspaceOrigin() {}
     async function switchView(view) { window.openedChart={view,patientId:activePatientId}; }
-    function normaliseAppointmentRecord(record) { return {id:record.id,patientId:record.patient_id,isNote:!record.patient_id,startAt:record.appointment_at,date:appointmentDateKey(new Date(record.appointment_at)),status:canonicalAppointmentStatus(record.status),patient:record.patients?.name}; }
-    window.serverRows=Array.from({length:12},(_,i)=>({id:String(i),patient_id:'patient-'+i,appointment_at:new Date(new Date().setHours(8+i,0,0,0)).toISOString(),status:APPOINTMENT_STATUSES[i%4],patients:{name:i===3?'A very long patient name that should remain inside the card':'Patient '+(i+1)}}));
+    function normaliseAppointmentRecord(record) { return {id:record.id,patientId:record.patient_id,assignedUserId:record.assigned_user_id,isNote:!record.patient_id,startAt:record.appointment_at,date:appointmentDateKey(new Date(record.appointment_at)),status:canonicalAppointmentStatus(record.status),patient:record.patients?.name}; }
+    window.serverRows=Array.from({length:12},(_,i)=>({id:String(i),patient_id:'patient-'+i,assigned_user_id:'staff',appointment_at:new Date(new Date().setHours(8+i,0,0,0)).toISOString(),status:APPOINTMENT_STATUSES[i%4],patients:{name:i===3?'A very long patient name that should remain inside the card':'Patient '+(i+1)}}));
+    serverRows.push({...serverRows[0],id:'foreign',assigned_user_id:'other',patient_id:'foreign-patient',patients:{name:'Other account patient'}});
+    serverRows.push({...serverRows[0],id:'unassigned',assigned_user_id:null,patient_id:'unassigned-patient'});
     window.queryCount=0;window.failReads=false;
-    const db={from(){return {select(){return this},gte(){return this},lt(){return this},order(){return this},async range(){window.queryCount++;return window.failReads?{error:Error('Offline')}:{data:structuredClone(window.serverRows)};}}}};
+    const db={from(){return {select(){return this},eq(column,value){window.assignmentFilter=[column,value];return this},gte(){return this},lt(){return this},order(){return this},async range(){window.queryCount++;return window.failReads?{error:Error('Offline')}:{data:structuredClone(window.serverRows)};}}}};
     ${helpers}
   ` });
   await page.addScriptTag({ url: base + '/lumin-chart-media.js?v=11' });
-  await page.addScriptTag({ url: base + '/lumin-chart-appointments.js?v=1' });
+  await page.addScriptTag({ url: base + '/lumin-chart-appointments.js?v=4' });
+  await page.addScriptTag({ url: base + '/lumin-mobile-nav.js' });
   await page.evaluate(async () => {
     document.getElementById('auth-gate').classList.add('hidden');
     document.getElementById('app-shell').classList.remove('hidden');
@@ -79,20 +82,26 @@ test('chart sidebar fits four cards, scrolls independently, collapses, navigates
   });
   const screenshots = process.env.LUMIN_APPOINTMENTS_SCREENSHOT_DIR || path.join(os.tmpdir(), 'lumin-chart-appointments-preview');
   fs.mkdirSync(screenshots, { recursive: true });
+  assert.deepEqual(await page.evaluate(()=>assignmentFilter),['assigned_user_id','staff']);
   for (const viewport of [{width:1440,height:1000},{width:1366,height:768},{width:1024,height:768},{width:800,height:600},{width:834,height:1112},{width:390,height:844},{width:320,height:568}]) {
     await page.setViewportSize(viewport);
     for (const language of ['en', 'ar']) {
       await page.evaluate(language => {
         currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';
+        setChartAppointmentsActive(true);
+      }, language);
+      const expanded=viewport.width>=768&&viewport.width>viewport.height;
+      assert.equal(await page.locator('#chart-appointments-collapse').getAttribute('aria-expanded'),String(expanded),'Chart entry only expands desktop/tablet landscape appointments');
+      await page.evaluate(() => {
         chartPatientMedia.collapsed=true;renderChartMediaPanel();
         chartPatientMedia.collapsed=!chartMediaIsLandscape();chartAppointments.collapsed=false;
         renderChartMediaPanel();renderChartAppointmentsPanel();window.scrollTo(0,0);
-      }, language);
+      });
       const panel=page.locator('#chart-appointments-panel'), body=page.locator('#chart-appointments-body');
       await panel.scrollIntoViewIfNeeded();
       assert.ok(await panel.isVisible());
       assert.equal(await page.locator('.chart-appointment-card').count(),12);
-      assert.match(await page.locator('#chart-appointments-title').textContent(),language==='ar'?/مواعيد اليوم/:/Today’s appointments/);
+      assert.match(await page.locator('#chart-appointments-title').textContent(),language==='ar'?/مواعيدي اليوم/:/My appointments today/);
       await body.evaluate(node => { node.scrollTop=0; });
       const bounds=await body.boundingBox();
       for(let i=0;i<4;i++) {
@@ -139,8 +148,15 @@ test('chart sidebar fits four cards, scrolls independently, collapses, navigates
       assert.equal(await body.isVisible(),true);
     }
   }
+  await page.setViewportSize({width:844,height:390});
+  const touch=await page.context().newCDPSession(page);
+  await touch.send('Network.setUserAgentOverride',{userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1'});
+  await page.evaluate(()=>setChartAppointmentsActive(true));
+  assert.equal(await page.locator('#chart-appointments-collapse').getAttribute('aria-expanded'),'false','A landscape phone keeps appointments collapsed');
+  await touch.send('Network.setUserAgentOverride',{userAgent:'Mozilla/5.0 Chrome/150.0.0.0 Safari/537.36'});
+  await touch.detach();
   await page.setViewportSize({width:1440,height:900});
-  await page.evaluate(()=>{currentUiLanguage='en';document.documentElement.dir='ltr';chartPatientMedia.collapsed=false;renderChartMediaPanel();renderChartAppointmentsPanel();window.scrollTo(0,0);});
+  await page.evaluate(()=>{currentUiLanguage='en';document.documentElement.dir='ltr';setChartAppointmentsActive(true);chartPatientMedia.collapsed=false;renderChartMediaPanel();renderChartAppointmentsPanel();window.scrollTo(0,0);});
   await page.locator('.chart-appointment-card').nth(1).click();
   assert.deepEqual(await page.evaluate(()=>window.openedChart),{view:'chart',patientId:'patient-1'});
   const initialShadow=await page.locator('[data-appointment-id="2"]').evaluate(node=>getComputedStyle(node).boxShadow);

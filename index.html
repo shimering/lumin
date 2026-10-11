@@ -87,10 +87,10 @@
   <script src="lumin-chart-media.js?v=17"></script>
   <script src="lumin-xray-rotation.js?v=1"></script>
   <script src="lumin-tooth-notes.js?v=3"></script>
-  <script src="lumin-chart-appointments.js?v=3"></script>
+  <script src="lumin-chart-appointments.js?v=4"></script>
   <script src="lumin-chart-dates.js?v=1"></script>
   <script src="lumin-specialty-picker.js?v=3"></script>
-  <script src="lumin-clinical-actions.js?v=4"></script>
+  <script src="lumin-clinical-actions.js?v=5"></script>
   <link rel="stylesheet" href="lumin-chart-dates.css?v=1" />
   <script src="lumin-media-teeth.js?v=2"></script>
   <script src="lumin-nav-motion.js?v=1"></script>
@@ -5321,7 +5321,7 @@
   <link rel="stylesheet" href="lumin-xray-rotation.css?v=1" />
   <link rel="stylesheet" href="lumin-tooth-notes.css?v=4" />
   <link rel="stylesheet" href="lumin-chart-appointments.css?v=1" />
-  <link rel="stylesheet" href="lumin-clinical-actions.css?v=4" />
+  <link rel="stylesheet" href="lumin-clinical-actions.css?v=5" />
   <link rel="stylesheet" href="lumin-media-teeth.css?v=1" />
   <link rel="stylesheet" href="lumin-quotations.css?v=5" />
   <style id="finance-ledger-styles">
@@ -6711,10 +6711,6 @@
         </header>
         <div id="chart-actions-body" hidden inert>
           <div class="chart-actions-content">
-          <div class="chart-actions-selection" id="selection-target-container">
-            <span id="selection-badge" class="chart-actions-selection-badge"><span id="selection-target-text">Select one or more teeth or surfaces</span></span>
-            <button id="chart-actions-clear-selection" type="button" class="chart-actions-button chart-actions-icon-button" onclick="clearClinicalActionsSelection()" aria-label="Clear tooth selection"><i data-lucide="x" aria-hidden="true"></i></button>
-          </div>
           <div hidden>
             <select id="chart-specialty-select" onchange="renderChartOperationOptions()" aria-label="Dental specialty"><option value="">Loading specialties...</option></select>
             <select id="chart-operation-select" onchange="updateClinicalOperationPreview()" aria-label="Selected procedure"><option value="">Choose an operation...</option></select>
@@ -6728,7 +6724,14 @@
           <div id="chart-actions-operations" aria-label="Dental procedures"></div>
           </div>
           <footer class="chart-actions-footer">
-            <div id="chart-operation-preview" class="chart-actions-preview" aria-live="polite">Choose a procedure to apply.</div>
+            <div class="chart-actions-summary">
+              <div id="chart-operation-preview" class="chart-actions-preview" aria-live="polite">Choose a procedure to apply.</div>
+              <div class="chart-actions-selection" id="selection-target-container">
+                <span class="sr-only"><span id="selection-badge"><span id="selection-target-text">Select one or more teeth or surfaces</span></span></span>
+                <div id="chart-actions-selected-teeth" class="chart-actions-selected-teeth" role="group" aria-label="Selected teeth"></div>
+                <button id="chart-actions-clear-selection" type="button" class="chart-actions-button chart-actions-icon-button" onclick="clearClinicalActionsSelection()" aria-label="Clear tooth selection"><i data-lucide="x" aria-hidden="true"></i></button>
+              </div>
+            </div>
             <div class="chart-actions-footer-row">
               <label><span id="chart-actions-status-label">Operation status</span><select id="chart-operation-status-select" class="chart-actions-select" onchange="setClinicalOperationStatus(this.value)" aria-label="Operation status"><option value="P">Planned</option><option value="In">In progress</option><option value="C">Completed</option><option value="E">Existed</option></select></label>
               <button id="chart-apply-operation-button" type="button" class="chart-actions-button" onclick="applySelectedDentalOperation()" disabled><i data-lucide="check" aria-hidden="true"></i>Apply</button>
@@ -6747,7 +6750,7 @@
       </aside>
       <aside id="chart-appointments-panel" class="chart-appointments-panel" aria-labelledby="chart-appointments-title" hidden>
         <header class="chart-appointments-header">
-          <h3><i data-lucide="calendar-clock" aria-hidden="true"></i><span id="chart-appointments-title">Today’s appointments</span><span id="chart-appointments-count" class="chart-appointments-count">0</span></h3>
+          <h3><i data-lucide="calendar-clock" aria-hidden="true"></i><span id="chart-appointments-title">My appointments today</span><span id="chart-appointments-count" class="chart-appointments-count">0</span></h3>
           <button id="chart-appointments-collapse" type="button" class="chart-media-button is-neutral" onclick="toggleChartAppointmentsPanel()" aria-controls="chart-appointments-body" aria-expanded="false" aria-label="Expand today’s appointments"><i data-lucide="chevron-up" aria-hidden="true"></i></button>
         </header>
         <div id="chart-appointments-body" class="chart-appointments-body" role="region" aria-labelledby="chart-appointments-title" hidden inert>
@@ -15404,9 +15407,11 @@
       const canApply = operation.active && (operation.actionScope === 'mouth' || applicableTargets.length > 0);
       const targetLabel = operation.actionScope === 'mouth'
         ? text('Whole mouth · selected teeth will be ignored', 'الفم كاملاً · لن يُستخدم تحديد الأسنان')
-        : canApply ? `${applicableTargets.map(target => chartToothLabel(target.tooth)).join(', ')} · ${typeof clinicalActionsScopeText === 'function' ? clinicalActionsScopeText(operation.actionScope) : operation.actionScope}`
+        : canApply ? `${typeof clinicalActionsScopeText === 'function' ? clinicalActionsScopeText(operation.actionScope) : operation.actionScope}`
           : operation.actionScope === 'surface' ? text('Select a tooth surface to apply.', 'حدد سطحاً من السن لتطبيق الإجراء.') : text('Select one or more teeth to apply.', 'حدد سناً أو أكثر لتطبيق الإجراء.');
-      preview.innerHTML = `<strong>${escapeHtml(operation.name)}</strong><span class="${canApply ? '' : 'chart-actions-validation'}">${escapeHtml(targetLabel)}</span>`;
+      const specialty = dentalSpecialties.find(item => item.id === operation.specialtyId);
+      const categoryIcon = typeof clinicalSpecialtyIconMarkup === 'function' ? clinicalSpecialtyIconMarkup(specialty) : specialtyIconMarkup(specialty?.iconName, null, 'compact');
+      preview.innerHTML = `<div class="chart-actions-procedure-badge" title="${escapeHtml(operation.name + (specialty?.name ? ` · ${specialty.name}` : ''))}">${categoryIcon}<strong>${escapeHtml(operation.name)}</strong></div><span class="${canApply && operation.actionScope !== 'mouth' ? 'chart-actions-scope' : 'chart-actions-validation'}">${escapeHtml(targetLabel)}</span>`;
       button.disabled = !canApply;
       button.style.backgroundColor = '';
       button.innerHTML = `<i data-lucide="check" aria-hidden="true"></i>${text('Apply', 'تطبيق')}`;

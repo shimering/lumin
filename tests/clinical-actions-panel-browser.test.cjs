@@ -18,7 +18,7 @@ const chartStart = html.indexOf('    <section id="view-chart"');
 const chart = html.slice(chartStart, html.indexOf('</section>', chartStart) + 10).replace('class="hidden space-y-6"', 'class="space-y-6"');
 const iconRegistry = html.slice(html.indexOf('    const SPECIALTY_ICON_OPTIONS = '), html.indexOf('    const DENTAL_VISUAL_PRESETS = '));
 
-test('clinical rail preserves selection, applies correct scopes and fits desktop, tablet and phone layouts', { skip: !chromium, timeout: 120000 }, async t => {
+test('clinical rail preserves selection, applies correct scopes and fits desktop, tablet and phone layouts', { skip: !chromium, timeout: 180000 }, async t => {
   const server = http.createServer((request, response) => {
     const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
     if (pathname === '/') {
@@ -45,7 +45,7 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
     'toggleSurface', 'updateSelectionUI', 'activeDentalSpecialties', 'closeChartProcedureMenu', 'renderChartSpecialtyRail',
     'renderChartProcedureMenu', 'renderClinicalActionSelectors', 'setClinicalOperationStatus', 'renderClinicalOperationStatusSelector',
     'renderChartOperationOptions', 'updateClinicalOperationPreview', 'normaliseSpecialtyIconName', 'normaliseSpecialtyAccentColor',
-    'specialtyIconMarkup', 'applySelectedDentalOperation', 'applySurfaceCondition',
+    'specialtyIconMarkup', 'isPrimaryToothId', 'palmerPositionForSlot', 'palmerQuadrantForSlot', 'palmerToothNotation', 'palmerQuadrantLabel', 'palmerNotationSVG', 'applySelectedDentalOperation', 'applySurfaceCondition',
     'applyToothStatus', 'applyMouthOperation', 'bindGlobalClickEvents', 'updateAppViewportDimensions'].map(source).join('\n');
   await page.addScriptTag({ content: `
     ${iconRegistry}
@@ -215,6 +215,71 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
   assert.equal(await page.locator('#chart-actions-search').inputValue(),'');
   assert.equal(await page.locator('#chart-actions-specialty-filter').inputValue(),'');
   assert.equal(await page.evaluate(()=>Object.keys(getActivePatient().chartState).length),0,'Patient change does not carry draft work into another chart');
+  await t.test('Palmer tiles remove individual teeth and retain the procedure and unaffected surfaces in both languages', async () => {
+    for (const viewport of [{width:1440,height:900},{width:800,height:600},{width:390,height:844},{width:320,height:568}]) for (const language of ['en','ar']) {
+      await page.setViewportSize(viewport);
+      await page.evaluate(language => {
+        currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';resetClinicalActionsFilters();
+        setChartSelectionTargets([{tooth:'3',slot:3,surfaces:['center','top']},{tooth:'14',slot:14,surfaces:[]},{tooth:'K',slot:20,surfaces:['center']},{tooth:'30',slot:30,surfaces:[]}]);
+        updateSelectionUI();chooseClinicalActionsOperation('composite');
+      }, language);
+      const teeth=page.locator('#chart-actions-selected-teeth');
+      assert.equal(await teeth.locator('button').count(),4);
+      assert.deepEqual(await teeth.locator('.palmer-value').allTextContents(),['6','6','E','6']);
+      assert.deepEqual(await teeth.locator('.palmer-bracket').evaluateAll(nodes=>nodes.map(node=>node.getAttribute('d'))),['M33 4 V23 H4','M7 4 V23 H36','M7 24 V5 H36','M33 24 V5 H4'],'Palmer quadrants remain anatomically oriented in RTL');
+      assert.equal(await teeth.evaluate(node=>Boolean(document.getElementById('chart-actions-operations').compareDocumentPosition(node)&Node.DOCUMENT_POSITION_FOLLOWING)),true,'Selected teeth appear beneath the procedure list');
+      assert.match(await page.locator('.chart-actions-procedure-badge img').getAttribute('src'),/dental-restorative.webp/);
+      assert.equal(await page.locator('.chart-actions-procedure-badge strong').textContent(),'Composite filling');
+      const first=teeth.locator('[data-clinical-remove-tooth="3"]');
+      assert.match(await first.getAttribute('aria-label'),language==='ar'?/إلغاء تحديد UR6/:/Remove UR6 from selection/);
+      const box=await first.boundingBox();
+      assert.ok(box.width>=44&&box.height>=44&&box.y>=0&&box.y+box.height<=viewport.height+1,JSON.stringify({viewport,language,box}));
+      assert.equal(await first.evaluate(node=>getComputedStyle(node).borderWidth),'0px');
+      const saves=await page.evaluate(()=>window.savedCharts.length);
+      await first.locator('.palmer-symbol').click();
+      assert.deepEqual(await page.evaluate(()=>chartSelectionTargets().map(target=>[target.tooth,target.surfaces])),[['14',[]],['K',['center']],['30',[]]]);
+      assert.equal(await page.locator('#chart-operation-select').inputValue(),'composite');
+      assert.equal(await page.locator('#chart-apply-operation-button').isEnabled(),true);
+      assert.equal(await page.evaluate(()=>document.activeElement.dataset.clinicalRemoveTooth),'14');
+      await teeth.locator('[data-clinical-remove-tooth="K"]').focus();
+      await page.keyboard.press('Enter');
+      assert.equal(await page.locator('#chart-apply-operation-button').isEnabled(),false,'Removing the only surface target disables a surface procedure');
+      assert.equal(await page.locator('#chart-actions-toggle').getAttribute('aria-expanded'),'true');
+      await page.evaluate(()=>chooseClinicalActionsOperation('crown'));
+      assert.equal(await page.locator('#chart-apply-operation-button').isEnabled(),true,'Whole-tooth procedures use the remaining teeth');
+      await teeth.locator('[data-clinical-remove-tooth="14"]').click();
+      await teeth.locator('[data-clinical-remove-tooth="30"]').click();
+      assert.equal(await teeth.locator('button').count(),0);
+      assert.equal(await page.locator('#chart-apply-operation-button').isEnabled(),false);
+      assert.equal(await page.locator('#chart-actions-toggle').getAttribute('aria-expanded'),'false');
+      assert.equal(await page.locator('#chart-operation-select').inputValue(),'crown','Removing teeth retains the procedure draft');
+      assert.equal(await page.evaluate(()=>window.savedCharts.length),saves,'Removing a selection does not alter chart findings');
+      if(viewport.width<768)assert.equal(await page.evaluate(()=>document.activeElement.dataset.toothCard),'30');
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    }
+    await page.setViewportSize({width:320,height:568});
+    const originalName=await page.evaluate(()=>{
+      const operation=dentalOperations.find(item=>item.id==='crown'),name=operation.name;
+      operation.name='Custom crown procedure with a very long clinical description';
+      document.documentElement.style.setProperty('--lumin-app-scale','.85');document.documentElement.style.zoom='.85';updateAppViewportDimensions();
+      setChartSelectionTargets(Array.from({length:32},(_,i)=>({tooth:String(i+1),slot:i+1,surfaces:[]})));
+      updateSelectionUI();chooseClinicalActionsOperation('crown');
+      return name;
+    });
+    assert.equal(await page.locator('#chart-actions-selected-teeth button').count(),32);
+    for(const selector of ['.chart-actions-tooth','#chart-apply-operation-button']){
+      const box=await page.locator(selector).first().boundingBox();
+      assert.ok(box.y>=0&&box.y+box.height<=568,JSON.stringify({selector,box}));
+      if(selector==='.chart-actions-tooth')assert.ok(box.width>=44&&box.height>=44,JSON.stringify(box));
+    }
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'All 32 teeth and a long procedure stay within the scaled mobile layout');
+    await page.screenshot({path:path.join(screenshots,'palmer-selection-320-ar.png')});
+    await page.evaluate(name=>{
+      dentalOperations.find(item=>item.id==='crown').name=name;
+      document.documentElement.style.removeProperty('zoom');document.documentElement.style.removeProperty('--lumin-app-scale');updateAppViewportDimensions();
+      clearClinicalActionsSelection();
+    },originalName);
+  });
   await t.test('specialty icon menu supports keyboard selection and stays inside mobile and RTL bounds', async () => {
     for(const viewport of [{width:1440,height:900},{width:800,height:600},{width:390,height:844},{width:320,height:568}])for(const language of ['en','ar']){
       await page.setViewportSize(viewport);
@@ -283,8 +348,9 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
       await page.locator('#tooth-card-1').click({position:{x:10,y:10}});
       assert.equal(await panel.isVisible(),true);
       const box=await panel.boundingBox();
-      assert.ok(Math.abs(box.height-viewport.height/2)<2,JSON.stringify({viewport,language,box}));
-      assert.ok(Math.abs(box.y-viewport.height/2)<2);
+      const expectedHeight=viewport.height<=500?Math.min(viewport.height*.9,280):viewport.height/2;
+      assert.ok(Math.abs(box.height-expectedHeight)<2,JSON.stringify({viewport,language,box}));
+      assert.ok(Math.abs(box.y-(viewport.height-expectedHeight))<2);
       assert.equal(await page.locator('.chart-clinical-column').evaluate(node=>node.inert),false,'The upper chart stays interactive for multiple selection');
       await page.locator('#tooth-card-2').click({position:{x:10,y:10}});
       assert.deepEqual(await page.evaluate(()=>chartSelectionTargets().map(target=>target.tooth)),['1','2']);
