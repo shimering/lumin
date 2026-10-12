@@ -384,7 +384,7 @@ async function loadChartPatientMedia(patientId = activePatientId) {
       response = await response.json();
     } finally { clearTimeout(timeout); }
     if (request !== chartPatientMedia.request || activePatientId !== patient.id) return;
-    chartPatientMedia.detailsError = response.metadataSource !== 'local' || Boolean(response.metadataUnavailable);
+    chartPatientMedia.detailsError = !['local', 'google-drive'].includes(response.metadataSource) || Boolean(response.metadataUnavailable);
     chartPatientMedia.files = (response.files || []).map(file => ({ ...file,
       mediaDetails: chartPatientMedia.detailsError ? null : file.mediaDetails || null }));
     chartPatientMedia.status = 'ready';

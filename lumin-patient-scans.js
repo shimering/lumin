@@ -81,7 +81,7 @@
           this.request(`/api/patient/${encodeURIComponent(this.patient.id)}/files?name=${encodeURIComponent(this.patient.name || '')}`).then(r => r.json())
         ]);
         if (!this.alive()) return;
-        if (listing.metadataSource !== 'local' || listing.metadataUnavailable) throw new Error('serverUpdate');
+        if (!['local', 'google-drive'].includes(listing.metadataSource) || listing.metadataUnavailable) throw new Error('serverUpdate');
         this.health = health;
         this.files = (listing.files || []).filter(file => (file.category === '3D-Scans' || file.relativePath?.split('/')[1] === '3D-Scans') && /\.zip$/i.test(file.filename)).map(file => ({ ...file,
           details: file.mediaDetails || {} }));
@@ -285,7 +285,7 @@
         body: JSON.stringify({ relativePath, details, patientName: this.patient.name,
           patientNumber: this.patient.patient_number, phone: this.patient.phone })
       })).json();
-      if (result.metadataSource !== 'local' || !result.details) throw new Error('serverUpdate');
+      if (!['local', 'google-drive'].includes(result.metadataSource) || !result.details) throw new Error('serverUpdate');
       return result.details;
     }
     async action(action, index) {

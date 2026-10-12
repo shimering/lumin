@@ -739,6 +739,30 @@ def require_sync_admin(authorization):
 install_sync_routes(app, get_sync_engine, require_sync_admin)
 
 
+def get_drive_sync_engine():
+    """Independent Drive pairing/history over the same patient files and annotations.
+
+    This leaves the existing PC/laptop pairing intact. Both engines share the
+    filesystem lock; optimistic revisions reject concurrent changes safely.
+    """
+    base = get_sync_engine()
+    with base.lock:
+        if not hasattr(base, 'drive_engine'):
+            instance = SyncEngine(base.root, base.state_root / 'google-drive',
+                                  list(base.extensions), generate_thumbnail,
+                                  on_change=lambda: update_storage_mapping_files())
+            from file_sync import DriveMetadata
+            instance.clinical = DriveMetadata(base.clinical)
+            instance.lock = base.lock
+            instance.drive_endpoint = SUPABASE_URL.rstrip('/') + '/functions/v1/google-drive'
+            base.job_groups = instance.job_groups = (base, instance)
+            base.drive_engine = instance
+        return base.drive_engine
+
+
+install_sync_routes(app, get_drive_sync_engine, require_sync_admin, prefix='/api/drive-sync')
+
+
 def verify_auth():
     """Verify clinic secret key from headers or query parameters."""
     req_key = request.headers.get("x-lumin-key") or request.args.get("key")

@@ -7,6 +7,7 @@ which file wins. Filesystem changes outside Lumin are discovered during scans.
 import base64
 from contextlib import contextmanager
 import hashlib
+import struct
 import hmac
 import json
 import os
@@ -54,6 +55,7 @@ KNOWN_SYNC_ERRORS = {
     'Pair the two servers first.': 'pair_required',
     'Start synchronization on the paired dedicated PC.': 'wrong_coordinator',
     'Wait for the current sync to finish before pairing.': 'sync_busy',
+    'Wait for the current sync to finish before starting another pair.': 'sync_busy',
     'Wait for the current sync to finish before unpairing.': 'sync_busy',
     'Choose two different servers with compatible sync support.': 'same_server',
     'Update and restart the storage server on both computers to sync patient files only.': 'update_required',
@@ -197,6 +199,42 @@ def json_request(url, method='GET', headers=None, data=None, timeout=25):
             return json.load(response)
         except (ValueError, UnicodeError):
             raise SyncError('The other server returned an invalid response.', 502)
+
+
+class DriveMetadata:
+    """Share local annotations, with a cross-language digest for Drive peers."""
+    def __init__(self, local):
+        self.local = local
+
+    def __getattr__(self, name):
+        return getattr(self.local, name)
+
+    @staticmethod
+    def digest(value):
+        def tagged(v):
+            if v is None:
+                return ['null']
+            if isinstance(v, bool):
+                return ['boolean', v]
+            if isinstance(v, (float, int)):
+                return ['number', struct.pack('>d', 0.0 if v == 0 else float(v)).hex()]
+            if isinstance(v, str):
+                return ['string', v]
+            if isinstance(v, list):
+                return ['array', [tagged(x) for x in v]]
+            return ['object', [[k, tagged(v[k])] for k in sorted(v)]]
+        return hashlib.sha256(json.dumps(tagged(value), ensure_ascii=False,
+                                        separators=(',', ':')).encode()).hexdigest()
+
+    def replace(self, value):
+        self.local.replace(value)
+        return self.digest(self.local.snapshot())
+
+    def replace_checked(self, value, expected):
+        with self.local.lock:
+            if self.digest(self.local.snapshot()) != expected:
+                raise ValueError('Local annotations changed during synchronization')
+            return self.replace(value)
 
 
 class SyncEngine:
@@ -963,6 +1001,9 @@ class SyncEngine:
             active = next((j for j in self.jobs() if j['status'] == 'running'), None)
             if active:
                 return active
+            for other in getattr(self, 'job_groups', ()):
+                if other is not self and any(j['status'] == 'running' for j in other.jobs()):
+                    raise SyncError('Wait for the current sync to finish before starting another pair.', 409)
             if any(c.get('pendingAction') and not c.get('reviewed') for j in self.jobs() for c in j.get('conflicts', [])):
                 raise SyncError('Finish the pending review before starting synchronization.', 409)
             job = dict(id=str(uuid.uuid4()), status='running', phase='scanning', totalBytes=0,
@@ -1149,7 +1190,7 @@ class SyncEngine:
             self.peer_json('record', 'POST', {'record': record, 'expected': expected})
 
 
-def install_sync_routes(app, engine, admin_check):
+def install_sync_routes(app, engine, admin_check, prefix='/api/sync'):
     """engine is lazy: importing server.py must not scan patient data or start jobs."""
     def require_admin():
         admin_check(request.headers.get('Authorization', ''))
@@ -1168,11 +1209,11 @@ def install_sync_routes(app, engine, admin_check):
 
     @app.after_request
     def sync_cache_control(response):
-        if request.path.startswith('/api/sync/'):
+        if request.path.startswith(prefix + '/'):
             response.headers['Cache-Control'] = 'no-store'
         return response
 
-    @app.get('/api/sync/info')
+    @app.get(prefix + '/info', endpoint=prefix + ':sync_info')
     def sync_info():
         require_admin()
         instance = engine()
@@ -1181,12 +1222,14 @@ def install_sync_routes(app, engine, admin_check):
                        clinicalMetadataVersion=CLINICAL_VERSION,
                        pair={k: pair[k] for k in ('peerId', 'role')} if pair else None)
 
-    @app.post('/api/sync/pair')
+    @app.post(prefix + '/pair', endpoint=prefix + ':sync_pair')
     def sync_pair():
         require_admin()
         instance = engine()
         data = request.get_json() or {}
         url = normalise_url(data.get('url'))
+        if getattr(instance, 'drive_endpoint', None) and url != instance.drive_endpoint:
+            raise SyncError('Drive pairing must use the clinic Google Drive endpoint.', 400)
         headers = {'x-lumin-key': str(data.get('key', '')), 'Authorization': request.headers['Authorization']}
         info = json_request(url + '/api/sync/info', headers=headers)
         if info.get('protocol') != PROTOCOL or not info.get('nodeId') or info['nodeId'] == instance.node_id:
@@ -1210,7 +1253,7 @@ def install_sync_routes(app, engine, admin_check):
             instance.meta('pair', dict(peerId=info['nodeId'], url=url, secret=secret, role='coordinator'))
         return jsonify(peerId=info['nodeId'], paired=True)
 
-    @app.post('/api/sync/pair/accept')
+    @app.post(prefix + '/pair/accept', endpoint=prefix + ':accept_pair')
     def accept_pair():
         require_admin()
         instance = engine()
@@ -1234,18 +1277,18 @@ def install_sync_routes(app, engine, admin_check):
         return jsonify(paired=True)
 
 
-    @app.post('/api/sync/jobs')
+    @app.post(prefix + '/jobs', endpoint=prefix + ':start_sync_job')
     def start_sync_job():
         require_admin()
         return jsonify(engine().start()), 202
 
-    @app.get('/api/sync/jobs/latest')
+    @app.get(prefix + '/jobs/latest', endpoint=prefix + ':latest_sync_job')
     def latest_sync_job():
         require_admin()
         jobs = engine().jobs()
         return jsonify(job=jobs[0] if jobs else None)
 
-    @app.get('/api/sync/jobs/<job_id>')
+    @app.get(prefix + '/jobs/<job_id>', endpoint=prefix + ':get_sync_job')
     def get_sync_job(job_id):
         require_admin()
         job = next((job for job in engine().jobs() if job['id'] == job_id), None)
@@ -1253,12 +1296,12 @@ def install_sync_routes(app, engine, admin_check):
             raise SyncError('Sync job not found.', 404)
         return jsonify(job)
 
-    @app.get('/api/sync/jobs/<job_id>/conflicts/<int:index>')
+    @app.get(prefix + '/jobs/<job_id>/conflicts/<int:index>', endpoint=prefix + ':conflict_review')
     def conflict_review(job_id, index):
         require_admin()
         return jsonify(engine().review_snapshot(job_id, index))
 
-    @app.post('/api/sync/jobs/<job_id>/conflicts/<int:index>')
+    @app.post(prefix + '/jobs/<job_id>/conflicts/<int:index>', endpoint=prefix + ':keep_conflict_versions')
     def keep_conflict_versions(job_id, index):
         require_admin()
         data = request.get_json() or {}
@@ -1269,7 +1312,7 @@ def install_sync_routes(app, engine, admin_check):
             return jsonify(job=engine().keep_reviewed_versions(job_id, index, data.get('revision')))
         return jsonify(job=engine().resolve_review(job_id, index, data.get('revision'), action))
 
-    @app.get('/api/sync/jobs/<job_id>/conflicts/<int:index>/file')
+    @app.get(prefix + '/jobs/<job_id>/conflicts/<int:index>/file', endpoint=prefix + ':conflict_file')
     def conflict_file(job_id, index):
         require_admin()
         instance = engine()
@@ -1297,14 +1340,14 @@ def install_sync_routes(app, engine, admin_check):
         return Response(chunks(), content_type=stream.headers.get('Content-Type', 'application/octet-stream'),
                         headers={'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff'})
 
-    @app.get('/api/sync/peer/manifest')
+    @app.get(prefix + '/peer/manifest', endpoint=prefix + ':peer_manifest')
     def peer_manifest():
         instance = require_peer()
         return jsonify(nodeId=instance.node_id, fileScope=FILE_SCOPE, clinicalMetadataVersion=CLINICAL_VERSION,
                        files=instance.scan())
 
 
-    @app.get('/api/sync/peer/review-record')
+    @app.get(prefix + '/peer/review-record', endpoint=prefix + ':peer_review_record')
     def peer_review_record():
         instance = require_peer()
         path = request.args.get('path', '')
@@ -1312,7 +1355,7 @@ def install_sync_routes(app, engine, admin_check):
                        annotationsStored=path.casefold() in instance.clinical.files,
                        reviewResolutionVersion=REVIEW_RESOLUTION_VERSION)
 
-    @app.put('/api/sync/peer/review-resolution')
+    @app.put(prefix + '/peer/review-resolution', endpoint=prefix + ':peer_review_resolution')
     def peer_review_resolution():
         instance = require_peer()
         if instance.meta('pair').get('role') != 'replica':
@@ -1351,7 +1394,7 @@ def install_sync_routes(app, engine, admin_check):
             staged.unlink(missing_ok=True)
         return jsonify(success=True)
 
-    @app.route('/api/sync/peer/metadata', methods=['GET', 'POST'])
+    @app.route(prefix + '/peer/metadata', methods=['GET', 'POST'], endpoint=prefix + ':peer_clinical_metadata')
     def peer_clinical_metadata():
         instance = require_peer()
         # Only the paired coordinator can commit the merged local snapshots.
@@ -1374,7 +1417,7 @@ def install_sync_routes(app, engine, admin_check):
         instance.clinical.write_all()
         return jsonify(digest=digest)
 
-    @app.post('/api/sync/peer/copy-annotations')
+    @app.post(prefix + '/peer/copy-annotations', endpoint=prefix + ':peer_copy_annotations')
     def peer_copy_annotations():
         instance = require_peer()
         if instance.meta('pair').get('role') != 'replica':
@@ -1385,7 +1428,7 @@ def install_sync_routes(app, engine, admin_check):
             raise SyncError('Invalid clinical metadata.')
         return jsonify(success=True)
 
-    @app.post('/api/sync/peer/finalize')
+    @app.post(prefix + '/peer/finalize', endpoint=prefix + ':peer_finalize')
     def peer_finalize():
         instance = require_peer()
         if callable(instance.on_change):
@@ -1394,7 +1437,7 @@ def install_sync_routes(app, engine, admin_check):
                 raise SyncError('Storage indexes could not be refreshed. Retry synchronization.', 503)
         return jsonify(success=True)
 
-    @app.get('/api/sync/peer/file')
+    @app.get(prefix + '/peer/file', endpoint=prefix + ':peer_download')
     def peer_download():
         instance = require_peer()
         rel = request.args.get('path', '')
@@ -1405,7 +1448,7 @@ def install_sync_routes(app, engine, admin_check):
                 raise SyncError('Source file changed. Retry sync.', 409)
             return send_file(safe_path(instance.root, rel), conditional=False)
 
-    @app.put('/api/sync/peer/file')
+    @app.put(prefix + '/peer/file', endpoint=prefix + ':peer_upload')
     def peer_upload():
         instance = require_peer()
         try:
@@ -1417,7 +1460,7 @@ def install_sync_routes(app, engine, admin_check):
         instance.apply(data.get('record'), data.get('expected'), request.stream)
         return jsonify(success=True)
 
-    @app.post('/api/sync/peer/record')
+    @app.post(prefix + '/peer/record', endpoint=prefix + ':peer_record')
     def peer_record():
         instance = require_peer()
         data = request.get_json() or {}

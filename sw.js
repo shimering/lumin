@@ -1,4 +1,4 @@
-const LUMIN_CACHE = "lumin-dental-shell-v217";
+const LUMIN_CACHE = "lumin-dental-shell-v218";
 const LUMIN_SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -20,7 +20,7 @@ const LUMIN_SHELL = [
   "/lumin-loyalty.js?v=5",
   "/lumin-finance-sync.js?v=2",
   "/lumin-cash-flow.js?v=1",
-  "/lumin-patient-scans.js?v=5",
+  "/lumin-patient-scans.js?v=6",
   "/lumin-patient-scans.css?v=4",
   "/lumin-scan-worker.js",
   "/lumin-scan-viewer.js?v=4",
@@ -32,12 +32,14 @@ const LUMIN_SHELL = [
   "/vendor/fflate/esm/browser.js",
   "/lumin-cash-flow.css?v=1",
   "/lumin-finance-sync.css?v=2",
-  "/lumin-storage-sync.js?v=15",
+  "/lumin-storage-sync.js?v=16",
   "/lumin-storage-sync.css?v=8",
+  "/lumin-google-drive.js?v=1",
+  "/lumin-google-drive.css?v=1",
   "/lumin-patient-swipe.js?v=1",
   "/lumin-patients.js?v=4",
   "/lumin-chart-sync.js?v=1",
-  "/lumin-chart-media.js?v=17",
+  "/lumin-chart-media.js?v=18",
   "/lumin-xray-rotation.js?v=1",
   "/lumin-xray-rotation.css?v=1",
   "/lumin-tooth-notes.js?v=3",

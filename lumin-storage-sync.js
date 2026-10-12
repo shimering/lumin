@@ -27,8 +27,12 @@
 
   function selectedServers() {
     const saved = selection(), list = presets();
-    return { coordinator: list.find(p => p.id === saved.coordinator), laptop: list.find(p => p.id === saved.laptop) };
+    const first = list.find(p => p.id === saved.coordinator), second = list.find(p => p.id === saved.laptop);
+    // A local process owns the durable job when one of the two locations is Drive.
+    return first?.provider === 'google-drive' ? {coordinator: second, laptop: first} : {coordinator: first, laptop: second};
   }
+
+  const drivePair = () => selectedServers().laptop?.provider === 'google-drive';
 
   function ready() {
     const { coordinator, laptop } = selectedServers();
@@ -194,7 +198,8 @@
           const { data, error } = sessionResult;
           if (requestSignal.aborted) throw requestSignal.reason;
           if (error || !data?.session?.access_token) throw Object.assign(new Error('Sign in again to synchronize storage.'), { status: 401 });
-          const response = await fetch(`${normaliseStoragePresetUrl(server.url)}/api/sync/${route}`, {
+          const prefix = drivePair() && server.provider !== 'google-drive' ? 'api/drive-sync' : 'api/sync';
+          const response = await fetch(`${normaliseStoragePresetUrl(server.url)}/${prefix}/${route}`, {
             method, cache: 'no-store', signal: requestSignal,
             headers: { 'x-lumin-key': server.key || '', Authorization: `Bearer ${data.session.access_token}`,
               ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
@@ -234,7 +239,11 @@
 
   async function compatibleInfo() {
     const { coordinator, laptop } = selectedServers();
-    const info = await Promise.all([api(coordinator, 'info'), api(laptop, 'info')]);
+    const info = drivePair() ? await (async () => {
+      await window.LuminGoogleDrive.ensure();
+      const local = await api(coordinator, 'info');
+      return [local, await api(laptop, `info?peer=${encodeURIComponent(local.nodeId)}`)];
+    })() : await Promise.all([api(coordinator, 'info'), api(laptop, 'info')]);
     if (info.some(server => server.protocol !== 1 || server.fileScope !== 'patient-files-v1' || server.clinicalMetadataVersion !== 2)) {
       throw Object.assign(new Error('Patient-file sync update required.'), { status: 426 });
     }
@@ -268,9 +277,9 @@
     const set = (id, text) => { const el = document.getElementById(id); if (el.textContent !== text) el.textContent = text; };
     panel.dir = t('ltr', 'rtl');
     set('storage-sync-title', t('Sync patient files', 'مزامنة ملفات المرضى'));
-    set('storage-sync-description', t('Sync patient files and their local tooth assignments, notes, and scan settings between both computers.', 'مزامنة ملفات المرضى وبياناتها المحلية، بما فيها الأسنان المحددة والملاحظات وإعدادات المسح، بين الجهازين.'));
-    set('storage-sync-coordinator-label', t('Dedicated PC', 'جهاز العيادة المخصص'));
-    set('storage-sync-laptop-label', t('Laptop', 'اللابتوب'));
+    set('storage-sync-description', t('Sync patient files, tooth assignments, notes, and scan settings between exactly two selected locations. A local server must be running for Drive sync.', 'مزامنة ملفات المرضى والأسنان المحددة والملاحظات وإعدادات المسح بين موقعين محددين فقط. يجب تشغيل الخادم المحلي للمزامنة مع Drive.'));
+    set('storage-sync-coordinator-label', t('First storage location', 'موقع التخزين الأول'));
+    set('storage-sync-laptop-label', t('Second storage location', 'موقع التخزين الثاني'));
     set('storage-sync-safety', t('Deleted copies wait for your review: delete on both or restore on both. Removed and replaced files are kept in a recovery archive.', 'تنتظر النسخ المحذوفة مراجعتك: الحذف من الجهازين أو الاستعادة عليهما. تُحفظ الملفات المحذوفة والمستبدلة في أرشيف للاستعادة.'));
     const saved = selection(), list = presets();
     const options = `<option value="">${t('Choose a saved server', 'اختر خادماً محفوظاً')}</option>` + list.map(p =>
@@ -316,7 +325,7 @@
       || (!ready() ? t('Set both server URLs in Saved servers, then pair them once.', 'أدخل رابطَي الجهازين في الخوادم المحفوظة، ثم اقرنهما مرة واحدة.')
       : state.repairPair ? t('The selected servers have an old pairing. Update pairing reconnects these two computers and preserves their stored files.',
         'الخادمان المحددان لديهما اقتران قديم. تحديث الاقتران يعيد توصيل هذين الجهازين ويحافظ على الملفات المخزنة.')
-      : state.paired ? t('Paired. Both computers must be running and reachable.', 'تم الاقتران. يجب تشغيل الجهازين وإمكانية الاتصال بهما.')
+      : state.paired ? drivePair() ? t('Paired. Keep the selected local server running and connected to Drive.', 'تم الاقتران. أبقِ الخادم المحلي المحدد قيد التشغيل ومتصلًا بـ Drive.') : t('Paired. Both computers must be running and reachable.', 'تم الاقتران. يجب تشغيل الجهازين وإمكانية الاتصال بهما.')
       : t('Pair these two servers to enable one-click sync.', 'اقرن الخادمين لتفعيل المزامنة بنقرة واحدة.'));
     const message = state.actionError || state.error || statusMessage;
     set('storage-sync-message', message);
@@ -494,6 +503,7 @@
 
   async function reviewFile(server, path, preview, signal) {
     return timedRequest(async requestSignal => {
+      if (server.provider === 'google-drive') { await window.LuminGoogleDrive.ensure(); server = window.LuminGoogleDrive.preset(); }
       const prefix = preview ? 'api/thumbnail' : 'files';
       const response = await fetch(`${normaliseStoragePresetUrl(server.url)}/${prefix}/${path.split('/').map(encodeURIComponent).join('/')}`, {
         headers: {'x-lumin-key': server.key || ''}, cache: 'no-store', signal: requestSignal

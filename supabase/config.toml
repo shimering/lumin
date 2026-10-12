@@ -3,3 +3,7 @@ verify_jwt = false
 
 [functions.quotation-manage]
 verify_jwt = true
+
+# OAuth callbacks, image grants and paired servers authenticate inside the handler.
+[functions.google-drive]
+verify_jwt = false

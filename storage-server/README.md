@@ -1,5 +1,10 @@
 # Lumin Local Storage Server & Cloudflare Tunnel
 
+Google Drive can also be selected for clinic storage and paired with one local
+server. See [Google Drive setup and two-location sync](../GOOGLE-DRIVE-STORAGE.md).
+Update `server.py` and `file_sync.py` together and restart this app before using
+Drive sync. Existing PC/laptop pairing is kept independently.
+
 Self-hosted file storage for Lumin Dental Clinic. Saves patient X-rays and clinical photos directly into human-readable Windows folders on your local hard drive, with secure, universal online access via Cloudflare Tunnel.
 
 ---

@@ -1,0 +1,24 @@
+#storage-google-drive-panel { display: grid; gap: 16px; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background: var(--lumin-face, #fff); min-width: 0; }
+#btn-save-storage.hidden { display: none; }
+.drive-heading,.drive-card-heading { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.drive-heading > div { flex: 1; }
+.drive-heading h4,.drive-card h4 { margin: 0; font-size: 14px; font-weight: 600; color: #0f172a; }
+.drive-heading p,.drive-note { margin: 4px 0 0; font-size: 12px; color: #64748b; line-height: 1.65; overflow-wrap: anywhere; }
+.drive-icon { display: inline-flex; width: 40px; height: 40px; flex: none; align-items: center; justify-content: center; border-radius: 999px; background: #eff6ff; color: #1d4ed8; border: 0; }
+.drive-icon svg { width: 20px; height: 20px; }
+.drive-badge { border: 0; border-radius: 999px; background: #f1f5f9; color: #475569; padding: 4px 10px; font-size: 12px; font-weight: 500; }
+.drive-badge.is-connected { color: #047857; background: #ecfdf5; }
+.drive-account { display: grid; gap: 4px; min-width: 0; padding: 16px; border-radius: 12px; background: #f8fafc; }
+.drive-account strong { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; color: #334155; text-align: start; }
+.drive-account span { font-size: 12px; color: #64748b; }
+.drive-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.drive-action { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; min-width: 44px; padding: 10px 16px; border: 0; border-radius: 12px; background: #f1f5f9; color: #475569; font-size: 12px; font-weight: 600; text-decoration: none; cursor: pointer; transition: background-color 150ms ease-out, transform 150ms ease-out; }
+.drive-action svg { width: 16px; height: 16px; flex: none; }
+.drive-action.is-primary { background: #eff6ff; color: #1d4ed8; }
+.drive-action:hover:not(:disabled) { background: #e2e8f0; }
+.drive-action.is-primary:hover:not(:disabled) { background: #dbeafe; }
+.drive-action:active:not(:disabled) { transform: scale(.98); }
+.drive-action:focus-visible { outline: 2px solid #3b82f6; outline-offset: 3px; }
+.drive-action:disabled { opacity: .5; pointer-events: none; }
+.drive-error { margin: 0; padding: 12px; border-radius: 12px; background: #fff1f2; color: #be123c; font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
+@media(max-width: 767px) { #storage-google-drive-panel { padding: 20px; } .drive-actions > * { flex: 1 1 160px; } }

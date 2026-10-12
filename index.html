@@ -76,15 +76,17 @@
   <script src="lumin-loyalty.js?v=5"></script>
   <script src="lumin-finance-sync.js?v=2"></script>
   <script src="lumin-cash-flow.js?v=1"></script>
-  <script src="lumin-patient-scans.js?v=5"></script>
+  <script src="lumin-patient-scans.js?v=6"></script>
   <link rel="stylesheet" href="lumin-patient-scans.css?v=4" />
   <link rel="stylesheet" href="lumin-cash-flow.css?v=1" />
-  <script src="lumin-storage-sync.js?v=15"></script>
+  <script src="lumin-storage-sync.js?v=16"></script>
+  <script src="lumin-google-drive.js?v=1"></script>
+  <link rel="stylesheet" href="lumin-google-drive.css?v=1" />
   <link rel="stylesheet" href="lumin-storage-sync.css?v=8" />
   <script src="lumin-patient-swipe.js?v=1"></script>
   <script src="lumin-patients.js?v=4"></script>
   <script src="lumin-chart-sync.js?v=1"></script>
-  <script src="lumin-chart-media.js?v=17"></script>
+  <script src="lumin-chart-media.js?v=18"></script>
   <script src="lumin-xray-rotation.js?v=1"></script>
   <script src="lumin-tooth-notes.js?v=3"></script>
   <script src="lumin-chart-appointments.js?v=4"></script>
@@ -6881,7 +6883,7 @@
                 <h3 id="admin-storage-heading" class="text-base font-semibold tracking-tight text-slate-800">Storage Server</h3>
                 <span id="settings-storage-status-badge" class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-black text-slate-500">Not Tested</span>
               </div>
-              <p class="mt-0.5 text-xs text-slate-400">Manage your clinic's local file storage server. Once saved here, connection settings automatically sync to all doctors and clinic devices.</p>
+              <p id="storage-main-description" class="mt-0.5 text-xs text-slate-400">Choose storage for the clinic. The saved selection applies to authorized doctors on all clinic devices.</p>
             </div>
           </div>
 
@@ -6916,7 +6918,9 @@
 
             <section id="storage-sync-panel" class="storage-sync-panel" aria-labelledby="storage-sync-title" translate="no"></section>
 
-            <div>
+            <section id="storage-google-drive-panel" aria-label="Google Drive storage" translate="no"></section>
+
+            <div id="storage-local-url-field">
               <div class="flex items-center justify-between mb-1.5">
                 <label for="settings-storage-url" class="block text-xs font-bold text-slate-700">Active Server URL (Tailscale, Tunnel, or LAN)</label>
                 <button type="button" onclick="saveCurrentUrlAsPreset()" class="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition">
@@ -6927,7 +6931,7 @@
               <p class="mt-1.5 text-[11px] text-slate-400">Paste your Tailscale Funnel address, dedicated PC link, or local IP.</p>
             </div>
 
-            <div>
+            <div id="storage-local-key-field">
               <label for="settings-storage-key" class="block text-xs font-bold text-slate-700 mb-1.5">Clinic Secret Key</label>
               <input id="settings-storage-key" type="password" placeholder="e.g. LuminClinicKey_2026" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               <p class="mt-1.5 text-[11px] text-slate-400">Must match the <code class="font-mono text-slate-600">clinic_secret_key</code> specified in your storage server's <code class="font-mono text-slate-600">config.json</code>.</p>
@@ -9888,6 +9892,11 @@
     (function handleOAuthPopupCallback() {
       try {
         const urlParams = new URLSearchParams(window.location.search);
+        const driveResult = urlParams.get('google_drive');
+        if (driveResult && window.opener && window.opener !== window) {
+          window.opener.postMessage({ type: 'GOOGLE_DRIVE_AUTH_RESULT', result: driveResult, message: urlParams.get('google_drive_message') || '' }, window.location.origin);
+          window.close();
+        }
         const oauthResult = urlParams.get('google_calendar');
         if (oauthResult && window.opener && window.opener !== window) {
           try {
@@ -12765,10 +12774,11 @@
         clinicStorageServerUrl = String(data.storage_server_url).trim();
         localStorage.setItem('lumin_storage_server_url', clinicStorageServerUrl);
       }
-      if (data?.storage_secret_key) {
-        clinicStorageSecretKey = String(data.storage_secret_key).trim();
+      if (data && Object.hasOwn(data, 'storage_secret_key')) {
+        clinicStorageSecretKey = String(data.storage_secret_key || '').trim();
         localStorage.setItem('lumin_storage_secret_key', clinicStorageSecretKey);
       }
+      if (window.LuminGoogleDrive?.isDrive(clinicStorageServerUrl)) await window.LuminGoogleDrive.ensure().catch(() => {});
       if (typeof populateStorageServerSettingsInputs === 'function') {
         populateStorageServerSettingsInputs();
       }
@@ -12907,6 +12917,7 @@
         }
         currentSession = null;
         if (typeof resetQuotationUi === 'function') resetQuotationUi();
+        window.LuminGoogleDrive?.reset();
         currentUserAccess = null;
         resetLoyaltyState();
         resetFinanceSyncState();
@@ -13225,6 +13236,7 @@
         stopRealtimeSync();
         const accessConfigurationFailed = error?.code === 'LUMIN_ACCESS_CONFIGURATION';
         currentSession = accessConfigurationFailed ? null : session;
+        window.LuminGoogleDrive?.reset();
         currentUserAccess = null;
         if (accessConfigurationFailed) await db.auth.signOut({ scope: 'local' });
         document.getElementById('login-password').value = '';
@@ -17004,6 +17016,7 @@
       if (showStorage) {
         populateStorageServerSettingsInputs();
         window.LuminStorageSync?.open();
+        window.LuminGoogleDrive?.open();
         void loadStorageLocationInfo();
       } else {
         window.LuminStorageSync?.close();
@@ -19084,6 +19097,7 @@
         stopRealtimeSync();
         currentSession = null;
         if (typeof resetQuotationUi === 'function') resetQuotationUi();
+        window.LuminGoogleDrive?.reset();
         currentUserAccess = null;
         resetLoyaltyState();
         resetFinanceSyncState();
@@ -26704,6 +26718,8 @@
       const dbUrl = (clinicStorageServerUrl || '').trim();
       const dbKey = (clinicStorageSecretKey || '').trim();
       const savedUrl = dbUrl || localStorage.getItem('lumin_storage_server_url') || 'http://localhost:5000';
+      const driveConfig = window.LuminGoogleDrive?.config(savedUrl);
+      if (driveConfig) return driveConfig;
       const savedKey = dbKey || (localStorage.getItem('lumin_storage_secret_key') ?? 'LuminClinicKey_2026');
       return {
         url: savedUrl.trim().replace(/\/+$/, ''),
@@ -26758,7 +26774,7 @@
     }
 
     function checkStorageServerConnection() {
-      const config = getStorageServerConfig();
+      let config = getStorageServerConfig();
       // Focus/pageshow events can arrive together. Reuse the check instead of
       // repeatedly aborting a slow tunnel request before it can finish.
       if (storageConnectionCheck?.config.url === config.url && storageConnectionCheck?.config.key === config.key) {
@@ -26774,6 +26790,12 @@
         let error = null;
         let transientFailure = true;
         try {
+          if (window.LuminGoogleDrive?.isDrive(config.url)) {
+            await window.LuminGoogleDrive.ensure();
+            config = getStorageServerConfig();
+            check.config = config;
+            storageConnectionConfig = config;
+          }
           if (!config.url || navigator.onLine === false) throw new Error('Storage server is unreachable.');
           const response = await fetch(`${config.url}/api/health`, {
             method: 'GET',
@@ -26787,7 +26809,7 @@
           }
           transientFailure = false;
           data = await response.json();
-          if (data?.status !== 'online' || data?.service !== 'Lumin Local Storage Server') {
+          if (data?.status !== 'online' || !['Lumin Local Storage Server', 'Lumin Google Drive Storage'].includes(data?.service)) {
             throw new Error('Invalid storage server health response.');
           }
         } catch (err) {
@@ -26917,16 +26939,20 @@
         const raw = localStorage.getItem('lumin_storage_server_presets');
         if (raw !== null) {
           const list = JSON.parse(raw);
-          if (Array.isArray(list)) return list.filter(preset => preset && typeof preset.id === 'string' && typeof preset.name === 'string' && typeof preset.url === 'string').map(preset => ({ ...preset }));
+          if (Array.isArray(list)) {
+            const saved = list.filter(preset => preset && typeof preset.id === 'string' && typeof preset.name === 'string' && typeof preset.url === 'string').map(preset => ({ ...preset }));
+            return window.LuminGoogleDrive ? window.LuminGoogleDrive.presets(saved) : saved;
+          }
         }
       } catch (err) {
         console.warn('Could not read storage presets:', err);
       }
-      return DEFAULT_STORAGE_PRESETS.map(preset => ({ ...preset }));
+      const defaults = DEFAULT_STORAGE_PRESETS.map(preset => ({ ...preset }));
+      return window.LuminGoogleDrive ? window.LuminGoogleDrive.presets(defaults) : defaults;
     }
 
     function saveStorageServerPresets(presets) {
-      localStorage.setItem('lumin_storage_server_presets', JSON.stringify(presets));
+      localStorage.setItem('lumin_storage_server_presets', JSON.stringify(presets.filter(preset => preset.provider !== 'google-drive')));
     }
 
     function normaliseStoragePresetUrl(value) {
@@ -26957,13 +26983,14 @@
       const labels = {
         'admin-storage-tab-label': t('Storage Server', 'خادم التخزين'),
         'admin-storage-heading': t('Storage Server', 'خادم التخزين'),
+        'storage-main-description': t('Choose storage for the clinic. The saved selection applies to authorized doctors on all clinic devices.', 'اختر موقع التخزين للعيادة. يُطبّق الاختيار المحفوظ على الأطباء المصرح لهم على جميع أجهزة العيادة.'),
         'storage-presets-title': t('Saved servers', 'الخوادم المحفوظة'),
         'storage-add-server-label': t('Add server', 'إضافة خادم'),
         'storage-presets-description': t('Choose a saved server to switch storage for the clinic.', 'اختر خادماً محفوظاً لتبديل التخزين للعيادة.'),
         'storage-preset-picker-label': t('Quick switch', 'التبديل السريع'),
         'storage-preset-picker-hint': storageSettingsSaving
           ? t('Saving the server selection…', 'جارٍ حفظ اختيار الخادم…')
-          : t('Switches immediately using the saved URL and key. No extra save step.', 'يتم التبديل مباشرة باستخدام الرابط والمفتاح المحفوظين، دون خطوة حفظ إضافية.')
+          : t('Switches clinic storage immediately using the saved connection. No extra save step.', 'يتم تبديل تخزين العيادة مباشرة باستخدام الاتصال المحفوظ، دون خطوة حفظ إضافية.')
       };
       Object.entries(labels).forEach(([id, text]) => {
         const element = document.getElementById(id);
@@ -26991,6 +27018,8 @@
         container.innerHTML = presets.map(preset => {
           const isActive = activePreset?.id === preset.id;
           const switching = storagePresetSwitchingId === preset.id;
+          const driveCard = window.LuminGoogleDrive?.card(preset, isActive, switching, storageSettingsSaving);
+          if (driveCard) return driveCard;
           const configured = !!preset.url.trim();
           const idArgument = escapeHtml(JSON.stringify(preset.id));
           const icon = ['server', 'laptop', 'hard-drive'].includes(preset.icon) ? preset.icon : 'server';
@@ -27014,6 +27043,7 @@
         }).join('');
       }
       renderStoragePresetConnectionStatus();
+      window.LuminGoogleDrive?.render();
       syncStoragePresetDialogLabels();
       window.LuminStorageSync?.render();
       if (window.lucide) lucide.createIcons();
@@ -27023,13 +27053,19 @@
       if (!currentUserAccess?.isAdmin || storageSettingsSaving) return false;
       const preset = getStorageServerPresets().find(preset => preset.id === presetId);
       if (!preset?.url) return false;
+      if (preset.provider === 'google-drive') {
+        try {
+          const status = await window.LuminGoogleDrive.ensure();
+          if (!status.connected) { await window.LuminGoogleDrive.connect(); return false; }
+        } catch (error) { showStorageSettingsMessage(error.message, false); return false; }
+      }
       const previous = getStorageServerConfig();
       if (storageServerUrlsMatch(preset.url, previous.url) && String(preset.key || '').trim() === previous.key) return true;
       const urlInput = document.getElementById('settings-storage-url');
       const keyInput = document.getElementById('settings-storage-key');
       if (!urlInput || !keyInput) return false;
       urlInput.value = preset.url;
-      keyInput.value = preset.key ?? previous.key;
+      keyInput.value = preset.provider === 'google-drive' ? '' : preset.key ?? previous.key;
       storagePresetSwitchingId = preset.id;
       try {
         const saved = await saveStorageServerSettings();
@@ -27153,7 +27189,7 @@
       const urlInput = document.getElementById('settings-storage-url');
       const keyInput = document.getElementById('settings-storage-key');
       if (urlInput && document.activeElement !== urlInput) urlInput.value = config.url;
-      if (keyInput && document.activeElement !== keyInput) keyInput.value = config.key;
+      if (keyInput && document.activeElement !== keyInput) keyInput.value = window.LuminGoogleDrive?.isDrive(config.url) ? '' : config.key;
       renderStorageServerPresets();
     }
 
@@ -27182,7 +27218,7 @@
         showStorageSettingsMessage(currentUiLanguage === 'ar' ? 'أدخل رابط خادم صحيحاً يبدأ بـ HTTP أو HTTPS.' : 'Enter a valid HTTP or HTTPS server URL.', false);
         return false;
       }
-      const cleanKey = keyInput.value.trim();
+      const cleanKey = window.LuminGoogleDrive?.isDrive(cleanUrl) ? '' : keyInput.value.trim();
       storageSettingsSaving = true;
       urlInput.disabled = true;
       keyInput.disabled = true;
@@ -27291,6 +27327,7 @@
     async function loadStorageLocationInfo() {
       if (storageLocationLoading) return;
       const config = getStorageServerConfig();
+      if (window.LuminGoogleDrive?.isDrive(config.url)) { window.LuminGoogleDrive.render(); return; }
       const loadingEl = document.getElementById('storage-location-loading');
       const detailsEl = document.getElementById('storage-location-details');
       const offlineEl = document.getElementById('storage-location-offline');
@@ -27854,9 +27891,9 @@
         body: JSON.stringify({ relativePath, details, patientName: patient?.name, patientNumber: patient?.patient_number, phone: patient?.phone })
       });
       const data = await response.json();
-      if (!response.ok || data.metadataSource !== 'local' || !data.details) throw new Error(currentUiLanguage === 'ar'
-        ? 'تعذر حفظ التفاصيل على الخادم المحلي. تأكد من تحديث خادم التخزين ثم أعد المحاولة.'
-        : 'Could not save details on the local server. Update the storage server, then retry.');
+      if (!response.ok || !['local', 'google-drive'].includes(data.metadataSource) || !data.details) throw new Error(currentUiLanguage === 'ar'
+        ? 'تعذر حفظ التفاصيل في موقع التخزين المحدد. تحقق من الاتصال ثم أعد المحاولة.'
+        : 'Could not save details on the selected storage. Check its connection, then retry.');
       return data.details;
     }
 
@@ -28045,7 +28082,7 @@
       }
 
       if (warning) warning.classList.add('hidden');
-      content.innerHTML = `<div class="p-12 text-center text-sm font-bold text-slate-400"><div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 mb-2"></div><p>${currentUiLanguage === 'ar' ? 'جارٍ تحميل الأشعة والوسائط من الخادم المحلي...' : 'Loading patient media from local storage...'}</p></div>`;
+      content.innerHTML = `<div class="p-12 text-center text-sm font-bold text-slate-400"><div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 mb-2"></div><p>${currentUiLanguage === 'ar' ? 'جارٍ تحميل الأشعة والوسائط من موقع التخزين المحدد...' : 'Loading patient media from selected storage...'}</p></div>`;
 
       try {
         const resp = await fetch(`${storageConfig.url}/api/patient/${patient.id}/files?name=${encodeURIComponent(patient.name || '')}`, {
@@ -28056,7 +28093,7 @@
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
         if (renderToken !== patientMediaRenderToken) return;
-        patientMediaDetailsError = data.metadataSource !== 'local' || Boolean(data.metadataUnavailable);
+        patientMediaDetailsError = !['local', 'google-drive'].includes(data.metadataSource) || Boolean(data.metadataUnavailable);
         currentPatientMediaFiles = (data.files || []).filter(file => file.category !== '3D-Scans' && !/\.zip$/i.test(file.filename || '')).map(file => ({ ...file,
           mediaDetails: patientMediaDetailsError ? null : file.mediaDetails || null }));
         activePatientMediaPatientId = patient.id;
@@ -28068,8 +28105,8 @@
         content.innerHTML = `
           <div class="rounded-2xl border border-rose-200 bg-rose-50/50 p-8 text-center text-rose-800">
             <i data-lucide="alert-triangle" class="mx-auto h-8 w-8 text-rose-500 mb-2"></i>
-            <p class="text-xs font-bold">${currentUiLanguage === 'ar' ? 'تعذر تحميل الوسائط من خادم التخزين المحلي' : 'Could not connect to local storage server'}: ${escapeHtml(err.message)}</p>
-            <p class="mt-1 text-[11px] text-rose-600">${currentUiLanguage === 'ar' ? 'تأكد من تشغيل start-server.bat أو نفق Cloudflare.' : 'Make sure start-server.bat and Cloudflare Tunnel are active on the clinic PC.'}</p>
+            <p class="text-xs font-bold">${currentUiLanguage === 'ar' ? 'تعذر تحميل الوسائط من موقع التخزين المحدد' : 'Could not connect to selected storage'}: ${escapeHtml(err.message)}</p>
+            <p class="mt-1 text-[11px] text-rose-600">${window.LuminGoogleDrive?.isDrive(storageConfig.url) ? (currentUiLanguage === 'ar' ? 'تحقق من اتصال الإنترنت وربط حساب Drive في إعدادات العيادة.' : 'Check the internet connection and the Drive connection in clinic settings.') : (currentUiLanguage === 'ar' ? 'تأكد من تشغيل start-server.bat أو نفق Cloudflare.' : 'Make sure start-server.bat and Cloudflare Tunnel are active on the clinic PC.')}</p>
             <button type="button" onclick="renderPatientMedia()" class="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700">
               <i data-lucide="refresh-cw" class="h-3.5 w-3.5"></i> <span>${currentUiLanguage === 'ar' ? 'إعادة المحاولة' : 'Retry'}</span>
             </button>
@@ -28486,7 +28523,7 @@
     }
 
     async function deletePatientMediaFile(relativePath) {
-      if (!confirm(currentUiLanguage === 'ar' ? 'هل أنت متأكد من حذف هذه الصورة/الأشعة نهائياً من الخادم المحلي؟' : 'Are you sure you want to permanently delete this file from local storage?')) return;
+      if (!confirm(currentUiLanguage === 'ar' ? 'هل تريد حذف هذه الصورة/الأشعة من موقع التخزين المحدد؟' : 'Delete this file from the selected storage?')) return;
       const storageConfig = getStorageServerConfig();
       const patientId = activePatientMediaPatientId;
       try {
