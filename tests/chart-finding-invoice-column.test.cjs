@@ -92,7 +92,11 @@ test('invoice column stays beside the tick and below the badge without overlappi
     let currentUiLanguage='en', documentedFindingsTab='treatment', documentedFindingsStatusFilter='all', chartInvoiceStateLoading=false;
     let openChartFindingNoteTrigger=null, chartDoctorsLoaded=true;
     const selectedFindingIds=new Set(), invoicedFindingIds=new Set(['paid','partial','steps','b1','v1']);
-    const chartSalaryTransfersByFindingId=new Map(), expandedFindingProcedureSteps=new Set(['steps']),collapsedOrthoFindings=new Set();
+    const chartSalaryTransfersByFindingId=new Map([
+      ['paid',{transfer_status:'eligible',invoiceItemId:10}],
+      ['b1',{transfer_status:'eligible',invoiceItemId:21}],
+      ['steps',{transfer_status:'transferred',invoiceItemId:11}],
+    ]), expandedFindingProcedureSteps=new Set(['steps']),collapsedOrthoFindings=new Set();
     const chartDoctors=[], SLOT_BY_PRIMARY_TOOTH={}, FINDING_SURFACE_TOGGLE_ORDER=[];
     const OPERATION_STATUSES={P:{key:'P',label:'Planned',color:'#dc2626'},C:{key:'C',label:'Completed',color:'#16a34a'},In:{key:'In',label:'In progress',color:'#2563eb'}};
     const base={kind:'whole',toothId:'3',toothIds:['3'],surfaces:[],price:400,notes:[],createdAt:'2026-09-23T09:00:00',beginDate:'2026-09-29T08:00:00',steps:[]};
@@ -101,7 +105,7 @@ test('invoice column stays beside the tick and below the badge without overlappi
       {...base,id:'steps',code:'Root canal treatment (molar) with a long clinical description',status:'C',steps:[{id:'s1',name:'Preparation',percentage:100,status:'C'}]},
       {...base,id:'paid',code:'Endo Three Canals',status:'C',notes:[{text:'Review at next visit'}]},
       {...base,id:'partial',code:'Endo Four Canals',status:'C'},
-      {...base,id:'b1',code:'Composite filling batch',status:'P',batchId:'batch',toothIds:['3','4'],memberFindings:[{...base,id:'b1'},{...base,id:'b2',toothId:'4'}]},
+      {...base,id:'b1',code:'Composite filling batch',status:'C',batchId:'batch',toothIds:['3','4'],memberFindings:[{...base,id:'b1'},{...base,id:'b2',toothId:'4'}]},
       {...base,id:'ortho',code:'Orthodontic package',status:'P',isOrthoPackage:true,orthoVisits:[{id:'v1',visitNumber:1,date:base.createdAt,price:100,status:'C',notes:''}]},
     ];
     const paidInvoice=${JSON.stringify(invoice(1,1000))}, partialInvoice=${JSON.stringify(invoice(2,300,150))};
@@ -145,6 +149,8 @@ test('invoice column stays beside the tick and below the badge without overlappi
     function renderChartFindingIcons(){if(window.lucide)lucide.createIcons();}
     function invoiceNumber(id){return 'INV-'+id;}
     function openInvoicePaymentModal(invoiceId,itemId){window.lastPayment=[invoiceId,itemId];}
+    function transferDoctorSalaryInvoiceItem(itemId){window.lastSalaryTransfer=itemId;}
+    function separateFindingBatch(button){window.lastSeparate=button.closest('[data-finding-id]').dataset.findingId;}
     ${moneyHelpers}
     ${['openFindingDateEditor','openFindingBeginDateEditor','chartFindingIdsFromControl','chartFindingToothIdsFromControl','normaliseOperationStatus','operationStatusDefinition','operationStatusSelectOptions','chartDoctorSelectOptions','chartProcedureStepStatusOptions','toggleFindingSelectionFromControl','toggleFindingCardSelection','renderFindingsList'].map(source).join('\n')}
   `});
@@ -163,7 +169,7 @@ test('invoice column stays beside the tick and below the badge without overlappi
       assert.equal(await page.locator('.ortho-visit-invoice .finding-invoice-amount').textContent(),'EGP 0 / 471.43');
       const geometry = await page.evaluate(() => {
         const rect = element => {const r=element.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom};};
-        const rows=[...document.querySelectorAll('.finding-row')].map(row => ({summary:rect(row.querySelector('.finding-row-summary')),notes:rect(row.querySelector('.finding-note-button')),invoice:rect(row.querySelector('.finding-row-actions > .finding-invoice-control')),dates:rect(row.querySelector('.finding-dates-group')),price:rect(row.querySelector('.finding-price-control')),status:rect(row.querySelector('.finding-status-control'))}));
+        const rows=[...document.querySelectorAll('.finding-row')].map(row => ({summary:rect(row.querySelector('.finding-row-summary')),notes:rect(row.querySelector('.finding-note-button')),invoice:rect(row.querySelector('.finding-row-actions > .finding-invoice-control')),dates:rect(row.querySelector('.finding-dates-group')),price:rect(row.querySelector('.finding-price-control')),status:rect(row.querySelector('.finding-status-control')),doctor:rect(row.querySelector('.finding-doctor-control')),salary:row.querySelector('.finding-salary-transfer-button')?rect(row.querySelector('.finding-salary-transfer-button')):null,separate:row.querySelector('.finding-separate-button')?rect(row.querySelector('.finding-separate-button')):null}));
         const paid=document.querySelector('[data-refresh-key="paid"]');
         const prices=[...document.querySelectorAll('.finding-price-control input')].map(input=>{
           const styles=getComputedStyle(input), canvas=document.createElement('canvas'), context=canvas.getContext('2d');
@@ -187,6 +193,17 @@ test('invoice column stays beside the tick and below the badge without overlappi
         assert.equal(overlaps(row.price,row.status),false,'Compact controls do not overlap');
         assert.ok(language==='ar'?row.notes.x>=row.dates.right:row.notes.right<=row.dates.x,'Notes occupy the former invoice position');
         assert.ok(language==='ar'?row.invoice.right<=row.status.x:row.invoice.x>=row.status.right,'Invoice and tick occupy the former notes position');
+        const statusInvoiceGap=language==='ar'?row.status.x-row.invoice.right:row.invoice.x-row.status.right;
+        assert.ok(statusInvoiceGap<=32,'No empty batch-action column remains between status and invoice');
+        if(row.salary){
+          assert.ok(row.salary.y>=row.doctor.bottom+4,'Salary transfer sits beneath the doctor dropdown');
+          assert.ok(Math.abs(row.salary.x-row.doctor.x)<2&&Math.abs(row.salary.width-row.doctor.width)<2,'Salary transfer aligns with the doctor dropdown');
+          assert.ok(row.salary.width>=44&&row.salary.height>=44,'Salary transfer remains easy to tap');
+        }
+        if(row.separate){
+          assert.ok(row.separate.y>=row.price.bottom,'Batch separation sits beneath pricing');
+          assert.ok(row.separate.width>=44&&row.separate.height>=44,'Batch separation remains easy to tap');
+        }
       }
       for(const price of geometry.prices)assert.ok(Math.abs(price.contentWidth-price.digitsWidth)<2,'Price inputs fit five digits');
       for(const status of geometry.statuses){
@@ -201,6 +218,14 @@ test('invoice column stays beside the tick and below the badge without overlappi
       assert.ok(Math.abs(geometry.amount.x+geometry.amount.width/2-geometry.badge.x-geometry.badge.width/2)<2,'Paid fraction aligns directly beneath the badge');
       assert.ok(geometry.button.width>=44&&geometry.button.height>=44);
       assert.equal(await page.locator('.finding-operation-heading .finding-invoice-badge').count(),0);
+      assert.equal(await page.locator('.finding-row-actions > [data-salary-transfer-item]').count(),0);
+      assert.equal(await page.locator('.finding-row-actions > .finding-separate-button').count(),0);
+      assert.equal(await page.locator('[data-refresh-key="steps"] [data-salary-transfer-item]').count(),0,'Transferred procedures do not offer another transfer');
+      assert.equal((await paid.locator('.finding-doctor-group [data-salary-transfer-item="10"]').textContent()).trim(),language==='ar'?'تحويل للراتب':'Transfer to salary');
+      await paid.locator('[data-salary-transfer-item="10"]').click();
+      assert.equal(await page.evaluate(()=>window.lastSalaryTransfer),10);
+      await page.locator('[data-refresh-key="b1"] .finding-pricing-group .finding-separate-button').click();
+      assert.equal(await page.evaluate(()=>window.lastSeparate),'b1');
       await paid.locator('[data-item-id="10"]').click();
       assert.deepEqual(await page.evaluate(()=>window.lastPayment),['1','10']);
       const planningButton = paid.locator('.finding-date-control button');

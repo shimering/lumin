@@ -825,11 +825,10 @@
         --finding-mobile-doctor: 8.5rem;
         --finding-mobile-price: 7rem;
         --finding-mobile-status: 4.5rem;
-        --finding-mobile-separate: 6rem;
         --finding-mobile-notes: 2.75rem;
         --finding-mobile-gap: 0.5rem;
         --finding-mobile-invoice: 11.5rem;
-        --finding-mobile-row-width: 78.5rem;
+        --finding-mobile-row-width: 72rem;
         overflow-x: auto !important;
         overscroll-behavior-inline: contain;
         -webkit-overflow-scrolling: touch;
@@ -901,7 +900,6 @@
           var(--finding-mobile-doctor)
           var(--finding-mobile-price)
           var(--finding-mobile-status)
-          var(--finding-mobile-separate)
           var(--finding-mobile-invoice);
         width: auto !important;
         min-width: 0 !important;
@@ -943,7 +941,7 @@
         min-width: 0 !important;
         flex: 1 1 auto !important;
       }
-      #findings-container .finding-doctor-control {
+      #findings-container .finding-doctor-group {
         grid-column: 3;
         width: 100% !important;
         min-width: 0 !important;
@@ -1048,12 +1046,6 @@
         height: 2.75rem !important;
         flex: 0 0 var(--finding-mobile-notes) !important;
         padding: 0 !important;
-        justify-content: center !important;
-      }
-      #findings-container .finding-separate-button {
-        grid-column: 6;
-        width: 100% !important;
-        min-height: 2.75rem !important;
         justify-content: center !important;
       }
       #findings-container .finding-row.has-procedure-steps {
@@ -1200,7 +1192,6 @@
           var(--finding-mobile-doctor)
           var(--finding-mobile-price)
           var(--finding-mobile-status)
-          var(--finding-mobile-separate)
           var(--finding-mobile-invoice);
         align-items: center !important;
         gap: var(--finding-mobile-gap) !important;
@@ -1227,7 +1218,7 @@
         --finding-mobile-doctor: 9.5rem;
         --finding-mobile-price: 7rem;
         --finding-mobile-status: 9.5rem;
-        --finding-mobile-row-width: 84.25rem;
+        --finding-mobile-row-width: 77.75rem;
       }
     }
 
@@ -1240,10 +1231,9 @@
         --finding-column-doctor: 12.5rem;
         --finding-column-price: 7rem;
         --finding-column-status: 9.5rem;
-        --finding-column-separate: 6rem;
         --finding-column-notes: 2.75rem;
         --finding-column-gap: 0.5rem;
-        --finding-row-min-width: 86rem;
+        --finding-row-min-width: 79.5rem;
       }
       #findings-container .finding-row:not(.has-ortho-visits) {
         display: grid !important;
@@ -1272,7 +1262,6 @@
           var(--finding-column-doctor)
           var(--finding-column-price)
           var(--finding-column-status)
-          var(--finding-column-separate)
           var(--finding-column-invoice);
         align-items: center !important;
         gap: var(--finding-column-gap) !important;
@@ -1298,7 +1287,7 @@
         min-width: 0;
         flex: 1 1 auto;
       }
-      #findings-container .finding-doctor-control {
+      #findings-container .finding-doctor-group {
         grid-column: 3;
         width: 100%;
         min-width: 0;
@@ -1322,11 +1311,6 @@
         width: fit-content !important;
         min-width: 0;
         max-width: 100%;
-      }
-      #findings-container .finding-separate-button {
-        grid-column: 6;
-        width: 100%;
-        justify-content: center;
       }
       #findings-container .finding-note-button {
         grid-column: 1;
@@ -1361,8 +1345,12 @@
       }
     }
 
+    #findings-container .finding-doctor-group { display: flex; flex-direction: column; align-items: stretch; gap: 6px; min-width: 0; }
+    #findings-container .finding-doctor-control { width: 100% !important; min-width: 0 !important; min-height: 44px; flex: none; }
+    #findings-container .finding-salary-transfer-button { width: 100%; min-width: 44px; min-height: 44px; white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
+    #findings-container .finding-separate-button { width: 100%; min-height: 44px; justify-content: center; margin-block-start: 4px; }
     #findings-container .finding-invoice-control {
-      grid-column: 7;
+      grid-column: 6;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -32640,7 +32628,8 @@
         const eligibleSalaryItems = memberFindings
           .map(member => ({ member, transfer: chartSalaryTransfersByFindingId.get(member.id) }))
           .filter(({ transfer }) => transfer?.transfer_status === 'eligible');
-        const doctorSalaryActionMarkup = eligibleSalaryItems.map(({ member, transfer }) => `<button type="button" data-salary-transfer-item="${Number(transfer.invoiceItemId)}" onclick="transferDoctorSalaryInvoiceItem(${Number(transfer.invoiceItemId)})" class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-blue-50 px-3 text-[10px] font-black text-blue-700 transition-all duration-150 ease-out hover:bg-blue-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50" title="${currentUiLanguage === 'ar' ? 'تحويل الإجراء المكتمل والمفوتر لحساب راتب الطبيب' : 'Transfer this completed, invoiced procedure to doctor salary'}${eligibleSalaryItems.length > 1 ? ` · ${escapeHtml(chartFindingNoteTargetLabel(member))}` : ''}"><i data-lucide="arrow-right-left" class="h-4 w-4"></i>${currentUiLanguage === 'ar' ? 'تحويل للراتب' : 'Transfer to salary'}</button>`).join('');
+        const doctorSalaryActionMarkup = eligibleSalaryItems.map(({ member, transfer }) => `<button type="button" data-salary-transfer-item="${Number(transfer.invoiceItemId)}" onclick="transferDoctorSalaryInvoiceItem(${Number(transfer.invoiceItemId)})" class="finding-salary-transfer-button inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-blue-50 px-3 text-[10px] font-black text-blue-700 transition-all duration-150 ease-out hover:bg-blue-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50" title="${currentUiLanguage === 'ar' ? 'تحويل الإجراء المكتمل والمفوتر لحساب راتب الطبيب' : 'Transfer this completed, invoiced procedure to doctor salary'}${eligibleSalaryItems.length > 1 ? ` · ${escapeHtml(chartFindingNoteTargetLabel(member))}` : ''}"><i data-lucide="arrow-right-left" class="h-4 w-4"></i>${currentUiLanguage === 'ar' ? 'تحويل للراتب' : 'Transfer to salary'}</button>`).join('');
+        const separateBatchMarkup = isBatch ? `<button type="button" onclick="separateFindingBatch(this)" class="finding-separate-button inline-flex shrink-0 items-center gap-1 rounded-lg bg-violet-50 px-2.5 py-1.5 text-[10px] font-semibold text-violet-700 transition-all duration-150 ease-out hover:bg-violet-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50" aria-label="${currentUiLanguage === 'ar' ? 'فصل المجموعة إلى إجراء مستقل لكل سن' : 'Separate this batch into one row per tooth'}" title="${currentUiLanguage === 'ar' ? 'إنشاء إجراء مستقل لكل سن' : 'Create one independent documented row for each tooth'}"><i data-lucide="split" class="h-3 w-3"></i>${currentUiLanguage === 'ar' ? 'فصل المجموعة' : 'Separate'}</button>` : '';
         const invoiceColumnMarkup = chartFindingInvoiceColumn(invoicedMemberIds, {
           partial: !isFullyInvoiced,
           showPayments: !isOrthoPackage,
@@ -32764,10 +32753,13 @@
                 ${createdAtMarkup}
                 ${beginDateMarkup}
               </div>
-              <label class="finding-doctor-control inline-flex min-h-11 min-w-44 items-center overflow-hidden rounded-lg border ${wholeDoctorLocked ? 'border-slate-200 bg-slate-100 opacity-60' : 'border-cyan-200 bg-white/85 focus-within:ring-2 focus-within:ring-cyan-500/20'}" title="${wholeDoctorLocked ? (currentUiLanguage === 'ar' ? 'ألغِ تعيين جميع أطباء الخطوات أولاً' : 'Unassign every step doctor first') : (currentUiLanguage === 'ar' ? 'تعيين كامل الإجراء لطبيب واحد' : 'Assign the whole procedure to one doctor')}">
-                <span class="border-r ${wholeDoctorLocked ? 'border-slate-200 bg-slate-100 text-slate-500' : 'border-cyan-100 bg-cyan-50 text-cyan-700'} px-2 py-1.5 text-[9px] font-black">${procedureSteps.length ? (currentUiLanguage === 'ar' ? 'الإجراء بالكامل' : 'Whole procedure') : (currentUiLanguage === 'ar' ? 'الطبيب' : 'Doctor')}</span>
-                <select onchange="updateFindingDoctorFromControl(this)" ${wholeDoctorLocked ? 'disabled' : ''} class="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-[11px] font-bold text-slate-700 outline-none disabled:text-slate-400" aria-label="${currentUiLanguage === 'ar' ? 'الطبيب المكلف بالإجراء' : 'Assigned doctor for'} ${escapeHtml(dentalOperationLabel(finding.code))}">${chartDoctorSelectOptions(finding, { wholeProcedure: Boolean(procedureSteps.length) })}</select>
-              </label>
+              <div class="finding-doctor-group">
+                <label class="finding-doctor-control inline-flex min-h-11 items-center overflow-hidden rounded-lg border ${wholeDoctorLocked ? 'border-slate-200 bg-slate-100 opacity-60' : 'border-cyan-200 bg-white/85 focus-within:ring-2 focus-within:ring-cyan-500/20'}" title="${wholeDoctorLocked ? (currentUiLanguage === 'ar' ? 'ألغِ تعيين جميع أطباء الخطوات أولاً' : 'Unassign every step doctor first') : (currentUiLanguage === 'ar' ? 'تعيين كامل الإجراء لطبيب واحد' : 'Assign the whole procedure to one doctor')}">
+                  <span class="border-r ${wholeDoctorLocked ? 'border-slate-200 bg-slate-100 text-slate-500' : 'border-cyan-100 bg-cyan-50 text-cyan-700'} px-2 py-1.5 text-[9px] font-black">${procedureSteps.length ? (currentUiLanguage === 'ar' ? 'الإجراء بالكامل' : 'Whole procedure') : (currentUiLanguage === 'ar' ? 'الطبيب' : 'Doctor')}</span>
+                  <select onchange="updateFindingDoctorFromControl(this)" ${wholeDoctorLocked ? 'disabled' : ''} class="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-[11px] font-bold text-slate-700 outline-none disabled:text-slate-400" aria-label="${currentUiLanguage === 'ar' ? 'الطبيب المكلف بالإجراء' : 'Assigned doctor for'} ${escapeHtml(dentalOperationLabel(finding.code))}">${chartDoctorSelectOptions(finding, { wholeProcedure: Boolean(procedureSteps.length) })}</select>
+                </label>
+                ${doctorSalaryActionMarkup}
+              </div>
               ${isOrthoPackage ? `
                 <div class="finding-pricing-group flex flex-col items-end justify-center shrink-0">
                   <div class="flex flex-col items-start gap-1">
@@ -32787,6 +32779,7 @@
                         : (currentUiLanguage === 'ar' ? 'المتبقي:' : 'Rem:') + ' ' + escapeHtml(formatInvoiceMoney(remainingBalance))}
                     </span>
                   </div>
+                  ${separateBatchMarkup}
                 </div>
               ` : `
                 <div class="finding-pricing-group flex flex-col items-end justify-center shrink-0">
@@ -32802,6 +32795,7 @@
                       </label>
                       <span class="whitespace-nowrap text-[10px] font-black text-violet-700 tracking-tight">= ${escapeHtml(formatInvoiceMoney(totalPrice))}</span>
                     </div>` : ''}
+                  ${separateBatchMarkup}
                 </div>
               `}
               ${procedureSteps.length ? `<div class="finding-status-control flex shrink-0 items-center gap-1.5 rounded-lg border bg-white/80 px-2 py-1.5" style="border-color:${statusBorder};color:${displayColor}" title="The procedure status is calculated from its steps">
@@ -32818,8 +32812,6 @@
                   ${operationStatusSelectOptions(finding.status, false)}
                 </select>
               </label>`}
-              ${doctorSalaryActionMarkup}
-              ${isBatch ? '<button type="button" onclick="separateFindingBatch(this)" class="finding-separate-button inline-flex shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[10px] font-black text-violet-700 transition hover:border-violet-300 hover:bg-violet-100" aria-label="Separate this batch into one row per tooth" title="Create one independent documented row for each tooth"><i data-lucide="split" class="h-3 w-3"></i>Separate</button>' : ''}
               <div class="finding-invoice-control" aria-label="${currentUiLanguage === 'ar' ? 'حالة الفاتورة والمدفوعات' : 'Invoice and payment status'}">${invoiceColumnMarkup}</div>
             </div>
             ${isOrthoPackage ? '</div>' : ''}
