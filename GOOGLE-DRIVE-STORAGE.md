@@ -96,7 +96,7 @@ peer, and reconnecting changes the credential fingerprint used by the cache.
 Patient galleries query only their annotated file keys instead of paging
 through the entire clinic's file index. Image bytes remain streamed live with
 `private, no-store`; this optimization adds no image cache on disk or in a CDN.
-Recognized Google thumbnail URLs request a 160-pixel preview. When Drive has
+Recognized Google thumbnail URLs request an 80-pixel preview. When Drive has
 not prepared a thumbnail, the gallery offers the original on tap instead of
 silently downloading the full image for each card. Full-view and sync routes
 continue to retrieve the original bytes.

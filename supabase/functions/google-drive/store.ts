@@ -1,7 +1,7 @@
 import {DriveError, MAX_UPLOAD, annotationSignature, caseFold, cleanName, decrypt, encrypt, equal, normaliseSnapshot, metadataDigest, safePath, sha256, uuid, validateRecord, sameContent, type RecordEntry} from "./core.ts";
 import {DriveTokenCache, tokenLifetime} from "./token_cache.ts";
 
-export function driveThumbnailUrl(link: string, maxSide = 160) {
+export function driveThumbnailUrl(link: string, maxSide = 80) {
   try {
     const target = new URL(link);
     if (target.protocol !== "https:" || !target.hostname.endsWith(".googleusercontent.com") || target.username || target.password || target.port) return null;
