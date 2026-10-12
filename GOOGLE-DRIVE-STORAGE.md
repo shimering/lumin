@@ -96,6 +96,17 @@ peer, and reconnecting changes the credential fingerprint used by the cache.
 Patient galleries query only their annotated file keys instead of paging
 through the entire clinic's file index. Image bytes remain streamed live with
 `private, no-store`; this optimization adds no image cache on disk or in a CDN.
+Recognized Google thumbnail URLs request a 160-pixel preview. When Drive has
+not prepared a thumbnail, the gallery offers the original on tap instead of
+silently downloading the full image for each card. Full-view and sync routes
+continue to retrieve the original bytes.
+
+The chart preloads an authenticated tooth-count index from connector records,
+without calling Google or downloading images. Counts and recent file lists
+stay in session memory, are scoped to the signed-in user and selected storage,
+and refresh in the background. Sign-out and permission changes discard them.
+If no index is loaded yet, the first chart still needs a network response;
+confirmed green indicators remain visible during subsequent refreshes.
 
 Set these **Supabase Edge Function secrets**, never frontend constants, browser
 storage or committed files:
@@ -151,10 +162,11 @@ The tests use disposable patient folders and simulated Google responses; they do
 not access a real Google account. Run from the repository root:
 
 ```powershell
-deno test supabase/functions/google-drive/core_test.ts supabase/functions/google-drive/handler_test.ts supabase/functions/google-drive/token_cache_test.ts supabase/functions/google-drive/retrieval_test.ts
+deno test supabase/functions/google-drive/core_test.ts supabase/functions/google-drive/handler_test.ts supabase/functions/google-drive/token_cache_test.ts supabase/functions/google-drive/retrieval_test.ts supabase/functions/google-drive/thumbnail_test.ts
 python tests/storage-file-sync.test.py
 python tests/google-drive-sync.test.py
 node --test tests/google-drive-browser.test.cjs tests/google-drive-migration.test.cjs
+node --test tests/chart-media-loading.test.cjs tests/chart-patient-media.test.cjs
 ```
 
 Python tests need the storage server dependencies. The Drive HTTP integration

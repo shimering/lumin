@@ -1,6 +1,20 @@
 import {DriveError, MAX_UPLOAD, annotationSignature, caseFold, cleanName, decrypt, encrypt, equal, normaliseSnapshot, metadataDigest, safePath, sha256, uuid, validateRecord, sameContent, type RecordEntry} from "./core.ts";
 import {DriveTokenCache, tokenLifetime} from "./token_cache.ts";
 
+export function driveThumbnailUrl(link: string, maxSide = 160) {
+  try {
+    const target = new URL(link);
+    if (target.protocol !== "https:" || !target.hostname.endsWith(".googleusercontent.com") || target.username || target.password || target.port) return null;
+    const limit = (value: string) => String(Number(value) > 0 ? Math.min(Number(value), maxSide) : maxSide);
+    if (maxSide > 0) {
+      target.pathname = target.pathname.replace(/=s(\d+)(?=-|$)/, (_, side) => "=s" + limit(side));
+      const size = target.searchParams.get("sz");
+      if (size && /^s?\d+$/.test(size)) target.searchParams.set("sz", (size.startsWith("s") ? "s" : "") + limit(size.replace(/^s/, "")));
+    }
+    return target;
+  } catch (_) { return null; }
+}
+
 export type DriveConfig = {supabaseUrl: string; clientId: string; clientSecret: string; encryptionKey: string; redirectUri: string; appUrl: string; rootName: string};
 export async function checked(query: any) {
   const {data, error} = await query;
@@ -278,12 +292,18 @@ export class DriveStore {
     if (thumbnail) {
       const info = await this.google(`/drive/v3/files/${encodeURIComponent(row.drive_id)}?fields=thumbnailLink`);
       if (info.thumbnailLink) {
-        const target = new URL(info.thumbnailLink);
-        if (target.protocol === "https:" && target.hostname.endsWith(".googleusercontent.com")) {
-          const preview = await this.fetcher(target, {headers: {Authorization: `Bearer ${await this.token()}`}, signal: AbortSignal.timeout(15000)});
-          if (preview.ok && preview.headers.get("Content-Type")?.startsWith("image/")) return preview;
+        const small = driveThumbnailUrl(info.thumbnailLink), original = driveThumbnailUrl(info.thumbnailLink, 0);
+        const targets = [...new Set([small?.href, original?.href].filter(Boolean))];
+        for (const target of targets) {
+          try {
+            const preview = await this.fetcher(target!, {headers: {Authorization: `Bearer ${await this.token()}`}, redirect: "error", signal: AbortSignal.timeout(15000)});
+            if (preview.ok && /^(image\/(?:jpeg|png|webp|gif|bmp|tiff))(?:;|$)/i.test(preview.headers.get("Content-Type") || "")) return preview;
+            await preview.body?.cancel();
+          } catch (_) { /* An expired or unsupported preview can use the next thumbnail URL. */ }
         }
       }
+      // Galleries must not download a full clinical image just because Drive is still preparing its preview.
+      throw new DriveError("Preview unavailable. Open the original image.", 404, "preview_unavailable");
     }
     return this.google(`/drive/v3/files/${encodeURIComponent(row.drive_id)}?alt=media`, {}, true) as Promise<Response>;
   }

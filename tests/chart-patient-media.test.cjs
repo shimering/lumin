@@ -130,6 +130,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
     const nativeFetch = window.fetch.bind(window);
     let holdPatientOne = false, releasePatientOne, holdText = false, releaseText;
     window.fetch = async (url, options) => {
+      if (String(url).includes('/api/xray-index')) return {ok:true,json:async () => ({metadataSource:'google-drive',countsByPatient:{'patient-1':{'3':1,'4':1}}})};
       if (String(url).includes('/api/patient/')) {
         const id = String(url).split('/api/patient/')[1].split('/')[0];
         if (id === 'patient-1' && holdPatientOne) await new Promise(resolve => releasePatientOne = resolve);
@@ -155,6 +156,18 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
   assert.equal(await page.locator('#chart-media-toggle').count(),0, 'Only the right rail and tooth indicators open the viewer');
   const screenshots = process.env.LUMIN_MEDIA_SCREENSHOT_DIR || path.join(os.tmpdir(), 'lumin-chart-media-preview');
   fs.mkdirSync(screenshots, {recursive:true});
+  await page.evaluate(async () => {
+    window.LuminGoogleDrive = {isDrive: () => true};
+    resetChartPatientMediaCache();
+    await preloadChartXrayIndex();
+    holdPatientOne = true;
+    window.coldChartRead = loadChartPatientMedia();
+  });
+  assert.equal(await page.locator('.chart-tooth-xray-indicator:not(.is-unassigned)').count(), 2, 'Preloaded Drive counts paint green buttons before the file list resolves');
+  assert.equal(await page.locator('[data-tooth-xray-slot="3"] small').textContent(), '1');
+  assert.equal(await page.evaluate(() => chartPatientMedia.status), 'loading', 'The buttons do not wait for the image list');
+  await page.screenshot({path:path.join(screenshots,'chart-instant-drive-xray-buttons.png')});
+  await page.evaluate(async () => { holdPatientOne=false; releasePatientOne(); await window.coldChartRead; delete window.LuminGoogleDrive; resetChartPatientMediaCache(); });
   for (const viewport of [{width:1440,height:900},{width:1180,height:820},{width:1024,height:768},{width:800,height:600},{width:834,height:1112},{width:390,height:844}]) {
     await page.setViewportSize(viewport);
     const landscape = viewport.width >= 768 && viewport.width > viewport.height;
@@ -377,6 +390,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
   assert.equal(await page.locator('.chart-media-caption h4').textContent(),'UR6 before treatment', 'Adding a permanent tooth after a primary tooth updates the viewer');
   assert.deepEqual(await page.evaluate(() => chartPatientMedia.filterToothIds),['A','3']);
   await page.evaluate(() => { holdPatientOne=true; window.latestToothRefresh=loadChartPatientMedia(); });
+  assert.equal(await page.locator('[data-tooth-xray-slot="A"] button:not(.is-unassigned)').count(), 1, 'Confirmed green buttons stay visible during refresh');
   await page.locator('[data-tooth-xray-slot="A"] button').click();
   await page.locator('[data-tooth-xray-slot="A"] button').click();
   assert.deepEqual(await page.evaluate(() => chartPatientMedia.filterToothIds),['3','A']);

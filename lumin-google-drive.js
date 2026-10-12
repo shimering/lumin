@@ -59,7 +59,11 @@
     })();
     return state.loading;
   }
-  async function ensure() { return refresh(false); }
+  async function ensure() {
+    const result = await refresh(false);
+    if (typeof preloadChartXrayIndex === 'function') void preloadChartXrayIndex();
+    return result;
+  }
   function stopPopup() { if (state.poll) clearInterval(state.poll); state.poll = null; state.busy = false; state.popup = null; }
   async function connectedResult(result, message) {
     stopPopup();
@@ -87,6 +91,7 @@
     finally { state.busy = false; renderAll(); }
   }
   function reset() {
+    if (typeof resetChartPatientMediaCache === 'function') resetChartPatientMediaCache();
     if (state.mediaGrant) void fetch(`${endpoint()}/api/revoke-grant`, {method: 'POST', headers: {'x-lumin-key': state.mediaGrant}, keepalive: true}).catch(() => {});
     state.popup?.close(); stopPopup(); Object.assign(state, {checked: false, connected: false, mediaGrant: '', expiresAt: 0, userId: null, loading: null, email: '', rootUrl: '', error: ''});
   }
@@ -96,6 +101,7 @@
   window.addEventListener('focus', () => { if (state.connected && state.expiresAt < Date.now() + 60000) void refresh().catch(() => {}); });
   setInterval(() => {
     if (state.connected && document.visibilityState === 'visible' && navigator.onLine !== false && state.expiresAt < Date.now() + 2 * 60000) void refresh().catch(() => {});
+    if (state.connected && document.visibilityState === 'visible' && navigator.onLine !== false && typeof preloadChartXrayIndex === 'function') void preloadChartXrayIndex();
   }, 60000);
   function open() {
     render();

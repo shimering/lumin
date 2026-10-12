@@ -106,6 +106,19 @@ async function mediaRoute(route: string, request: Request, url: URL, store: Driv
     const meta = await store.metadata();
     return {status: "online", service: "Lumin Google Drive Storage", storageRoot: connection.root_name, totalPatientFolders: meta.snapshot?.patients?.length || 0, maxFileSizeMB: MAX_UPLOAD / 1024 / 1024, capabilities: {patient3dScans: true, scanOriginalFilenames: true, localMediaMetadata: true, syncClinicalMetadata: true}};
   }
+  if (route === "/api/xray-index" && request.method === "GET") {
+    const meta = await store.metadata();
+    const annotations = (meta.snapshot?.files || []).filter((f: any) => /^(Panoramic|Periapical)$/.test(f.relative_path.split("/")[1]) && /\.(?:jpe?g|png|webp|gif|bmp|avif)$/i.test(f.relative_path));
+    const rows = await store.fileRows(annotations.map((f: any) => f.relative_path));
+    const live = new Set(rows.filter((r: any) => !r.record.deleted).map((r: any) => r.path_key));
+    const countsByPatient: Record<string, Record<string, number>> = {};
+    for (const file of annotations) {
+      if (!live.has(caseFold(file.relative_path))) continue;
+      const counts = countsByPatient[file.patient_id] ||= {};
+      for (const tooth of new Set<string>(file.tooth_ids ?? (file.tooth_id ? [file.tooth_id] : []))) counts[tooth] = (counts[tooth] || 0) + 1;
+    }
+    return {metadataSource: "google-drive", revision: meta.revision, countsByPatient};
+  }
   const listMatch = route.match(/^\/api\/patient\/([^/]+)\/files$/);
   if (listMatch && request.method === "GET") {
     const [p, meta] = await Promise.all([patient(db, listMatch[1]), store.metadata()]);

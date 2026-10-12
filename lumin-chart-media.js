@@ -1,5 +1,98 @@
 // Patient media stays beside the chart; requests are isolated from gallery navigation.
 const chartPatientMedia = { patientId: null, files: [], status: 'idle', detailsError: false, request: 0, selectedPath: '', filterToothIds: [], collapsed: true, activeTab: 'xrays', lastToothId: '' };
+// Session memory only: no patient files or tooth assignments are written to browser storage.
+const chartPatientMediaCache = new Map();
+const chartPatientMediaReads = new Map();
+let chartMediaCacheEpoch = 0;
+let chartXrayIndex = null;
+let chartXrayIndexRead = null;
+
+function chartMediaCacheScope(config = getStorageServerConfig()) {
+  const user = typeof currentSession !== 'undefined' ? currentSession?.user?.id : typeof currentUserAccess !== 'undefined' ? currentUserAccess?.userId : '';
+  return JSON.stringify([user || '', config.url.replace(/\/+$/, ''), config.key]);
+}
+
+function resetChartPatientMediaCache() {
+  chartMediaCacheEpoch++;
+  chartPatientMediaCache.clear(); chartPatientMediaReads.clear();
+  chartXrayIndex = null; chartXrayIndexRead = null;
+  chartPatientMedia.request++;
+  chartPatientMedia.patientId = null; chartPatientMedia.files = []; chartPatientMedia.status = 'idle';
+}
+
+function chartMediaCounts(files) {
+  const counts = {};
+  files.filter(file => patientMediaFileKind(file) === 'image' && ['Panoramic', 'Periapical'].includes(file.category))
+    .forEach(file => patientMediaToothIds(file.mediaDetails).forEach(id => counts[id] = (counts[id] || 0) + 1));
+  return counts;
+}
+
+function cacheChartPatientMediaResponse(patientId, response, config = getStorageServerConfig()) {
+  if (!hasPageAccess('patients')) return;
+  const scope = chartMediaCacheScope(config), key = scope + patientId;
+  if (chartPatientMediaCache.size >= 12) chartPatientMediaCache.delete(chartPatientMediaCache.keys().next().value);
+  chartPatientMediaCache.set(key, {expiresAt: Date.now() + 60000, response: structuredClone(response)});
+  if (chartXrayIndex?.scope === scope && !response.metadataUnavailable && ['local', 'google-drive'].includes(response.metadataSource)) {
+    chartXrayIndex.countsByPatient[patientId] = chartMediaCounts(response.files || []);
+  }
+}
+
+function cachedChartPatientMedia(patientId, config) {
+  const entry = chartPatientMediaCache.get(chartMediaCacheScope(config) + patientId);
+  return entry?.expiresAt > Date.now() ? structuredClone(entry.response) : null;
+}
+
+async function fetchChartPatientMedia(patient, config = getStorageServerConfig()) {
+  const scope = chartMediaCacheScope(config), key = scope + patient.id, epoch = chartMediaCacheEpoch;
+  if (chartPatientMediaReads.has(key)) return chartPatientMediaReads.get(key);
+  const pending = (async () => {
+    const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(`${config.url}/api/patient/${encodeURIComponent(patient.id)}/files?name=${encodeURIComponent(patient.name || '')}`, {headers: {'x-lumin-key': config.key}, signal: controller.signal});
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      if (epoch !== chartMediaCacheEpoch || scope !== chartMediaCacheScope() || !hasPageAccess('patients')) throw new Error('Patient media context changed');
+      cacheChartPatientMediaResponse(patient.id, data, config);
+      return data;
+    } catch (error) {
+      if (epoch === chartMediaCacheEpoch) {
+        chartPatientMediaCache.delete(key);
+        if (chartXrayIndex?.scope === scope) delete chartXrayIndex.countsByPatient[patient.id];
+      }
+      throw error;
+    } finally { clearTimeout(timeout); }
+  })();
+  chartPatientMediaReads.set(key, pending);
+  try { return await pending; }
+  finally { if (chartPatientMediaReads.get(key) === pending) chartPatientMediaReads.delete(key); }
+}
+
+async function prefetchChartPatientMedia(patientId) {
+  const patient = getKnownPatient(patientId), config = getStorageServerConfig();
+  if (!patient || !config.url || !hasPageAccess('patients') || cachedChartPatientMedia(patientId, config)) return;
+  try { await fetchChartPatientMedia(patient, config); } catch (_) {}
+}
+
+async function preloadChartXrayIndex() {
+  const config = getStorageServerConfig();
+  if (!config.key || !hasPageAccess('patients') || !window.LuminGoogleDrive?.isDrive(config.url)) return;
+  const scope = chartMediaCacheScope(config), epoch = chartMediaCacheEpoch;
+  if (chartXrayIndex?.scope === scope && chartXrayIndex.expiresAt > Date.now() + 60000) return;
+  if (chartXrayIndexRead?.scope === scope) return chartXrayIndexRead.pending;
+  const pending = (async () => {
+    try {
+      const response = await fetch(`${config.url}/api/xray-index`, {headers: {'x-lumin-key': config.key}, signal: AbortSignal.timeout(15000)});
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      if (epoch !== chartMediaCacheEpoch || scope !== chartMediaCacheScope() || !hasPageAccess('patients')) return;
+      chartXrayIndex = {scope, expiresAt: Date.now() + 120000, countsByPatient: data.countsByPatient || {}};
+      renderChartToothXrayIndicators();
+    } catch (_) { if (epoch === chartMediaCacheEpoch && chartXrayIndex?.scope === scope) chartXrayIndex = null; }
+  })();
+  chartXrayIndexRead = {scope, pending};
+  try { await pending; }
+  finally { if (chartXrayIndexRead?.pending === pending) chartXrayIndexRead = null; }
+}
 let chartMediaPreviousFocus = null;
 let patientAttachmentState = null;
 let patientAttachmentRequest = 0;
@@ -133,9 +226,10 @@ function chartPatientXrays(toothIds = chartPatientMedia.filterToothIds) {
 function renderChartToothXrayIndicators() {
   const counts = new Map();
   const accessible = Boolean(activePatientId && chartPatientMedia.patientId === activePatientId && hasPageAccess('patients'));
-  const countsAvailable = accessible && chartPatientMedia.status === 'ready' && !chartPatientMedia.detailsError;
+  const index = chartXrayIndex?.scope === chartMediaCacheScope() && chartXrayIndex.expiresAt > Date.now() ? chartXrayIndex : null;
+  const countsAvailable = accessible && !chartPatientMedia.detailsError && (chartPatientMedia.status === 'ready' || chartPatientMedia.status === 'loading' && Boolean(index));
   if (countsAvailable) {
-    chartPatientXrays([]).forEach(file => patientMediaToothIds(file.mediaDetails).forEach(id => counts.set(id, (counts.get(id) || 0) + 1)));
+    Object.entries(chartPatientMedia.status === 'ready' ? chartMediaCounts(chartPatientMedia.files) : index.countsByPatient[activePatientId] || {}).forEach(([id, count]) => counts.set(id, count));
   }
   document.querySelectorAll('[data-tooth-xray-slot]').forEach(slot => {
     const id = slot.dataset.toothXraySlot;
@@ -360,29 +454,22 @@ async function loadChartPatientMedia(patientId = activePatientId) {
     if (typeof patientMediaUploadContext !== 'undefined' && patientMediaUploadContext?.fromChart) closePatientMediaUploadModal();
     if (patientMediaToothPicker?.prefix === 'chart-filter') closePatientMediaToothPicker(false);
   }
+  const config = getStorageServerConfig();
+  const cached = patient && hasPageAccess('patients') ? cachedChartPatientMedia(patientId, config) : null;
   chartPatientMedia.patientId = patientId;
-  chartPatientMedia.files = [];
-  chartPatientMedia.detailsError = false;
-  chartPatientMedia.status = 'loading';
+  chartPatientMedia.files = cached?.files || [];
+  chartPatientMedia.detailsError = cached ? !['local', 'google-drive'].includes(cached.metadataSource) || Boolean(cached.metadataUnavailable) : false;
+  chartPatientMedia.status = cached ? 'ready' : 'loading';
   renderChartMediaPanel();
   if (patientAttachmentState && patientAttachmentState.patientId !== patientId) closePatientAttachmentModal();
   if (patientAttachmentState?.mode === 'list') renderPatientAttachmentList();
   if (!patient || !hasPageAccess('patients')) {
     chartPatientMedia.status = 'unavailable'; renderChartMediaPanel(); renderPatientAttachmentList(); return;
   }
-  const config = getStorageServerConfig();
   if (!config.url) { chartPatientMedia.status = 'unconfigured'; renderChartMediaPanel(); renderPatientAttachmentList(); return; }
+  void preloadChartXrayIndex();
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-    let response;
-    try {
-      response = await fetch(`${config.url}/api/patient/${encodeURIComponent(patient.id)}/files?name=${encodeURIComponent(patient.name || '')}`, {
-        headers: { 'x-lumin-key': config.key }, signal: controller.signal,
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      response = await response.json();
-    } finally { clearTimeout(timeout); }
+    const response = await fetchChartPatientMedia(patient, config);
     if (request !== chartPatientMedia.request || activePatientId !== patient.id) return;
     chartPatientMedia.detailsError = !['local', 'google-drive'].includes(response.metadataSource) || Boolean(response.metadataUnavailable);
     chartPatientMedia.files = (response.files || []).map(file => ({ ...file,
@@ -392,6 +479,7 @@ async function loadChartPatientMedia(patientId = activePatientId) {
     if (patientAttachmentState?.mode === 'list' && patientAttachmentState.patientId === patient.id) renderPatientAttachmentList();
   } catch (error) {
     if (request !== chartPatientMedia.request || activePatientId !== patient.id) return;
+    chartPatientMedia.files = [];
     chartPatientMedia.status = 'error';
     renderChartMediaPanel();
     if (patientAttachmentState?.mode === 'list') renderPatientAttachmentList();
@@ -513,7 +601,7 @@ function openChartMediaGallery() {
 function fallbackChartMediaImage(image, index) {
   const file = chartPatientMedia.files[index];
   if (!file) return;
-  if (!image.dataset.originalAttempted) { image.dataset.originalAttempted = 'true'; image.src = patientMediaAuthenticatedUrl(file); return; }
+  if (!window.LuminGoogleDrive?.isDrive(getStorageServerConfig().url) && !image.dataset.originalAttempted) { image.dataset.originalAttempted = 'true'; image.src = patientMediaAuthenticatedUrl(file); return; }
   image.onerror = null;
   image.hidden = true;
   if (image.closest('.chart-media-preview')) image.parentElement.insertAdjacentHTML('beforeend', `<span class="chart-media-image-error">${chartMediaText('Preview unavailable. Tap to open the original.', 'المعاينة غير متاحة. اضغط لفتح الصورة الأصلية.')}</span>`);
