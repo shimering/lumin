@@ -256,8 +256,8 @@ test('real finding cards retain controls during rapid chart edits on mobile, tab
         const price=a.querySelector('input[type=number]'),step=c.querySelector('select[data-procedure-step-id="s2"][onchange*="status"]');
         price.value='1234';step.focus();list.scrollTop=150;
         const beforeIcons=Array.from(c.querySelectorAll('svg'));
-        const status=a.querySelector('.finding-status-select-mobile');status.value='C';const first=updateFindingGroupStatusFromControl(status);
-        const other=b.querySelector('.finding-status-select-mobile');other.value='In';const next=updateFindingGroupStatusFromControl(other);
+        const status=a.querySelector('.finding-status-control select');status.value='C';const first=updateFindingGroupStatusFromControl(status);
+        const other=b.querySelector('.finding-status-control select');other.value='In';const next=updateFindingGroupStatusFromControl(other);
         const preservedBefore=price===a.querySelector('input[type=number]')&&price.value==='1234'&&step===document.activeElement&&a===list.children[0]&&c===list.children[2];
         const beforeScroll=list.scrollTop;
         releaseWrite(0);await new Promise(resolve=>setTimeout(resolve,0));releaseWrite(1);await Promise.all([first,next]);

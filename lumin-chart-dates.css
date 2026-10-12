@@ -1,15 +1,19 @@
-.finding-date-edit-button {
-  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 44px;
-  width: 44px; min-height: 44px; border: 0; border-radius: 10px;
-  background: #f3eefe; color: #6d28d9; cursor: pointer; transition: background .15s, transform .15s;
+.finding-date-button {
+  display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; min-height: 44px;
+  padding: 8px; border: 0; border-radius: 10px; text-align: start;
+  background: #f5f3ff; color: #6d28d9; cursor: pointer; transition: background .15s ease-out, transform .15s ease-out;
 }
-.finding-begin-date-control .finding-date-edit-button { background: #eff6ff; color: #2563eb; }
-.finding-date-edit-button:hover { background: #e9dffa; }
-.finding-begin-date-control .finding-date-edit-button:hover { background: #dbeafe; }
-.finding-date-edit-button svg { width: 16px; height: 16px; }
-.finding-date-edit-button:active, .chart-date-button:active { transform: scale(.98); }
-.finding-date-edit-button:focus-visible, .chart-date-button:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
-.finding-date-edit-button:disabled, .chart-date-button:disabled { opacity: .5; pointer-events: none; }
+.finding-begin-date-control .finding-date-button { background: #eff6ff; color: #2563eb; }
+.finding-date-button.is-not-started { background: #f1f5f9; color: #64748b; }
+.finding-date-button:hover { background: #ede9fe; }
+.finding-begin-date-control .finding-date-button:hover { background: #dbeafe; }
+.finding-date-button.is-not-started:hover { background: #e2e8f0; }
+.finding-date-button svg { width: 14px; height: 14px; flex-shrink: 0; }
+.finding-date-button-label { flex: 0 0 auto; font-size: 9px; font-weight: 600; text-transform: uppercase; }
+.finding-date-button time { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; font-weight: 600; color: #475569; }
+.finding-date-button:active, .chart-date-button:active { transform: scale(.98); }
+.finding-date-button:focus-visible, .chart-date-button:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+.finding-date-button:disabled, .chart-date-button:disabled { opacity: .5; pointer-events: none; }
 #chart-finding-date-dialog {
   inset: 0; margin: auto;
   width: min(480px, calc(100% - 32px)); max-width: none; max-height: calc(100dvh - 32px);

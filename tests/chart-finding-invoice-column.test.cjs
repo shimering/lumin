@@ -142,7 +142,7 @@ test('invoice column stays beside the tick and below the badge without overlappi
     function dentalOperationLabel(code){return code;}
     function chartToothLabel(id){return 'Tooth '+id;}
     function palmerNotationSVG(){return '<svg width="40" height="28"><text x="12" y="20">6</text></svg>';}
-    function formatChartOperationCreatedAt(){return '23 Sep 2026 at 09:00';}
+    function formatChartOperationCreatedAt(value){return value?'23 Sep 2026 at 09:00':'';}
     ${['chartFindingCreatedAtTimestamp','chartOperationDateInputValue'].map(source).join('\n')}
     function setStableHtml(element,markup){element.innerHTML=markup;return true;}
     function reconcileChartFindingNode(){}
@@ -182,7 +182,7 @@ test('invoice column stays beside the tick and below the badge without overlappi
           const longestLabel=Math.max(...[...select.options].map(option=>context.measureText(option.textContent).width));
           return {width:select.getBoundingClientRect().width,height:select.getBoundingClientRect().height,longestLabel,padding:parseFloat(styles.paddingLeft)+parseFloat(styles.paddingRight)};
         });
-        return {rows,prices,statuses,badge:rect(paid.querySelector('.finding-invoice-badge')),button:rect(paid.querySelector('[data-item-id]')),amount:rect(paid.querySelector('.finding-invoice-amount')),overflow:document.documentElement.scrollWidth>innerWidth};
+        return {rows,prices,statuses,assembly:rect(paid.querySelector('.finding-invoice-status')),badge:rect(paid.querySelector('.finding-invoice-badge')),button:rect(paid.querySelector('[data-item-id]')),amount:rect(paid.querySelector('.finding-invoice-amount')),dates:[...document.querySelectorAll('.finding-date-button')].map(rect),overflow:document.documentElement.scrollWidth>innerWidth};
       });
       const overlaps=(a,b)=>a.x<b.right-1&&b.x<a.right-1&&a.y<b.bottom-1&&b.y<a.bottom-1;
       assert.equal(geometry.overflow,false,`${viewport.width} ${language} page overflow`);
@@ -215,8 +215,15 @@ test('invoice column stays beside the tick and below the badge without overlappi
       assert.match(await paid.locator('.finding-note-button').getAttribute('aria-label'),language==='ar'?/ملاحظات \(1\)/:/1 note/);
       assert.equal(overlaps(geometry.badge,geometry.button),false,'Badge is beside the tick');
       assert.ok(geometry.amount.y>=geometry.badge.bottom,'Paid fraction is beneath the badge');
-      assert.ok(Math.abs(geometry.amount.x+geometry.amount.width/2-geometry.badge.x-geometry.badge.width/2)<2,'Paid fraction aligns directly beneath the badge');
+      assert.ok(geometry.amount.y>=geometry.button.bottom,'Paid fraction occupies one row beneath the payment control and badge');
+      assert.ok(Math.abs(geometry.amount.x+geometry.amount.width/2-geometry.assembly.x-geometry.assembly.width/2)<2,'Paid fraction uses the full compact assembly width');
+      assert.ok(geometry.rows[2].invoice.width<=136&&geometry.assembly.width<=128,'The invoice column is narrower than the former 184px column');
       assert.ok(geometry.button.width>=44&&geometry.button.height>=44);
+      for(const date of geometry.dates)assert.ok(date.width>=44&&date.width<=168&&date.height>=44,'The entire date box is a compact touch target');
+      assert.equal(await page.locator('.finding-date-edit-button').count(),0,'Separate date pencil controls are removed');
+      for(const text of await page.locator('.finding-status-control option, select[data-procedure-step-id][onchange*="status"] option').allTextContents())assert.doesNotMatch(text,/^(?:P|In|C|E)\s*[·-]/,'Status options have no code prefix');
+      assert.equal(await paid.locator('.finding-status-control option:checked').textContent(),language==='ar'?'مكتمل':'Completed');
+      assert.equal(await page.locator('[data-refresh-key="steps"] select[data-procedure-step-id][onchange*="status"] option:checked').textContent(),language==='ar'?'مكتمل':'Completed');
       assert.equal(await page.locator('.finding-operation-heading .finding-invoice-badge').count(),0);
       assert.equal(await page.locator('.finding-row-actions > [data-salary-transfer-item]').count(),0);
       assert.equal(await page.locator('.finding-row-actions > .finding-separate-button').count(),0);
@@ -233,7 +240,7 @@ test('invoice column stays beside the tick and below the badge without overlappi
       const beforeDate = await page.evaluate(() => findings.find(f=>f.id==='paid').createdAt);
       const beforeBegin = await page.evaluate(() => findings.find(f=>f.id==='paid').beginDate);
       const beforeSaves = await page.evaluate(() => dateSaveCount);
-      await planningButton.click();
+      await paid.locator('.finding-date-control time').click();
       const dateDialog = page.locator('#chart-finding-date-dialog');
       assert.ok(await dateDialog.isVisible());
       assert.equal(await dateDialog.locator('h2').textContent(),language==='ar'?'تعديل تاريخ التخطيط':'Edit planning date');
@@ -241,7 +248,7 @@ test('invoice column stays beside the tick and below the badge without overlappi
       const afterSize = await paid.boundingBox();
       assert.equal(afterSize.width,beforeSize.width);
       assert.equal(afterSize.height,beforeSize.height,'Editing a date does not expand the clinical row');
-      assert.equal(await page.evaluate(()=>selectedFindingIds.size),0,'Date pencils do not toggle invoice selection');
+      assert.equal(await page.evaluate(()=>selectedFindingIds.size),0,'Date boxes do not toggle invoice selection');
       assert.equal(await paid.locator('.finding-date-editor, .finding-begin-date-editor').count(),0);
       const dialogBounds = await dateDialog.boundingBox();
       assert.ok(dialogBounds.x>=0&&dialogBounds.y>=0&&dialogBounds.x+dialogBounds.width<=viewport.width+1&&dialogBounds.y+dialogBounds.height<=viewport.height+1);
@@ -260,9 +267,12 @@ test('invoice column stays beside the tick and below the badge without overlappi
       await dateDialog.locator('[data-date-cancel]').click();
       assert.equal(await page.evaluate(()=>dateSaveCount),beforeSaves);
       assert.equal(await page.evaluate(()=>findings.find(f=>f.id==='paid').createdAt),beforeDate);
-      await planningButton.click();
+      await planningButton.focus();
+      await page.keyboard.press('Enter');
+      assert.ok(await dateDialog.isVisible(),'The date box opens with the keyboard');
       await page.keyboard.press('Escape');
       assert.ok(!(await dateDialog.isVisible()));
+      assert.equal(await planningButton.evaluate(button=>document.activeElement===button),true,'Closing the date editor restores focus to its date box');
       await planningButton.click();
       await dateDialog.locator('input').fill('');
       await dateDialog.locator('[data-date-save]').click();

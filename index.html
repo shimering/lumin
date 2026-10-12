@@ -91,7 +91,7 @@
   <script src="lumin-chart-dates.js?v=1"></script>
   <script src="lumin-specialty-picker.js?v=3"></script>
   <script src="lumin-clinical-actions.js?v=5"></script>
-  <link rel="stylesheet" href="lumin-chart-dates.css?v=1" />
+  <link rel="stylesheet" href="lumin-chart-dates.css?v=2" />
   <script src="lumin-media-teeth.js?v=2"></script>
   <script src="lumin-nav-motion.js?v=1"></script>
   <script src="lumin-mobile-nav.js?v=2"></script>
@@ -821,14 +821,14 @@
     @media (max-width: 899px) {
       #findings-container {
         --finding-mobile-summary: 19rem;
-        --finding-mobile-dates: 13rem;
+        --finding-mobile-dates: 10rem;
         --finding-mobile-doctor: 8.5rem;
         --finding-mobile-price: 7rem;
-        --finding-mobile-status: 4.5rem;
+        --finding-mobile-status: 8.25rem;
         --finding-mobile-notes: 2.75rem;
         --finding-mobile-gap: 0.5rem;
-        --finding-mobile-invoice: 11.5rem;
-        --finding-mobile-row-width: 72rem;
+        --finding-mobile-invoice: 8.5rem;
+        --finding-mobile-row-width: 69.75rem;
         overflow-x: auto !important;
         overscroll-behavior-inline: contain;
         -webkit-overflow-scrolling: touch;
@@ -935,11 +935,6 @@
       #findings-container .finding-begin-date-display {
         width: 100% !important;
         min-width: 0 !important;
-        justify-content: flex-end !important;
-      }
-      #findings-container :is(.finding-date-display, .finding-begin-date-display) > :is(time, span):first-child {
-        min-width: 0 !important;
-        flex: 1 1 auto !important;
       }
       #findings-container .finding-doctor-group {
         grid-column: 3;
@@ -1029,14 +1024,6 @@
         max-width: var(--finding-mobile-status) !important;
         flex: 0 0 auto !important;
         justify-content: center !important;
-      }
-      #findings-container .finding-status-select-mobile {
-        width: 2.75rem !important;
-        min-width: 2.75rem !important;
-        max-width: 2.75rem !important;
-        padding-inline: 0.2rem !important;
-        text-align: center !important;
-        text-align-last: center !important;
       }
       #findings-container .finding-note-button {
         grid-column: 1;
@@ -1217,8 +1204,7 @@
       #findings-container {
         --finding-mobile-doctor: 9.5rem;
         --finding-mobile-price: 7rem;
-        --finding-mobile-status: 9.5rem;
-        --finding-mobile-row-width: 77.75rem;
+        --finding-mobile-row-width: 70.5rem;
       }
     }
 
@@ -1226,14 +1212,14 @@
     @media (min-width: 900px) {
       #findings-container {
         --finding-summary-min: 18rem;
-        --finding-column-invoice: 11.5rem;
-        --finding-column-dates: 13.5rem;
+        --finding-column-invoice: 8.5rem;
+        --finding-column-dates: 10.5rem;
         --finding-column-doctor: 12.5rem;
         --finding-column-price: 7rem;
-        --finding-column-status: 9.5rem;
+        --finding-column-status: 8.25rem;
         --finding-column-notes: 2.75rem;
         --finding-column-gap: 0.5rem;
-        --finding-row-min-width: 79.5rem;
+        --finding-row-min-width: 72.25rem;
       }
       #findings-container .finding-row:not(.has-ortho-visits) {
         display: grid !important;
@@ -1277,15 +1263,14 @@
         margin: 0 !important;
         align-items: stretch !important;
       }
-      #findings-container :is(.finding-date-control, .finding-begin-date-control),
-      #findings-container :is(.finding-date-display, .finding-begin-date-display) {
+      #findings-container :is(.finding-date-control, .finding-begin-date-control) {
         width: 100%;
         min-width: 0;
         justify-content: flex-end;
       }
-      #findings-container :is(.finding-date-display, .finding-begin-date-display) > :is(time, span):first-child {
+      #findings-container :is(.finding-date-display, .finding-begin-date-display) {
+        width: 100%;
         min-width: 0;
-        flex: 1 1 auto;
       }
       #findings-container .finding-doctor-group {
         grid-column: 3;
@@ -1396,6 +1381,7 @@
     }
     #findings-container .finding-price-control input::-webkit-inner-spin-button,
     #findings-container .finding-price-control input::-webkit-outer-spin-button { margin: 0; -webkit-appearance: none; }
+    #findings-container .finding-status-control { justify-self: end; }
     #findings-container .finding-status-control select {
       width: auto !important;
       min-width: 44px;
@@ -1413,17 +1399,22 @@
     }
     #findings-container :is(.finding-price-control input, .finding-status-control select):disabled { opacity: 0.5; pointer-events: none; }
     #findings-container .finding-invoice-status {
-      display: flex;
+      display: grid;
+      grid-template-columns: 44px minmax(0, 1fr);
       align-items: center;
-      justify-content: center;
-      gap: 8px;
+      gap: 2px 4px;
       width: 100%;
       max-width: 100%;
+      padding: 4px;
+      border-radius: 12px;
+      background: #f8fafc;
+      box-sizing: border-box;
     }
-    #findings-container .finding-invoice-details { display: flex; flex: 1; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+    #findings-container .finding-invoice-details { display: contents; }
     #findings-container .finding-payment-controls {
       display: flex;
-      flex: 0 0 44px;
+      grid-column: 1;
+      grid-row: 1;
       flex-direction: column;
       align-items: center;
       justify-content: center;
@@ -1431,31 +1422,38 @@
       min-width: 0;
     }
     #findings-container .finding-invoice-badge {
+      grid-column: 1 / -1;
+      grid-row: 1;
+      justify-self: center;
+      max-width: 100%;
       border: 0;
       border-radius: 999px;
       background: #ecfdf5;
       color: #047857;
-      padding: 4px 8px;
+      padding: 2px 6px;
       font-size: 10px;
       font-weight: 650;
       line-height: 1.4;
       text-align: center;
     }
+    #findings-container .finding-invoice-status.has-payments .finding-invoice-badge { grid-column: 2; }
     #findings-container .finding-invoice-badge.is-partial { background: #eff6ff; color: #1d4ed8; }
     #findings-container .finding-invoice-badge.is-pending { background: #fef3c7; color: #92400e; }
     #findings-container .finding-invoice-amount {
       display: block;
+      grid-column: 1 / -1;
+      grid-row: 2;
       max-width: 100%;
       color: #64748b;
-      font-size: 11px;
+      font-size: 10.5px;
       font-weight: 550;
-      line-height: 1.6;
+      line-height: 1.4;
       text-align: center;
       font-variant-numeric: tabular-nums;
       overflow-wrap: anywhere;
     }
     #findings-container .finding-operation-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-    #findings-container .ortho-visit-invoice { flex: 0 0 11.5rem; width: 11.5rem; min-width: 0; }
+    #findings-container .ortho-visit-invoice { flex: 0 0 8.5rem; width: 8.5rem; min-width: 0; }
 
     @media (max-width: 767.98px) {
       .procedure-step-clinical-row {
@@ -4195,7 +4193,7 @@
       white-space: nowrap;
     }
     .patient-workspace-tab > svg { width: calc(1rem + 2px); height: calc(1rem + 2px); flex-shrink: 0; }
-    .dental-chart-icon { color: #111111; }
+    .dental-chart-icon { color: inherit; }
     .patient-workspace-tab > img { width: calc(1.25rem + 2px); height: calc(1.25rem + 2px); }
     .patient-workspace-tab[data-patient-workspace-tab="profile"] {
       width: max-content;
@@ -6638,10 +6636,10 @@
             <!-- Chart Legend -->
             <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-slate-200 pt-4 text-[11px] font-semibold text-slate-600">
               <span class="font-black uppercase tracking-wider text-slate-800">Operation status</span>
-              <div class="flex items-center gap-1.5"><span class="h-3.5 w-3.5 rounded-full bg-red-600"></span> P · Planned</div>
-              <div class="flex items-center gap-1.5"><span class="h-3.5 w-3.5 rounded-full bg-blue-600"></span> In · In progress</div>
-              <div class="flex items-center gap-1.5"><span class="h-3.5 w-3.5 rounded-full bg-green-600"></span> C · Completed</div>
-              <div class="flex items-center gap-1.5"><span class="h-3.5 w-3.5 rounded-full bg-black"></span> E · Existed</div>
+              <div class="flex items-center gap-1.5"><span class="h-3.5 w-3.5 rounded-full bg-red-600"></span> Planned</div>
+              <div class="flex items-center gap-1.5"><span class="h-3.5 w-3.5 rounded-full bg-blue-600"></span> In progress</div>
+              <div class="flex items-center gap-1.5"><span class="h-3.5 w-3.5 rounded-full bg-green-600"></span> Completed</div>
+              <div class="flex items-center gap-1.5"><span class="h-3.5 w-3.5 rounded-full bg-black"></span> Existed</div>
             </div>
             </div>
           </div>
@@ -6660,10 +6658,10 @@
               <span class="shrink-0 text-[10px] font-black uppercase tracking-wider text-slate-400">Status</span>
               <select id="findings-status-filter" onchange="setDocumentedFindingsStatusFilter(this.value)" class="min-w-0 flex-1 bg-transparent py-1 text-xs font-black text-slate-700 outline-none sm:w-36" aria-label="Filter documented findings by status">
                 <option value="all">All in this tab</option>
-                <option value="P">P · Planned</option>
-                <option value="In">In · In progress</option>
-                <option value="C">C · Completed</option>
-                <option value="E">E · Existed</option>
+                <option value="P">Planned</option>
+                <option value="In">In progress</option>
+                <option value="C">Completed</option>
+                <option value="E">Existed</option>
               </select>
             </label>
             <div class="inline-flex w-full rounded-xl border border-slate-200 bg-slate-100 p-1 sm:w-auto" role="tablist" aria-label="Documented findings status groups">
@@ -11137,8 +11135,10 @@
       'Scheduled': 'مجدول',
       'Confirmed': 'مؤكد',
       'Checked in': 'تم الحضور',
+      'Planned': 'مخطط',
       'In progress': 'قيد العلاج',
       'Completed': 'مكتمل',
+      'Existed': 'موجود',
       'Cancelled': 'ملغي',
       'No-show': 'لم يحضر',
       'Notes': 'ملاحظات',
@@ -30669,9 +30669,10 @@
       if (statusFilter) statusFilter.value = documentedFindingsStatusFilter;
     }
 
-    function operationStatusSelectOptions(selectedStatus, short = false) {
+    function operationStatusSelectOptions(selectedStatus) {
+      const arabicLabels = { P: 'مخطط', In: 'قيد العلاج', C: 'مكتمل', E: 'موجود' };
       return Object.values(OPERATION_STATUSES).map(status => `
-        <option value="${status.key}" ${status.key === selectedStatus ? 'selected' : ''}>${short ? status.key : `${status.key} · ${status.label}`}</option>
+        <option value="${status.key}" ${status.key === selectedStatus ? 'selected' : ''}>${escapeHtml(currentUiLanguage === 'ar' ? arabicLabels[status.key] || status.label : status.label)}</option>
       `).join('');
     }
 
@@ -31227,9 +31228,10 @@
     }
 
     function chartProcedureStepStatusOptions(currentStatus) {
+      const arabicLabels = { P: 'مخطط', In: 'قيد العلاج', C: 'مكتمل' };
       return ['P', 'In', 'C'].map(status => {
         const definition = operationStatusDefinition(status);
-        return `<option value="${status}" ${status === currentStatus ? 'selected' : ''}>${escapeHtml(definition.key)} · ${escapeHtml(definition.label)}</option>`;
+        return `<option value="${status}" ${status === currentStatus ? 'selected' : ''}>${escapeHtml(currentUiLanguage === 'ar' ? arabicLabels[status] : definition.label)}</option>`;
       }).join('');
     }
 
@@ -32426,7 +32428,7 @@
         : `Procedure paid / invoiced total: ${amount}`;
       const badge = label || (currentUiLanguage === 'ar' ? (partial ? 'مفوترة جزئياً' : 'مفوترة') : (partial ? 'Partly invoiced' : 'Invoiced'));
       const buttons = showPayments ? linked.map(({ id, record }) => chartFindingPaymentButton(id, linked.length > 1 ? chartToothLabel(record.item.toothId || '') : '')).join('') : '';
-      return `<div class="finding-invoice-status">${buttons ? `<div class="finding-payment-controls">${buttons}</div>` : ''}<div class="finding-invoice-details"><span class="finding-invoice-badge ${partial ? 'is-partial' : ''}">${escapeHtml(badge)}</span><span class="finding-invoice-amount" dir="ltr" title="${escapeHtml(amountLabel)}" aria-label="${escapeHtml(amountLabel)}">${escapeHtml(amount)}</span></div></div>`;
+      return `<div class="finding-invoice-status${buttons ? ' has-payments' : ''}">${buttons ? `<div class="finding-payment-controls">${buttons}</div>` : ''}<div class="finding-invoice-details"><span class="finding-invoice-badge ${partial ? 'is-partial' : ''}">${escapeHtml(badge)}</span><span class="finding-invoice-amount" dir="ltr" title="${escapeHtml(amountLabel)}" aria-label="${escapeHtml(amountLabel)}">${escapeHtml(amount)}</span></div></div>`;
     }
 
     function renderFindingsList() {
@@ -32462,6 +32464,8 @@
 
       const changed = setStableHtml(container, visibleFindings.map(finding => {
         const status = operationStatusDefinition(finding.status);
+        const statusLabel = currentUiLanguage === 'ar'
+          ? ({ P: 'مخطط', In: 'قيد العلاج', C: 'مكتمل', E: 'موجود' }[status.key] || status.label) : status.label;
         const displayColor = finding.status === 'E' ? '#475569' : status.color;
         const statusSoft = appointmentColorRgba(displayColor, 0.085);
         const statusBorder = appointmentColorRgba(displayColor, 0.22);
@@ -32655,15 +32659,13 @@
               ? `<button type="button" data-finding-tooth-trigger onclick="openFindingToothEditor(this)" aria-haspopup="dialog" aria-expanded="false" aria-disabled="${toothEditingLocked}" class="finding-palmer-button inline-flex h-6 w-12 shrink-0 items-center justify-center rounded-lg border border-violet-200 bg-violet-50 text-[10px] font-black text-violet-700" title="${escapeHtml(toothEditorTitle)}" aria-label="${escapeHtml(toothEditorTitle)}. ${toothIds.length - visibleToothIds.length} additional teeth">+${toothIds.length - visibleToothIds.length}</button>`
               : '');
         const createdAtLabel = formatChartOperationCreatedAt(finding.createdAt);
-        const createdAtDisplay = createdAtLabel
-          ? `<time datetime="${escapeHtml(finding.createdAt)}" class="inline-flex items-center gap-1 rounded-lg border border-violet-100 bg-white/80 px-2 py-0.5 text-[9px] font-black text-slate-600 shadow-2xs" title="Planning date"><span class="w-8 shrink-0 text-[8px] font-black uppercase text-violet-600">Plan</span><i data-lucide="calendar" class="h-3 w-3 text-violet-500 shrink-0"></i><span class="truncate">${escapeHtml(createdAtLabel)}</span></time>`
-          : '<span class="inline-flex items-center gap-1 rounded-lg border border-slate-100 bg-white/70 px-2 py-0.5 text-[9px] font-semibold text-slate-300" title="This operation was saved before creation-date tracking was added"><span class="w-8 shrink-0 text-[8px] font-bold uppercase text-slate-400">Plan</span><span class="truncate">Date unavailable</span></span>';
+        const planningEditLabel = currentUiLanguage === 'ar' ? 'تعديل تاريخ التخطيط' : 'Edit planning date';
+        const planningDisplayLabel = createdAtLabel || (currentUiLanguage === 'ar' ? 'تاريخ غير متوفر' : 'Date unavailable');
         const createdAtMarkup = `
           <span class="finding-date-control inline-flex max-w-full items-center justify-end" data-date-value="${escapeHtml(finding.createdAt || '')}">
-            <span class="finding-date-display inline-flex items-center gap-1">
-              ${createdAtDisplay}
-              <button type="button" onclick="openFindingDateEditor(this,event)" class="finding-date-edit-button" aria-haspopup="dialog" title="${currentUiLanguage === 'ar' ? 'تعديل تاريخ التخطيط' : 'Edit planning date'}" aria-label="${currentUiLanguage === 'ar' ? 'تعديل تاريخ التخطيط' : 'Edit planning date'}"><i data-lucide="pencil" class="h-2.5 w-2.5"></i></button>
-            </span>
+            <button type="button" onclick="openFindingDateEditor(this,event)" class="finding-date-display finding-date-button" aria-haspopup="dialog" title="${escapeHtml(planningEditLabel)} · ${escapeHtml(planningDisplayLabel)}" aria-label="${escapeHtml(planningEditLabel)} · ${escapeHtml(planningDisplayLabel)}">
+              <span class="finding-date-button-label">${currentUiLanguage === 'ar' ? 'تخطيط' : 'Plan'}</span><i data-lucide="calendar" aria-hidden="true"></i><time ${finding.createdAt ? `datetime="${escapeHtml(finding.createdAt)}"` : ''}>${escapeHtml(planningDisplayLabel)}</time>
+            </button>
           </span>`;
 
         const isPlanning = finding.status === 'P';
@@ -32672,35 +32674,16 @@
         const beginDateLabel = rawBeginDate ? formatChartOperationCreatedAt(rawBeginDate) : '';
 
         let beginDateMarkup = '';
-        if (isPlanning) {
-          const displayLabel = beginDateLabel || (currentUiLanguage === 'ar' ? 'لم يبدأ' : 'Not started');
+        if (isPlanning || !isExisted || rawBeginDate) {
+          const displayLabel = beginDateLabel || (isPlanning
+            ? (currentUiLanguage === 'ar' ? 'لم يبدأ' : 'Not started')
+            : (currentUiLanguage === 'ar' ? 'تاريخ غير متوفر' : 'Date unavailable'));
+          const editLabel = currentUiLanguage === 'ar' ? 'تعديل تاريخ بدء الإجراء' : 'Edit begin date';
           beginDateMarkup = `
             <span class="finding-begin-date-control inline-flex max-w-full items-center justify-end" data-date-value="${escapeHtml(rawBeginDate || '')}">
-              <span class="finding-begin-date-display inline-flex items-center gap-1">
-                <time datetime="${escapeHtml(rawBeginDate || '')}" class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-100/80 px-2 py-0.5 text-[9px] font-bold text-slate-400" title="Treatment begin date — Planning stage (not started)">
-                  <span class="w-8 shrink-0 text-[8px] font-bold uppercase text-slate-400">Begin</span>
-                  <i data-lucide="clock" class="h-3 w-3 text-slate-400 shrink-0"></i>
-                  <span class="truncate">${escapeHtml(displayLabel)}</span>
-                </time>
-                <button type="button" onclick="openFindingBeginDateEditor(this,event)" class="finding-date-edit-button" aria-haspopup="dialog" title="${currentUiLanguage === 'ar' ? 'تحديد تاريخ بدء الإجراء' : 'Set begin date'}" aria-label="${currentUiLanguage === 'ar' ? 'تحديد تاريخ بدء الإجراء' : 'Set begin date'}">
-                  <i data-lucide="pencil" class="h-2.5 w-2.5"></i>
-                </button>
-              </span>
-            </span>`;
-        } else if (!isExisted || rawBeginDate) {
-          const displayLabel = beginDateLabel || (currentUiLanguage === 'ar' ? 'تاريخ غير متوفر' : 'Date unavailable');
-          beginDateMarkup = `
-            <span class="finding-begin-date-control inline-flex max-w-full items-center justify-end" data-date-value="${escapeHtml(rawBeginDate || '')}">
-              <span class="finding-begin-date-display inline-flex items-center gap-1">
-                <time datetime="${escapeHtml(rawBeginDate || '')}" class="inline-flex items-center gap-1 rounded-lg border border-blue-100 bg-white/80 px-2 py-0.5 text-[9px] font-black text-slate-600 shadow-2xs" title="Treatment begin date">
-                  <span class="w-8 shrink-0 text-[8px] font-black uppercase text-blue-600">Begin</span>
-                  <i data-lucide="clock" class="h-3 w-3 text-blue-500 shrink-0"></i>
-                  <span class="truncate">${escapeHtml(displayLabel)}</span>
-                </time>
-                <button type="button" onclick="openFindingBeginDateEditor(this,event)" class="finding-date-edit-button" aria-haspopup="dialog" title="${currentUiLanguage === 'ar' ? 'تعديل تاريخ بدء الإجراء' : 'Edit begin date'}" aria-label="${currentUiLanguage === 'ar' ? 'تعديل تاريخ بدء الإجراء' : 'Edit begin date'}">
-                  <i data-lucide="pencil" class="h-2.5 w-2.5"></i>
-                </button>
-              </span>
+              <button type="button" onclick="openFindingBeginDateEditor(this,event)" class="finding-begin-date-display finding-date-button ${isPlanning ? 'is-not-started' : ''}" aria-haspopup="dialog" title="${escapeHtml(editLabel)} · ${escapeHtml(displayLabel)}" aria-label="${escapeHtml(editLabel)} · ${escapeHtml(displayLabel)}">
+                <span class="finding-date-button-label">${currentUiLanguage === 'ar' ? 'بدء' : 'Begin'}</span><i data-lucide="clock" aria-hidden="true"></i><time ${rawBeginDate ? `datetime="${escapeHtml(rawBeginDate)}"` : ''}>${escapeHtml(displayLabel)}</time>
+              </button>
             </span>`;
         }
         const surfaceToggleButtons = isMouth || isWhole || isBatch ? '' : FINDING_SURFACE_TOGGLE_ORDER.map(surface => {
@@ -32800,16 +32783,11 @@
               `}
               ${procedureSteps.length ? `<div class="finding-status-control flex shrink-0 items-center gap-1.5 rounded-lg border bg-white/80 px-2 py-1.5" style="border-color:${statusBorder};color:${displayColor}" title="The procedure status is calculated from its steps">
                 <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${displayColor}"></span>
-                <span class="finding-status-select-mobile sm:hidden text-center font-black text-xs">${escapeHtml(status.key)}</span>
-                <span class="finding-status-select-desktop hidden sm:inline min-w-0 flex-1 truncate text-[11px] font-black">${completedProcedureSteps}/${procedureSteps.length} steps · ${escapeHtml(status.label)}</span>
+                <span class="min-w-0 flex-1 truncate text-[11px] font-semibold">${completedProcedureSteps}/${procedureSteps.length} · ${escapeHtml(statusLabel)}</span>
               </div>` : `<label class="finding-status-control flex shrink-0 items-center gap-1.5">
-                <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${displayColor}" title="${status.key} · ${status.label}"></span>
-                <span class="sr-only">Operation status</span>
-                <select ${dataAttributes} class="finding-status-select-mobile sm:hidden rounded-lg border bg-white/80 px-1 py-1.5 text-xs font-black outline-none transition focus:ring-2 focus:ring-blue-500/20 text-center" style="border-color:${statusBorder};color:${displayColor}" aria-label="Status: ${status.key} · ${status.label}">
-                  ${operationStatusSelectOptions(finding.status, true)}
-                </select>
-                <select ${dataAttributes} class="finding-status-select-desktop hidden sm:block min-w-0 rounded-lg border bg-white/80 px-2.5 py-1.5 text-[11px] font-bold outline-none transition focus:ring-2 focus:ring-blue-500/20" style="border-color:${statusBorder};color:${displayColor}" aria-label="${currentUiLanguage === 'ar' ? 'حالة الإجراء' : 'Operation status'}">
-                  ${operationStatusSelectOptions(finding.status, false)}
+                <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${displayColor}" title="${escapeHtml(statusLabel)}"></span>
+                <select ${dataAttributes} class="min-w-0 rounded-lg border bg-white/80 px-2.5 py-1.5 text-[11px] font-semibold outline-none transition focus:ring-2 focus:ring-blue-500/20" style="border-color:${statusBorder};color:${displayColor}" aria-label="${currentUiLanguage === 'ar' ? 'حالة الإجراء' : 'Operation status'}">
+                  ${operationStatusSelectOptions(finding.status)}
                 </select>
               </label>`}
               <div class="finding-invoice-control" aria-label="${currentUiLanguage === 'ar' ? 'حالة الفاتورة والمدفوعات' : 'Invoice and payment status'}">${invoiceColumnMarkup}</div>

@@ -307,6 +307,9 @@ test('patient Quotations tab supports editing, deletion, pagination and patient 
   assert.notEqual(await hoveredTab.evaluate(node=>getComputedStyle(node).boxShadow),normalShadow);
   if(process.env.LUMIN_QUOTATION_SCREENSHOTS)await page.locator('#patient-workspace-header').screenshot({path:path.join(process.env.LUMIN_QUOTATION_SCREENSHOTS,'patient-tabs-hover.png')});
   await page.evaluate(()=>updatePatientWorkspaceNavigation(patient,'chart'));
+  const chartIconColors=await page.locator('[data-patient-workspace-tab="chart"]').evaluate(button=>({text:getComputedStyle(button).color,icon:getComputedStyle(button.querySelector('.dental-chart-icon')).color}));
+  assert.equal(chartIconColors.icon,chartIconColors.text,'The chart tooth icon follows the active tab color');
+  assert.equal(chartIconColors.icon,'rgb(255, 255, 255)','The selected chart tooth icon is white');
   await page.evaluate(()=>renderFindingInvoiceToolbar([{id:patient.chartState[3].wholeOperations[0].id,price:3500},{id:patient.chartState[3].wholeOperations[1].id,price:5500}]));
   for(const viewport of [{width:390,height:844},{width:834,height:1112},{width:1440,height:900}]) {
     await page.setViewportSize(viewport);
