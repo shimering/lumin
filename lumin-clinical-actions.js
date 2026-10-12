@@ -300,6 +300,13 @@ function syncClinicalActionsPanel() {
 document.addEventListener('DOMContentLoaded', () => {
   const panel = document.getElementById('action-palette-card');
   if (!panel) return;
+  panel.addEventListener('pointerdown', event => {
+    if (!clinicalActionsIsMobile() || !clinicalActionsPanel.open || event.button !== 0 || !event.isPrimary
+      || document.activeElement !== document.getElementById('chart-actions-search') || !event.target.closest('button')) return;
+    // Keep the keyboard from moving the tapped button before its click completes.
+    // Procedure selection moves focus after the click, allowing the keyboard to close safely.
+    event.preventDefault();
+  });
   panel.addEventListener('click', event => {
     const tooth = event.target.closest('[data-clinical-remove-tooth]');
     if (tooth) { removeClinicalActionsTooth(tooth.dataset.clinicalRemoveTooth); return; }

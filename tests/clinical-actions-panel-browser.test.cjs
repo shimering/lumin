@@ -439,7 +439,9 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
       await page.locator('#standard-icons-fixture').screenshot({path:path.join(screenshots,`standard-icons-${viewport.width}-${language}.png`)});
     }
   });
-  await t.test('mobile search fills the visible keyboard viewport and returns to half height after dismissal', async () => {
+  await t.test('mobile search fills the keyboard viewport, retains procedure selection and dismisses only on explicit actions', async st => {
+    const touch=await page.context().newCDPSession(page);
+    st.after(()=>touch.detach());
     await page.setViewportSize({width:390,height:844});
     await page.evaluate(() => {
       dentalSpecialties=[{id:'endo',name:'Endo',iconName:'dental-endodontics',active:true}];
@@ -515,6 +517,50 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
           assert.equal(await search.inputValue(),'root','Keyboard dismissal retains the search');
           assert.deepEqual(await page.evaluate(()=>chartSelectionTargets().map(target=>target.tooth)),['1']);
           assert.equal(await page.locator('#chart-operation-select').inputValue(),'root-canal','Resizing retains the procedure draft');
+          const beforeChoice=await page.evaluate(()=>{
+            document.getElementById('chart-operation-select').value='';updateClinicalOperationPreview();
+            return window.savedCharts.length;
+          });
+          await search.focus();
+          if(shrinkLayout)await page.setViewportSize({width:viewport.width,height:viewport.keyboardHeight});
+          await page.evaluate(viewport=>{
+            window.visualViewport.height=viewport.keyboardHeight;
+            window.visualViewport.dispatchEvent(new Event('resize'));
+          },viewport);
+          await page.waitForFunction(()=>document.body.classList.contains('lumin-mobile-keyboard-open'));
+          const procedure=page.locator('[data-clinical-operation="root-canal"]');
+          await procedure.scrollIntoViewIfNeeded();
+          const choice=await procedure.boundingBox();
+          const x=choice.x+choice.width/2,y=choice.y+choice.height/2;
+          if(shrinkLayout) {
+            await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+            await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+          } else {
+            await page.mouse.move(x,y);await page.mouse.down();await page.mouse.up();
+          }
+          await page.waitForFunction(()=>document.getElementById('chart-operation-select').value==='root-canal',null,{timeout:2000});
+          assert.equal(await page.locator('#chart-operation-select').inputValue(),'root-canal','Tapping a search result selects it while the keyboard is open: '+JSON.stringify({viewport,language,scale,shrinkLayout}));
+          assert.equal(await panel.isVisible(),true,'Selecting a procedure never dismisses the panel');
+          assert.equal(await page.evaluate(()=>window.savedCharts.length),beforeChoice,'Choosing a result never applies it');
+          await page.setViewportSize({width:viewport.width,height:viewport.height});
+          await page.evaluate(viewport=>{
+            window.visualViewport.height=viewport.height;
+            window.visualViewport.dispatchEvent(new Event('resize'));
+          },viewport);
+          assert.equal(await panel.isVisible(),true,'The panel stays open after keyboard dismissal');
+          assert.ok(Math.abs((await panel.boundingBox()).height-half)<2,'The chosen procedure returns to a half-screen panel');
+          if(scale===1) {
+            if(shrinkLayout) {
+              await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:4,y:4}]});
+              await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+              assert.equal(await panel.isVisible(),false,'An actual outside tap dismisses the panel');
+              assert.equal(await page.evaluate(()=>window.savedCharts.length),beforeChoice,'Outside dismissal never applies the draft');
+            } else {
+              await page.locator('#chart-apply-operation-button').click();
+              assert.equal(await panel.isVisible(),false,'Apply dismisses the panel');
+              assert.equal(await page.evaluate(()=>window.savedCharts.length),beforeChoice+1,'Only Apply writes the chosen procedure');
+            }
+          }
         }
       }
     } finally {
