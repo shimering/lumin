@@ -3,11 +3,11 @@ import {fixture, DOCTOR, PID} from "./test_fixture.ts";
 import {createHandler} from "./index.ts";
 import {driveThumbnailUrl} from "./store.ts";
 
-Deno.test("Drive previews request 80 pixels without enlarging small previews or changing signed query values", () => {
-  assert(driveThumbnailUrl("https://lh3.googleusercontent.com/preview=s220?token=private")?.href === "https://lh3.googleusercontent.com/preview=s80?token=private");
+Deno.test("Drive previews request 160 pixels without enlarging small previews or changing signed query values", () => {
+  assert(driveThumbnailUrl("https://lh3.googleusercontent.com/preview=s220?token=private")?.href === "https://lh3.googleusercontent.com/preview=s160?token=private");
   assert(driveThumbnailUrl("https://lh4.googleusercontent.com/preview=s64")?.pathname.endsWith("=s64"));
-  assert(driveThumbnailUrl("https://lh3.googleusercontent.com/preview=s0")?.pathname.endsWith("=s80"));
-  assert(driveThumbnailUrl("https://lh3.googleusercontent.com/preview?sz=s800&s=signed")?.searchParams.get("sz") === "s80");
+  assert(driveThumbnailUrl("https://lh3.googleusercontent.com/preview=s0")?.pathname.endsWith("=s160"));
+  assert(driveThumbnailUrl("https://lh3.googleusercontent.com/preview?sz=s800&s=signed")?.searchParams.get("sz") === "s160");
   assert(driveThumbnailUrl("https://lh3.googleusercontent.com/preview?sz=s800&s=signed")?.searchParams.get("s") === "signed");
   for (const link of ["invalid", "http://lh3.googleusercontent.com/p=s220", "https://googleusercontent.com.evil.test/p=s220", "https://user:pass@lh3.googleusercontent.com/p=s220"]) assert(driveThumbnailUrl(link) === null);
 });
@@ -28,7 +28,7 @@ Deno.test("gallery previews remain small and authenticated; originals are reques
   const request = (route: string) => handler(new Request(f.config.supabaseUrl + "/functions/v1/google-drive/" + route + uploaded.relativePath, {headers: {Authorization: "Bearer doctor"}}));
   const preview = await request("api/thumbnail/");
   assert(await preview.text() === "small-preview" && preview.headers.get("Cache-Control") === "private, no-store");
-  assert(previews[0].endsWith("=s80") && Number(originals) === 0);
+  assert(previews[0].endsWith("=s160") && Number(originals) === 0);
   delete f.google.files.get(row.drive_id).thumbnailLink;
   assert((await request("api/thumbnail/")).status === 404 && Number(originals) === 0);
   assert(await (await request("files/")).text() === "xray" && Number(originals) === 1);
