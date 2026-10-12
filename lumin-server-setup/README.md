@@ -36,6 +36,30 @@ installation or terminal commands are needed.
    select the dedicated PC as coordinator and the laptop as peer, then click
    **Pair servers** and **Sync now**. Both PCs must be running compatible servers.
 
+## Syncing with Google Drive
+
+Use this updated EXE on the computer selected alongside Google Drive. Older
+copies can serve patient files normally while lacking the Drive sync endpoint;
+Lumin then shows a connection error when pairing. Quit the old setup app from
+its tray menu and open the updated EXE. Existing settings and sync identity on
+that computer are retained.
+
+Connect the clinic Google account once in **Lumin Admin → Storage Server**.
+Under **Sync patient files**, select this computer and **Google Drive**, click
+**Pair servers**, then **Sync now**. Exactly those two locations are compared.
+Keep this local server running during sync. The existing PC/laptop pairing is
+preserved, and authorized doctors use the clinic connection through Lumin.
+Patient folders, categories and file annotations accompany their files.
+
+The release's `build-info.json` and `server-verification.json` confirm
+`googleDriveSync: true` after testing the packaged Drive API and authentication.
+
+لمزامنة Google Drive، أغلق تطبيق الإعداد القديم من قائمة أيقونة منطقة الإعلام
+ثم افتح ملف EXE المحدّث؛ تبقى إعدادات هذا الكمبيوتر وهوية المزامنة محفوظة.
+اربط حساب العيادة من **إدارة Lumin → خادم التخزين**، ثم اختر هذا الكمبيوتر
+و**Google Drive** في قسم المزامنة واضغط **اقتران الخادمين** ثم **مزامنة الآن**.
+تُقارَن وجهتا التخزين المحددتان فقط. اترك الخادم المحلي يعمل أثناء المزامنة.
+
 If one computer has been reinstalled and the previous pairing no longer matches,
 click **Update pairing** to reconnect the selected PCs. This requires an active
 Lumin administrator on both servers, waits for running sync jobs, and preserves

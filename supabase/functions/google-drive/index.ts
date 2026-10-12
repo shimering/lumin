@@ -1,7 +1,8 @@
 import "jsr:@supabase/functions-js@2.117.3/edge-runtime.d.ts";
 import {createClient} from "npm:@supabase/supabase-js@2.105.0";
-import {DriveError, MAX_UPLOAD, access, cleanName, equal, safePath, sha256, uuid} from "./core.ts";
+import {DriveError, MAX_UPLOAD, access, caseFold, cleanName, equal, safePath, sha256, uuid} from "./core.ts";
 import {DriveStore, checked, mimeForPath, type DriveConfig} from "./store.ts";
+import {DriveTokenCache} from "./token_cache.ts";
 
 const cors = {"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, apikey, x-client-info, content-type, x-lumin-key, x-lumin-sync-key, x-lumin-sync-node, x-lumin-sync-meta", "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS"};
 const noCache = {...cors, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer"};
@@ -107,9 +108,13 @@ async function mediaRoute(route: string, request: Request, url: URL, store: Driv
   }
   const listMatch = route.match(/^\/api\/patient\/([^/]+)\/files$/);
   if (listMatch && request.method === "GET") {
-    const p = await patient(db, listMatch[1]), meta = await store.metadata();
-    const rows = await store.fileRows();
-    const files = rows.filter((r: any) => !r.record.deleted && store.details(meta.snapshot, r.record.path).patient_id === p.id).map((r: any) => ({filename: r.record.path.split("/").at(-1), category: r.record.path.split("/")[1], patientFolder: r.record.path.split("/")[0], relativePath: r.record.path, sizeBytes: r.record.size, modifiedAt: r.modified_at, mediaDetails: store.details(meta.snapshot, r.record.path)})).sort((a: any, b: any) => b.modifiedAt.localeCompare(a.modifiedAt));
+    const [p, meta] = await Promise.all([patient(db, listMatch[1]), store.metadata()]);
+    const annotations = (meta.snapshot?.files || []).filter((f: any) => f.patient_id === p.id);
+    const paths = annotations.map((f: any) => f.relative_path);
+    const rows = await store.fileRows(paths);
+    const owner = meta.snapshot?.patients?.find((value: any) => value.id === p.id);
+    const details = new Map<string, any>(annotations.map((row: any) => [caseFold(row.relative_path), {...row, patient_name: owner?.name || "", patient_number: owner?.patient_number || "", metadata_available: true}]));
+    const files = rows.filter((r: any) => !r.record.deleted && details.get(r.path_key)?.patient_id === p.id).map((r: any) => ({filename: r.record.path.split("/").at(-1), category: r.record.path.split("/")[1], patientFolder: r.record.path.split("/")[0], relativePath: r.record.path, sizeBytes: r.record.size, modifiedAt: r.modified_at, mediaDetails: details.get(r.path_key)})).sort((a: any, b: any) => b.modifiedAt.localeCompare(a.modifiedAt));
     return {patientId: p.id, total: files.length, files, metadataSource: "google-drive", metadataUnavailable: false};
   }
   if (route === "/api/upload" && request.method === "POST") {
@@ -178,7 +183,9 @@ async function mediaRoute(route: string, request: Request, url: URL, store: Driv
   }
   throw new DriveError("This operation is not available for Google Drive.", 404, "unsupported_operation");
 }
-export function createHandler(config: DriveConfig, db: any, fetcher: typeof fetch = fetch) { return async (request: Request) => {
+export function createHandler(config: DriveConfig, db: any, fetcher: typeof fetch = fetch) {
+ const tokens = new DriveTokenCache();
+ return async (request: Request) => {
   if (request.method === "OPTIONS") return new Response(null, {status: 204, headers: cors});
   try {
     if (request.body) {
@@ -192,7 +199,7 @@ export function createHandler(config: DriveConfig, db: any, fetcher: typeof fetc
       }}));
       request = new Request(request, {body: bounded});
     }
-    const store = new DriveStore(db, config, fetcher);
+    const store = new DriveStore(db, config, fetcher, tokens);
     const url = new URL(request.url), route = url.pathname.replace(/^.*\/google-drive(?=\/|$)/, "") || "/";
     if (route === "/callback" && request.method === "GET") return await callback(url, store);
     if (route === "/" && request.method === "POST") { const body = await request.json(); return json(await control(String(body.action || "status"), body, request, url, store)); }

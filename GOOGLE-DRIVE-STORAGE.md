@@ -89,6 +89,14 @@ own permissions; access within Lumin uses the doctor's Lumin permissions.
 
 ## Backend configuration and deployment
 
+Image retrieval reuses Google access tokens in the Edge Function worker's
+memory until shortly before their expiry. Concurrent image requests share a
+single refresh. Each request still validates the current Lumin user or sync
+peer, and reconnecting changes the credential fingerprint used by the cache.
+Patient galleries query only their annotated file keys instead of paging
+through the entire clinic's file index. Image bytes remain streamed live with
+`private, no-store`; this optimization adds no image cache on disk or in a CDN.
+
 Set these **Supabase Edge Function secrets**, never frontend constants, browser
 storage or committed files:
 
@@ -143,7 +151,7 @@ The tests use disposable patient folders and simulated Google responses; they do
 not access a real Google account. Run from the repository root:
 
 ```powershell
-deno test supabase/functions/google-drive/core_test.ts supabase/functions/google-drive/handler_test.ts
+deno test supabase/functions/google-drive/core_test.ts supabase/functions/google-drive/handler_test.ts supabase/functions/google-drive/token_cache_test.ts supabase/functions/google-drive/retrieval_test.ts
 python tests/storage-file-sync.test.py
 python tests/google-drive-sync.test.py
 node --test tests/google-drive-browser.test.cjs tests/google-drive-migration.test.cjs

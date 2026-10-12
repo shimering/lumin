@@ -1,4 +1,5 @@
 import {DriveError, MAX_UPLOAD, annotationSignature, caseFold, cleanName, decrypt, encrypt, equal, normaliseSnapshot, metadataDigest, safePath, sha256, uuid, validateRecord, sameContent, type RecordEntry} from "./core.ts";
+import {DriveTokenCache, tokenLifetime} from "./token_cache.ts";
 
 export type DriveConfig = {supabaseUrl: string; clientId: string; clientSecret: string; encryptionKey: string; redirectUri: string; appUrl: string; rootName: string};
 export async function checked(query: any) {
@@ -9,8 +10,10 @@ export async function checked(query: any) {
 export class DriveStore {
   private connectionCache: any;
   private accessToken = "";
+  private accessTokenExpiresAt = 0;
+  private tokenKey = "";
   private lockOwner = "";
-  constructor(public db: any, public config: DriveConfig, public fetcher: typeof fetch = fetch) {}
+  constructor(public db: any, public config: DriveConfig, public fetcher: typeof fetch = fetch, private tokens = new DriveTokenCache()) {}
   configured() { const c = this.config; return Boolean(c.clientId && c.clientSecret && c.encryptionKey.length >= 32 && c.appUrl); }
   async savedConnection() { return checked(this.db.from("google_drive_connection").select("*").eq("id", 1).maybeSingle()); }
   async connection() {
@@ -29,24 +32,56 @@ export class DriveStore {
       rows.push(...page); if (page.length < 1000) return rows;
     }
   }
-  async fileRows() { return this.rows("google_drive_files"); }
+  async fileRows(paths?: string[]) {
+    if (!paths) return this.rows("google_drive_files");
+    const keys = [...new Set(paths.map(caseFold))], rows: any[] = [];
+    let chunk: string[] = [], encoded = 0;
+    for (const key of keys) {
+      const size = encodeURIComponent(key).length + 6;
+      // Long legacy paths retain the paginated fallback rather than exceeding URL limits.
+      if (size > 4000) {
+        const wanted = new Set(keys);
+        return (await this.rows("google_drive_files")).filter(row => wanted.has(row.path_key));
+      }
+      if (chunk.length && (chunk.length >= 50 || encoded + size > 5000)) {
+        rows.push(...await checked(this.db.from("google_drive_files").select("*").in("path_key", chunk)));
+        chunk = []; encoded = 0;
+      }
+      chunk.push(key); encoded += size;
+    }
+    if (chunk.length) rows.push(...await checked(this.db.from("google_drive_files").select("*").in("path_key", chunk)));
+    return rows;
+  }
   async tokenRequest(params: Record<string, string>) {
     const response = await this.fetcher("https://oauth2.googleapis.com/token", {method: "POST", headers: {"Content-Type": "application/x-www-form-urlencoded"}, body: new URLSearchParams(params), signal: AbortSignal.timeout(15000)});
     const result = await response.json();
-    if (!response.ok || !result.access_token) throw new DriveError("Google Drive needs to be reconnected by the administrator.", 409, "reconnect_required");
+    if (!response.ok || typeof result.access_token !== "string" || !result.access_token) throw new DriveError("Google Drive needs to be reconnected by the administrator.", 409, "reconnect_required");
     return result;
   }
   async token() {
-    if (this.accessToken) return this.accessToken;
+    if (this.accessToken && this.accessTokenExpiresAt > this.tokens.clock()) return this.accessToken;
     if (!this.configured()) throw new DriveError("Google Drive setup is incomplete.", 503, "not_configured");
     const c = await this.connection();
-    const refresh = await decrypt(c.refresh_token_encrypted, this.config.encryptionKey);
-    const result = await this.tokenRequest({client_id: this.config.clientId, client_secret: this.config.clientSecret, refresh_token: refresh, grant_type: "refresh_token"});
-    this.accessToken = result.access_token; return this.accessToken;
+    this.tokenKey = await sha256(JSON.stringify([this.config.supabaseUrl, this.config.clientId, this.config.clientSecret, this.config.encryptionKey, c.node_id, c.google_email, c.refresh_token_encrypted]));
+    const result = await this.tokens.get(this.tokenKey, async () => {
+      const refresh = await decrypt(c.refresh_token_encrypted, this.config.encryptionKey);
+      return this.tokenRequest({client_id: this.config.clientId, client_secret: this.config.clientSecret, refresh_token: refresh, grant_type: "refresh_token"});
+    });
+    this.accessToken = result.value; this.accessTokenExpiresAt = result.expiresAt; return this.accessToken;
+  }
+  invalidateToken(token: string) {
+    this.tokens.invalidate(this.tokenKey, token);
+    if (this.accessToken === token) { this.accessToken = ""; this.accessTokenExpiresAt = 0; }
   }
   async google(path: string, options: RequestInit = {}, binary = false) {
     await this.guard();
-    const response = await this.fetcher(`https://www.googleapis.com${path}`, {...options, headers: {Authorization: `Bearer ${await this.token()}`, ...(options.body && typeof options.body === "string" ? {"Content-Type": "application/json"} : {}), ...options.headers}, signal: AbortSignal.timeout(45000)});
+    const send = (token: string) => this.fetcher(`https://www.googleapis.com${path}`, {...options, headers: {Authorization: `Bearer ${token}`, ...(options.body && typeof options.body === "string" ? {"Content-Type": "application/json"} : {}), ...options.headers}, signal: AbortSignal.timeout(45000)});
+    const token = await this.token();
+    let response = await send(token);
+    if (response.status === 401 && this.tokenKey && (!options.method || options.method === "GET")) {
+      this.invalidateToken(token); await response.body?.cancel();
+      response = await send(await this.token());
+    }
     if (!response.ok && response.status !== 308) {
       const body = await response.json().catch(() => ({}));
       const reason = body?.error?.errors?.[0]?.reason;
@@ -151,6 +186,7 @@ export class DriveStore {
     if (target.protocol !== "https:" || target.hostname !== "www.googleapis.com") throw new DriveError("Invalid Google upload endpoint.", 502);
     await this.guard();
     const upload = await this.fetcher(target, {method: "PUT", headers: {Authorization: `Bearer ${await this.token()}`, "Content-Type": mime}, body: bytes as BodyInit, signal: AbortSignal.timeout(45000)});
+    if (upload.status === 401) this.invalidateToken(this.accessToken);
     if (!upload.ok) throw new DriveError("Google Drive upload failed. Retry the operation.", 502);
     const result = await upload.json(); if (!result.id) throw new DriveError("Google did not confirm the upload.", 502);
     return result.id;
@@ -312,6 +348,7 @@ export class DriveStore {
     const c = this.config;
     const result = await this.tokenRequest({client_id: c.clientId, client_secret: c.clientSecret, redirect_uri: c.redirectUri, code, grant_type: "authorization_code"});
     this.accessToken = result.access_token;
+    this.accessTokenExpiresAt = this.tokens.clock() + tokenLifetime(result.expires_in);
     const userResponse = await this.fetcher("https://openidconnect.googleapis.com/v1/userinfo", {headers: {Authorization: `Bearer ${result.access_token}`}, signal: AbortSignal.timeout(15000)});
     if (!userResponse.ok) throw new DriveError("Google identity could not be verified.", 502);
     const googleUser = await userResponse.json(); if (!googleUser.email || !googleUser.email_verified) throw new DriveError("A verified Google account is required.");

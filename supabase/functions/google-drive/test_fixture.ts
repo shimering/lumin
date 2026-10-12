@@ -42,6 +42,7 @@ class Query implements PromiseLike<any> {
   constructor(public db: MemoryDB, public table: string) {}
   select(_fields = "*") { return this; }
   eq(k: string, v: any) { this.filters.push(r => r[k] === v); return this; }
+  in(k: string, values: any[]) { this.filters.push(r => values.includes(r[k])); return this; }
   neq(k: string, v: any) { this.filters.push(r => r[k] !== v); return this; }
   gt(k: string, v: any) { this.filters.push(r => r[k] > v); return this; }
   lt(k: string, v: any) { this.filters.push(r => r[k] < v); return this; }
@@ -84,7 +85,7 @@ export class GoogleMock {
   fetch = async (input: RequestInfo | URL, options: RequestInit = {}) => {
     const url = new URL(String(input)), method = options.method || "GET";
     const json = (body: any, status = 200, headers: any = {}) => new Response(JSON.stringify(body), {status, headers: {"Content-Type": "application/json", ...headers}});
-    if (url.hostname === "oauth2.googleapis.com") return json({access_token: "private-google-access", refresh_token: "private-google-refresh"});
+    if (url.hostname === "oauth2.googleapis.com") return json({access_token: "private-google-access", refresh_token: "private-google-refresh", expires_in: 3600});
     if (url.hostname === "openidconnect.googleapis.com") return json({email: this.email, email_verified: true});
     if (url.pathname === "/drive/v3/changes/startPageToken") return json({startPageToken: String(this.changes.length)});
     if (url.pathname === "/drive/v3/changes") { const index = Number(url.searchParams.get("pageToken")); return json({changes: this.changes.slice(index), newStartPageToken: String(this.changes.length)}); }

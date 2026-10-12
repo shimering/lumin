@@ -202,12 +202,24 @@ def json_request(url, method='GET', headers=None, data=None, timeout=25):
 
 
 class DriveMetadata:
-    """Share local annotations, with a cross-language digest for Drive peers."""
-    def __init__(self, local):
+    """Share annotations for syncable media while retaining local-only metadata."""
+    def __init__(self, local, includes):
         self.local = local
+        self.includes = includes
 
     def __getattr__(self, name):
         return getattr(self.local, name)
+
+    def snapshot(self):
+        value = self.local.snapshot()
+        if value is not None:
+            value['files'] = [row for row in value['files'] if self.includes(row['relative_path'])]
+        return value
+
+    def normalise(self, value):
+        value = self.local.normalise(value)
+        value['files'] = [row for row in value['files'] if self.includes(row['relative_path'])]
+        return value
 
     @staticmethod
     def digest(value):
@@ -227,12 +239,21 @@ class DriveMetadata:
                                         separators=(',', ':')).encode()).hexdigest()
 
     def replace(self, value):
-        self.local.replace(value)
-        return self.digest(self.local.snapshot())
+        with self.local.lock:
+            value = self.normalise(value)
+            previous = self.local.snapshot() or {'patients': [], 'files': []}
+            retained = [row for row in previous['files'] if not self.includes(row['relative_path'])]
+            patients = {row['id']: row for row in value['patients']}
+            retained_ids = {row['patient_id'] for row in retained}
+            for patient in previous['patients']:
+                if patient['id'] in retained_ids and patient['id'] not in patients:
+                    patients[patient['id']] = patient
+            self.local.replace(dict(value, patients=list(patients.values()), files=value['files'] + retained))
+            return self.digest(self.snapshot())
 
     def replace_checked(self, value, expected):
         with self.local.lock:
-            if self.digest(self.local.snapshot()) != expected:
+            if self.digest(self.snapshot()) != expected:
                 raise ValueError('Local annotations changed during synchronization')
             return self.replace(value)
 

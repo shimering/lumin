@@ -283,11 +283,21 @@ def self_test(output):
                 with urllib.request.urlopen(request, timeout=8) as response:
                     assert response.read() == path.read_bytes(), "Original file bytes changed."
             # Auth remains required; setup does not introduce an admin bypass.
-            try:
-                urllib.request.urlopen(url + "/api/sync/info", timeout=8)
-                raise AssertionError("Unprotected sync endpoint.")
-            except urllib.error.HTTPError as error:
-                assert error.code == 401
+            app_address = urllib.parse.urlsplit(APP_URL)
+            for route in ("/api/sync/info", "/api/drive-sync/info"):
+                request = urllib.request.Request(url + route, method="OPTIONS", headers={
+                    "Origin": f"{app_address.scheme}://{app_address.netloc}", "Access-Control-Request-Method": "GET",
+                    "Access-Control-Request-Headers": "authorization,x-lumin-key"})
+                with urllib.request.urlopen(request, timeout=8) as response:
+                    assert response.status == 200, "Packaged sync route is missing: " + route
+                    assert response.headers.get("Access-Control-Allow-Origin"), "Sync preflight failed."
+                request = urllib.request.Request(url + route,
+                    headers={"x-lumin-key": "disposable-test-key"})
+                try:
+                    urllib.request.urlopen(request, timeout=8)
+                    raise AssertionError("Unprotected sync endpoint: " + route)
+                except urllib.error.HTTPError as error:
+                    assert error.code == 401
             pid = '12345678-1234-4234-8234-123456789abc'
             rel = image.relative_to(storage).as_posix()
             request = urllib.request.Request(url + '/api/patient/' + pid + '/media-details', method='POST',
@@ -308,6 +318,18 @@ def self_test(output):
             # Verify the same bundled engine includes files and excludes metadata.
             module = load_server(config_path)
             engine = module.get_sync_engine()
+            drive_engine = module.get_drive_sync_engine()
+            assert drive_engine.node_id != engine.node_id, "Drive must have independent pairing history."
+            assert drive_engine.lock is engine.lock, "Drive and PC sync must share the file lock."
+            assert drive_engine.clinical.local is engine.clinical, "Drive must use this PC's annotations."
+            local_only = metadata.relative_to(storage).as_posix()
+            annotations = engine.clinical.snapshot()
+            annotations['files'].append(dict(patient_id=pid, relative_path=local_only, note='Local-only fixture'))
+            engine.clinical.replace(annotations)
+            scoped = drive_engine.clinical.snapshot()
+            assert all(row['relative_path'] != local_only for row in scoped['files'])
+            drive_engine.clinical.replace(scoped)
+            assert engine.clinical.details(local_only)['note'] == 'Local-only fixture'
             records = engine.scan()
             assert scan.relative_to(storage).as_posix().casefold() in records
             assert image.relative_to(storage).as_posix().casefold() in records
@@ -335,6 +357,7 @@ def self_test(output):
             assert engine.node_id == status["nodeId"], "Restart must preserve this computer's identity."
             result = {"ok": True, "health": True, "originalImageAndZipBytes": True,
                       "metadataExcluded": True, "clinicalMetadata": True, "localMediaMetadata": True, "authRequired": True,
+                      "googleDriveSync": True, "driveLocalOnlyAnnotationsPreserved": True,
                       "independentIdentity": True, "stableIdentity": True, "syncProtocol": PROTOCOL,
                       "patient3dScans": health["capabilities"]["patient3dScans"],
                       "scanOriginalFilenames": health["capabilities"]["scanOriginalFilenames"],

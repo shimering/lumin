@@ -752,7 +752,7 @@ def get_drive_sync_engine():
                                   list(base.extensions), generate_thumbnail,
                                   on_change=lambda: update_storage_mapping_files())
             from file_sync import DriveMetadata
-            instance.clinical = DriveMetadata(base.clinical)
+            instance.clinical = DriveMetadata(base.clinical, instance.includes)
             instance.lock = base.lock
             instance.drive_endpoint = SUPABASE_URL.rstrip('/') + '/functions/v1/google-drive'
             base.job_groups = instance.job_groups = (base, instance)

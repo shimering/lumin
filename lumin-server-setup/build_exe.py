@@ -56,10 +56,12 @@ def main():
             raise RuntimeError("Packaged verification failed: " + name)
     manifest["executableSHA256"] = hashlib.sha256(executable.read_bytes()).hexdigest()
     manifest["verified"] = {"server": True, "englishArabicUI": True, "clinicalMetadata": True, "localMediaMetadata": True,
+                            "googleDriveSync": True,
                             "trayToggle": True, "trayReopenAndQuit": True}
     (OUTPUT / "build-info.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     with zipfile.ZipFile(BASE / "LuminStorageSetup.zip", "w", zipfile.ZIP_DEFLATED) as package:
-        for name in ("LuminStorageSetup.exe", "READ-ME.md", "build-info.json"):
+        for name in ("LuminStorageSetup.exe", "READ-ME.md", "build-info.json",
+                     "server-verification.json", "ui-verification.json"):
             package.write(OUTPUT / name, "LuminStorageSetup/" + name)
     # Existing Python installations keep their own config and identity. Never
     # distribute the current clinic config, .venv, patient data or runtime state.

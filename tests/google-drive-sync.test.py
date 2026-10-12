@@ -127,4 +127,22 @@ class DriveSyncTests(unittest.TestCase):
         self.completed(self.resolve(job, 'delete_both'))
         self.assertFalse((self.engine.root / path).exists())
 
+    def test_excluded_annotations_stay_local_when_drive_metadata_is_synced(self):
+        path = 'أحمد_علي/Periapical/test.png'
+        excluded = 'أحمد_علي/patient_media_details.json'
+        self.local.write(0, path, b'original')
+        self.local.engines[0].clinical.replace({'version': 2, 'patients': [{'id': PID, 'name': 'أحمد علي'}],
+            'files': [{'patient_id': PID, 'relative_path': path, 'note': 'media note'},
+                      {'patient_id': PID, 'relative_path': excluded, 'note': 'local-only annotation'}]})
+        self.pair(); self.completed(self.sync())
+        remote = json_request(self.cloud + '/api/sync/peer/metadata', headers=self.engine.peer_headers())
+        self.assertEqual([f['relative_path'] for f in remote['snapshot']['files']], [path])
+        self.assertEqual(self.local.engines[0].clinical.details(excluded)['note'], 'local-only annotation')
+        json_request(self.cloud + '/api/patient/' + PID + '/media-details', 'POST', self.cloud_headers,
+                     {'relativePath': path, 'details': {'note': 'Drive edit'}})
+        self.completed(self.sync())
+        self.assertEqual(self.local.engines[0].clinical.details(path)['note'], 'Drive edit')
+        self.assertEqual(self.local.engines[0].clinical.details(excluded)['note'], 'local-only annotation')
+        self.completed(self.sync())
+
 if __name__ == '__main__': unittest.main()
