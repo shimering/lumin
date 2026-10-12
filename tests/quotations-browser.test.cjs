@@ -251,7 +251,7 @@ test('patient Quotations tab supports editing, deletion, pagination and patient 
       if(body.action==='create'||body.action==='update'){savedQuote={...savedQuote,...body,id:'${id(99)}',token:'${'b'.repeat(64)}',patient_id:patient.id,revision:(savedQuote?.revision||0)+1,created_at:savedQuote?.created_at||new Date().toISOString()};return{data:{quotation:savedQuote}};}
       return{data:{settings}};
     }}};
-    ${['setupPatientWorkspaceTabScrolling','openPatientWorkspace','openPatientWorkspaceTab','updatePatientWorkspaceNavigation','chartFindingBillingMultiplier','chartFindingBatchTotal','chartFindingInvoiceAmounts','formatInvoiceMoney','renderFindingInvoiceToolbar'].map(source).join('\n')}
+    ${['setupPatientWorkspaceTabScrolling','openPatientWorkspace','openPatientWorkspaceTab','updatePatientWorkspaceNavigation','chartFindingBillingMultiplier','chartFindingBatchTotal','chartFindingInvoiceAmounts','formatInvoiceMoney','chartFindingSelectionMap','chartFindingDeletionLocked','renderFindingInvoiceToolbar'].map(source).join('\n')}
   `});
   await page.addScriptTag({path:path.join(root,'lumin-quotations.js')});
   await page.evaluate(()=>{document.getElementById('patient-workspace-header').classList.remove('hidden');setupPatientWorkspaceTabScrolling();updatePatientWorkspaceNavigation(patient,'chart');});

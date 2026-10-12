@@ -8,7 +8,7 @@ const html = fs.readFileSync(path.resolve(__dirname, '..', 'index.html'), 'utf8'
 test('desktop documented findings use a shared two-region row grid', () => {
   assert.match(html, /@media \(min-width: 900px\)[\s\S]*#findings-container \.finding-row:not\(\.has-ortho-visits\)\s*\{[\s\S]*display:\s*grid !important/);
   assert.match(html, /grid-template-columns:\s*minmax\(var\(--finding-summary-min\), 1fr\) max-content/);
-  assert.match(html, /--finding-row-min-width:\s*89\.25rem/);
+  assert.match(html, /--finding-row-min-width:\s*86rem/);
 });
 
 test('finding action controls are assigned stable semantic columns', () => {
@@ -19,8 +19,7 @@ test('finding action controls are assigned stable semantic columns', () => {
     ['finding-pricing-group', 4],
     ['finding-status-control', 5],
     ['finding-separate-button', 6],
-    ['finding-invoice-control', 7],
-    ['finding-delete-button', 8]
+    ['finding-invoice-control', 7]
   ];
 
   for (const [className, column] of expectedColumns) {
@@ -36,8 +35,8 @@ test('conditional batch and expandable rows preserve the column contract', () =>
 
 test('tablet and mobile findings use one fixed card length with contained scrolling', () => {
   assert.match(html, /@media \(max-width: 899px\)[\s\S]*#findings-container\s*\{[\s\S]*overflow-x:\s*auto !important/);
-  assert.match(html, /--finding-mobile-row-width:\s*81\.75rem/);
-  assert.match(html, /@media \(min-width: 640px\) and \(max-width: 899px\)[\s\S]*--finding-mobile-row-width:\s*87\.5rem/);
+  assert.match(html, /--finding-mobile-row-width:\s*78\.5rem/);
+  assert.match(html, /@media \(min-width: 640px\) and \(max-width: 899px\)[\s\S]*--finding-mobile-row-width:\s*84\.25rem/);
   assert.match(html, /#findings-container \.finding-row\s*\{[\s\S]*grid-template-columns:\s*var\(--finding-mobile-summary\) max-content/);
   assert.match(html, /#findings-container \.finding-row\.is-batch-finding\s*\{[\s\S]*width:\s*var\(--finding-mobile-row-width\) !important/);
   assert.match(html, /#findings-container \.finding-row\.has-procedure-steps\s*\{[\s\S]*width:\s*var\(--finding-mobile-row-width\) !important/);
@@ -46,7 +45,8 @@ test('tablet and mobile findings use one fixed card length with contained scroll
 
 test('mobile summaries cannot overlap the date column', () => {
   assert.match(html, /#findings-container \.finding-row-summary\s*\{[\s\S]*max-width:\s*var\(--finding-mobile-summary\) !important;[\s\S]*overflow:\s*hidden !important/);
-  assert.match(html, /#findings-container \.finding-row-actions\s*\{[\s\S]*grid-template-columns:[\s\S]*var\(--finding-mobile-dates\)[\s\S]*var\(--finding-mobile-delete\)/);
+  assert.match(html, /#findings-container \.finding-row-actions\s*\{[\s\S]*grid-template-columns:[\s\S]*var\(--finding-mobile-dates\)[\s\S]*var\(--finding-mobile-invoice\);/);
+  assert.doesNotMatch(html, /finding-delete-button|--finding-(?:mobile|column)-delete/);
 });
 
 test('mobile price controls keep the compact horizontal desktop shape', () => {

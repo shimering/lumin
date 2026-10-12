@@ -3,6 +3,13 @@
 .finding-selection-actions[hidden] { display:none; }
 .finding-selection-actions #findings-invoice-button { position:static; transform:none; max-width:none; }
 .finding-selection-actions #findings-invoice-button:active { transform:scale(.98); }
+#findings-delete-button { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; flex-shrink:0; padding:0; border:0; border-radius:14px; background:#fff1f2; color:#be123c; box-shadow:0 5px 20px #0f172a1a; cursor:pointer; transition:background 150ms ease-out,transform 150ms ease-out; }
+#findings-delete-button[hidden] { display:none; }
+#findings-delete-button svg { width:20px; height:20px; }
+#findings-delete-button:hover { background:#ffe4e6; }
+#findings-delete-button:active { transform:scale(.98); }
+#findings-delete-button:focus-visible { outline:2px solid #3b82f6; outline-offset:4px; }
+#findings-delete-button:disabled { opacity:.5; pointer-events:none; }
 #findings-quotation-button { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; flex-shrink:0; padding:0; border:0; border-radius:14px; background:var(--lumin-face,#fff); color:#2563eb; box-shadow:0 5px 20px #0f172a1a; }
 #findings-quotation-button svg { width:20px; height:20px; }
 #findings-quotation-button:hover { background:#eff6ff; }

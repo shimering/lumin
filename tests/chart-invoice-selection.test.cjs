@@ -13,25 +13,44 @@ function source(name) {
   assert.ok(start >= 0, name);
   return html.slice(start, html.indexOf('\n    }', start) + 6);
 }
-const helpers = ['chartFindingBillingMultiplier', 'chartFindingBatchTotal', 'chartFindingInvoiceAmounts', 'formatInvoiceMoney', 'renderFindingInvoiceToolbar'].map(source).join('\n');
+const helpers = ['chartFindingBillingMultiplier', 'chartFindingBatchTotal', 'chartFindingInvoiceAmounts', 'formatInvoiceMoney', 'chartFindingSelectionMap', 'chartFindingDeletionLocked', 'renderFindingInvoiceToolbar'].map(source).join('\n');
 function setup(ids=[], invoiced=[]) {
   const classes = new Set(['hidden']);
   const button = {disabled:true, innerHTML:'', attributes:{}, classList:{toggle(name, value){if(value)classes.add(name);else classes.delete(name);}},
     setAttribute(name,value){this.attributes[name]=value;},getAttribute(name){return this.attributes[name];}};
+  const deleteButton={disabled:true,hidden:true,attributes:{},setAttribute(name,value){this.attributes[name]=value;},getAttribute(name){return this.attributes[name];}};
+  const actions={hidden:true};
   const context = vm.createContext({currentUiLanguage:'en',chartInvoiceStateLoading:false,
     selectedFindingIds:new Set(ids),invoicedFindingIds:new Set(invoiced),
-    document:{getElementById:id=>id==='findings-invoice-button'?button:null},
+    document:{getElementById:id=>({'findings-invoice-button':button,'findings-delete-button':deleteButton,'findings-selection-actions':actions}[id]||null)},
     setStableHtml(element,markup){element.innerHTML=markup;return true;},renderChartFindingIcons(){},escapeHtml:value=>String(value)});
   vm.runInContext(helpers,context);
-  return {context,button,classes};
+  return {context,button,classes,deleteButton,actions};
 }
+
+test('zero-price procedures and uninvoiced packages remain selectable for deletion without being invoiced',()=>{
+  const {context,button,classes,deleteButton,actions}=setup(['zero','package','v1']);
+  const findings=[{id:'zero',price:0},{id:'package',price:9000,isOrthoPackage:true,orthoVisits:[{id:'v1',price:0}]}];
+  context.renderFindingInvoiceToolbar(findings);
+  assert.deepEqual([...context.selectedFindingIds],['zero','package','v1']);
+  assert.equal(button.disabled,true);assert.ok(classes.has('hidden'));
+  assert.equal(deleteButton.hidden,false);assert.equal(deleteButton.disabled,false);assert.equal(actions.hidden,false);
+  context.currentUiLanguage='ar';context.renderFindingInvoiceToolbar(findings);
+  assert.match(deleteButton.attributes['aria-label'],/حذف.*\(3\)/);
+  context.chartInvoiceStateLoading=true;context.renderFindingInvoiceToolbar(findings);
+  assert.equal(deleteButton.hidden,true);assert.equal(deleteButton.disabled,true);assert.equal(actions.hidden,true);
+  context.chartInvoiceStateLoading=false;context.invoicedFindingIds.add('v1');context.renderFindingInvoiceToolbar(findings);
+  assert.deepEqual([...context.selectedFindingIds],['zero'],'An invoiced visit also locks its parent package');
+  context.selectedFindingIds.clear();context.renderFindingInvoiceToolbar(findings);
+  assert.equal(deleteButton.hidden,true);assert.equal(actions.hidden,true);
+});
 test('selection total stays in the invoice button after removing the instruction strip',()=>{
   const {context,button,classes}=setup(['a','b','paid','zero','deleted'],['paid']);
   const findings=[{id:'a',price:1100},{id:'b',price:250.75},{id:'paid',price:999},{id:'zero',price:0}];
   context.renderFindingInvoiceToolbar(findings);
   assert.match(button.innerHTML,/Selected total.*EGP 1,350.75/);
   assert.match(button.attributes['aria-label'],/Add 2 selected operations to invoice.*EGP 1,350.75/);
-  assert.deepEqual([...context.selectedFindingIds],['a','b']);
+  assert.deepEqual([...context.selectedFindingIds],['a','b','zero']);
   assert.equal(button.disabled,false);assert.ok(classes.has('inline-flex'));
   findings[1].price=400;
   context.renderFindingInvoiceToolbar(findings);
@@ -78,9 +97,9 @@ test('chart voice commands and duplicate chart toolbar controls are fully remove
   assert.match(html,/id="setting-whatsapp-gemini-key"/,'Shared WhatsApp AI settings remain available');
 });
 
-test('the invoice button shows an elegant total on phones, tablets and desktops in both languages', {skip:!chromium&&'Playwright unavailable'},async t=>{
+test('selection actions fit phones, tablets and desktops in both languages', {skip:!chromium&&'Playwright unavailable'},async t=>{
   const head=html.slice(0,html.indexOf('</head>')+7).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'');
-  const markup=html.match(/<button id="findings-invoice-button"[\s\S]*?<\/button>/)[0];
+  const markup=html.match(/<div id="findings-selection-actions"[\s\S]*?<\/div>/)[0];
   const fixture=head+'<body class="lumin-raised"><main style="padding:24px"><h1>Dental chart</h1><p>Selected procedures</p></main>'+markup+'</body></html>';
   const server=http.createServer((req,res)=>{
     const url=new URL(req.url,'http://localhost');
@@ -102,9 +121,10 @@ test('the invoice button shows an elegant total on phones, tablets and desktops 
     function renderChartFindingIcons(){if(window.lucide)lucide.createIcons();}
     function escapeHtml(value){return String(value);}
     function invoiceSelectedFindings(){window.lastInvoiceSelection=[...selectedFindingIds];}
+    function deleteSelectedFindings(){window.lastDeleteSelection=[...selectedFindingIds];}
     ${helpers}
   `});
-  for(const viewport of [{width:390,height:844},{width:834,height:1112},{width:1020,height:884},{width:1440,height:900}]){
+  for(const viewport of [{width:320,height:700},{width:390,height:844},{width:834,height:1112},{width:1020,height:884},{width:1440,height:900}]){
     await page.setViewportSize(viewport);
     for(const language of ['en','ar']){
       await page.evaluate(language=>{currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';document.documentElement.style.setProperty('--mobile-nav-height',innerWidth<1024?'88px':'0px');renderFindingInvoiceToolbar(findings);},language);
@@ -116,6 +136,13 @@ test('the invoice button shows an elegant total on phones, tablets and desktops 
       assert.ok(bounds.y+bounds.height<viewport.height-(viewport.width<1024?88:0),'Button stays above navigation');
       const styles=await button.evaluate(button=>({border:getComputedStyle(button).borderWidth,label:parseFloat(getComputedStyle(button.querySelector('.finding-invoice-button-label')).fontSize),total:parseFloat(getComputedStyle(button.querySelector('.finding-invoice-button-total')).fontSize),overflow:document.documentElement.scrollWidth>innerWidth}));
       assert.equal(styles.border,'0px');assert.ok(styles.total<styles.label);assert.equal(styles.overflow,false);
+      const deleteButton=page.locator('#findings-delete-button'),tray=page.locator('#findings-selection-actions');
+      assert.ok(await deleteButton.isVisible());
+      const deleteBounds=await deleteButton.boundingBox(),trayBounds=await tray.boundingBox();
+      assert.ok(deleteBounds.width>=44&&deleteBounds.height>=44);
+      assert.ok(trayBounds.x>=0&&trayBounds.x+trayBounds.width<=viewport.width,'The whole action tray stays in the viewport');
+      assert.equal(await deleteButton.evaluate(node=>getComputedStyle(node).borderWidth),'0px');
+      await deleteButton.click();assert.deepEqual(await page.evaluate(()=>window.lastDeleteSelection),['a','b']);
       await button.click();assert.deepEqual(await page.evaluate(()=>window.lastInvoiceSelection),['a','b']);
       if(process.env.LUMIN_MEDIA_SCREENSHOT_DIR&&viewport.width===1020)await page.screenshot({path:path.join(process.env.LUMIN_MEDIA_SCREENSHOT_DIR,`chart-invoice-selected-total-${language}.png`)});
     }

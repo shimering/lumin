@@ -534,6 +534,11 @@
       cursor: not-allowed;
       opacity: 1;
     }
+    .finding-selection-target { display: inline-flex; align-items: center; justify-content: center; width: 44px; min-height: 44px; flex-shrink: 0; border-radius: 10px; cursor: pointer; transition: background 150ms ease-out; }
+    .finding-selection-target:hover { background: #f1f5f9; }
+    .finding-selection-target:active { transform: scale(.98); }
+    .finding-selection-target:focus-within { outline: 2px solid #3b82f6; outline-offset: 2px; }
+    .finding-selection-target:has(:disabled) { opacity: .5; pointer-events: none; }
     .finding-row.is-invoiced {
       opacity: 0.84;
     }
@@ -822,10 +827,9 @@
         --finding-mobile-status: 4.5rem;
         --finding-mobile-separate: 6rem;
         --finding-mobile-notes: 2.75rem;
-        --finding-mobile-delete: 2.75rem;
         --finding-mobile-gap: 0.5rem;
         --finding-mobile-invoice: 11.5rem;
-        --finding-mobile-row-width: 81.75rem;
+        --finding-mobile-row-width: 78.5rem;
         overflow-x: auto !important;
         overscroll-behavior-inline: contain;
         -webkit-overflow-scrolling: touch;
@@ -898,8 +902,7 @@
           var(--finding-mobile-price)
           var(--finding-mobile-status)
           var(--finding-mobile-separate)
-          var(--finding-mobile-invoice)
-          var(--finding-mobile-delete);
+          var(--finding-mobile-invoice);
         width: auto !important;
         min-width: 0 !important;
         max-width: none !important;
@@ -1045,15 +1048,6 @@
         height: 2.75rem !important;
         flex: 0 0 var(--finding-mobile-notes) !important;
         padding: 0 !important;
-        justify-content: center !important;
-      }
-      #findings-container .finding-delete-button {
-        grid-column: 8;
-        width: 2.75rem !important;
-        min-width: 2.75rem !important;
-        max-width: 2.75rem !important;
-        height: 2.75rem !important;
-        flex: 0 0 2.75rem !important;
         justify-content: center !important;
       }
       #findings-container .finding-separate-button {
@@ -1207,8 +1201,7 @@
           var(--finding-mobile-price)
           var(--finding-mobile-status)
           var(--finding-mobile-separate)
-          var(--finding-mobile-invoice)
-          var(--finding-mobile-delete);
+          var(--finding-mobile-invoice);
         align-items: center !important;
         gap: var(--finding-mobile-gap) !important;
         width: auto !important;
@@ -1234,7 +1227,7 @@
         --finding-mobile-doctor: 9.5rem;
         --finding-mobile-price: 7rem;
         --finding-mobile-status: 9.5rem;
-        --finding-mobile-row-width: 87.5rem;
+        --finding-mobile-row-width: 84.25rem;
       }
     }
 
@@ -1249,9 +1242,8 @@
         --finding-column-status: 9.5rem;
         --finding-column-separate: 6rem;
         --finding-column-notes: 2.75rem;
-        --finding-column-delete: 2.75rem;
         --finding-column-gap: 0.5rem;
-        --finding-row-min-width: 89.25rem;
+        --finding-row-min-width: 86rem;
       }
       #findings-container .finding-row:not(.has-ortho-visits) {
         display: grid !important;
@@ -1281,8 +1273,7 @@
           var(--finding-column-price)
           var(--finding-column-status)
           var(--finding-column-separate)
-          var(--finding-column-invoice)
-          var(--finding-column-delete);
+          var(--finding-column-invoice);
         align-items: center !important;
         gap: var(--finding-column-gap) !important;
         width: auto !important;
@@ -1340,10 +1331,6 @@
       #findings-container .finding-note-button {
         grid-column: 1;
         justify-content: center;
-      }
-      #findings-container .finding-delete-button {
-        grid-column: 8;
-        justify-self: center;
       }
       #findings-container .finding-row.has-procedure-steps > [data-procedure-steps-panel] {
         grid-column: 1 / -1;
@@ -1437,7 +1424,6 @@
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
     }
     #findings-container :is(.finding-price-control input, .finding-status-control select):disabled { opacity: 0.5; pointer-events: none; }
-    #findings-container .finding-delete-button { min-width: 44px; min-height: 44px; }
     #findings-container .finding-invoice-status {
       display: flex;
       align-items: center;
@@ -5323,7 +5309,7 @@
   <link rel="stylesheet" href="lumin-chart-appointments.css?v=1" />
   <link rel="stylesheet" href="lumin-clinical-actions.css?v=5" />
   <link rel="stylesheet" href="lumin-media-teeth.css?v=1" />
-  <link rel="stylesheet" href="lumin-quotations.css?v=5" />
+  <link rel="stylesheet" href="lumin-quotations.css?v=6" />
   <style id="finance-ledger-styles">
     #finance-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     #finance-summary-cards > div { min-width: 0; }
@@ -6766,6 +6752,7 @@
         <i data-lucide="receipt-text" class="h-4 w-4"></i>
         <span>Add invoice</span>
       </button>
+        <button id="findings-delete-button" type="button" onclick="deleteSelectedFindings()" disabled hidden aria-label="Delete selected procedures" title="Delete selected procedures"><i data-lucide="trash-2" aria-hidden="true"></i></button>
         <button id="findings-quotation-button" type="button" onclick="openPatientQuotation()" disabled aria-label="Create quotation" title="Create quotation"><i data-lucide="file-text" aria-hidden="true"></i></button>
       </div>
     </section>
@@ -30839,57 +30826,59 @@
       openChartFindingDateDialog(button, 'beginDate');
     }
 
-    async function deleteFindingFromControl(button) {
+    async function deleteSelectedFindings() {
       const patient = getActivePatient();
-      const card = button.closest('[data-finding-id]');
-      if (!patient || !card) return;
-
-      const findingIds = chartFindingIdsFromControl(button);
-      const toothIds = chartFindingToothIdsFromControl(button);
-      if (findingIds.some(findingId => invoicedFindingIds.has(findingId))) {
-        alert(currentUiLanguage === 'ar' ? 'احذف الإجراء من الفاتورة أولاً قبل حذفه من مخطط الأسنان. احذف مصروف راتب الطبيب المرتبط قبل حذف الفاتورة إن وُجد.' : 'Remove this procedure from its invoice before deleting it from the dental chart. Delete any linked doctor salary expense first.');
+      if (!patient || patient.recordComplete === false || patientWorkspaceLoadingId === patient.id || chartInvoiceStateLoading) return;
+      const currentFindings = chartFindingSelectionMap(collectDocumentedFindings(patient));
+      const findings = [...selectedFindingIds].map(id => currentFindings.get(id)).filter(Boolean);
+      if (!findings.length) return;
+      if (findings.some(chartFindingDeletionLocked)) {
+        alert(currentUiLanguage === 'ar' ? 'أزل الإجراءات أو الزيارات المحددة من الفاتورة أولاً قبل حذفها من مخطط الأسنان.' : 'Remove the selected procedures or visits from their invoice before deleting them from the dental chart.');
         return;
       }
-      const operationCode = card.dataset.operationCode;
-      const operationLabel = dentalOperationLabel(operationCode);
-      const targetLabel = card.dataset.findingKind === 'mouth'
-        ? 'the whole mouth'
-        : toothIds.length > 1 ? `${toothIds.length} teeth` : chartToothLabel(toothIds[0]);
+      const selectedIds = new Set(findings.map(finding => finding.id));
+      const targets = findings.filter(finding => !finding.isOrthoVisit || !selectedIds.has(finding.parentFindingId));
+      const packageWarning = targets.some(finding => finding.isOrthoPackage)
+        ? (currentUiLanguage === 'ar' ? ' ستُحذف أيضاً جميع زيارات الباقات المحددة.' : ' All visits in selected packages will also be deleted.') : '';
+      if (!confirm(currentUiLanguage === 'ar'
+        ? `هل تريد حذف ${targets.length} من الإجراءات أو الزيارات المحددة؟${packageWarning} لا يمكن التراجع عن هذا الإجراء.`
+        : `Delete ${targets.length} selected procedure${targets.length === 1 ? '' : 's'} or visit${targets.length === 1 ? '' : 's'}?${packageWarning} This cannot be undone.`)) return;
 
-      const mouthFinding = chartMouthFindings(patient).find(f => findingIds.includes(f.id));
-      let wholeFinding = null;
-      Object.values(patient.chartState || {}).forEach(toothData => {
-        if (!toothData || typeof toothData !== 'object' || Array.isArray(toothData)) return;
-        const match = ensureWholeOperations(toothData).find(f => findingIds.includes(f.id));
-        if (match) wholeFinding = match;
-      });
-      const findingToCheck = mouthFinding || wholeFinding;
-      if (findingToCheck?.isOrthoPackage) {
-        const hasInvoicedVisits = (findingToCheck.orthoVisits || []).some(v => invoicedFindingIds.has(v.id));
-        if (hasInvoicedVisits) {
-          alert(currentUiLanguage === 'ar' ? 'لا يمكن حذف هذه الباقة لأن بعض زياراتها مفوترة بالفعل. يرجى إزالة بنود الفاتورة أولاً.' : 'Cannot delete this procedure because one or more visits have already been invoiced. Please remove the invoiced visits from the invoice first.');
-          return;
-        }
-      }
-
-      if (!confirm(`Delete ${operationLabel} from ${targetLabel}? This cannot be undone.`)) return;
-
-      let deleted = false;
-      findingIds.forEach(findingId => {
-        if (deleteChartFindingById(patient, findingId)) {
-          deleted = true;
-          void deleteImplantProgressByFindingId(findingId);
+      const previousChartState = JSON.parse(JSON.stringify(patient.chartState || {}));
+      const deletedIds = new Set();
+      const procedureIds = [];
+      const toothIds = [...new Set(targets.map(finding => finding.toothId).filter(Boolean))];
+      targets.forEach(finding => {
+        if (finding.isOrthoVisit) {
+          if (updateChartFindingById(patient, finding.parentFindingId, parent => ({
+            ...parent,
+            orthoVisits: (parent.orthoVisits || []).filter(visit => visit.id !== finding.id)
+              .map((visit, index) => ({ ...visit, visitNumber: index + 1 }))
+          }))) deletedIds.add(finding.id);
+        } else if (deleteChartFindingById(patient, finding.id)) {
+          deletedIds.add(finding.id);
+          procedureIds.push(finding.id);
+          (finding.orthoVisits || []).forEach(visit => deletedIds.add(visit.id));
         }
       });
-
-      if (!deleted) return;
-      findingIds.forEach(findingId => {
-        selectedFindingIds.delete(findingId);
-        collapsedOrthoFindings.delete(findingId);
-      });
+      if (!deletedIds.size) return;
+      deletedIds.forEach(id => selectedFindingIds.delete(id));
       renderChartFindingTeeth(toothIds);
       renderFindingsList();
-      await saveActivePatientChart();
+      if (!(await saveActivePatientChart(patient, { previousChartState }))) {
+        if (getActivePatient()?.id === patient.id) {
+          findings.forEach(finding => selectedFindingIds.add(finding.id));
+          renderChartFindingTeeth(toothIds);
+          renderFindingsList();
+        }
+        alert(currentUiLanguage === 'ar' ? 'تعذر حذف الإجراءات المحددة. يرجى المحاولة مرة أخرى.' : 'Could not delete the selected procedures. Please try again.');
+        return;
+      }
+      deletedIds.forEach(id => {
+        collapsedOrthoFindings.delete(id);
+        expandedFindingProcedureSteps.delete(id);
+      });
+      procedureIds.forEach(id => { void deleteImplantProgressByFindingId(id); });
     }
 
     function updateChartFindingById(patient, findingId, updater) {
@@ -31923,7 +31912,6 @@
       }
       const roundedPrice = Math.round(price * 100) / 100;
       if (!updateChartFindingsByIds(patient, findingIds, finding => ({ ...finding, price: roundedPrice }))) return;
-      if (roundedPrice <= 0) findingIds.forEach(findingId => selectedFindingIds.delete(findingId));
       renderFindingsList();
       await saveActivePatientChart();
     }
@@ -31960,40 +31948,60 @@
       if (checkbox && !checkbox.disabled) toggleFindingSelectionFromControl(checkbox);
     }
 
-    function renderFindingInvoiceToolbar(findings) {
-      const button = document.getElementById('findings-invoice-button');
-      if (!button) return;
+    function chartFindingSelectionMap(findings) {
       const currentFindings = new Map();
       findings.forEach(finding => {
-        if (finding.isOrthoPackage && Array.isArray(finding.orthoVisits)) {
-          finding.orthoVisits.forEach(visit => {
+        (finding.memberFindings || [finding]).forEach(member => {
+          if (member.id) currentFindings.set(member.id, { ...member, isOrthoPackage: Boolean(finding.isOrthoPackage) });
+          if (!finding.isOrthoPackage) return;
+          (member.orthoVisits || []).forEach(visit => {
             if (visit.id) {
               currentFindings.set(visit.id, {
                 ...visit,
                 code: finding.code,
-                toothId: finding.toothId,
-                parentFindingId: finding.id,
+                toothId: member.toothId,
+                parentFindingId: member.id,
                 isOrthoVisit: true
               });
             }
           });
-        }
-        if (!finding.isOrthoPackage) {
-          (finding.memberFindings || [finding]).forEach(member => {
-            if (member.id) currentFindings.set(member.id, member);
-          });
-        }
+        });
       });
+      return currentFindings;
+    }
+
+    function chartFindingDeletionLocked(finding) {
+      return invoicedFindingIds.has(finding.id) || Boolean(finding.isOrthoPackage
+        && (finding.orthoVisits || []).some(visit => invoicedFindingIds.has(visit.id)));
+    }
+
+    function renderFindingInvoiceToolbar(findings) {
+      const button = document.getElementById('findings-invoice-button');
+      if (!button) return;
+      const currentFindings = chartFindingSelectionMap(findings);
       selectedFindingIds = new Set([...selectedFindingIds].filter(id => {
         const finding = currentFindings.get(id);
-        return finding && !invoicedFindingIds.has(id) && Number(finding.price) > 0;
+        return finding && !chartFindingDeletionLocked(finding);
       }));
-      const selectedFindings = [...selectedFindingIds].map(id => currentFindings.get(id)).filter(Boolean);
+      const selectedFindings = [...selectedFindingIds].map(id => currentFindings.get(id));
+      const invoiceFindings = selectedFindings.filter(finding => !finding.isOrthoPackage && Number(finding.price) > 0);
       const invoiceAmounts = chartFindingInvoiceAmounts(findings);
-      const total = [...selectedFindingIds].reduce((sum, findingId) => sum + (invoiceAmounts.get(findingId) || 0), 0);
-      const count = selectedFindings.length;
+      const total = invoiceFindings.reduce((sum, finding) => sum + (invoiceAmounts.get(finding.id) || 0), 0);
+      const count = invoiceFindings.length;
+      const selectionCount = selectedFindings.length;
       const shouldShow = !chartInvoiceStateLoading && count > 0;
-      if (typeof renderQuotationSelectionActions === 'function') renderQuotationSelectionActions(findings, count, chartInvoiceStateLoading);
+      if (typeof renderQuotationSelectionActions === 'function') renderQuotationSelectionActions(findings, selectionCount, chartInvoiceStateLoading);
+      const actions = document.getElementById('findings-selection-actions');
+      if (actions) actions.hidden = chartInvoiceStateLoading || !selectionCount;
+      const deleteButton = document.getElementById('findings-delete-button');
+      if (deleteButton) {
+        deleteButton.hidden = chartInvoiceStateLoading || !selectionCount;
+        deleteButton.disabled = deleteButton.hidden;
+        deleteButton.setAttribute('aria-label', currentUiLanguage === 'ar'
+          ? `حذف الإجراءات أو الزيارات المحددة (${selectionCount})`
+          : `Delete selected procedures or visits (${selectionCount})`);
+        deleteButton.title = deleteButton.getAttribute('aria-label');
+      }
       button.classList.toggle('inline-flex', shouldShow);
       button.classList.toggle('hidden', !shouldShow);
       button.disabled = !shouldShow;
@@ -32154,38 +32162,6 @@
       );
     }
 
-    async function deleteOrthoVisit(button) {
-      const card = button.closest('[data-finding-id]');
-      const visitRow = button.closest('[data-ortho-visit-id]');
-      const findingId = card?.dataset.findingId;
-      const visitId = visitRow?.dataset.orthoVisitId;
-      const patient = getActivePatient();
-      if (!patient || !findingId || !visitId) return;
-      if (invoicedFindingIds.has(visitId)) {
-        alert(currentUiLanguage === 'ar' ? 'هذه الزيارة مفوترة بالفعل ولا يمكن حذفها.' : 'This visit has already been invoiced and cannot be deleted.');
-        return;
-      }
-      if (!confirm(currentUiLanguage === 'ar' ? 'هل أنت متأكد من حذف هذه الزيارة؟' : 'Are you sure you want to delete this visit?')) return;
-      let deleted = false;
-      updateChartFindingById(patient, findingId, finding => {
-        const visits = (finding.orthoVisits || []).filter(v => v.id !== visitId);
-        const renumbered = visits.map((v, idx) => ({ ...v, visitNumber: idx + 1 }));
-        deleted = true;
-        return {
-          ...finding,
-          orthoVisits: renumbered
-        };
-      });
-      if (!deleted) return;
-      selectedFindingIds.delete(visitId);
-      renderFindingsList();
-      await saveActivePatientChart();
-      showAppointmentNotificationToast(
-        currentUiLanguage === 'ar' ? 'تم حذف الزيارة' : 'Visit deleted',
-        currentUiLanguage === 'ar' ? 'تمت إزالة الزيارة بنجاح' : 'The visit has been removed.'
-      );
-    }
-
     async function updateOrthoVisitDate(input) {
       const card = input.closest('[data-finding-id]');
       const visitRow = input.closest('[data-ortho-visit-id]');
@@ -32231,9 +32207,6 @@
         } : v);
         return { ...finding, orthoVisits: visits };
       })) return;
-      if (roundedPrice <= 0) {
-        selectedFindingIds.delete(visitId);
-      }
       renderFindingsList();
       await saveActivePatientChart();
     }
@@ -32559,18 +32532,20 @@
             const isVisitInvoiced = invoicedFindingIds.has(visit.id);
             const isVisitSelected = selectedFindingIds.has(visit.id);
             const visitPrice = Math.max(0, Number(visit.price) || 0);
-            const canSelectVisit = !isVisitInvoiced && visitPrice > 0 && !chartInvoiceStateLoading;
+            const canSelectVisit = !isVisitInvoiced && !chartInvoiceStateLoading;
             return `
               <div data-ortho-visit-id="${escapeHtml(visit.id)}" class="ortho-visit-card flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-2xs transition hover:border-indigo-200">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                   <div class="flex items-center gap-2 min-w-0">
+                    <label class="finding-selection-target">
                     <input type="checkbox"
                       data-ortho-visit-id="${escapeHtml(visit.id)}"
                       class="h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                       ${isVisitInvoiced ? 'checked disabled' : (canSelectVisit ? (isVisitSelected ? 'checked' : '') : 'disabled')}
                       onchange="toggleOrthoVisitSelection(this)"
-                      aria-label="${isVisitInvoiced ? 'Invoiced' : 'Select'} visit #${visit.visitNumber}"
-                      title="${isVisitInvoiced ? 'This visit is already invoiced' : (visitPrice <= 0 ? 'Set visit price before invoicing' : 'Select for invoice')}">
+                      aria-label="${currentUiLanguage === 'ar' ? (isVisitInvoiced ? 'زيارة مفوترة' : 'تحديد الزيارة') : (isVisitInvoiced ? 'Invoiced visit' : 'Select visit')} #${visit.visitNumber}"
+                      title="${currentUiLanguage === 'ar' ? (isVisitInvoiced ? 'هذه الزيارة مفوترة بالفعل' : 'تحديد الزيارة للفوترة أو الحذف') : (isVisitInvoiced ? 'This visit is already invoiced' : 'Select visit for invoicing or deletion')}">
+                    </label>
                     <span class="inline-flex items-center justify-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-black text-indigo-700">
                       ${currentUiLanguage === 'ar' ? 'زيارة' : 'Visit'} #${visit.visitNumber}
                     </span>
@@ -32607,14 +32582,6 @@
                         aria-label="Visit price">
                     </label>
 
-                    <!-- Delete Visit Button -->
-                    ${isVisitInvoiced ? '' : `
-                    <button type="button" onclick="deleteOrthoVisit(this)"
-                      class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:border-red-300 hover:bg-red-100"
-                      title="${currentUiLanguage === 'ar' ? 'حذف الزيارة' : 'Delete visit'}"
-                      aria-label="Delete visit #${visit.visitNumber}">
-                      <i data-lucide="trash-2" class="h-3 w-3"></i>
-                    </button>`}
                   </div>
                 </div>
 
@@ -32664,9 +32631,9 @@
           ? orthoVisits.filter(v => invoicedFindingIds.has(v.id)).map(v => v.id)
           : findingIds.filter(findingId => invoicedFindingIds.has(findingId));
         const selectableMemberIds = isOrthoPackage
-          ? []
+          ? (isOrthoLocked ? [] : findingIds.filter(findingId => !invoicedFindingIds.has(findingId)))
           : memberFindings
-              .filter(member => member.id && !invoicedFindingIds.has(member.id) && Number(member.price) > 0)
+              .filter(member => member.id && !invoicedFindingIds.has(member.id))
               .map(member => member.id);
         const isInvoiced = isOrthoPackage ? isOrthoLocked : invoicedMemberIds.length > 0;
         const isFullyInvoiced = isOrthoPackage ? isOrthoFullyInvoiced : Boolean(findingIds.length && invoicedMemberIds.length === findingIds.length);
@@ -32759,13 +32726,9 @@
           <article data-refresh-key="${escapeHtml(String(findingIds[0] || finding.batchId || finding.id))}" ${findingIdentityAttributes} onclick="toggleFindingCardSelection(event, this)" aria-selected="${isSelected}" class="finding-row ${procedureSteps.length ? 'has-procedure-steps' : ''} ${isOrthoPackage ? 'has-ortho-visits' : ''} ${isSelected ? 'is-selected' : ''} ${isInvoiced ? 'is-invoiced' : ''} ${isBatch ? 'is-batch-finding' : ''} flex flex-row ${(procedureSteps.length || isOrthoPackage) ? 'flex-wrap' : 'flex-nowrap'} items-center gap-2.5 overflow-hidden rounded-xl border border-slate-200 border-l-4 px-3 py-2.5 shadow-sm transition hover:shadow-md" style="--finding-display-color:${displayColor};--finding-status-soft:${statusSoft};--finding-status-border:${statusBorder};border-left-color:${displayColor}">
             ${isOrthoPackage ? '<div class="finding-row-main flex flex-row flex-nowrap items-center gap-2.5 w-full">' : ''}
             <div class="finding-row-summary flex min-w-0 flex-1 items-center gap-3">
-              ${isOrthoPackage ? `
-                <div class="flex h-4 w-4 shrink-0 items-center justify-center text-indigo-600" title="${currentUiLanguage === 'ar' ? 'باقة زيارات متعددة (تفوتر بالزيارة)' : 'Multi-visit package (invoiced per visit)'}">
-                  <i data-lucide="package" class="h-4 w-4"></i>
-                </div>
-              ` : `
-                <input type="checkbox" class="finding-selection-checkbox ${isFullyInvoiced ? 'is-invoiced-checkbox' : ''} h-4 w-4 shrink-0 rounded border-slate-300 text-violet-600 focus:ring-violet-500" ${isCheckboxChecked ? 'checked' : ''} ${canSelect ? '' : 'disabled'} onchange="toggleFindingSelectionFromControl(this)" aria-label="${isFullyInvoiced ? 'Invoiced' : 'Select'} ${escapeHtml(dentalOperationLabel(finding.code))}${isFullyInvoiced ? '' : ' for invoicing'}" title="${isFullyInvoiced ? 'This operation is already invoiced' : !selectableMemberIds.length ? 'Add a price before selecting this operation' : isInvoiced ? 'Select the uninvoiced teeth in this batch' : 'Select for invoicing'}">
-              `}
+              <label class="finding-selection-target">
+                <input type="checkbox" class="finding-selection-checkbox ${isFullyInvoiced ? 'is-invoiced-checkbox' : ''} h-4 w-4 shrink-0 rounded border-slate-300 text-violet-600 focus:ring-violet-500" ${isCheckboxChecked ? 'checked' : ''} ${canSelect ? '' : 'disabled'} onchange="toggleFindingSelectionFromControl(this)" aria-label="${currentUiLanguage === 'ar' ? (isFullyInvoiced ? 'إجراء مفوتر' : 'تحديد الإجراء') : (isFullyInvoiced ? 'Invoiced procedure' : 'Select procedure')} ${escapeHtml(dentalOperationLabel(finding.code))}" title="${currentUiLanguage === 'ar' ? (!selectableMemberIds.length ? 'أزل بنود الفاتورة أولاً قبل تحديد الإجراء' : isOrthoPackage ? 'تحديد الباقة للحذف مع جميع زياراتها' : 'تحديد الإجراء للفوترة أو الحذف') : (!selectableMemberIds.length ? 'Remove invoice items before selecting this procedure' : isOrthoPackage ? 'Select package for deletion with all its visits' : 'Select procedure for invoicing or deletion')}">
+              </label>
               <div class="finding-tooth-picker flex flex-col shrink-0 items-center justify-center gap-1 w-12">
                 ${toothBadges}
               </div>
@@ -32858,11 +32821,6 @@
               ${doctorSalaryActionMarkup}
               ${isBatch ? '<button type="button" onclick="separateFindingBatch(this)" class="finding-separate-button inline-flex shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[10px] font-black text-violet-700 transition hover:border-violet-300 hover:bg-violet-100" aria-label="Separate this batch into one row per tooth" title="Create one independent documented row for each tooth"><i data-lucide="split" class="h-3 w-3"></i>Separate</button>' : ''}
               <div class="finding-invoice-control" aria-label="${currentUiLanguage === 'ar' ? 'حالة الفاتورة والمدفوعات' : 'Invoice and payment status'}">${invoiceColumnMarkup}</div>
-              ${isOrthoPackage && isOrthoLocked ? `
-                <button type="button" disabled class="finding-delete-button inline-flex h-7 w-7 shrink-0 cursor-not-allowed items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-slate-400 opacity-60" title="${currentUiLanguage === 'ar' ? 'لا يمكن حذف هذه الباقة لأن بعض زياراتها مفوترة بالفعل. يرجى حذف بنود الفاتورة أولاً.' : 'Cannot delete this package because one or more visits are invoiced. Remove invoice items first.'}" aria-label="Delete locked"><i data-lucide="lock" class="h-3.5 w-3.5"></i></button>
-              ` : `
-                <button type="button" onclick="deleteFindingFromControl(this)" class="finding-delete-button inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:border-red-300 hover:bg-red-100" title="Delete ${escapeHtml(dentalOperationLabel(finding.code))}" aria-label="Delete ${escapeHtml(dentalOperationLabel(finding.code))}"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button>
-              `}
             </div>
             ${isOrthoPackage ? '</div>' : ''}
             ${procedureStepsMarkup}
