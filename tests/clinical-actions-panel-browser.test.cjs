@@ -439,6 +439,94 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
       await page.locator('#standard-icons-fixture').screenshot({path:path.join(screenshots,`standard-icons-${viewport.width}-${language}.png`)});
     }
   });
+  await t.test('mobile search fills the visible keyboard viewport and returns to half height after dismissal', async () => {
+    await page.setViewportSize({width:390,height:844});
+    await page.evaluate(() => {
+      dentalSpecialties=[{id:'endo',name:'Endo',iconName:'dental-endodontics',active:true}];
+      dentalOperations=[{id:'root-canal',name:'Root canal',specialtyId:'endo',active:true,actionScope:'tooth',code:'root-canal',price:1200,steps:[]}];
+      renderClinicalActionSelectors();
+      window.clinicalOriginalViewport = window.visualViewport;
+      const viewport = Object.assign(new EventTarget(), {width:390,height:844,offsetTop:0,offsetLeft:0});
+      Object.defineProperty(window, 'visualViewport', {configurable:true,value:viewport});
+      viewport.addEventListener('resize', updateAppViewportDimensions);
+      viewport.addEventListener('scroll', updateAppViewportDimensions);
+      const source=document.createElement('nav');source.hidden=true;document.body.appendChild(source);
+      window.clinicalKeyboardNavigation=LuminMobileNav.create({
+        source,shell:document.getElementById('view-chart'),getLanguage:()=>currentUiLanguage,
+        onLayout:()=>{},onQuickCreate:()=>{},closeQuickCreate:()=>{}
+      });
+    });
+    try {
+      for(const viewport of [{width:390,height:844,keyboardHeight:480},{width:320,height:568,keyboardHeight:340}]) {
+        await page.setViewportSize({width:viewport.width,height:viewport.height});
+        for(const language of ['en','ar'])for(const scale of [.85,1,1.25])for(const shrinkLayout of [false,true]) {
+          await page.setViewportSize({width:viewport.width,height:viewport.height});
+          await page.evaluate(({viewport,language,scale})=>{
+            document.activeElement.blur();
+            Object.assign(window.visualViewport,{width:viewport.width,height:viewport.height,offsetTop:0});
+            document.documentElement.style.zoom=String(scale);
+            document.documentElement.style.setProperty('--lumin-app-scale',String(scale));
+            currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';
+            activeSelection=emptyChartSelection();resetClinicalActionsFilters();updateSelectionUI();toggleSelectedChartTooth('1',1);
+            chooseClinicalActionsOperation('root-canal');
+            window.visualViewport.dispatchEvent(new Event('resize'));
+            clinicalKeyboardNavigation.refresh();
+          },{viewport,language,scale});
+          const panel=page.locator('#action-palette-card'),search=page.locator('#chart-actions-search');
+          const half=(await panel.boundingBox()).height;
+          assert.ok(Math.abs(half-viewport.height/2)<2,'Selection starts with a half-screen sheet');
+          await search.focus();
+          assert.ok(Math.abs((await panel.boundingBox()).height-half)<2,'Focus alone never expands the sheet');
+          await search.fill('root');
+          assert.equal(await page.locator('[data-clinical-operation]').count(),1,'Search retains matching procedures');
+          assert.equal(await page.locator('#chart-apply-operation-button').isEnabled(),true,'The selected procedure can still be applied');
+          if(shrinkLayout)await page.setViewportSize({width:viewport.width,height:viewport.keyboardHeight});
+          await page.evaluate(viewport=>{
+            Object.assign(window.visualViewport,{height:viewport.keyboardHeight,offsetTop:0});
+            window.visualViewport.dispatchEvent(new Event('resize'));
+          },viewport);
+          await page.waitForFunction(()=>document.body.classList.contains('lumin-mobile-keyboard-open'));
+          for(const offsetTop of [0,24]) {
+            if(shrinkLayout)await page.setViewportSize({width:viewport.width,height:viewport.keyboardHeight+offsetTop});
+            await page.evaluate(offset=>{
+              window.visualViewport.offsetTop=offset;
+              window.visualViewport.dispatchEvent(new Event('scroll'));
+            },offsetTop);
+            const box=await panel.boundingBox();
+            assert.ok(Math.abs(box.height-viewport.keyboardHeight)<2,JSON.stringify({viewport,language,scale,shrinkLayout,box}));
+            assert.ok(Math.abs(box.y-offsetTop)<2,'The sheet starts at the top of the visible keyboard viewport: '+JSON.stringify({viewport,scale,shrinkLayout,offsetTop,box}));
+            for(const control of [search,page.locator('#chart-apply-operation-button')]) {
+              const bounds=await control.boundingBox();
+              assert.ok(bounds.y>=box.y&&bounds.y+bounds.height<=box.y+box.height+1,'Search and Apply stay above the keyboard');
+            }
+            assert.ok(await page.locator('.chart-actions-content').evaluate(node=>node.clientHeight)>0,'Procedures retain an internal scrolling area');
+            assert.equal(await search.evaluate(node=>node===document.activeElement),true,'Resizing preserves search focus');
+            assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+          }
+          if(viewport.width===390&&scale===1&&!shrinkLayout)await page.screenshot({path:path.join(screenshots,`mobile-keyboard-sheet-${language}.png`)});
+          await page.setViewportSize({width:viewport.width,height:viewport.height});
+          await page.evaluate(viewport=>{
+            Object.assign(window.visualViewport,{height:viewport.height,offsetTop:0});
+            window.visualViewport.dispatchEvent(new Event('resize'));
+          },viewport);
+          await page.waitForFunction(()=>!document.body.classList.contains('lumin-mobile-keyboard-open'));
+          const restored=await panel.boundingBox();
+          assert.ok(Math.abs(restored.height-half)<2&&Math.abs(restored.y-viewport.height/2)<2,'Keyboard dismissal restores half height even while search retains focus');
+          assert.equal(await search.inputValue(),'root','Keyboard dismissal retains the search');
+          assert.deepEqual(await page.evaluate(()=>chartSelectionTargets().map(target=>target.tooth)),['1']);
+          assert.equal(await page.locator('#chart-operation-select').inputValue(),'root-canal','Resizing retains the procedure draft');
+        }
+      }
+    } finally {
+      await page.setViewportSize({width:390,height:844});
+      await page.evaluate(()=>{
+        document.activeElement.blur();
+        Object.defineProperty(window,'visualViewport',{configurable:true,value:window.clinicalOriginalViewport});
+        document.documentElement.style.removeProperty('zoom');document.documentElement.style.removeProperty('--lumin-app-scale');
+        updateAppViewportDimensions();clinicalKeyboardNavigation.refresh();
+      });
+    }
+  });
   assert.deepEqual(await page.evaluate(()=>window.alerts),[]);
   assert.deepEqual(errors,[]);
 });
