@@ -6933,7 +6933,7 @@
 
             <div id="storage-local-key-field">
               <label for="settings-storage-key" class="block text-xs font-bold text-slate-700 mb-1.5">Clinic Secret Key</label>
-              <input id="settings-storage-key" type="password" placeholder="e.g. LuminClinicKey_2026" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input id="settings-storage-key" type="password" placeholder="Private server key" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               <p class="mt-1.5 text-[11px] text-slate-400">Must match the <code class="font-mono text-slate-600">clinic_secret_key</code> specified in your storage server's <code class="font-mono text-slate-600">config.json</code>.</p>
             </div>
 
@@ -8581,7 +8581,7 @@
                 </label>
                 <label class="wa-settings-field is-wide">
                   <span class="wa-settings-label">Webhook Verify Token</span>
-                  <input id="setting-whatsapp-verify-token" placeholder="lumin_secret_token" class="wa-settings-input font-mono" autocomplete="off" />
+                  <input id="setting-whatsapp-verify-token" placeholder="Private verification token" class="wa-settings-input font-mono" autocomplete="off" />
                 </label>
                 <label class="wa-settings-field is-wide">
                   <span class="wa-settings-label">Meta Access Token <small>Keep private</small></span>
@@ -10586,6 +10586,8 @@
       'Secure practice management login': 'تسجيل دخول آمن لإدارة العيادة',
       'Login name or email': 'اسم الدخول أو البريد الإلكتروني',
       'Password': 'كلمة المرور',
+      'Private server key': 'مفتاح الخادم الخاص',
+      'Private verification token': 'رمز التحقق الخاص',
       'Your password': 'كلمة المرور الخاصة بك',
       'dr sara or name@clinic.com': 'د. سارة أو name@clinic.com',
       'Sign in': 'تسجيل الدخول',
@@ -12778,7 +12780,7 @@
       }
       if (data && Object.hasOwn(data, 'storage_secret_key')) {
         clinicStorageSecretKey = String(data.storage_secret_key || '').trim();
-        localStorage.setItem('lumin_storage_secret_key', clinicStorageSecretKey);
+        localStorage.removeItem('lumin_storage_secret_key');
       }
       if (window.LuminGoogleDrive?.isDrive(clinicStorageServerUrl)) await window.LuminGoogleDrive.ensure().catch(() => {});
       if (typeof populateStorageServerSettingsInputs === 'function') {
@@ -12920,6 +12922,7 @@
         currentSession = null;
         if (typeof resetQuotationUi === 'function') resetQuotationUi();
         window.LuminGoogleDrive?.reset();
+        clearStorageCredentials();
         currentUserAccess = null;
         resetLoyaltyState();
         resetFinanceSyncState();
@@ -13239,6 +13242,7 @@
         const accessConfigurationFailed = error?.code === 'LUMIN_ACCESS_CONFIGURATION';
         currentSession = accessConfigurationFailed ? null : session;
         window.LuminGoogleDrive?.reset();
+        clearStorageCredentials();
         currentUserAccess = null;
         if (accessConfigurationFailed) await db.auth.signOut({ scope: 'local' });
         document.getElementById('login-password').value = '';
@@ -14256,6 +14260,7 @@
     }
 
     window.addEventListener('message', async (event) => {
+      if (event.origin !== window.location.origin) return;
       if (event.data?.type === 'GOOGLE_CALENDAR_AUTH_RESULT') {
         if (event.data.result === 'connected') {
           setGoogleCalendarMessage('Google Calendar connected successfully. Loading settings…', 'success');
@@ -19101,6 +19106,7 @@
         currentSession = null;
         if (typeof resetQuotationUi === 'function') resetQuotationUi();
         window.LuminGoogleDrive?.reset();
+        clearStorageCredentials();
         currentUserAccess = null;
         resetLoyaltyState();
         resetFinanceSyncState();
@@ -26719,6 +26725,62 @@
     let lightboxInverted = false;
     let clinicStorageServerUrl = '';
     let clinicStorageSecretKey = '';
+    const storageMediaGrants = new Map();
+    let storageMediaGrantGeneration = 0;
+    // Remove credentials left by older releases. Server names/URLs remain usable.
+    try {
+      localStorage.removeItem('lumin_storage_secret_key');
+      const presets = JSON.parse(localStorage.getItem('lumin_storage_server_presets') || 'null');
+      if (Array.isArray(presets)) localStorage.setItem('lumin_storage_server_presets', JSON.stringify(presets.map(({key, ...preset}) => preset)));
+    } catch (_) {}
+
+    async function ensureStorageMediaGrant(config = getStorageServerConfig()) {
+      if (window.LuminGoogleDrive?.isDrive(config.url)) {
+        await window.LuminGoogleDrive.ensure();
+        Object.assign(config, window.LuminGoogleDrive.config(config.url));
+        return;
+      }
+      const existing = storageMediaGrants.get(config.url);
+      if (existing?.key === config.key && existing.expiresAt > Date.now() + 60000) return;
+      if (existing?.key === config.key && existing.pending) return existing.pending;
+      const generation = storageMediaGrantGeneration;
+      const entry = {key: config.key, expiresAt: 0};
+      entry.pending = (async () => {
+        const response = await fetch(`${config.url}/api/media-grant`, {method: 'POST', headers: {'x-lumin-key': config.key}, cache: 'no-store', signal: AbortSignal.timeout(10000)});
+        if (!response.ok) throw new Error(currentUiLanguage === 'ar' ? 'تعذر اعتماد جلسة الوسائط. حدّث خادم التخزين وتحقق من المفتاح.' : 'Could not authorize media. Update the storage server and check its key.');
+        const data = await response.json();
+        if (generation !== storageMediaGrantGeneration) {
+          if (data.mediaGrant) void fetch(`${config.url}/api/media-grant/revoke`, {method:'POST',headers:{'Content-Type':'application/json','x-lumin-key':config.key},body:JSON.stringify({mediaGrant:data.mediaGrant}),keepalive:true}).catch(() => {});
+          return;
+        }
+        if (typeof data.mediaGrant !== 'string' || data.mediaGrant.length < 32 || !Number.isFinite(data.expiresAt)) throw new Error(currentUiLanguage === 'ar' ? 'بيانات اعتماد الوسائط غير صحيحة.' : 'Invalid media authorization.');
+        Object.assign(entry, data);
+      })().finally(() => { entry.pending = null; });
+      storageMediaGrants.set(config.url, entry);
+      return entry.pending;
+    }
+
+    function storageMediaUrl(url, config = getStorageServerConfig()) {
+      const target = new URL(url);
+      if (window.LuminGoogleDrive?.isDrive(config.url)) target.searchParams.set('key', config.key);
+      else {
+        const grant = storageMediaGrants.get(config.url);
+        if (grant?.key === config.key && grant.expiresAt > Date.now()) target.searchParams.set('media', grant.mediaGrant);
+      }
+      return target.toString();
+    }
+
+    function clearStorageCredentials() {
+      storageMediaGrantGeneration++;
+      for (const [url, grant] of storageMediaGrants) {
+        if (grant.mediaGrant) void fetch(`${url}/api/media-grant/revoke`, {method: 'POST', headers: {'Content-Type':'application/json','x-lumin-key':grant.key}, body:JSON.stringify({mediaGrant:grant.mediaGrant}), keepalive:true}).catch(() => {});
+      }
+      storageMediaGrants.clear();
+      storagePresetKeys.clear();
+      clinicStorageSecretKey = '';
+      localStorage.removeItem('lumin_storage_secret_key');
+    }
+
     const STORAGE_CONNECTION_POLL_MS = 30000;
     const STORAGE_CONNECTION_TIMEOUT_MS = 12000;
     const STORAGE_CONNECTION_FAILURE_LIMIT = 3;
@@ -26735,7 +26797,7 @@
       const savedUrl = dbUrl || localStorage.getItem('lumin_storage_server_url') || 'http://localhost:5000';
       const driveConfig = window.LuminGoogleDrive?.config(savedUrl);
       if (driveConfig) return driveConfig;
-      const savedKey = dbKey || (localStorage.getItem('lumin_storage_secret_key') ?? 'LuminClinicKey_2026');
+      const savedKey = dbKey;
       return {
         url: savedUrl.trim().replace(/\/+$/, ''),
         key: savedKey.trim()
@@ -26824,7 +26886,7 @@
           }
           transientFailure = false;
           data = await response.json();
-          if (data?.status !== 'online' || !['Lumin Local Storage Server', 'Lumin Google Drive Storage'].includes(data?.service)) {
+          if (data?.status !== 'online' || data.authConfigured === false || !['Lumin Local Storage Server', 'Lumin Google Drive Storage'].includes(data?.service)) {
             throw new Error('Invalid storage server health response.');
           }
         } catch (err) {
@@ -26909,7 +26971,8 @@
       window.addEventListener('storage', event => {
         if (event.key === 'lumin_storage_server_url' || event.key === 'lumin_storage_secret_key' || event.key === null) {
           clinicStorageServerUrl = localStorage.getItem('lumin_storage_server_url') || '';
-          clinicStorageSecretKey = localStorage.getItem('lumin_storage_secret_key') || '';
+          clinicStorageSecretKey = '';
+          if (currentSession) void fetchClinicSettings();
           refreshStorageConnectionConfig();
           if (typeof renderStorageServerPresets === 'function') renderStorageServerPresets();
         } else if (event.key === 'lumin_storage_server_presets') {
@@ -26919,26 +26982,27 @@
     }
 
     // ================= STORAGE SERVER PRESETS & SWITCHER =================
+    const storagePresetKeys = new Map();
     const DEFAULT_STORAGE_PRESETS = [
       {
         id: 'preset-laptop',
         name: 'Laptop (Test Server)',
         url: 'https://desktop-mlncjfe.tailf46d13.ts.net',
-        key: 'LuminClinicKey_2026',
+        key: '',
         icon: 'laptop'
       },
       {
         id: 'preset-dedicated',
         name: 'Dedicated Clinic PC (Main)',
         url: 'https://desktop-qqh9t0j.tailf46d13.ts.net',
-        key: 'LuminClinicKey_2026',
+        key: '',
         icon: 'server'
       },
       {
         id: 'preset-local',
         name: 'Localhost (LAN / Direct)',
         url: 'http://localhost:5000',
-        key: 'LuminClinicKey_2026',
+        key: '',
         icon: 'hard-drive'
       }
     ];
@@ -26955,7 +27019,9 @@
         if (raw !== null) {
           const list = JSON.parse(raw);
           if (Array.isArray(list)) {
-            const saved = list.filter(preset => preset && typeof preset.id === 'string' && typeof preset.name === 'string' && typeof preset.url === 'string').map(preset => ({ ...preset }));
+            list.forEach(preset => { if (preset?.key && preset.key !== 'LuminClinicKey_2026') storagePresetKeys.set(preset.id, preset.key); });
+            localStorage.setItem('lumin_storage_server_presets', JSON.stringify(list.map(({key, ...preset}) => preset)));
+            const saved = list.filter(preset => preset && typeof preset.id === 'string' && typeof preset.name === 'string' && typeof preset.url === 'string').map(preset => ({ ...preset, key: storagePresetKeys.get(preset.id) || (storageServerUrlsMatch(preset.url, clinicStorageServerUrl) ? clinicStorageSecretKey : '') }));
             return window.LuminGoogleDrive ? window.LuminGoogleDrive.presets(saved) : saved;
           }
         }
@@ -26967,7 +27033,8 @@
     }
 
     function saveStorageServerPresets(presets) {
-      localStorage.setItem('lumin_storage_server_presets', JSON.stringify(presets.filter(preset => preset.provider !== 'google-drive')));
+      presets.forEach(preset => { if (preset.key) storagePresetKeys.set(preset.id, preset.key); });
+      localStorage.setItem('lumin_storage_server_presets', JSON.stringify(presets.filter(preset => preset.provider !== 'google-drive').map(({key, ...preset}) => preset)));
     }
 
     function normaliseStoragePresetUrl(value) {
@@ -27080,7 +27147,7 @@
       const keyInput = document.getElementById('settings-storage-key');
       if (!urlInput || !keyInput) return false;
       urlInput.value = preset.url;
-      keyInput.value = preset.provider === 'google-drive' ? '' : preset.key ?? previous.key;
+      keyInput.value = preset.provider === 'google-drive' ? '' : preset.key || previous.key;
       storagePresetSwitchingId = preset.id;
       try {
         const saved = await saveStorageServerSettings();
@@ -27234,6 +27301,10 @@
         return false;
       }
       const cleanKey = window.LuminGoogleDrive?.isDrive(cleanUrl) ? '' : keyInput.value.trim();
+      if (!window.LuminGoogleDrive?.isDrive(cleanUrl) && (!cleanKey || cleanKey === 'LuminClinicKey_2026')) {
+        showStorageSettingsMessage(currentUiLanguage === 'ar' ? 'أدخل مفتاحاً خاصاً بخادم التخزين. المفتاح الافتراضي القديم لم يعد مقبولاً.' : 'Enter the server’s private key. The old default key is no longer accepted.', false);
+        return false;
+      }
       storageSettingsSaving = true;
       urlInput.disabled = true;
       keyInput.disabled = true;
@@ -27251,7 +27322,7 @@
         clinicStorageSecretKey = cleanKey;
         try {
           localStorage.setItem('lumin_storage_server_url', cleanUrl);
-          localStorage.setItem('lumin_storage_secret_key', cleanKey);
+          localStorage.removeItem('lumin_storage_secret_key');
         } catch (_) { console.warn('Storage settings synced, but could not be cached on this device.'); }
         urlInput.value = cleanUrl;
         refreshStorageConnectionConfig();
@@ -27363,13 +27434,12 @@
       if (offlineEl) offlineEl.classList.add('hidden');
 
       try {
-        const separator = config.url.includes('?') ? '&' : '?';
-        const url = `${config.url}/api/storage/location${separator}key=${encodeURIComponent(config.key || '')}`;
+        const url = `${config.url}/api/storage/location`;
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
         const res = await fetch(url, {
           signal: controller.signal,
-          headers: { 'x-lumin-key': config.key || '' }
+          headers: { 'x-lumin-key': config.key || '', Authorization: `Bearer ${currentSession?.access_token || ''}` }
         });
         clearTimeout(timeout);
 
@@ -27668,13 +27738,13 @@
       }
 
       try {
-        const separator = config.url.includes('?') ? '&' : '?';
-        const url = `${config.url}/api/storage/browse${separator}key=${encodeURIComponent(config.key || '')}`;
+        const url = `${config.url}/api/storage/browse`;
         const res = await fetch(url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-lumin-key': config.key || ''
+            'x-lumin-key': config.key || '',
+            Authorization: `Bearer ${currentSession?.access_token || ''}`
           },
           body: JSON.stringify({ path: targetPath })
         });
@@ -27723,11 +27793,11 @@
             const escapedSubPath = escapeHtml(fullSubPath);
             return `
               <div class="flex items-center justify-between py-2 px-2 hover:bg-slate-50 transition rounded-lg">
-                <button type="button" onclick="browseStorageFolder('${escapedSubPath}')" class="flex items-center gap-2 min-w-0 text-left flex-1 text-xs font-semibold text-slate-700 hover:text-indigo-600 transition truncate">
+                <button type="button" style="min-height:44px;min-width:44px" data-storage-browse-path="${escapedSubPath}" onclick="browseStorageFolder(this.dataset.storageBrowsePath)" class="flex items-center gap-2 min-w-0 text-left flex-1 text-xs font-semibold text-slate-700 hover:text-indigo-600 transition truncate">
                   <i data-lucide="folder" class="h-4 w-4 shrink-0 text-amber-500"></i>
                   <span class="truncate" dir="ltr">${escapeHtml(folderName)}</span>
                 </button>
-                <button type="button" onclick="selectBrowserPath('${escapedSubPath}')" class="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2 py-1 rounded-md transition shrink-0 ml-2">
+                <button type="button" style="min-height:44px;min-width:44px;margin-inline-start:0.5rem" data-storage-select-path="${escapedSubPath}" onclick="selectBrowserPath(this.dataset.storageSelectPath)" class="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2 py-1 rounded-md transition shrink-0 ml-2">
                   <i data-lucide="check" class="h-3 w-3"></i>
                   <span>${t('Select', 'اختيار')}</span>
                 </button>
@@ -27834,20 +27904,20 @@
       if (msgEl) msgEl.classList.add('hidden');
 
       try {
-        const separator = config.url.includes('?') ? '&' : '?';
-        const url = `${config.url}/api/storage/location${separator}key=${encodeURIComponent(config.key || '')}`;
+        const url = `${config.url}/api/storage/location`;
         const res = await fetch(url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-lumin-key': config.key || ''
+            'x-lumin-key': config.key || '',
+            Authorization: `Bearer ${currentSession?.access_token || ''}`
           },
-          body: JSON.stringify({ newPath, migrateFiles })
+          body: JSON.stringify({ newPath, migrateExisting: migrateFiles, migrateFiles })
         });
 
         const data = await res.json().catch(() => ({}));
 
-        if (!res.ok || data.status !== 'success') {
+        if (!res.ok || (data.success !== true && data.status !== 'success')) {
           throw new Error(data.error || `Server returned error (${res.status})`);
         }
 
@@ -27965,7 +28035,37 @@
       return `${getStorageServerConfig().url}/files/${file.relativePath.split('/').map(encodeURIComponent).join('/')}`;
     }
 
-    function openPatientMediaLightboxByIndex(index) {
+    async function downloadPatientMediaFile(file, event) {
+      event?.preventDefault();
+      if (!file || !hasPageAccess('patients')) return;
+      const userId = currentSession?.user?.id;
+      if (!userId) return;
+      const config = getStorageServerConfig();
+      const trigger = event?.currentTarget;
+      trigger?.setAttribute('aria-busy', 'true');
+      try {
+        await ensureStorageMediaGrant(config);
+        const currentConfig = getStorageServerConfig();
+        if (currentSession?.user?.id !== userId || !hasPageAccess('patients') || currentConfig.url !== config.url || currentConfig.key !== config.key) return;
+        const fileUrl = `${config.url}/files/${file.relativePath.split('/').map(encodeURIComponent).join('/')}`;
+        const response = await fetch(fileUrl, {headers: {'x-lumin-key': config.key}, cache: 'no-store', signal: AbortSignal.timeout(30000)});
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        if (currentSession?.user?.id !== userId || !hasPageAccess('patients') || getStorageServerConfig().url !== config.url || getStorageServerConfig().key !== config.key) return;
+        const url = URL.createObjectURL(blob), link = document.createElement('a');
+        link.href = url; link.download = patientMediaDownloadName(file);
+        document.body.append(link); link.click(); link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch (_) {
+        showAppointmentNotificationToast(currentUiLanguage === 'ar' ? 'تعذر تنزيل الملف. تحقق من الاتصال ثم أعد المحاولة.' : 'Could not download the file. Check the connection and retry.');
+      } finally { trigger?.removeAttribute('aria-busy'); }
+    }
+
+    function downloadPatientMediaByIndex(index, event) {
+      return downloadPatientMediaFile(currentPatientMediaFiles[index], event);
+    }
+
+    async function openPatientMediaLightboxByIndex(index) {
       const file = currentPatientMediaFiles[index];
       if (!file) return;
       if (typeof openPatientMediaFile === 'function') {
@@ -27973,8 +28073,12 @@
         return;
       }
       const config = getStorageServerConfig();
+      const patientId = activePatientMediaPatientId, renderToken = patientMediaRenderToken;
+      try { await ensureStorageMediaGrant(config); }
+      catch (_) { showAppointmentNotificationToast(currentUiLanguage === 'ar' ? 'تعذر فتح الصورة. تحقق من التخزين ثم أعد المحاولة.' : 'Could not open the image. Check storage and retry.'); return; }
+      if (patientId !== activePatientMediaPatientId || renderToken !== patientMediaRenderToken || !hasPageAccess('patients')) return;
       const path = file.relativePath.split('/').map(encodeURIComponent).join('/');
-      openMediaLightbox(patientMediaFileUrl(file), file.category, patientMediaDisplayName(file), file.modifiedAt?.split('T')[0] || '', `${config.url}/api/thumbnail/${path}?key=${encodeURIComponent(config.key)}`, file.relativePath);
+      openMediaLightbox(patientMediaFileUrl(file), file.category, patientMediaDisplayName(file), file.modifiedAt?.split('T')[0] || '', storageMediaUrl(`${config.url}/api/thumbnail/${path}`, config), file.relativePath);
     }
 
     function fallbackPatientMediaPreview(image, index) {
@@ -27986,7 +28090,7 @@
         image.parentElement.insertAdjacentHTML('beforeend', `<span class="flex h-44 items-center justify-center px-4 text-center text-xs text-slate-500">${currentUiLanguage === 'ar' ? 'المعاينة غير متاحة. اضغط لفتح الصورة الأصلية.' : 'Preview unavailable. Tap to open the original.'}</span>`);
         return;
       }
-      image.src = `${patientMediaFileUrl(file)}?key=${encodeURIComponent(getStorageServerConfig().key)}`;
+      image.src = storageMediaUrl(patientMediaFileUrl(file));
     }
 
     function openPatientMediaMoveByIndex(index) {
@@ -28105,6 +28209,7 @@
       content.innerHTML = `<div class="p-12 text-center text-sm font-bold text-slate-400"><div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 mb-2"></div><p>${currentUiLanguage === 'ar' ? 'جارٍ تحميل الأشعة والوسائط من موقع التخزين المحدد...' : 'Loading patient media from selected storage...'}</p></div>`;
 
       try {
+        await ensureStorageMediaGrant(storageConfig);
         const resp = await fetch(`${storageConfig.url}/api/patient/${patient.id}/files?name=${encodeURIComponent(patient.name || '')}`, {
           method: 'GET',
           headers: { 'x-lumin-key': storageConfig.key }
@@ -28172,7 +28277,7 @@
         const toothLabel = patientMediaTeethLabel(file.mediaDetails);
         const fileUrl = patientMediaFileUrl(file);
         const encodedPath = file.relativePath.split('/').map(encodeURIComponent).join('/');
-        const thumbUrl = `${storageConfig.url}/api/thumbnail/${encodedPath}?key=${encodeURIComponent(storageConfig.key)}`;
+        const thumbUrl = storageMediaUrl(`${storageConfig.url}/api/thumbnail/${encodedPath}`, storageConfig);
         const editLabel = currentUiLanguage === 'ar' ? 'تعديل التفاصيل' : 'Edit details';
         const moveLabel = currentUiLanguage === 'ar' ? 'تغيير التصنيف' : 'Change Category';
         const downloadLabel = currentUiLanguage === 'ar' ? 'تنزيل' : 'Download';
@@ -28210,7 +28315,7 @@
                 <div class="media-card-actions">
                   <button type="button" onclick="openPatientMediaDetailsModal(${index})" data-media-edit-index="${index}" class="media-action media-action-edit" ${patientMediaDetailsError ? 'disabled' : ''}><i data-lucide="pencil" class="h-4 w-4"></i><span>${editLabel}</span></button>
                   <button type="button" onclick="openPatientMediaMoveByIndex(${index})" title="${moveLabel}" aria-label="${moveLabel}" class="media-action" ${patientMediaDetailsError ? 'disabled' : ''}><i data-lucide="folder-input" class="h-4 w-4"></i></button>
-                  <a href="${escapeHtml(fileUrl)}?key=${encodeURIComponent(storageConfig.key)}" download="${escapeHtml(patientMediaDownloadName(file))}" target="_blank" rel="noopener" title="${downloadLabel}" aria-label="${downloadLabel}" class="media-action"><i data-lucide="download" class="h-4 w-4"></i></a>
+                  <a href="${escapeHtml(storageMediaUrl(fileUrl, storageConfig))}" download="${escapeHtml(patientMediaDownloadName(file))}" target="_blank" rel="noopener" title="${downloadLabel}" aria-label="${downloadLabel}" class="media-action" onclick="downloadPatientMediaByIndex(${index}, event)"><i data-lucide="download" class="h-4 w-4"></i></a>
                   <button type="button" onclick="deletePatientMediaByIndex(${index})" title="${deleteLabel}" aria-label="${deleteLabel}" class="media-action media-action-danger"><i data-lucide="trash-2" class="h-4 w-4"></i></button>
                 </div>
               </div>
@@ -28681,7 +28786,7 @@
       if (!modal || !img) return;
 
       const storageConfig = getStorageServerConfig();
-      const fullUrl = `${url}?key=${encodeURIComponent(storageConfig.key)}`;
+      const fullUrl = storageMediaUrl(url, storageConfig);
       currentLightboxOriginalUrl = fullUrl;
       currentLightboxRelativePath = relativePath;
       currentLightboxPatientId = patientId;
@@ -28849,7 +28954,7 @@
           currentLightboxRelativePath = resData.newRelativePath || relativePath;
           const badge = document.getElementById('lightbox-category-badge');
           if (badge) badge.textContent = resData.newCategory || targetCategory;
-          currentLightboxOriginalUrl = `${patientMediaFileUrl(fileRecord)}?key=${encodeURIComponent(storageConfig.key)}`;
+          currentLightboxOriginalUrl = storageMediaUrl(patientMediaFileUrl(fileRecord), storageConfig);
           const image = document.getElementById('lightbox-img');
           if (image) image.src = currentLightboxOriginalUrl;
           const download = document.getElementById('lightbox-download-link');
@@ -40894,7 +40999,7 @@
         if (dispatchSelect) dispatchSelect.value = data.whatsapp_dispatch_mode || clinicWhatsAppDispatchMode || 'cloud_api';
         document.getElementById('setting-whatsapp-phone-id').value = data.whatsapp_phone_number_id || '';
         document.getElementById('setting-whatsapp-waba-id').value = data.whatsapp_business_account_id || '';
-        document.getElementById('setting-whatsapp-verify-token').value = data.whatsapp_verify_token || 'lumin_secret_token';
+        document.getElementById('setting-whatsapp-verify-token').value = data.whatsapp_verify_token || '';
         document.getElementById('setting-whatsapp-gemini-key').value = data.gemini_api_key || '';
         const modelSelect = document.getElementById('setting-whatsapp-model');
         if (modelSelect) modelSelect.value = data.whatsapp_ai_model || 'gemini-3.5-flash-lite';

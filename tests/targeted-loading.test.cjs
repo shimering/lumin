@@ -14,7 +14,7 @@ function deferred() { let resolve; const promise = new Promise(r => resolve = r)
 function context(extra = {}, names = []) {
   const ctx = vm.createContext({ Date, console, currentSession: {user:{id:'staff'}}, currentUiLanguage:'en',
     patients:[], patientDirectoryRows:[], patientProcedureState:{patientsById:new Map()},
-    patientDetailReads:new Map(), patientDetailFreshness:new Map(), patientChartSaveStates:new Map(), patientChartWriteRevision:7, targetedLoadingGeneration:0,
+    prefetchChartPatientMedia(){}, patientDetailReads:new Map(), patientDetailFreshness:new Map(), patientChartSaveStates:new Map(), patientChartWriteRevision:7, targetedLoadingGeneration:0,
     PATIENT_SELECT_FIELDS:'id,name,chart_state', patientChartSaveKey:id=>id, normalisePatientRecord:r=>({id:r.id,name:r.name,chartState:r.chart_state,recordComplete:true}),
     coalescedRefreshReads:new Map(), workspaceNavigationToken:0, stableJsonStringify:JSON.stringify, ...extra });
   ['contentRefreshContext','coalesceRefreshRead','getKnownPatient',...names].forEach(name => vm.runInContext(source(name), ctx));

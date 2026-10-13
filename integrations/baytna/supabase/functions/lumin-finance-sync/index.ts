@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.3";
 
 // Each request is authenticated with an event-specific HMAC, never a reusable credential.
 Deno.serve(async (req: Request) => {

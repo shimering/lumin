@@ -230,7 +230,7 @@ test('patient Quotations tab supports editing, deletion, pagination and patient 
     const patient={id:activePatientId,name:'Omar Hassan',phone:'01001234567',chartState:chart};
     const settings={clinic_name:'Noura Dental',logo_data_url:'${formLogo}',whatsapp_phone:'201001234567'};
     let savedQuote=null;window.payloads=[];window.canChart=true;window.failHistory=false;window.delayHistory=false;
-    function getActivePatient(){return patient;} function patientWorkspaceId(){return activePatientId;} function hasPageAccess(page){return page!=='chart'||window.canChart;}
+    function getActivePatient(){return patient;} function patientWorkspaceId(){return activePatientId;} function prefetchChartPatientMedia(){} function hasPageAccess(page){return page!=='chart'||window.canChart;}
     function rememberPatientWorkspaceOrigin(){} function currentPatientAge(){return null;} function formatPatientNumber(){return '001';}
     function translateUiTree(){} function syncLoyaltyVisibility(){} function canViewPatientLoyalty(){return true;} function canViewPatientAppointments(){return true;} function canViewPatientPrescriptions(){return true;} function canViewPatientInvoices(){return true;}
     async function switchView(name){window.openedView=name;resetQuotationUi();document.getElementById('chart-selection-fixture').classList.toggle('hidden',name!=='chart');document.getElementById('history').hidden=name==='patient-quotations';document.getElementById('view-patient-quotations').classList.toggle('hidden',name!=='patient-quotations');updatePatientWorkspaceNavigation(patient,name==='patient-quotations'?'quotations':'chart');if(name==='patient-quotations')await renderPatientQuotations();}

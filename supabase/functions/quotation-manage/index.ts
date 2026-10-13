@@ -1,4 +1,4 @@
-import { createClient } from "npm:@supabase/supabase-js@2.105.0";
+import { createClient } from "npm:@supabase/supabase-js@2.117.3";
 import "../../../lumin-quotation-model.js";
 
 const headers = {"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, apikey, content-type, x-client-info","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json","Cache-Control":"no-store, private"};

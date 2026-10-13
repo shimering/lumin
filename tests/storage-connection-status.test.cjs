@@ -24,7 +24,7 @@ function harness() {
   const badge = { dataset: {}, attributes: {}, setAttribute(name, value) { this.attributes[name] = value; }, querySelector: () => text };
   const settingsBadge = { className: '', textContent: '' };
   const ctx = vm.createContext({
-    AbortController, currentUiLanguage: 'en',
+    AbortController, currentSession:{user:{id:'fixture'}}, fetchClinicSettings:async()=>{}, currentUiLanguage: 'en',
     navigator: { onLine: true },
     localStorage: { getItem: key => values.get(key) || null },
     document: {
@@ -41,6 +41,7 @@ function harness() {
     fetch: async (url, options) => { requests.push({ url, options }); return response(); }
   });
   vm.runInContext(helpers, ctx);
+  vm.runInContext("clinicStorageSecretKey='test-key'",ctx);
   ctx.setupStorageConnectionMonitor();
   return { ctx, badge, text, settingsBadge, requests, values, timeouts, intervals, windowListeners, documentListeners };
 }
@@ -70,6 +71,7 @@ test('HTTP errors, malformed JSON, offline health, and unrelated servers never s
     async () => response({}, 503),
     async () => ({ ok: true, json: async () => { throw Error('Invalid JSON'); } }),
     async () => response({ ...healthy, status: 'offline' }),
+    async () => response({ ...healthy, authConfigured: false }),
     async () => response({ ...healthy, service: 'Other service' }),
     async () => response(null)
   ]) {

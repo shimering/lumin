@@ -1,8 +1,8 @@
 [
   {
     "package": "three",
-    "version": "0.180.0",
-    "tarballSha256": "ad66d724565ee29a2467277fa84daa5ed0211d6b8d446e9ef29f6bae0cd14144",
+    "version": "0.186.1",
+    "tarballSha256": "8cd068708ea44f2c73c944b1cead2ba2f0d5c15c8fc194e5700f4e4f4a033fe7",
     "files": [
       "build/three.module.js",
       "build/three.core.js",
@@ -14,8 +14,8 @@
   },
   {
     "package": "fflate",
-    "version": "0.8.2",
-    "tarballSha256": "61fd5061e2fc8e5e3e3129f7f2fec7bd78a313e1bf4becbf1cc1cc9998d141dc",
+    "version": "0.8.3",
+    "tarballSha256": "38c2cd824402407b43153c782274aec2ea83ea688e4aa0b743c5f2c305857d92",
     "files": [
       "esm/browser.js",
       "LICENSE"

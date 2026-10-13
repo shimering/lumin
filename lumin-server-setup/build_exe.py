@@ -23,7 +23,7 @@ def current_defaults():
     path = SERVER / "config.json"
     if path.exists():
         defaults.update(json.loads(path.read_text(encoding="utf-8-sig")))
-    return {name: defaults[name] for name in ("port", "max_file_size_mb", "allowed_extensions")}
+    return {name: defaults[name] for name in ("port", "max_file_size_mb", "allowed_extensions", "allowed_origins")}
 
 
 def main():

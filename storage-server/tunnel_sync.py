@@ -25,7 +25,7 @@ PYTHON_EXE = BASE_DIR / ".venv" / "Scripts" / "python.exe"
 # Supabase configuration
 SUPABASE_URL = "https://pqbayjkypzfxvnksgwwf.supabase.co"
 SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxYmF5amt5cHpmeHZua3Nnd3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkxMjI4NzAsImV4cCI6MjEwNDY5ODg3MH0.e5tPe3PKUiFiS_ZnXcpDF9CRtGtp_B1oZsK37phOQ8Q"
-CLINIC_KEY = "LuminClinicKey_2026"
+CLINIC_KEY = ""
 
 if not PYTHON_EXE.exists():
     PYTHON_EXE = Path(sys.executable)

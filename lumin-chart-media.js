@@ -43,11 +43,14 @@ function cachedChartPatientMedia(patientId, config) {
 }
 
 async function fetchChartPatientMedia(patient, config = getStorageServerConfig()) {
-  const scope = chartMediaCacheScope(config), key = scope + patient.id, epoch = chartMediaCacheEpoch;
+  let scope = chartMediaCacheScope(config);
+  const key = scope + patient.id, epoch = chartMediaCacheEpoch;
   if (chartPatientMediaReads.has(key)) return chartPatientMediaReads.get(key);
   const pending = (async () => {
     const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 15000);
     try {
+      await ensureStorageMediaGrant(config);
+      scope = chartMediaCacheScope(config);
       const response = await fetch(`${config.url}/api/patient/${encodeURIComponent(patient.id)}/files?name=${encodeURIComponent(patient.name || '')}`, {headers: {'x-lumin-key': config.key}, signal: controller.signal});
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
@@ -299,12 +302,12 @@ function chartPatientAttachments() {
 }
 
 function patientMediaAuthenticatedUrl(file) {
-  return `${patientMediaFileUrl(file)}?key=${encodeURIComponent(getStorageServerConfig().key)}`;
+  return storageMediaUrl(patientMediaFileUrl(file));
 }
 
 function patientMediaThumbnailUrl(file) {
   const config = getStorageServerConfig();
-  return `${config.url}/api/thumbnail/${file.relativePath.split('/').map(encodeURIComponent).join('/')}?key=${encodeURIComponent(config.key)}`;
+  return storageMediaUrl(`${config.url}/api/thumbnail/${file.relativePath.split('/').map(encodeURIComponent).join('/')}`, config);
 }
 
 function updateChartMediaStickyTop() {
@@ -680,7 +683,7 @@ function renderPatientAttachmentList() {
   else if (!files.length) content.innerHTML = `<div class="chart-media-empty"><i data-lucide="paperclip"></i><h4>${chartMediaText('No attachments yet', 'لا توجد مرفقات بعد')}</h4><p>${chartMediaText('Add PDFs, reports, photos, or other patient files.', 'أضف ملفات PDF أو تقارير أو صورًا أو ملفات أخرى للمريض.')}</p></div>`;
   else content.innerHTML = files.map(file => {
     const index = chartPatientMedia.files.indexOf(file);
-    return `<article class="patient-attachment-row"><i data-lucide="${patientMediaFileKind(file) === 'image' ? 'image' : 'file-text'}"></i><div class="patient-attachment-row-info"><h4 data-media-user-content dir="auto">${escapeHtml(patientMediaDisplayName(file))}</h4><p>${escapeHtml(String(file.filename).split('.').pop().toUpperCase())} · ${(Number(file.sizeBytes || 0) / 1024).toFixed(0)} KB</p></div><button type="button" class="chart-media-button" onclick="openChartPatientMediaFile(${index})" aria-label="${escapeHtml(chartMediaText('View ', 'عرض ') + patientMediaDisplayName(file))}"><i data-lucide="eye"></i></button><a class="chart-media-button is-neutral" href="${escapeHtml(patientMediaAuthenticatedUrl(file))}" download="${escapeHtml(patientMediaDownloadName(file))}" target="_blank" rel="noopener" aria-label="${chartMediaText('Download', 'تنزيل')}"><i data-lucide="download"></i></a></article>`;
+    return `<article class="patient-attachment-row"><i data-lucide="${patientMediaFileKind(file) === 'image' ? 'image' : 'file-text'}"></i><div class="patient-attachment-row-info"><h4 data-media-user-content dir="auto">${escapeHtml(patientMediaDisplayName(file))}</h4><p>${escapeHtml(String(file.filename).split('.').pop().toUpperCase())} · ${(Number(file.sizeBytes || 0) / 1024).toFixed(0)} KB</p></div><button type="button" class="chart-media-button" onclick="openChartPatientMediaFile(${index})" aria-label="${escapeHtml(chartMediaText('View ', 'عرض ') + patientMediaDisplayName(file))}"><i data-lucide="eye"></i></button><a class="chart-media-button is-neutral" href="${escapeHtml(patientMediaAuthenticatedUrl(file))}" download="${escapeHtml(patientMediaDownloadName(file))}" onclick="downloadChartPatientMediaFile(${index}, event)" target="_blank" rel="noopener" aria-label="${chartMediaText('Download', 'تنزيل')}"><i data-lucide="download"></i></a></article>`;
   }).join('');
   document.getElementById('patient-attachment-footer').innerHTML = `<button type="button" class="chart-media-button" onclick="openChartPatientMediaUpload(true)"><i data-lucide="plus"></i>${chartMediaText('Add attachment', 'إضافة مرفق')}</button>`;
   if (window.lucide) lucide.createIcons();
@@ -688,6 +691,13 @@ function renderPatientAttachmentList() {
 
 async function openPatientMediaFile(file, patientId) {
   if (!hasPageAccess('patients')) return;
+  const request = ++patientAttachmentRequest;
+  try { await ensureStorageMediaGrant(); }
+  catch (_) {
+    if (request === patientAttachmentRequest) showAppointmentNotificationToast(chartMediaText('Could not open the file. Check storage and retry.', 'تعذر فتح الملف. تحقق من التخزين ثم أعد المحاولة.'));
+    return;
+  }
+  if (request !== patientAttachmentRequest || !hasPageAccess('patients')) return;
   const kind = patientMediaFileKind(file);
   if (kind === 'image') {
     closePatientAttachmentModal();
@@ -699,7 +709,6 @@ async function openPatientMediaFile(file, patientId) {
     openMediaLightbox(patientMediaFileUrl(file), file.category, patientMediaDisplayName(file), file.modifiedAt?.split('T')[0] || '', patientMediaThumbnailUrl(file), file.relativePath);
     return;
   }
-  const request = ++patientAttachmentRequest;
   showPatientAttachmentModal(patientId, 'file');
   const name = patientMediaDisplayName(file);
   const url = patientMediaAuthenticatedUrl(file);
@@ -708,6 +717,8 @@ async function openPatientMediaFile(file, patientId) {
   const content = document.getElementById('patient-attachment-content');
   content.replaceChildren();
   document.getElementById('patient-attachment-footer').innerHTML = `${patientId === chartPatientMedia.patientId ? `<button type="button" class="chart-media-button is-neutral" onclick="openPatientAttachmentList()"><i data-lucide="paperclip"></i>${chartMediaText('Attachments', 'المرفقات')}</button>` : ''}<a class="chart-media-button is-neutral" href="${escapeHtml(url)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i>${chartMediaText('Open in new tab', 'فتح في علامة تبويب جديدة')}</a><a class="chart-media-button" href="${escapeHtml(url)}" download="${escapeHtml(patientMediaDownloadName(file))}" target="_blank" rel="noopener"><i data-lucide="download"></i>${chartMediaText('Download', 'تنزيل')}</a>`;
+  const download = document.querySelector('#patient-attachment-footer a[download]');
+  if (download) download.onclick = event => downloadPatientMediaFile(file, event);
   if (window.lucide) lucide.createIcons();
   if (kind === 'pdf') {
     const frame = document.createElement('iframe');
@@ -738,6 +749,10 @@ async function openPatientMediaFile(file, patientId) {
     }
   } else content.innerHTML = patientAttachmentUnavailablePreview();
   if (window.lucide) lucide.createIcons();
+}
+
+function downloadChartPatientMediaFile(index, event) {
+  return downloadPatientMediaFile(chartPatientMedia.files[index], event);
 }
 
 function resetChartPatientMedia() {

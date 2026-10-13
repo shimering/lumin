@@ -51,6 +51,8 @@ test('account-specific chart appointments open only in landscape and preserve re
     function escapeHtml(value) { const node=document.createElement('span');node.textContent=String(value);return node.innerHTML.replaceAll('"','&quot;'); }
     function arabicUiPhrase(value) { return {'Scheduled':'مجدول','Confirmed':'مؤكد','Checked in':'تم تسجيل الحضور','In progress':'قيد التنفيذ'}[value] || value; }
     function getKnownPatient(id) { return {id,name:'Ahmed Hassan'}; }
+    async function ensureStorageMediaGrant(){}
+    function storageMediaUrl(url){return url+'?media=fixture'}
     function getStorageServerConfig() { return {url:location.origin,key:'fixture'}; }
     function patientMediaToothIds(details) { return details?.tooth_ids || []; }
     function patientMediaTeethLabel() { return 'UR6'; }

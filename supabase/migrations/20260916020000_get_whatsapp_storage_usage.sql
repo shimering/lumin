@@ -1,11 +1,11 @@
-﻿-- Migration: get_whatsapp_storage_usage RPC function
+-- Migration: get_whatsapp_storage_usage RPC function
 -- Purpose: Safely query file count and total size used by whatsapp-media bucket out of the 1GB free tier.
 
 CREATE OR REPLACE FUNCTION public.get_whatsapp_storage_usage()
 RETURNS json
 LANGUAGE plpgsql
 SECURITY DEFINER
-AS 
+AS $$
 DECLARE
     result json;
 BEGIN
@@ -20,6 +20,6 @@ BEGIN
     
     RETURN result;
 END;
-;
+$$;
 
 GRANT EXECUTE ON FUNCTION public.get_whatsapp_storage_usage() TO authenticated, anon, service_role;

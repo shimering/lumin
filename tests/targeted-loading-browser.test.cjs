@@ -33,7 +33,7 @@ test('patient navigation shows immediately, rejects old responses, and finance p
   await page.addScriptTag({content:`
     let currentSession={user:{id:'staff'}},currentUiLanguage='en',workspaceNavigationToken=0,patientWorkspaceLoadingId=null;
     let activeWorkspacePatientId=null,activePatientId=null,activeInvoicePatientId=null,activePatientsTab='browse',activeClinicManagementTab='finances';
-    let chartStructureInitialized=false,dentalCustomizationLoaded=false;
+    let activePatientScans=null,chartStructureInitialized=false,dentalCustomizationLoaded=false;
     const patientWorkspaceSwipe=null,patients=[],patientDirectoryRows=[{id:'a',name:'Patient A',recordComplete:false},{id:'b',name:'Patient B',recordComplete:false}];
     const patientProcedureState={patientsById:new Map()},patientDetailReads=new Map(),patientDetailFreshness=new Map(),patientChartSaveStates=new Map(),coalescedRefreshReads=new Map();
     const PATIENT_SELECT_FIELDS='id,name,chart_state';let patientChartWriteRevision=0,targetedLoadingGeneration=0;
@@ -43,6 +43,7 @@ test('patient navigation shows immediately, rejects old responses, and finance p
     const db={from:()=>({select(){return this},eq(k,id){this.id=id;return this},maybeSingle(){return new Promise(resolve=>fixtureReads.set(this.id,resolve))}})};
     function escapeHtml(v){return String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;')}
     const lucide={createIcons(){}};
+    function prefetchChartPatientMedia(){}
     function hasPageAccess(){return true}function canOpenPatientsPage(){return true}
     function canViewPatientInvoices(){return true}function canViewPatientAppointments(){return true}
     function canViewPatientPrescriptions(){return true}function canViewPatientLoyalty(){return true}
@@ -50,7 +51,7 @@ test('patient navigation shows immediately, rejects old responses, and finance p
     function updatePatientWorkspaceNavigation(patient){document.querySelectorAll('.patient-workspace-name').forEach(el=>el.textContent=patient.name)}
     function renderPatientProfile(){document.getElementById('profile-patient-phone').textContent=getKnownPatient(activeWorkspacePatientId).phone||''}
     ${['closeChartFindingDateDialog','closeMobileHeaderOverlay','closeWhatsAppTemplatePicker','closeQuickCreateMenu','syncNavMountLocation',
-      'resetPatientAppointmentsState','resetPatientPrescriptionsState','renderChartMediaPanel','resetWhatsAppWindowScroll','resetPatientQueryWindowScroll',
+      'clearChartPatientMedia','resetPatientAppointmentsState','resetPatientPrescriptionsState','renderChartMediaPanel','resetWhatsAppWindowScroll','resetPatientQueryWindowScroll',
       'resetAppointmentsCalendarWindowScroll','scheduleDashboardViewportUpdate','renderDashboard','renderPatientInvoices','renderPatientPayments',
       'renderPatientAppointments','renderPatientPrescriptions','renderPatientMedia','renderPatientLoyalty','schedulePatientQueryViewportUpdate','switchPatientsTab'].map(n=>`function ${n}(){}`).join('\n')}
     ${['contentRefreshContext','coalesceRefreshRead','getKnownPatient','ensureKnownPatient','patientWorkspaceId','patientWorkspaceLoadState','switchView'].map(source).join('\n')}

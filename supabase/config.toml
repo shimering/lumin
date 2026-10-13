@@ -7,3 +7,7 @@ verify_jwt = true
 # OAuth callbacks, image grants and paired servers authenticate inside the handler.
 [functions.google-drive]
 verify_jwt = false
+
+# Staff JWTs and Meta HMAC signatures are verified by the handler.
+[functions.whatsapp-webhook]
+verify_jwt = false

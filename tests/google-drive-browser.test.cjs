@@ -6,7 +6,7 @@ const test = require('node:test');
 let chromium; try { ({chromium} = require('playwright')); } catch (_) {}
 const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-const workflow = html.slice(html.indexOf('    const DEFAULT_STORAGE_PRESETS ='), html.indexOf('    async function testStorageServerConnection()'));
+const workflow = html.slice(html.indexOf('    const storagePresetKeys ='), html.indexOf('    async function testStorageServerConnection()'));
 function source(name) {
   const start = html.search(new RegExp(`    (?:async )?function ${name}\\(`));
   const end = html.slice(start).match(/\r?\n    }\r?\n/);

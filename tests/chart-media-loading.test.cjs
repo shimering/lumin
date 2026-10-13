@@ -9,12 +9,12 @@ function fixture() {
   let allow = true, config = {url: 'https://storage.test', key: 'clinic-key'}, releases = [], requests = 0;
   const context = vm.createContext({window: {matchMedia: () => ({matches: false})}, document: {addEventListener() {}, getElementById: () => null},
     activePatientId: 'one', currentSession: {user: {id: 'doctor'}}, patientMediaToothPicker: null,
-    getKnownPatient: id => ({id, name: id}), hasPageAccess: () => allow, getStorageServerConfig: () => config,
+    getKnownPatient: id => ({id, name: id}), hasPageAccess: () => allow, ensureStorageMediaGrant: async()=>{}, storageMediaUrl:url=>url, getStorageServerConfig: () => config,
     structuredClone, AbortController, AbortSignal, setTimeout, clearTimeout,
     fetch: async () => { requests++; return new Promise(resolve => releases.push(data => resolve({ok: true, json: async () => data}))); }
   });
   vm.runInContext(source, context); context.renderChartMediaPanel = () => {}; context.renderPatientAttachmentList = () => {};
-  return {context, state: vm.runInContext('chartPatientMedia', context), release: data => releases.shift()(data), requests: () => requests, deny: () => allow = false, changeStorage: () => config = {url: 'https://other.test', key: 'other-key'}};
+  return {context, state: vm.runInContext('chartPatientMedia', context), release: async data => { while (!releases.length) await Promise.resolve(); releases.shift()(data); }, requests: () => requests, deny: () => allow = false, changeStorage: () => config = {url: 'https://other.test', key: 'other-key'}};
 }
 const response = name => ({metadataSource: 'local', files: [{filename: name + '.png', category: 'Periapical', relativePath: name + '/Periapical/x.png', mediaDetails: {tooth_ids: ['3']}}]});
 
@@ -29,7 +29,7 @@ test('reopening a chart renders confirmed X-rays immediately while new records l
 
 test('prefetch and chart opening share one request; different patients and storage never share records', async () => {
   const f = fixture(), prefetch = f.context.prefetchChartPatientMedia('one'), first = f.context.loadChartPatientMedia();
-  assert.equal(f.requests(), 1); f.release(response('one')); await Promise.all([prefetch, first]);
+  await new Promise(resolve=>setImmediate(resolve)); assert.equal(f.requests(), 1); f.release(response('one')); await Promise.all([prefetch, first]);
   f.context.activePatientId = 'two'; const second = f.context.loadChartPatientMedia();
   assert.equal(f.state.files.length, 0); f.release(response('two')); await second;
   f.changeStorage(); const other = f.context.loadChartPatientMedia();

@@ -1,0 +1,11 @@
+{
+  "auto_start_server": true,
+  "auto_enable_tailscale": true,
+  "minimize_to_tray": true,
+  "start_on_boot": false,
+  "auto_sync_enabled": false,
+  "auto_sync_interval_minutes": 30,
+  "peer_url": "https://desktop-qqh9t0j.tailf46d13.ts.net",
+  "peer_key": "",
+  "server_role": "coordinator"
+}

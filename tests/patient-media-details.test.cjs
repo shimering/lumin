@@ -45,6 +45,7 @@ function createHarness() {
     document: { getElementById: node, querySelector() { return null; }, addEventListener() {} },
     console: { warn() {}, error() {} },
     escapeHtml: value => String(value).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]),
+    cacheChartPatientMediaResponse() {}, ensureStorageMediaGrant: async () => {}, storageMediaUrl: url => url + '?media=fixture',
     hasPageAccess: () => true, getStorageServerConfig: () => ({ url:'https://storage.example', key:'test-key' }),
     getKnownPatient: id => ({ id, name: 'Patient' }), updatePatientWorkspaceNavigation() {}, translateUiTree() {},
     closePatientMediaUploadModal() {}, closePatientMediaMoveModal() {},

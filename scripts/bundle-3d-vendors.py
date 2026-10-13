@@ -9,10 +9,10 @@ import urllib.request
 base = Path(__file__).resolve().parents[1] / 'vendor'
 records = []
 for name, version, files in [
-    ('three', '0.180.0', ['build/three.module.js', 'build/three.core.js',
+    ('three', '0.186.1', ['build/three.module.js', 'build/three.core.js',
      'examples/jsm/loaders/OBJLoader.js', 'examples/jsm/loaders/MTLLoader.js',
      'examples/jsm/controls/OrbitControls.js', 'LICENSE']),
-    ('fflate', '0.8.2', ['esm/browser.js', 'LICENSE']),
+    ('fflate', '0.8.3', ['esm/browser.js', 'LICENSE']),
 ]:
     data = urllib.request.urlopen(f'https://registry.npmjs.org/{name}/-/{name}-{version}.tgz', timeout=30).read()
     archive = tarfile.open(fileobj=io.BytesIO(data), mode='r:gz')
@@ -28,4 +28,4 @@ for name, version, files in [
     records.append({'package': name, 'version': version,
                     'tarballSha256': hashlib.sha256(data).hexdigest(), 'files': files})
 (base / '3d-packages.json').write_text(json.dumps(records, indent=2))
-print('Bundled Three.js 0.180.0 and fflate 0.8.2, including licenses.')
+print('Bundled Three.js 0.186.1 and fflate 0.8.3, including licenses.')

@@ -150,6 +150,7 @@ class StorageTunnelTests(unittest.TestCase):
         with patch.object(tunnel, "load_origin_url", return_value=ORIGIN), \
                 patch.object(tunnel, "load_clinic_key"), \
                 patch.object(tunnel, "check_server_running", return_value=True), \
+                patch.object(tunnel, "CLOUDFLARED_EXE", Mock(exists=lambda: True)), \
                 patch.object(tunnel, "run_tunnel", side_effect=["http2", 4]) as run, \
                 patch.object(tunnel.subprocess, "Popen") as spawn:
             self.assertEqual(tunnel.main([]), 4)

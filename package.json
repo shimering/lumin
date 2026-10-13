@@ -1,0 +1,23 @@
+{
+  "name": "lumin",
+  "version": "1.0.0",
+  "private": true,
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "build": "node scripts/build-web-assets.cjs",
+    "test": "node --test --test-concurrency=3 tests/*.test.cjs",
+    "test:sql": "node --test tests/security-sql.test.cjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.117.3",
+    "fflate": "0.8.3",
+    "lucide": "0.468.0",
+    "pdf-lib": "1.17.1",
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.9",
+    "playwright": "1.64.0",
+    "wrangler": "4.149.0"
+  }
+}

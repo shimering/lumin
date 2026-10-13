@@ -121,6 +121,8 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
     const details = [{relative_path:'Ahmed/Periapical/preop.png',display_name:'UR6 before treatment',tooth_id:'3',tooth_ids:['3','4'],note:'Review distal surface.\\nCompare with the previous image.'},{relative_path:'Ahmed/Panoramic/child.png',display_name:'Deciduous follow-up',tooth_id:'A',note:'ملاحظة متابعة للطفل'}];
     function hasPageAccess() { return canReadPatients; }
     function getKnownPatient(id) { return {id, name:id === 'patient-1' ? 'Ahmed Hassan' : 'Sara Ahmed'}; }
+    async function ensureStorageMediaGrant(){}
+    function storageMediaUrl(url){return url+'?media=fixture'}
     function getStorageServerConfig() { return {url:storageUrl,key:'test-key'}; }
     function escapeHtml(value) { const element = document.createElement('span'); element.textContent = String(value); return element.innerHTML.replaceAll('"','&quot;'); }
     function openMediaLightbox(...args) { window.lastLightbox = args; }
@@ -252,7 +254,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
       assert.ok(dialog.x >= 0 && dialog.x + dialog.width <= viewport.width + 1 && dialog.y >= 0 && dialog.y + dialog.height <= viewport.height + 1);
       await page.locator('.patient-attachment-row button').first().click();
       assert.ok(await page.locator('#patient-attachment-content iframe').isVisible());
-      assert.match(await page.locator('#patient-attachment-content iframe').getAttribute('src'), /lab\.pdf\?key=test-key/);
+      assert.match(await page.locator('#patient-attachment-content iframe').getAttribute('src'), /lab\.pdf\?media=fixture/);
       const targets = await page.locator('#patient-attachment-modal .chart-media-button').evaluateAll(elements => elements.map(element => ({w:element.getBoundingClientRect().width,h:element.getBoundingClientRect().height})));
       assert.ok(targets.every(target => target.w >= 44 && target.h >= 44));
       await page.keyboard.press('Escape');
@@ -423,7 +425,9 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
   assert.match(await page.locator('#patient-attachment-content pre').textContent(), /<script>alert/);
   assert.equal(await page.locator('#patient-attachment-content script').count(),0);
   await page.keyboard.press('Escape');
-  await page.evaluate(() => { holdText=true; window.textPreview=openPatientMediaFile(filesByPatient['patient-1'][3], 'patient-1'); openPatientAttachmentList(); });
+  await page.evaluate(() => { holdText=true; window.textPreview=openPatientMediaFile(filesByPatient['patient-1'][3], 'patient-1'); });
+  await page.waitForFunction(() => typeof releaseText === 'function');
+  await page.evaluate(() => openPatientAttachmentList());
   await page.evaluate(async () => { releaseText(); await window.textPreview; holdText=false; });
   assert.equal(await page.locator('.patient-attachment-row').count(),4,'A stale text preview cannot replace the attachment list');
   await page.keyboard.press('Escape');
@@ -480,6 +484,8 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
     let currentUiLanguage='en', activePatientId='patient-1';
     function hasPageAccess() { return true; }
     function getKnownPatient(id) { return {id,name:'Ahmed Hassan'}; }
+    async function ensureStorageMediaGrant(){}
+    function storageMediaUrl(url){return url+'?media=fixture'}
     function getStorageServerConfig() { return {url:location.origin,key:'test-key'}; }
     function escapeHtml(value) { const node=document.createElement('span'); node.textContent=String(value); return node.innerHTML.replaceAll('"','&quot;'); }
     const PRIMARY_TOOTH_BY_SLOT={4:'A'}, SLOT_BY_PRIMARY_TOOTH={A:4};

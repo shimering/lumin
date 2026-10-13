@@ -1,5 +1,5 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2.95.0";
+import "jsr:@supabase/functions-js@2.117.3/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.117.3";
 
 const ONESIGNAL_APP_ID = "1796b727-661f-43cb-9770-1b3938e4db8c";
 const corsHeaders = {

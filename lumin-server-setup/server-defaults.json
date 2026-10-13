@@ -12,5 +12,8 @@
     "dcm",
     "tif",
     "tiff"
+  ],
+  "allowed_origins": [
+    "https://lumin.gazarxperia.workers.dev"
   ]
 }

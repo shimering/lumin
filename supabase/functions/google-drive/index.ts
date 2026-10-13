@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js@2.117.3/edge-runtime.d.ts";
-import {createClient} from "npm:@supabase/supabase-js@2.105.0";
+import {createClient} from "npm:@supabase/supabase-js@2.117.3";
 import {DriveError, MAX_UPLOAD, access, caseFold, cleanName, equal, safePath, sha256, uuid} from "./core.ts";
 import {DriveStore, checked, mimeForPath, type DriveConfig} from "./store.ts";
 import {DriveTokenCache} from "./token_cache.ts";

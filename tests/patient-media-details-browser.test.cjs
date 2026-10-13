@@ -56,6 +56,8 @@ test('media gallery and edit sheet fit phone, tablet, and desktop in English and
       {filename:'second.png',relativePath:'Test/Periapical/second.png',category:'Periapical',sizeBytes:2048,mediaDetails:{display_name:'صورة متابعة لطفل باسم طويل جداً',tooth_id:'A',note:'ملاحظة سريرية تحت الصورة. '.repeat(8)}},
     ];
     function escapeHtml(value) { const element = document.createElement('span'); element.textContent = String(value); return element.innerHTML.replaceAll('"','&quot;'); }
+    async function ensureStorageMediaGrant(){}
+    function storageMediaUrl(url){return url}
     function getStorageServerConfig() { return {url:location.origin,key:'test-key'}; }
     function hasPageAccess() { return true; }
     function closeMediaLightbox() {}

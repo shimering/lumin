@@ -8,7 +8,7 @@ const { randomUUID } = require('node:crypto');
 
 const root = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-const workflow = source.slice(source.indexOf('    const DEFAULT_STORAGE_PRESETS ='), source.indexOf('    async function testStorageServerConnection()'));
+const workflow = source.slice(source.indexOf('    const storagePresetKeys ='), source.indexOf('    async function testStorageServerConnection()'));
 function functionSource(name) {
   const start = source.search(new RegExp(`    (?:async )?function ${name}\\(`));
   assert.ok(start >= 0, name);
@@ -38,9 +38,9 @@ function harness() {
   const query = { update(value) { writes.push(value); return this; }, eq() { return this; }, select() { return this; }, maybeSingle: () => Promise.resolve(saveResult) };
   const ctx = vm.createContext({
     URL, crypto: { randomUUID }, currentUiLanguage: 'en', currentUserAccess: { isAdmin: true },
-    storageConnectionConnected: false, storageConnectionState: 'disconnected', clinicStorageServerUrl: '', clinicStorageSecretKey: '',
+    storageConnectionConnected: false, storageConnectionState: 'disconnected', clinicStorageServerUrl: presets[0].url, clinicStorageSecretKey: presets[0].key,
     document: { getElementById: element, querySelectorAll: () => [], activeElement: element('return-focus') },
-    localStorage: { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) },
+    localStorage: { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) },
     window: {}, console: { warn() {} }, requestAnimationFrame: fn => fn(),
     setTimeout: () => 1, clearTimeout() {}, confirm: () => true,
     escapeHtml: value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;'),
@@ -160,7 +160,7 @@ test('real Storage Server subtab supports adding and one-step switching with acc
   await page.goto(origin);
   await page.addScriptTag({ url: origin + '/vendor/lucide.min.js' });
   await page.addScriptTag({ content: `
-    let currentUiLanguage='en', currentUserAccess={isAdmin:true}, clinicStorageServerUrl='', clinicStorageSecretKey='', storageConnectionConnected=false, storageConnectionState='disconnected';
+    let currentUiLanguage='en', currentUserAccess={isAdmin:true}, clinicStorageServerUrl='https://clinic.test', clinicStorageSecretKey='main-key', storageConnectionConnected=false, storageConnectionState='disconnected';
     let writeCount=0;
     const db={from:()=>({update(){writeCount++;return this},eq(){return this},select(){return this},async maybeSingle(){return {data:{id:1},error:null}}})};
     function escapeHtml(value){return String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;')}

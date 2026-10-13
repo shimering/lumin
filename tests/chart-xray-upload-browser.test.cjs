@@ -60,6 +60,8 @@ test('chart X-ray filters prefill uploads, allow multiple teeth, and save withou
     function escapeHtml(value) { const node=document.createElement('span'); node.textContent=String(value); return node.innerHTML.replaceAll('"','&quot;'); }
     function hasPageAccess() { return canReadPatients; }
     function getKnownPatient(id) { return {id,name:id==='patient-1'?'Test patient':'Other patient'}; }
+    async function ensureStorageMediaGrant(){}
+    function storageMediaUrl(url){return url}
     function getStorageServerConfig() { return {url:location.origin,key:'test-key'}; }
     function patientWorkspaceId() { return activeWorkspacePatientId; }
     function openPatientWorkspace() { throw Error('Upload must stay on the chart'); }

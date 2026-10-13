@@ -1,5 +1,5 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2.95.0";
+import "jsr:@supabase/functions-js@2.117.3/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.117.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,7 +16,53 @@ const jsonResponse = (body: unknown, status = 200) =>
 function getSupabaseClient() {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-  return createClient(supabaseUrl, supabaseKey);
+  return createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
+}
+
+async function authorizeWhatsAppStaff(request: Request, supabase: any): Promise<Response | null> {
+  const authorization = request.headers.get("authorization") || "";
+  if (!authorization.startsWith("Bearer ")) return jsonResponse({ error: "Authentication required." }, 401);
+  const { data, error } = await supabase.auth.getUser(authorization.slice(7));
+  if (error || !data?.user) return jsonResponse({ error: "Invalid or expired session." }, 401);
+  const profile = await supabase.from("user_profiles")
+    .select("active,access_roles(is_admin,role_permissions(page_key,can_view))")
+    .eq("user_id", data.user.id).maybeSingle();
+  if (profile.error) return jsonResponse({ error: "Could not verify access." }, 503);
+  const role = Array.isArray(profile.data?.access_roles) ? profile.data.access_roles[0] : profile.data?.access_roles;
+  if (!profile.data?.active || !(role?.is_admin === true || role?.role_permissions?.some((p: any) => p.page_key === "whatsapp" && p.can_view === true))) {
+    return jsonResponse({ error: "WhatsApp access is required." }, 403);
+  }
+  return null;
+}
+
+async function verifyMetaSignature(request: Request, raw: string): Promise<boolean> {
+  const signature = request.headers.get("x-hub-signature-256") || "";
+  const secret = Deno.env.get("WHATSAPP_APP_SECRET") || "";
+  if (!secret || !/^sha256=[a-f0-9]{64}$/i.test(signature)) return false;
+  const bytes = Uint8Array.from(signature.slice(7).match(/../g)!, value => parseInt(value, 16));
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+  return crypto.subtle.verify("HMAC", key, bytes, new TextEncoder().encode(raw));
+}
+
+async function readWebhookBody(request: Request): Promise<string | null> {
+  const limit = 25 * 1024 * 1024;
+  if (Number(request.headers.get("content-length") || 0) > limit) return null;
+  if (!request.body) return "";
+  const reader = request.body.getReader(), chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      size += value.length;
+      if (size > limit) { await reader.cancel(); return null; }
+      chunks.push(value);
+    }
+  } finally { reader.releaseLock(); }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+  return new TextDecoder("utf-8", {fatal: true}).decode(bytes);
 }
 
 function compileWhatsAppAiInstructions(blocks: unknown, legacyInstructions: unknown): string {
@@ -309,7 +355,7 @@ async function getClinicWhatsAppSettings(supabase: any) {
     phoneId: String(data?.whatsapp_phone_number_id || Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") || "").trim(),
     wabaId: String(data?.whatsapp_business_account_id || Deno.env.get("WHATSAPP_BUSINESS_ACCOUNT_ID") || "").trim(),
     accessToken: String(data?.whatsapp_access_token || Deno.env.get("WHATSAPP_ACCESS_TOKEN") || "").trim(),
-    verifyToken: String(data?.whatsapp_verify_token || Deno.env.get("WHATSAPP_VERIFY_TOKEN") || "lumin_secret_token").trim(),
+    verifyToken: String(data?.whatsapp_verify_token || Deno.env.get("WHATSAPP_VERIFY_TOKEN") || "").trim(),
     geminiApiKey: String(data?.gemini_api_key || Deno.env.get("GEMINI_API_KEY") || "").trim(),
     aiInstructions: compileWhatsAppAiInstructions(data?.whatsapp_ai_instruction_blocks, data?.whatsapp_ai_instructions),
     aiModel: String(data?.whatsapp_ai_model || "gemini-3.5-flash-lite").trim(),
@@ -356,6 +402,7 @@ async function sendMetaWhatsAppMessage(
   }
 
   const res = await fetch(url, {
+    signal: AbortSignal.timeout(15000),
     method: "POST",
     headers: {
       "Authorization": `Bearer ${accessToken}`,
@@ -366,7 +413,7 @@ async function sendMetaWhatsAppMessage(
 
   const data = await res.json();
   if (!res.ok) {
-    console.error("Meta Graph API error:", data);
+    console.error("Meta Graph API error:", res.status);
     throw new Error(data?.error?.message || "Failed to send WhatsApp message via Meta API");
   }
   return data;
@@ -441,6 +488,7 @@ async function sendMetaWhatsAppLocation(
   }
 
   const res = await fetch(url, {
+    signal: AbortSignal.timeout(15000),
     method: "POST",
     headers: {
       "Authorization": `Bearer ${accessToken}`,
@@ -450,7 +498,7 @@ async function sendMetaWhatsAppLocation(
   });
   const data = await res.json();
   if (!res.ok) {
-    console.error("Meta Graph API location error:", data);
+    console.error("Meta Graph API location error:", res.status);
     throw new Error(data?.error?.message || "Failed to send WhatsApp location via Meta API");
   }
   return data;
@@ -494,6 +542,7 @@ async function sendMetaWhatsAppReaction(
   }
 
   const res = await fetch(url, {
+    signal: AbortSignal.timeout(15000),
     method: "POST",
     headers: {
       "Authorization": `Bearer ${accessToken}`,
@@ -504,7 +553,7 @@ async function sendMetaWhatsAppReaction(
 
   const data = await res.json();
   if (!res.ok) {
-    console.error("Meta Graph API reaction error:", data);
+    console.error("Meta Graph API reaction error:", res.status);
     throw new Error(data?.error?.message || "Failed to send reaction via Meta API");
   }
   return data;
@@ -550,6 +599,7 @@ async function sendMetaWhatsAppAudioMessage(
   }
 
   const res = await fetch(url, {
+    signal: AbortSignal.timeout(15000),
     method: "POST",
     headers: {
       "Authorization": `Bearer ${accessToken}`,
@@ -560,7 +610,7 @@ async function sendMetaWhatsAppAudioMessage(
 
   const data = await res.json();
   if (!res.ok) {
-    console.error("Meta Graph API audio error:", data);
+    console.error("Meta Graph API audio error:", res.status);
     throw new Error(data?.error?.message || "Failed to send WhatsApp audio message via Meta API");
   }
   return data;
@@ -613,6 +663,7 @@ async function sendMetaWhatsAppTemplate(
   }
 
   const res = await fetch(url, {
+    signal: AbortSignal.timeout(15000),
     method: "POST",
     headers: {
       "Authorization": `Bearer ${accessToken}`,
@@ -623,7 +674,7 @@ async function sendMetaWhatsAppTemplate(
 
   const data = await res.json();
   if (!res.ok) {
-    console.error("Meta Graph API template error:", data);
+    console.error("Meta Graph API template error:", res.status);
     throw new Error(data?.error?.message || "Failed to send WhatsApp template via Meta API");
   }
   return data;
@@ -670,6 +721,7 @@ async function processIncomingMedia(
 
     // 1. Get media URL
     const metaMediaRes = await fetch(`https://graph.facebook.com/v21.0/${mediaId}`, {
+      signal: AbortSignal.timeout(15000),
       headers: { "Authorization": `Bearer ${accessToken}` },
     });
     if (!metaMediaRes.ok) return { publicUrl: null };
@@ -679,6 +731,7 @@ async function processIncomingMedia(
 
     // 2. Download media binary
     const fileRes = await fetch(directUrl, {
+      signal: AbortSignal.timeout(30000),
       headers: { "Authorization": `Bearer ${accessToken}` },
     });
     if (!fileRes.ok) return { publicUrl: null };
@@ -907,6 +960,7 @@ async function sendAppointmentPushNotification(
 
   try {
     const res = await fetch("https://api.onesignal.com/notifications", {
+      signal: AbortSignal.timeout(15000),
       method: "POST",
       headers: {
         "Authorization": `Key ${apiKey}`,
@@ -1019,6 +1073,7 @@ async function sendIncomingWhatsAppPushNotification(
 
   try {
     const res = await fetch("https://api.onesignal.com/notifications", {
+      signal: AbortSignal.timeout(15000),
       method: "POST",
       headers: {
         "Authorization": `Key ${apiKey}`,
@@ -1255,6 +1310,15 @@ function buildGeminiTools(doctorNames: string[] = [], visitTypeNames: string[] =
 }
 
 // Execute tool calls against Supabase DB
+async function whatsappPatientIsAllowed(supabase: any, conversation: any, patientId: string): Promise<boolean> {
+  if (!patientId) return false;
+  if (patientId === conversation.patient_id) return true; // Existing staff/sender-authorized link.
+  const matches = isBsuid(conversation.phone)
+    ? await findPatientsByWhatsApp(supabase, conversation.phone)
+    : await findPatientsByPhone(supabase, conversation.phone);
+  return matches.some((patient: any) => patient.id === patientId);
+}
+
 async function handleGeminiToolCall(
   supabase: any,
   call: { name: string; args: any },
@@ -1298,7 +1362,7 @@ async function handleGeminiToolCall(
     const settingsMap = new Map((staffSettings || []).map((s: any) => [s.user_id, s.weekly_schedule]));
 
     const doctorList = (activeDoctors || []).map((doc: any) => {
-      const sched = settingsMap.get(doc.user_id) || {};
+      const sched: any = settingsMap.get(doc.user_id) || {};
       const days: number[] = Array.isArray(sched.days)
         ? sched.days
             .map(Number)
@@ -1583,6 +1647,9 @@ async function handleGeminiToolCall(
 
   if (name === "lookup_patient") {
     const rawPhone = String(args.phone || "").trim();
+    if (isBsuid(conversation.phone) || !cleanPhone(rawPhone) || getPhoneTail(rawPhone) !== getPhoneTail(conversation.phone)) {
+      return { success: false, found: false, error: "PATIENT_IDENTITY_REQUIRED" };
+    }
     if (!rawPhone) {
       return {
         found: false,
@@ -1664,6 +1731,9 @@ async function handleGeminiToolCall(
       return { success: false, error: "patient_id or valid patient_name is required" };
     }
 
+    if (!(await whatsappPatientIsAllowed(supabase, conversation, targetPatientId))) {
+      return { success: false, error: "PATIENT_IDENTITY_REQUIRED" };
+    }
     const { data: p, error: pErr } = await supabase
       .from("patients")
       .select("id, name, phone")
@@ -1713,12 +1783,18 @@ async function handleGeminiToolCall(
       return { success: false, error: "patient_name is required" };
     }
 
+    if (args.phone && !isBsuid(conversation.phone) && getPhoneTail(args.phone) !== getPhoneTail(conversation.phone)) {
+      return { success: false, error: "PATIENT_IDENTITY_REQUIRED" };
+    }
     const rawTargetPhone = args.phone || conversation.phone || "";
     const phoneToAssign = isBsuid(rawTargetPhone) ? "" : rawTargetPhone;
 
     // GUARD AGAINST DUPLICATE CREATION:
     // If patient(s) already exist with this phone number, re-use the existing profile!
     const existingMatches = phoneToAssign ? await findPatientsByPhone(supabase, phoneToAssign) : [];
+    if (isBsuid(conversation.phone) && existingMatches.some((patient: any) => patient.id !== conversation.patient_id)) {
+      return { success: false, error: "PATIENT_IDENTITY_REQUIRED" };
+    }
 
     if (existingMatches.length === 1) {
       const existing = existingMatches[0];
@@ -1783,56 +1859,6 @@ async function handleGeminiToolCall(
       }
     }
 
-    // Also check if a patient with this exact or normalized name already exists in the database
-    if (patientName) {
-      const normReq = normalizeArabicName(patientName);
-      const firstWord = normReq.split(" ")[0];
-      const { data: nameCandidates } = await supabase
-        .from("patients")
-        .select("id, name, phone")
-        .ilike("name", `${firstWord}%`)
-        .limit(10);
-
-      if (Array.isArray(nameCandidates) && nameCandidates.length > 0) {
-        const bestNameMatch = nameCandidates
-          .map((c: any) => ({ c, score: matchPatientNameScore(patientName, c.name) }))
-          .filter((x: any) => x.score >= 80)
-          .sort((a: any, b: any) => b.score - a.score)[0];
-
-        if (bestNameMatch) {
-          const existing = bestNameMatch.c;
-          if (!existing.phone && phoneToAssign) {
-            await supabase.from("patients").update({ phone: phoneToAssign }).eq("id", existing.id);
-          }
-          await supabase
-            .from("whatsapp_conversations")
-            .update({
-              patient_id: existing.id,
-              patient_name: existing.name,
-            })
-            .eq("id", conversation.id);
-
-          conversation.patient_id = existing.id;
-          conversation.patient_name = existing.name;
-
-          await savePatientWhatsAppIdentity(supabase, existing.id, {
-            whatsapp_username: conversation.patient_name !== existing.name ? conversation.patient_name : null,
-            whatsapp_code: isBsuid(conversation.phone) ? formatWhatsAppCode(conversation.phone) : null,
-            phone: phoneToAssign,
-          });
-
-          return {
-            success: true,
-            already_existed: true,
-            patient_id: existing.id,
-            patient_name: existing.name,
-            phone: existing.phone || phoneToAssign,
-            message: `تم العثور على ملف مسجل مسبقاً للمريض "${existing.name}" واستخدامه بنجاح دون إنشاء مريض مكرر. المريض لديه ملف فعلي مسجل الآن: لا تسأله عن رقم هاتفه مرة أخرى أبداً، ويمكنك فقط تأكيد رقم هاتفه المسجل معه إذا دعت الحاجة.`,
-          };
-        }
-      }
-    }
-
     const nameParts = patientName.split(/\s+/).filter(Boolean);
     const firstName = nameParts[0] || "Patient";
     const lastName = nameParts.slice(1).join(" ") || "";
@@ -1892,6 +1918,9 @@ async function handleGeminiToolCall(
 
     // 1. Resolve patient: prioritize provided patient_id or conversation.patient_id
     let patientId = patient_id || conversation.patient_id;
+    if (patientId && !(await whatsappPatientIsAllowed(supabase, conversation, patientId))) {
+      return { success: false, error: "PATIENT_IDENTITY_REQUIRED" };
+    }
     let finalPatientName = (patient_name || conversation.patient_name || "").trim();
 
     // If patientId is provided, verify it exists
@@ -2060,7 +2089,7 @@ async function handleGeminiToolCall(
       const reqMin = th * 60 + tm;
 
       for (const doc of (activeDocs || [])) {
-        const sched = settingsMap.get(doc.user_id) || {};
+        const sched: any = settingsMap.get(doc.user_id) || {};
         const days: number[] = Array.isArray(sched.days) ? sched.days.map(Number) : [0, 1, 2, 3, 4];
         if (!days.includes(dayOfWeek)) continue;
         const daily = (sched.daily && typeof sched.daily === "object") ? sched.daily : {};
@@ -2290,10 +2319,10 @@ async function runGeminiAgentWithModel(
       const functionResponses = [];
       for (const fcPart of functionCalls) {
         const call = fcPart.functionCall;
-        console.log(`[${model}] Gemini tool call:`, call.name, call.args);
+        console.log(`[${model}] Gemini tool call:`, call.name);
 
         const toolResult = await handleGeminiToolCall(supabase, call, conversation, timeZone, customInstructions);
-        console.log(`[${model}] Tool result:`, toolResult);
+        console.log(`[${model}] Tool completed:`, call.name);
 
         functionResponses.push({
           functionResponse: {
@@ -2737,6 +2766,32 @@ ${customInstructions ? `Additional clinic instruction sections:\n${customInstruc
   throw lastError || new Error("All configured Gemini models failed to generate response");
 }
 
+// Shared phone resolution; the callers retain their different conversation-ID fallback rules.
+async function findOrCreateWhatsAppConversation(supabase: any, body: any, lastMessage: string) {
+  const targetIsBsuid = isBsuid(body.phone);
+  const clean = targetIsBsuid ? body.phone.trim() : cleanPhone(body.phone);
+  const tail = getPhoneTail(clean);
+  let query = supabase.from("whatsapp_conversations").select("*");
+  query = targetIsBsuid ? query.eq("phone", clean) : query.or(`phone.eq.${clean},phone.ilike.%${tail}`);
+  const { data: existingConv } = await query.maybeSingle();
+  if (existingConv) return existingConv;
+  let linkedPatientId = body.patient_id || null;
+  let linkedPatientName = body.patient_name || (targetIsBsuid ? "WhatsApp User" : `+${clean}`);
+  if (!linkedPatientId && !targetIsBsuid) {
+    const matchedPatients = await findPatientsByPhone(supabase, clean);
+    if (matchedPatients.length === 1) {
+      linkedPatientId = matchedPatients[0].id;
+      linkedPatientName = matchedPatients[0].name || linkedPatientName;
+    }
+  }
+  const { data: conversation, error } = await supabase.from("whatsapp_conversations").insert({
+    phone: clean, patient_id: linkedPatientId, patient_name: linkedPatientName, ai_enabled: true,
+    last_message: lastMessage, last_message_at: new Date().toISOString(), unread_count: 0, status: "active",
+  }).select().single();
+  if (error) throw error;
+  return conversation;
+}
+
 // Main Edge Function Handler
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -2744,16 +2799,16 @@ Deno.serve(async (req: Request) => {
   }
 
   const supabase = getSupabaseClient();
-  const settings = await getClinicWhatsAppSettings(supabase);
 
   // 1. GET: Webhook Verification by Meta
   if (req.method === "GET") {
+    const settings = await getClinicWhatsAppSettings(supabase);
     const url = new URL(req.url);
     const mode = url.searchParams.get("hub.mode");
     const token = url.searchParams.get("hub.verify_token");
     const challenge = url.searchParams.get("hub.challenge");
 
-    if (mode === "subscribe" && token === settings.verifyToken) {
+    if (mode === "subscribe" && settings.verifyToken && token === settings.verifyToken) {
       console.log("Meta webhook verified successfully!");
       return new Response(challenge, {
         status: 200,
@@ -2761,14 +2816,25 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    console.warn("Meta webhook verification failed: token mismatch", { expected: settings.verifyToken, received: token });
+    console.warn("Meta webhook verification failed");
     return new Response("Forbidden", { status: 403 });
   }
 
   // 2. POST: Handle Events or Manual Outbound Send
   if (req.method === "POST") {
     try {
-      const body = await req.json();
+      const raw = await readWebhookBody(req);
+      if (raw === null) return jsonResponse({ error: "Payload too large." }, 413);
+      const body = JSON.parse(raw);
+      if (!body || typeof body !== "object" || Array.isArray(body)) return jsonResponse({ error: "Invalid request." }, 400);
+      if (body.action) {
+        if (!["send_manual_message", "send_reaction", "list_templates", "send_template"].includes(body.action)) return jsonResponse({ error: "Unknown action." }, 400);
+        const denied = await authorizeWhatsAppStaff(req, supabase);
+        if (denied) return denied;
+      } else if (!(await verifyMetaSignature(req, raw))) {
+        return jsonResponse({ error: "Invalid webhook signature." }, 401);
+      }
+      const settings = await getClinicWhatsAppSettings(supabase);
 
       // Case A: Staff Manual Outbound Message from Lumin Webapp
       if (body.action === "send_manual_message") {
@@ -2776,8 +2842,6 @@ Deno.serve(async (req: Request) => {
           conversation_id,
           content,
           phone,
-          patient_name,
-          patient_id,
           message_type = "text",
           audio_base64,
           audio_mime_type,
@@ -2811,51 +2875,7 @@ Deno.serve(async (req: Request) => {
           }
           conv = data;
         } else if (phone) {
-          const targetIsBsuid = isBsuid(phone);
-          const clean = targetIsBsuid ? phone.trim() : cleanPhone(phone);
-          const tail = getPhoneTail(clean);
-
-          // Try to find existing conversation
-          let query = supabase.from("whatsapp_conversations").select("*");
-          if (targetIsBsuid) {
-            query = query.eq("phone", clean);
-          } else {
-            query = query.or(`phone.eq.${clean},phone.ilike.%${tail}`);
-          }
-          const { data: existingConv } = await query.maybeSingle();
-
-          if (existingConv) {
-            conv = existingConv;
-          } else {
-            // Find or link patient if exists
-            let linkedPatientId = patient_id || null;
-            let linkedPatientName = patient_name || (targetIsBsuid ? "WhatsApp User" : `+${clean}`);
-            if (!linkedPatientId && !targetIsBsuid) {
-              const matchedPatients = await findPatientsByPhone(supabase, clean);
-              if (matchedPatients.length === 1) {
-                linkedPatientId = matchedPatients[0].id;
-                linkedPatientName = matchedPatients[0].name || linkedPatientName;
-              }
-            }
-
-            const { data: newConv, error: createConvErr } = await supabase
-              .from("whatsapp_conversations")
-              .insert({
-                phone: clean,
-                patient_id: linkedPatientId,
-                patient_name: linkedPatientName,
-                ai_enabled: true,
-                last_message: displayContent,
-                last_message_at: new Date().toISOString(),
-                unread_count: 0,
-                status: "active",
-              })
-              .select()
-              .single();
-
-            if (createConvErr) throw createConvErr;
-            conv = newConv;
-          }
+          conv = await findOrCreateWhatsAppConversation(supabase, body, displayContent);
         }
 
         let metaSendResult = null;
@@ -2868,6 +2888,7 @@ Deno.serve(async (req: Request) => {
             .from("whatsapp_messages")
             .select("whatsapp_message_id")
             .eq("id", reply_to_id)
+            .eq("conversation_id", conv.id)
             .maybeSingle();
           if (parentMsg?.whatsapp_message_id) {
             contextWamid = parentMsg.whatsapp_message_id;
@@ -2981,6 +3002,7 @@ Deno.serve(async (req: Request) => {
         if (msgErr || !targetMsg) {
           return jsonResponse({ error: "Message not found" }, 404);
         }
+        if (targetMsg.conversation_id !== conversation_id) return jsonResponse({ error: "Message does not belong to this conversation." }, 400);
 
         const { data: conv } = await supabase
           .from("whatsapp_conversations")
@@ -3026,13 +3048,14 @@ Deno.serve(async (req: Request) => {
         try {
           const url = `https://graph.facebook.com/v21.0/${settings.wabaId}/message_templates?fields=name,status,category,language,components&limit=100`;
           const res = await fetch(url, {
+    signal: AbortSignal.timeout(15000),
             headers: {
               "Authorization": `Bearer ${settings.accessToken}`,
             },
           });
           const data = await res.json();
           if (!res.ok) {
-            console.error("Meta list_templates error:", data);
+            console.error("Meta list_templates error:", res.status);
             return jsonResponse({
               templates: [],
               error: data?.error?.message || "Failed to fetch templates from Meta",
@@ -3054,8 +3077,6 @@ Deno.serve(async (req: Request) => {
         const {
           conversation_id,
           phone,
-          patient_name,
-          patient_id,
           template_name,
           language_code = "ar",
           components = [],
@@ -3082,48 +3103,7 @@ Deno.serve(async (req: Request) => {
         }
 
         if (!conv && phone) {
-          const targetIsBsuid = isBsuid(phone);
-          const clean = targetIsBsuid ? phone.trim() : cleanPhone(phone);
-          const tail = getPhoneTail(clean);
-          let query = supabase.from("whatsapp_conversations").select("*");
-          if (targetIsBsuid) {
-            query = query.eq("phone", clean);
-          } else {
-            query = query.or(`phone.eq.${clean},phone.ilike.%${tail}`);
-          }
-          const { data: existingConv } = await query.maybeSingle();
-
-          if (existingConv) {
-            conv = existingConv;
-          } else {
-            let linkedPatientId = patient_id || null;
-            let linkedPatientName = patient_name || (targetIsBsuid ? "WhatsApp User" : `+${clean}`);
-            if (!linkedPatientId && !targetIsBsuid) {
-              const matchedPatients = await findPatientsByPhone(supabase, clean);
-              if (matchedPatients.length === 1) {
-                linkedPatientId = matchedPatients[0].id;
-                linkedPatientName = matchedPatients[0].name || linkedPatientName;
-              }
-            }
-
-            const { data: newConv, error: createConvErr } = await supabase
-              .from("whatsapp_conversations")
-              .insert({
-                phone: clean,
-                patient_id: linkedPatientId,
-                patient_name: linkedPatientName,
-                ai_enabled: true,
-                last_message: rendered_text || `📋 Template: ${template_name}`,
-                last_message_at: new Date().toISOString(),
-                unread_count: 0,
-                status: "active",
-              })
-              .select()
-              .single();
-
-            if (createConvErr) throw createConvErr;
-            conv = newConv;
-          }
+          conv = await findOrCreateWhatsAppConversation(supabase, body, rendered_text || `📋 Template: ${template_name}`);
         }
 
         if (!conv) {
@@ -3420,7 +3400,7 @@ Deno.serve(async (req: Request) => {
                 }
 
                 // 2. Insert incoming message into whatsapp_messages
-                const { error: msgInsertErr } = await supabase
+                const { data: insertedMsg, error: msgInsertErr } = await supabase
                   .from("whatsapp_messages")
                   .insert({
                     conversation_id: conv.id,
@@ -3434,7 +3414,9 @@ Deno.serve(async (req: Request) => {
                     reply_to_id: replyToId,
                     reply_to_text: replyToText,
                     reply_to_sender: replyToSender,
-                  });
+                  })
+                  .select("id, created_at")
+                  .maybeSingle();
 
                 if (msgInsertErr) {
                   console.error("Failed to insert whatsapp message:", msgInsertErr);
@@ -3457,6 +3439,38 @@ Deno.serve(async (req: Request) => {
                 if (isAiActive) {
                   const aiTask = (async () => {
                     try {
+                      // Anti-race debounce: brief 1.5s delay to allow rapid consecutive messages to land in DB
+                      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+                      // Check if a newer incoming patient message arrived in this conversation
+                      if (insertedMsg?.id) {
+                        const { data: latestCheck } = await supabase
+                          .from("whatsapp_messages")
+                          .select("id")
+                          .eq("conversation_id", conv.id)
+                          .eq("sender", "patient")
+                          .order("created_at", { ascending: false })
+                          .limit(1)
+                          .maybeSingle();
+
+                        if (latestCheck && latestCheck.id !== insertedMsg.id) {
+                          console.log("Superseded by newer incoming message; skipping earlier AI task");
+                          return;
+                        }
+                      }
+
+                      // Check if AI was disabled or taken over by staff while waiting
+                      const { data: convCheck } = await supabase
+                        .from("whatsapp_conversations")
+                        .select("ai_enabled, status")
+                        .eq("id", conv.id)
+                        .maybeSingle();
+
+                      if (convCheck && (!convCheck.ai_enabled || convCheck.status === "human_needed")) {
+                        console.log("AI was muted or taken over by staff; skipping AI task");
+                        return;
+                      }
+
                       const { data: rawHistory } = await supabase
                         .from("whatsapp_messages")
                         .select("sender, content, media_url")
@@ -3485,6 +3499,34 @@ Deno.serve(async (req: Request) => {
                         currentAudioPart,
                         settings.attendanceTimezone || "Africa/Cairo"
                       );
+
+                      // Guard right before dispatch: ensure no newer patient message arrived during generation
+                      if (insertedMsg?.id) {
+                        const { data: latestCheckAfterGen } = await supabase
+                          .from("whatsapp_messages")
+                          .select("id")
+                          .eq("conversation_id", conv.id)
+                          .eq("sender", "patient")
+                          .order("created_at", { ascending: false })
+                          .limit(1)
+                          .maybeSingle();
+
+                        if (latestCheckAfterGen && latestCheckAfterGen.id !== insertedMsg.id) {
+                          console.log("Superseded by newer patient message during generation; skipping obsolete dispatch");
+                          return;
+                        }
+                      }
+
+                      const { data: finalConvCheck } = await supabase
+                        .from("whatsapp_conversations")
+                        .select("ai_enabled, status")
+                        .eq("id", conv.id)
+                        .maybeSingle();
+
+                      if (finalConvCheck && (!finalConvCheck.ai_enabled || finalConvCheck.status === "human_needed")) {
+                        console.log("Conversation taken over by staff during generation; skipping dispatch");
+                        return;
+                      }
 
                       let metaAiSend = null;
                       if (settings.phoneId && settings.accessToken) {

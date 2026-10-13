@@ -4,6 +4,24 @@ const { pathToFileURL } = require('node:url');
 const test = require('node:test');
 const root = path.resolve(__dirname, '..');
 
+test('malformed ZIP64 compressed-size sentinel is rejected without hanging the parser', async () => {
+  const {execFile} = require('node:child_process');
+  const {promisify} = require('node:util');
+  const worker = pathToFileURL(path.join(root,'lumin-scan-worker.js')).href;
+  const fflate = pathToFileURL(path.join(root,'vendor/fflate/esm/browser.js')).href;
+  const script = `
+    import assert from 'node:assert/strict';
+    globalThis.self={};
+    const parser=await import(${JSON.stringify(worker)});
+    const {zipSync,strToU8}=await import(${JSON.stringify(fflate)});
+    const bytes=zipSync({'upper.obj':strToU8('v 0 0 0')},{level:0});
+    const view=new DataView(bytes.buffer);
+    for(let at=0;at<bytes.length-4;at++) if(view.getUint32(at,true)===0x02014b50){view.setUint32(at+20,0xffffffff,true);break;}
+    assert.throws(()=>parser.inspectZip(bytes.buffer),/zip|damaged|archive/i);
+  `;
+  await promisify(execFile)(process.execPath,['--input-type=module','-e',script],{timeout:5000,windowsHide:true});
+});
+
 test('archive parser bounds expansion, checks CRC, rejects traversal, and bounds image dimensions before decoding', async () => {
   global.self = {};
   const parser = await import(pathToFileURL(path.join(root, 'lumin-scan-worker.js')));

@@ -111,6 +111,8 @@ test('tooth notes open and edit in the sidebar, stay live, and fit expanded, col
     function hasPageAccess(){return canReadChart;}
     function chartToothHasFinding(){return false;}
     function getKnownPatient(){return patient;}
+    async function ensureStorageMediaGrant(){}
+    function storageMediaUrl(url){return url+'?media=fixture'}
     function getStorageServerConfig(){return {url:location.origin};}
     function patientMediaToothIds(details){return details?.tooth_ids||[];}
     function patientMediaToothLabel(value){return value;}

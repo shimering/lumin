@@ -5,6 +5,9 @@ Exposes a secure REST API for universal access across Lumin users via Cloudflare
 """
 
 import os
+import hmac
+import secrets
+import time
 import re
 import sys
 import json
@@ -63,6 +66,8 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 logger = logging.getLogger("LuminStorage")
+# Request URLs contain patient paths and temporary media grants.
+logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
 # Load configuration
 CONFIG_FILE = Path(os.environ.get("LUMIN_STORAGE_CONFIG", str(Path(__file__).parent / "config.json")))
@@ -70,7 +75,8 @@ DEFAULT_CONFIG = {
     "port": 5000,
     "storage_path": "D:\\LuminStorage\\Patients",
     "fallback_storage_path": "./LuminStorage/Patients",
-    "clinic_secret_key": "LuminClinicKey_2026",
+    "clinic_secret_key": "",
+    "allowed_origins": ["https://lumin.gazarxperia.workers.dev"],
     "max_file_size_mb": 50,
     "allowed_extensions": ["jpg", "jpeg", "png", "webp", "gif", "bmp", "pdf", "dcm", "tif", "tiff"]
 }
@@ -128,10 +134,10 @@ def generate_thumbnail(original_file_path: Path):
             im.thumbnail((480, 480), Image.Resampling.LANCZOS)
             im.save(thumb_path, "WEBP", quality=80)
 
-        logger.info(f"Generated thumbnail for {rel}: {thumb_path.stat().st_size / 1024:.1f} KB")
+        logger.info("Patient thumbnail generated (%s bytes)", thumb_path.stat().st_size)
         return thumb_path
     except Exception as e:
-        logger.warning(f"Failed to generate thumbnail for {original_file_path}: {e}")
+        logger.warning("Could not generate a patient thumbnail (%s)", type(e).__name__)
         return None
 
 def get_folder_patient_id(folder_path: Path) -> str:
@@ -176,7 +182,7 @@ def set_folder_patient_id(folder_path: Path, patient_id: str, patient_name: str 
         }
         meta_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     except Exception as e:
-        logger.warning(f"Could not write .patient_id in {folder_path}: {e}")
+        logger.warning("Could not write patient identity metadata (%s)", type(e).__name__)
 
 
 def rename_patient_storage_folder(patient_id: str, old_folder_name: str, new_folder_name: str) -> bool:
@@ -244,14 +250,14 @@ def rename_patient_storage_folder(patient_id: str, old_folder_name: str, new_fol
         # Update PATIENT_NAME_CACHE
         PATIENT_NAME_CACHE[patient_id] = clean_new
 
-        logger.info(f"Successfully migrated patient folder {clean_old} -> {clean_new} for patient {patient_id}")
+        logger.info("Patient storage folder renamed")
         try:
             threading.Thread(target=update_storage_mapping_files, daemon=True, name="lumin-update-mappings").start()
         except Exception:
             pass
         return True
     except Exception as e:
-        logger.error(f"Failed to rename patient folder {clean_old} -> {clean_new}: {e}")
+        logger.error("Could not rename patient storage folder (%s)", type(e).__name__)
         return False
 
 
@@ -393,7 +399,7 @@ def update_storage_mapping_files() -> dict:
                     "files": patient_files
                 }, ensure_ascii=False, indent=2), encoding="utf-8")
             except Exception as e:
-                logger.warning(f"Could not write patient_mapping.json in {d.name}: {e}")
+                logger.warning("Could not write patient mapping JSON (%s)", type(e).__name__)
 
             # 2. Per-patient SQL
             try:
@@ -459,7 +465,7 @@ def update_storage_mapping_files() -> dict:
                     p_sql_lines.append("")
                 (d / "patient_mapping.sql").write_text("\n".join(p_sql_lines) + media_sql(patient_files, sql_quote), encoding="utf-8")
             except Exception as e:
-                logger.warning(f"Could not write patient_mapping.sql in {d.name}: {e}")
+                logger.warning("Could not write patient mapping SQL (%s)", type(e).__name__)
 
         # Master Files in STORAGE_ROOT
         master_sql_path = STORAGE_ROOT / "patients_mapping.sql"
@@ -661,7 +667,7 @@ def tag_existing_patient_folders():
             resolved_id = pdata.get("id") or pid
             if resolved_id:
                 set_folder_patient_id(d, resolved_id, pdata.get("name") or clean_name, str(pdata.get("patient_number") or ""), str(pdata.get("phone") or ""))
-                logger.info(f"Tagged existing folder {d.name} with patient_id {resolved_id} (Patient #{pdata.get('patient_number') or 'N/A'})")
+                logger.info("Patient storage folder mapped")
         # Run storage mappings generation
         update_storage_mapping_files()
     except Exception as e:
@@ -669,7 +675,10 @@ def tag_existing_patient_folders():
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}}, max_age=600)
+allowed_origins = config.get("allowed_origins", ["https://lumin.gazarxperia.workers.dev"])
+if not isinstance(allowed_origins, list) or any(not isinstance(origin, str) or "*" in origin for origin in allowed_origins):
+    raise ValueError("allowed_origins must contain explicit application origins.")
+CORS(app, resources={r"/*": {"origins": allowed_origins + [re.compile(r"^http://(?:localhost|127\.0\.0\.1)(?::\d+)?$")]}}, max_age=600)
 app.config['MAX_CONTENT_LENGTH'] = config["max_file_size_mb"] * 1024 * 1024
 
 _sync_engine = None
@@ -763,13 +772,59 @@ def get_drive_sync_engine():
 install_sync_routes(app, get_drive_sync_engine, require_sync_admin, prefix='/api/drive-sync')
 
 
+_media_grants = {}
+_media_grants_lock = threading.Lock()
+
+
 def verify_auth():
-    """Verify clinic secret key from headers or query parameters."""
-    req_key = request.headers.get("x-lumin-key") or request.args.get("key")
+    """Shared keys belong in headers; short-lived grants authorize media reads only."""
     expected_key = config.get("clinic_secret_key", "")
-    if expected_key and req_key != expected_key:
+    if not isinstance(expected_key, str):
         return False
-    return True
+    expected_key = expected_key.strip()
+    if not expected_key or expected_key == "LuminClinicKey_2026":
+        return False
+    req_key = request.headers.get("x-lumin-key", "")
+    if req_key and hmac.compare_digest(req_key.encode("utf-8"), expected_key.encode("utf-8")):
+        return True
+    if request.method == "GET" and request.path.startswith(("/files/", "/api/thumbnail/")):
+        with _media_grants_lock:
+            grant = _media_grants.get(request.args.get("media", ""))
+        return bool(grant and grant[0] > time.time() and grant[1] == str(STORAGE_ROOT)
+                    and hmac.compare_digest(grant[2].encode("utf-8"), expected_key.encode("utf-8")))
+    return False
+
+
+@app.post("/api/media-grant")
+def create_media_grant():
+    now = time.time()
+    with _media_grants_lock:
+        for token in list(_media_grants):
+            if _media_grants[token][0] <= now:
+                del _media_grants[token]
+        if len(_media_grants) >= 512:
+            return jsonify({"error": "Too many active media sessions."}), 429
+        token = secrets.token_urlsafe(32)
+        expires = now + 15 * 60
+        _media_grants[token] = (expires, str(STORAGE_ROOT), str(config["clinic_secret_key"]).strip())
+    return jsonify({"mediaGrant": token, "expiresAt": expires * 1000})
+
+
+@app.post("/api/media-grant/revoke")
+def revoke_media_grant():
+    data = request.get_json(silent=True) or {}
+    with _media_grants_lock:
+        _media_grants.pop(data.get("mediaGrant", ""), None)
+    return jsonify({"success": True})
+
+
+@app.after_request
+def private_storage_responses(response):
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
 
 @app.before_request
 def check_authentication():
@@ -778,6 +833,8 @@ def check_authentication():
         return
     # Public health check
     if request.path == "/api/health":
+        if request.headers.get("x-lumin-key") and not verify_auth():
+            return jsonify({"error": "Invalid clinic key.", "code": "invalid_clinic_key"}), 401
         return
     # These routes validate their own separate server-to-server pairing credentials.
     if request.path.startswith('/api/sync/peer/'):
@@ -786,6 +843,8 @@ def check_authentication():
     if not verify_auth():
         return jsonify({"error": "Unauthorized. Invalid or missing clinic secret key.",
                         "code": "invalid_clinic_key"}), 401
+    if request.path in ("/api/storage/location", "/api/storage/browse"):
+        require_sync_admin(request.headers.get("Authorization", ""))
 
 @app.route("/api/health", methods=["GET"])
 def health_check():
@@ -797,6 +856,7 @@ def health_check():
     return jsonify({
         "status": "online",
         "service": "Lumin Local Storage Server",
+        "authConfigured": bool(config.get("clinic_secret_key") and config.get("clinic_secret_key") != "LuminClinicKey_2026"),
         "timestamp": datetime.now().isoformat(),
         "storageRoot": str(STORAGE_ROOT),
         "totalPatientFolders": total_folders,
@@ -839,7 +899,7 @@ def upload_file():
                     break
         if existing_folder and existing_folder != patient_folder_name:
             if rename_patient_storage_folder(patient_id, existing_folder, patient_folder_name):
-                logger.info(f"Auto-migrated folder {existing_folder} to {patient_folder_name} prior to upload")
+                logger.info("Patient storage folder updated before upload")
 
     target_dir = STORAGE_ROOT / patient_folder_name / category
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -871,7 +931,7 @@ def upload_file():
         file_path = safe_path(STORAGE_ROOT, (target_dir / saved_filename).relative_to(STORAGE_ROOT).as_posix())
         target_dir.mkdir(parents=True, exist_ok=True)
     else:
-        saved_filename = f"{date_str}_{timestamp_unique}_{original_filename}"
+        saved_filename = f"{date_str}_{timestamp_unique}_{secrets.token_hex(8)}_{original_filename}"
 
     file_path = target_dir / saved_filename
     if category == '3D-Scans':
@@ -884,7 +944,7 @@ def upload_file():
     relative_path = str(file_path.relative_to(STORAGE_ROOT)).replace("\\", "/")
     file_size = file_path.stat().st_size
 
-    logger.info(f"Saved: {relative_path} ({file_size / 1024:.1f} KB)")
+    logger.info("Patient file saved (%s bytes)", file_size)
 
     try:
         threading.Thread(target=update_storage_mapping_files, daemon=True, name="lumin-update-mappings").start()
@@ -1075,7 +1135,7 @@ def delete_file():
                 thumb_candidate.unlink()
             except Exception:
                 pass
-        logger.info(f"Deleted: {clean_rel_path}")
+        logger.info("Patient file deleted")
         try:
             threading.Thread(target=update_storage_mapping_files, daemon=True, name="lumin-update-mappings").start()
         except Exception:
@@ -1084,7 +1144,7 @@ def delete_file():
     except SyncError:
         raise
     except Exception as e:
-        logger.error(f"Failed to delete {clean_rel_path}: {e}")
+        logger.error("Could not delete patient file (%s)", type(e).__name__)
         return jsonify({"error": f"Failed to delete file: {e}"}), 500
 
 @app.route("/api/file/move", methods=["POST"])
@@ -1145,7 +1205,7 @@ def move_file():
         else:
             generate_thumbnail(dest_path)
 
-        logger.info(f"Moved category: {clean_rel_path} -> {new_rel_path}")
+        logger.info("Patient file category changed")
 
         try:
             threading.Thread(target=update_storage_mapping_files, daemon=True, name="lumin-update-mappings").start()
@@ -1163,7 +1223,7 @@ def move_file():
     except SyncError:
         raise
     except Exception as e:
-        logger.error(f"Failed to move file {clean_rel_path}: {e}")
+        logger.error("Could not move patient file (%s)", type(e).__name__)
         return jsonify({"error": f"Failed to move file: {e}"}), 500
 
 @app.route("/api/thumbnail/<path:filename>", methods=["GET"])
@@ -1190,7 +1250,7 @@ def get_thumbnail(filename):
     except SyncError:
         raise
     except Exception as e:
-        logger.error(f"Error serving thumbnail {filename}: {e}")
+        logger.error("Could not serve patient thumbnail (%s)", type(e).__name__)
         return jsonify({"error": str(e)}), 500
 
 @app.route("/files/<path:filename>", methods=["GET"])
@@ -1557,7 +1617,7 @@ if __name__ == "__main__":
     print(f"  Local Host:        http://localhost:{port}")
     if local_ip:
         print(f"  Clinic LAN Access: http://{local_ip}:{port}")
-    print(f"  Secret Clinic Key: {config.get('clinic_secret_key')}")
+    print("  Clinic Key: configured" if config.get("clinic_secret_key") else "  Clinic Key: NOT CONFIGURED")
     print("=" * 60)
     threading.Thread(target=tag_existing_patient_folders, daemon=True, name="lumin-tag-folders").start()
     app.run(host="0.0.0.0", port=port, debug=False)

@@ -2,7 +2,7 @@
   "port": 5000,
   "storage_path": "D:\\LuminStorage\\Patients",
   "fallback_storage_path": "./LuminStorage/Patients",
-  "clinic_secret_key": "LuminClinicKey_2026",
+  "clinic_secret_key": "",
   "max_file_size_mb": 50,
   "allowed_extensions": ["jpg", "jpeg", "png", "webp", "gif", "bmp", "pdf", "dcm", "tif", "tiff"]
 }

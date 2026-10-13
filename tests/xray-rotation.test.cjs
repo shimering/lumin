@@ -86,6 +86,8 @@ test('chart and enlarged viewer save, reopen, fit rotated images, recover errors
     window.savedDetails=structuredClone(initial);window.failSave=false;window.holdSave=false;window.saveCalls=0;
     const template={filename:'film.png',relativePath:'Patient/Periapical/film.png',category:'Periapical',modifiedAt:'2026-10-08T10:00:00Z',sizeBytes:1024};
     let currentPatientMediaFiles=[{...template,mediaDetails:structuredClone(initial)}];
+    async function ensureStorageMediaGrant(){}
+    function storageMediaUrl(url){return url}
     function getStorageServerConfig(){return {url:location.origin,key:'test'};}
     function getKnownPatient(id){return {id,name:'Ahmed Hassan'};}
     function hasPageAccess(){return allowed;}
