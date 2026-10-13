@@ -24,6 +24,15 @@ create function private.chart_finding_by_id(state jsonb,id uuid) returns jsonb l
 create function private.try_parse_timestamptz(text) returns timestamptz language sql as $$select $1::timestamptz$$;
 create function private.doctor_salary_assignment_is_complete(jsonb) returns boolean language sql as $$select $1->>'status'='C' and ($1->>'doctorId' is not null or jsonb_array_length($1->'steps')>0)$$;
 create function private.doctor_salary_assignment_signature(jsonb) returns jsonb language sql as $$select $1$$;
+create function private.doctor_salary_linked_expenses(p_item_id bigint) returns table(expense_id uuid,expense_name text) language sql as $$
+  select distinct paid.payment_id,'Salary expense'::text
+  from public.patient_invoice_items item
+  left join private.hr_doctor_salary_transfers transfer on transfer.finding_id=item.finding_id
+  join private.hr_doctor_salary_payment_items paid on paid.finding_id=item.finding_id
+    or exists(select 1 from jsonb_to_recordset(coalesce(transfer.allocations,'[]'::jsonb)) as allocation(finding_id uuid)
+      where allocation.finding_id=paid.finding_id)
+  where item.id=p_item_id;
+$$;
 insert into clinic_settings values(1,'Africa/Cairo');
 insert into user_profiles values('00000000-0000-4000-8000-000000000001','Dr A',true,true),('00000000-0000-4000-8000-000000000002','Dr B',true,true);
 insert into dental_operations values('00000000-0000-4000-8000-000000000003','composite','Composite'),('00000000-0000-4000-8000-000000000004','dz_diagnosis_a1','Diagnosis');

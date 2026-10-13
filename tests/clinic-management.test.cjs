@@ -20,6 +20,7 @@ test('SQL projections calculate split shares, snapshots, permissions and ledger 
   try{
     await db.exec(fs.readFileSync(path.join(__dirname,'fixtures/clinic-management.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261013143556_clinic_management_overview.sql'),'utf8'));
+    await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261013210209_exclude_settled_clinic_salary_alerts.sql'),'utf8'));
     const call=async sql=>(await db.query('select '+sql+' as result')).rows[0].result;
     const day=await call("public.get_clinic_doctor_day_payroll('2026-10-13','00000000-0000-4000-8000-000000000001')");
     assert.equal(day.ready_amount,900);assert.equal(day.untransferred_amount,739.98);assert.equal(day.invoice_count,4);assert.equal(day.rows.length,4);
@@ -35,6 +36,16 @@ test('SQL projections calculate split shares, snapshots, permissions and ledger 
     assert.equal(overview.finance.income_total,225);assert.equal(overview.finance.expense_total,45);assert.equal(overview.finance.net_total,180);
     assert.equal(overview.finance.expense_types[0].amount,45);assert.equal(overview.finance.days.length,3);assert.equal(overview.finance.days[2].income,0);
     assert.equal(overview.hr.untransferred_invoice_count,3);assert.equal(overview.hr.untransferred_doctor_count,2);assert.equal(overview.finance.unpaid_expense_total,30);
+    assert.ok(overview.hr.untransferred_preview.some(row=>row.doctor_name==='Dr A'));
+    assert.ok(overview.hr.untransferred_preview.some(row=>row.doctor_name==='Dr B'),'Pending invoices for every unpaid doctor appear');
+    await db.exec("insert into private.hr_doctor_salary_payment_items values('00000000-0000-4000-8000-000000000012','00000000-0000-4000-8000-000000000002',300,'00000000-0000-4000-8000-000000000098')");
+    const linkedPaid=await call("public.get_clinic_management_overview('2026-10-01','2026-10-03')");
+    assert.equal(linkedPaid.hr.untransferred_invoice_count,2,'An invoice item paid under a previous doctor allocation cannot be transferred again');
+    assert.equal(linkedPaid.hr.untransferred_amount,513.32);
+    assert.ok(linkedPaid.hr.untransferred_preview.every(row=>row.invoice_item_id!==12));
+    const existingPayroll=await call("public.get_clinic_doctor_day_payroll('2026-10-13','00000000-0000-4000-8000-000000000001')");
+    assert.equal(existingPayroll.untransferred_amount,739.98,'Alert filtering does not change payroll calculations');
+    assert.equal((await db.query('select count(*)::int count from private.hr_doctor_salary_payment_items')).rows[0].count,2,'The overview never changes existing salary payments');
     await db.exec("select set_config('test.access','analytics',false)");
     const analytics=await call("public.get_clinic_management_overview('2026-10-01','2026-10-03')");
     assert.equal(analytics.hr,null);assert.equal(analytics.finance.debt_total,undefined);assert.equal(analytics.finance.unpaid_expense_total,null);
