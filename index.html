@@ -76,6 +76,8 @@
   <script src="lumin-loyalty.js?v=5"></script>
   <script src="lumin-finance-sync.js?v=2"></script>
   <script src="lumin-cash-flow.js?v=1"></script>
+  <script src="lumin-clinic-management.js?v=1"></script>
+  <link rel="stylesheet" href="lumin-clinic-management.css?v=1" />
   <script src="lumin-patient-scans.js?v=6"></script>
   <link rel="stylesheet" href="lumin-patient-scans.css?v=4" />
   <link rel="stylesheet" href="lumin-cash-flow.css?v=1" />
@@ -5900,9 +5902,14 @@
       <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
         <div class="app-page-bar app-page-bar-embedded">
           <div class="app-page-heading"><span class="app-page-icon" aria-hidden="true"><i data-lucide="building-2"></i></span><h2 class="app-page-title">Clinic Management</h2></div>
+          <div class="cm-title-actions">
+            <button id="cm-refresh" type="button" class="cm-button cm-button-icon" onclick="LuminClinicManagement.refresh({ force: true })" aria-label="Refresh clinic overview"><i data-lucide="refresh-cw" aria-hidden="true"></i></button>
+            <button id="cm-alert-bell" type="button" class="cm-button cm-button-icon cm-alert-bell" onclick="LuminClinicManagement.toggleAlerts()" aria-label="Action center" aria-haspopup="dialog" aria-controls="cm-alert-menu" aria-expanded="false"><i data-lucide="bell" aria-hidden="true"></i><span id="cm-alert-count" class="cm-alert-count" hidden></span></button>
+          </div>
         </div>
         <div class="px-3 pt-3 sm:px-5">
-          <div id="clinic-management-tabs" role="tablist" aria-label="Clinic management sections" class="flex items-center gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1 sm:w-fit mobile-scroll-region scrollbar-none">
+          <div id="clinic-management-tabs" role="tablist" aria-label="Clinic management sections" onkeydown="LuminClinicManagement.tabKeydown(event)" class="flex items-center gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1 sm:w-fit mobile-scroll-region scrollbar-none">
+            <button id="clinic-management-tab-overview" data-clinic-management-tab="overview" type="button" role="tab" aria-selected="false" aria-controls="view-clinic-overview" onclick="switchClinicManagementTab('overview')" class="cm-button cm-button-quiet"><i data-lucide="layout-dashboard" aria-hidden="true"></i><span>Overview</span></button>
             <button id="clinic-management-tab-finances" data-clinic-management-tab="finances" type="button" role="tab" aria-selected="true" aria-controls="view-finances" onclick="switchClinicManagementTab('finances')" class="inline-flex shrink-0 min-h-10 items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-[11px] font-black text-emerald-700 shadow-xs sm:px-4 sm:text-xs">
               <i data-lucide="landmark" class="h-4 w-4"></i><span>Finances</span>
             </button>
@@ -5915,6 +5922,25 @@
           </div>
         </div>
       </div>
+      <section id="view-clinic-overview" class="cm-overview" role="tabpanel" aria-labelledby="clinic-management-tab-overview" hidden>
+        <div id="cm-range-toolbar" class="cm-toolbar"></div>
+        <div id="cm-overview-error" hidden></div>
+        <div id="cm-stats" class="cm-stats" aria-live="polite"></div>
+        <section id="cm-payroll-panel" class="cm-panel" aria-labelledby="cm-payroll-heading">
+          <div id="cm-payroll-title" class="cm-panel-heading"></div>
+          <div id="cm-payroll-controls" class="cm-controls"></div>
+          <div id="cm-payroll-summary" class="cm-payroll-summary" aria-live="polite"></div>
+          <div id="cm-payroll-rows" class="cm-scrollbox" role="region" aria-label="Doctor invoice procedures" tabindex="0"></div>
+          <div id="cm-payroll-pager" class="cm-pager"></div>
+          <p id="cm-payroll-note" class="cm-note"></p>
+          <div id="cm-payroll-footer" class="cm-footer"></div>
+        </section>
+        <section id="cm-cash-panel" class="cm-panel" aria-labelledby="cm-cash-heading"><div id="cm-cash-title" class="cm-panel-heading"></div><div id="cm-cash-chart" class="cm-chart"></div></section>
+        <div class="cm-bottom-grid">
+          <section id="cm-expense-panel" class="cm-panel" aria-labelledby="cm-expense-heading"><div id="cm-expense-title" class="cm-panel-heading"></div><div id="cm-expense-breakdown" class="cm-breakdown"></div></section>
+          <section id="cm-team-panel" class="cm-panel" aria-labelledby="cm-team-heading"><div id="cm-team-title" class="cm-panel-heading"></div><div id="cm-team-content" class="cm-team-content"></div></section>
+        </div>
+      </section>
     </section>
 
     <!-- ================= CLINIC FINANCES ================= -->
@@ -10215,7 +10241,7 @@
     let financeOverviewRenderToken = 0;
     let financeUniversalSearchTimer = null;
     let activeFinanceTab = 'invoices';
-    let activeClinicManagementTab = 'finances';
+    let activeClinicManagementTab = 'overview';
     let financeExpenses = [];
     let financeExpensesLoaded = false;
     let financeExpenseLoadPromise = null;
@@ -11680,6 +11706,7 @@
       }));
       translateUiTree(document.body, currentUiLanguage);
       if (typeof refreshQuotationLanguage === 'function') refreshQuotationLanguage();
+      if (window.LuminClinicManagement) LuminClinicManagement.languageChanged();
       if (typeof renderChartMediaPanel === 'function') renderChartMediaPanel();
       if (typeof renderChartAppointmentsPanel === 'function') renderChartAppointmentsPanel();
       if (typeof syncClinicalActionsPanel === 'function') { syncClinicalActionsPanel(); updateClinicalOperationPreview(); }
@@ -13117,7 +13144,8 @@
         incomeStatementRenderToken += 1;
         if (typeof resetCashFlowAnalytics === 'function') resetCashFlowAnalytics();
         activeFinanceTab = 'invoices';
-        activeClinicManagementTab = 'finances';
+        activeClinicManagementTab = 'overview';
+        if (window.LuminClinicManagement) LuminClinicManagement.reset();
         hrDirectoryUsers = [];
         hrDirectoryLoaded = false;
         hrDirectoryLoadPromise = null;
@@ -13289,7 +13317,8 @@
         incomeStatementRenderToken += 1;
         if (typeof resetCashFlowAnalytics === 'function') resetCashFlowAnalytics();
         activeFinanceTab = 'invoices';
-        activeClinicManagementTab = 'finances';
+        activeClinicManagementTab = 'overview';
+        if (window.LuminClinicManagement) LuminClinicManagement.reset();
         hrDirectoryUsers = [];
         hrDirectoryLoaded = false;
         hrDirectoryLoadPromise = null;
@@ -19148,6 +19177,8 @@
         REALTIME_HR_TABLES.forEach(tableName => realtimePendingTables.add(tableName));
       }
       if (realtimeViewIsVisible('clinic-management')) {
+        [...REALTIME_INVOICE_TABLES, ...REALTIME_EXPENSE_TABLES, ...REALTIME_HR_TABLES, ...REALTIME_DENTAL_CUSTOMIZATION_TABLES]
+          .forEach(tableName => realtimePendingTables.add(tableName));
         if (activeClinicManagementTab === 'finances') {
           const tables = activeFinanceTab === 'expenses' ? REALTIME_EXPENSE_TABLES : REALTIME_INVOICE_TABLES;
           tables.forEach(tableName => realtimePendingTables.add(tableName));
@@ -19386,6 +19417,9 @@
         }
         if (hrChanged && (attendanceStateLoadedAt || realtimeViewIsVisible('dashboard'))) await refreshMyAttendanceState({ force: true });
         const doctorSalaryChanged = invoicesChanged || expensesChanged || dentalCustomizationChanged || changedTables.has('appointments');
+        if (window.LuminClinicManagement && (accessChanged || hrChanged || doctorSalaryChanged || changedTables.has('patients'))) {
+          LuminClinicManagement.invalidate();
+        }
         if (accessChanged || hrChanged || doctorSalaryChanged || changedTables.has('patients')) {
           hrDirectoryLoaded = false;
           hrDoctorSettlementRangeKey = '';
@@ -29337,13 +29371,13 @@
     }
 
     function firstAuthorizedClinicManagementTab(preferredTab = activeClinicManagementTab) {
-      const orderedTabs = [preferredTab, 'finances', 'analytics', 'hr'].filter(tab => ['finances', 'analytics', 'hr'].includes(tab));
-      return orderedTabs.find((tabName, index) => orderedTabs.indexOf(tabName) === index && hasPageAccess(tabName)) || null;
+      const orderedTabs = [preferredTab, 'overview', 'finances', 'analytics', 'hr'].filter(tab => ['overview', 'finances', 'analytics', 'hr'].includes(tab));
+      return orderedTabs.find((tabName, index) => orderedTabs.indexOf(tabName) === index && hasPageAccess(tabName === 'overview' ? 'clinic-management' : tabName)) || null;
     }
 
     async function switchClinicManagementTab(tabName, options = {}) {
       const { updateHash = true } = options;
-      const authorizedTab = ['finances', 'analytics', 'hr'].includes(tabName) && hasPageAccess(tabName) ? tabName : firstAuthorizedClinicManagementTab();
+      const authorizedTab = ['overview', 'finances', 'analytics', 'hr'].includes(tabName) && hasPageAccess(tabName === 'overview' ? 'clinic-management' : tabName) ? tabName : firstAuthorizedClinicManagementTab();
       if (!authorizedTab) {
         const fallbackView = firstAuthorizedView();
         if (fallbackView && fallbackView !== 'clinic-management') await switchView(fallbackView);
@@ -29351,27 +29385,33 @@
       }
       activeClinicManagementTab = authorizedTab;
       const tabStyles = {
+        overview: 'text-blue-700',
         finances: 'text-emerald-700',
         analytics: 'text-indigo-700',
         hr: 'text-rose-700'
       };
-      ['finances', 'analytics', 'hr'].forEach(candidate => {
-        const allowed = hasPageAccess(candidate);
+      ['overview', 'finances', 'analytics', 'hr'].forEach(candidate => {
+        const allowed = hasPageAccess(candidate === 'overview' ? 'clinic-management' : candidate);
         const isActive = candidate === authorizedTab;
         const button = document.getElementById(`clinic-management-tab-${candidate}`);
-        const panel = document.getElementById(`view-${candidate}`);
+        const panel = document.getElementById(candidate === 'overview' ? 'view-clinic-overview' : `view-${candidate}`);
         if (button) {
           button.className = `${allowed ? '' : 'hidden '}inline-flex shrink-0 min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-[11px] font-black transition sm:px-4 sm:text-xs ${isActive ? `bg-white ${tabStyles[candidate]} shadow-xs` : 'text-slate-500 hover:bg-white/70 hover:text-slate-800'}`;
           button.setAttribute('aria-selected', isActive ? 'true' : 'false');
           button.tabIndex = allowed && isActive ? 0 : -1;
         }
         panel?.classList.toggle('hidden', !isActive);
+        if (candidate === 'overview' && panel) panel.hidden = !isActive;
       });
       if (authorizedTab === 'finances') {
         await switchFinanceTab(activeFinanceTab);
       }
       else if (authorizedTab === 'analytics') await refreshActiveAnalyticsTab();
       else if (authorizedTab === 'hr') await Promise.allSettled([refreshHrDirectory(), ensureDentalCustomizationLoaded()]);
+      if (window.LuminClinicManagement) {
+        LuminClinicManagement.closeAlerts(false);
+        await LuminClinicManagement.refresh();
+      }
       if (updateHash) window.location.hash = 'clinic-management';
       lucide.createIcons();
     }
@@ -29903,6 +29943,7 @@
     }
 
     async function switchView(viewName) {
+      if (window.LuminClinicManagement) LuminClinicManagement.closeAlerts(false);
       if (typeof closeClinicalSpecialtyPicker === 'function') closeClinicalSpecialtyPicker();
       closeChartFindingDateDialog({ force: true, restoreFocus: false });
       patientWorkspaceSwipe?.cancel();

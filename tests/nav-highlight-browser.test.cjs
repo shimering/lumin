@@ -40,6 +40,7 @@ test('one navbar highlight slides through stationary icon boxes, retargets smoot
     function switchView(viewName) { ${navUpdate} syncNavMountLocation(); }
     ${source('syncNavMountLocation')}
     ${source('updateAppViewportDimensions')}
+    ${source('getAppViewportBounds')}
     document.getElementById('auth-gate').classList.add('hidden');
     document.getElementById('app-shell').classList.remove('hidden');
     const mobileNavigation=LuminMobileNav.create({source:document.getElementById('app-primary-nav'),shell:document.getElementById('app-shell'),

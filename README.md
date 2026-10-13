@@ -44,6 +44,12 @@ The frontend is a Single-Page Application (PWA). Cloudflare Workers hosting uses
 
 ## Loading and finance queries
 
+Clinic Management opens on an Overview with real receipts, paid expenses, net cash, patient balances, a cumulative cash chart, expense categories, and the current HR payroll summary. Its title-bar bell turns red and gently pulses when actionable alerts exist; opening it shows transfer, balance, unpaid-expense, payroll-review, and incomplete-attendance alerts. The dropdown supports keyboard dismissal, Arabic/RTL, touch screens, and reduced motion.
+
+Doctor day payroll displays paged invoice procedure rows in a scrollbox with completion-date and doctor filters. Only transferred, unpaid procedures enter the payable total; pending transfers and paid snapshots remain distinct. **Pay day payroll** reuses the HR payment-method confirmation and server-side expected-amount checks, while **Open doctor in HR** opens that doctor's single-day settlement details. No salaries are paid merely by opening or refreshing the overview.
+
+Apply `20261013143556_clinic_management_overview.sql` before serving this frontend. The migration adds read-only, permission-gated overview and payroll projections; it does not change the settlement functions or financial records. Run `node --test tests/clinic-management.test.cjs tests/clinic-management-browser.test.cjs` with installed Chrome (`LUMIN_TEST_BROWSER_CHANNEL=chrome`) and `supabase/tests/clinic_management_overview.test.sql` for read-only ledger reconciliation and HR/authorization checks.
+
 Clinic Management → Analytics includes a Cash flow tab with monthly income and expense lines, money in/out and net totals, selectable months, and 6/12-month or year-to-date presets. Apply `clinic_cash_flow` before serving this frontend. Its compact aggregate requires Analytics access and groups actual receipts and expense installments by payment date; older paid amounts without installment history use the recorded expense date and are identified in the chart. Zero-activity months remain visible. English, Arabic, keyboard navigation, touch controls, and the raised theme are supported.
 
 Run `node --test tests/cash-flow.test.cjs tests/cash-flow-browser.test.cjs` (with Playwright in `NODE_PATH` and `LUMIN_TEST_BROWSER_CHANNEL=chrome` for browser checks), and `supabase/tests/clinic_cash_flow.test.sql` for rolled-back ledger and permission checks.
