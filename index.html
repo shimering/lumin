@@ -1695,7 +1695,7 @@
     .arch-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     .arch-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-    .appointment-day-scroll::-webkit-scrollbar { width: 8px; }
+    .appointment-day-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
     .appointment-day-scroll::-webkit-scrollbar-track { background: #f8fafc; }
     .appointment-day-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
     .appointment-day-swipe-surface {
@@ -1703,6 +1703,8 @@
       overscroll-behavior-x: contain;
       overflow-x: hidden;
     }
+    .appointment-day-swipe-surface.has-horizontal-overflow,
+    .appointment-day-swipe-surface.has-horizontal-overflow .appointment-slot-surface { touch-action: pan-x pan-y; }
     .appointment-day-scroll {
       transform: translate3d(0, 0, 0);
       transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease;
@@ -1755,77 +1757,9 @@
       container-type: size;
       transition: box-shadow 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
     }
-    .appointment-day-stack {
-      position: absolute;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      overflow-x: hidden;
-      overflow-y: auto;
-      border-radius: 8px;
-      scrollbar-width: thin;
-      scrollbar-color: #94a3b8 transparent;
-      touch-action: pan-y;
-    }
-    .appointment-day-stack:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
-    .appointment-day-event.is-stacked {
-      position: relative !important;
-      inset: auto !important;
-      width: 100% !important;
-      height: auto !important;
-      min-height: calc(44px / var(--lumin-app-scale, 1));
-      flex: 1 0 calc(44px / var(--lumin-app-scale, 1));
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      align-content: center;
-      align-items: center;
-      column-gap: 8px;
-      padding: 4px 8px;
-      container-type: normal;
-      text-align: start;
-    }
-    #appointments-day-timeline .appointment-day-event.is-stacked .appointment-day-patient-name {
-      grid-column: 1;
-      grid-row: 1;
-      min-width: 0;
-      margin: 0;
-      font-size: 12px;
-      line-height: 16px;
-    }
-    .appointment-day-event.is-stacked .appointment-day-doctor-row {
-      grid-column: 1 / -1;
-      grid-row: 2;
-      flex-wrap: nowrap;
-      padding-inline-end: 20px;
-    }
-    #appointments-day-timeline .appointment-day-event.is-stacked .appointment-day-doctor {
-      flex: 0 1 auto;
-      font-size: 10px;
-      line-height: 14px;
-    }
-    #appointments-day-timeline .appointment-day-event.is-stacked [data-drag-time] {
-      grid-column: 2;
-      grid-row: 1;
-      max-width: 100%;
-      font-size: 10px;
-      line-height: 14px;
-      direction: ltr;
-    }
-    .appointment-day-event.is-stacked .appointment-visit-type-badge { border: 0; }
-    .appointment-day-event.is-stacked::after { width: 20px; height: 16px; filter: none; }
-    .appointment-day-event.is-stacked:hover { transform: none; filter: brightness(.98); }
     .appointment-day-event:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
-    .appointment-day-event.is-stacked:active { transform: scale(.98); }
+    .appointment-day-event:active { transform: scale(.98); }
     .appointment-day-event:disabled { opacity: .5; pointer-events: none; }
-    html[dir="rtl"] .appointment-day-event.is-stacked { direction: rtl; }
-    .appointment-day-event.is-stacked .appointment-resize-handle { inset-inline-start: auto; inset-inline-end: 0; width: 44px; height: 100%; }
-    .appointment-day-event.is-stacked .appointment-resize-handle::before { width: 16px; }
-    .appointment-day-event.is-stacked [data-drag-time] { padding-inline-end: 24px; }
-    @media (max-width: 767px) {
-      .appointment-day-event.is-stacked { grid-template-columns: minmax(0, 1fr); }
-      #appointments-day-timeline .appointment-day-event.is-stacked [data-drag-time] { grid-column: 1; grid-row: 3; }
-      .appointment-day-event.is-stacked { flex-basis: 60px; min-height: 60px; }
-    }
     .appointment-day-patient-name {
       font-size: clamp(11px, calc(var(--appointment-card-height, 40px) * 0.08 + 8.5px), 24px);
       line-height: 1.25;
@@ -1866,6 +1800,7 @@
     }
     .appointment-day-doctor-row .appointment-visit-type-badge {
       max-width: 100% !important;
+      border: 0;
     }
     .appointment-week-event > p:first-child {
       margin-bottom: 0.2rem;
@@ -33246,6 +33181,15 @@
       }
     }
 
+    function syncAppointmentDayHorizontalScroll() {
+      const dayView = document.getElementById('appointments-day-view');
+      const scroll = document.getElementById('appointments-day-timeline-scroll');
+      const timeline = document.getElementById('appointments-day-timeline');
+      const columnSlots = Number(timeline?.dataset.dayColumnSlots);
+      if (columnSlots > 0) timeline.style.minWidth = `${columnSlots * (44 / appointmentRootZoomScale() + 4) + 72}px`;
+      dayView?.classList.toggle('has-horizontal-overflow', Boolean(scroll && scroll.scrollWidth > scroll.clientWidth + 2));
+    }
+
     function updateAppointmentCalendarViewportHeight() {
       const appointmentsView = document.getElementById('view-appointments');
       const toolbar = document.getElementById('appointments-calendar-toolbar');
@@ -33253,6 +33197,7 @@
       const appShell = document.getElementById('app-shell');
       if (!appointmentsView || appointmentsView.classList.contains('hidden') || !toolbar || !main || !appShell) return;
 
+      syncAppointmentDayHorizontalScroll();
       const viewportBottom = getAppViewportBounds().bottom;
       const isMobile = window.matchMedia('(max-width: 1023px)').matches;
       const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
@@ -35887,7 +35832,7 @@
         entry,
         start: appointmentMinuteOfDay(entry),
         end: appointmentMinuteOfDay(entry) + entry.duration
-      })).sort((left, right) => left.start - right.start || left.end - right.end);
+      })).sort((left, right) => left.start - right.start || left.end - right.end || String(left.entry.id).localeCompare(String(right.entry.id)));
       const groups = [];
       let currentGroup = [];
       let groupEnd = -1;
@@ -35939,9 +35884,11 @@
         layoutDayAppointments(byDoctor.get(doctorKey)).map(item => ({
           ...item,
           doctorKey,
+          overlapColumn: item.column,
+          overlapColumnCount: item.columnCount,
           column,
           columnCount: doctorKeys.length,
-          stacked: item.groupCount > 1
+          overlapping: item.columnCount > 1
         }))
       );
     }
@@ -36125,6 +36072,10 @@
       const mobileHeading = document.getElementById('appointments-mobile-heading');
       const entries = appointmentsForDate(appointmentSelectedDate);
       const laidOutEntries = layoutDayDoctorAppointments(entries);
+      // Keep each overlapping card at least 44px wide; dense days scroll inside the calendar.
+      const doctorColumnCount = Math.max(1, ...laidOutEntries.map(item => item.columnCount));
+      const maxOverlapColumns = Math.max(1, ...laidOutEntries.map(item => item.overlapColumnCount));
+      timeline.dataset.dayColumnSlots = doctorColumnCount * maxOverlapColumns;
       const timelineHeight = appointmentDayHourHeight * 24;
       const dateKey = appointmentDateKey(appointmentSelectedDate);
       const previousDateKey = scroll.dataset.dateKey;
@@ -36143,33 +36094,26 @@
         </div>
       `).join('');
 
-      const stackedGroups = new Map();
-      const eventBlocks = laidOutEntries.map(({ entry, start, column, columnCount, doctorKey, groupStart, groupEnd, stacked }) => {
+      const eventBlocks = laidOutEntries.map(({ entry, start, column, columnCount, overlapColumn, overlapColumnCount, overlapping }) => {
         const top = start / 60 * appointmentDayHourHeight;
         const height = Math.max(entry.duration / 60 * appointmentDayHourHeight, 24);
-        const left = column / columnCount * 100;
-        const width = 100 / columnCount;
+        const left = (column + overlapColumn / overlapColumnCount) / columnCount * 100;
+        const width = 100 / columnCount / overlapColumnCount;
         const selected = entry.id === selectedAppointmentId;
         const editable = canModifyAppointments();
         const markup = `
-          <button type="button" data-timeline-appointment-id="${entry.id}" data-day-start-minutes="${start}" data-day-duration-minutes="${entry.duration}" data-appointment-status="${canonicalAppointmentStatus(entry.status)}" aria-label="${escapeAppointmentText(entry.patient)}, ${escapeAppointmentText(entry.doctor)}, ${appointmentTimeRange(entry)}, ${appointmentDurationLabel(entry.duration)}, ${escapeAppointmentText(canonicalAppointmentStatus(entry.status))}" aria-haspopup="dialog" aria-expanded="${appointmentCardPopoverId === entry.id}" class="appointment-day-event ${stacked ? 'is-stacked' : ''} appointment-status-glow absolute overflow-hidden rounded-lg border border-l-4 px-2 py-1 text-left cursor-${editable ? 'grab' : 'pointer'} ${appointmentCardPopoverId === entry.id ? 'is-popover-anchor' : ''} ${selected ? 'ring-2 ring-blue-500 ring-offset-1' : 'shadow-sm'}" style="top:${top}px;height:${height}px;--appointment-card-height:${height}px;left:calc(${left}% + 2px);width:calc(${width}% - 4px);${appointmentStatusVisualStyle(entry)}">
+          <button type="button" data-timeline-appointment-id="${entry.id}" data-day-start-minutes="${start}" data-day-duration-minutes="${entry.duration}" data-appointment-status="${canonicalAppointmentStatus(entry.status)}" aria-label="${escapeAppointmentText(entry.patient)}, ${escapeAppointmentText(entry.doctor)}, ${appointmentTimeRange(entry)}, ${appointmentDurationLabel(entry.duration)}, ${escapeAppointmentText(canonicalAppointmentStatus(entry.status))}" aria-haspopup="dialog" aria-expanded="${appointmentCardPopoverId === entry.id}" class="appointment-day-event appointment-status-glow absolute overflow-hidden rounded-lg border border-l-4 px-2 py-1 text-left cursor-${editable ? 'grab' : 'pointer'} ${appointmentCardPopoverId === entry.id ? 'is-popover-anchor' : ''} ${selected ? 'ring-2 ring-blue-500 ring-offset-1' : 'shadow-sm'}" style="top:${top}px;height:${height}px;--appointment-card-height:${height}px;left:calc(${left}% + 2px);width:calc(${width}% - 4px);${appointmentStatusVisualStyle(entry)}">
             <p class="appointment-day-patient-name truncate font-black" dir="auto">${escapeAppointmentText(entry.patient)}</p>
             <div class="appointment-day-doctor-row">
               <p class="appointment-day-doctor truncate text-[10px] font-bold opacity-80" dir="auto">${escapeAppointmentText(entry.doctor)}</p>
               <span class="appointment-day-visit-type-wrap flex shrink-0">${appointmentVisitTypeBadgeMarkup(entry, true)}</span>
             </div>
-            <p data-drag-time class="truncate text-[10px] font-bold opacity-70">${appointmentTimeRange(entry, stacked)}${stacked ? '' : ` · ${appointmentDurationLabel(entry.duration)}`}</p>
+            <p data-drag-time class="truncate text-[10px] font-bold opacity-70">${appointmentTimeRange(entry, overlapping)}${overlapping ? '' : ` · ${appointmentDurationLabel(entry.duration)}`}</p>
             ${editable ? `<span data-appointment-resize-handle="${entry.id}" class="appointment-resize-handle" title="Drag to change appointment duration" aria-hidden="true"></span>` : ''}
           </button>
         `;
-        if (!stacked) return markup;
-        const key = `${doctorKey}:${groupStart}`;
-        if (!stackedGroups.has(key)) stackedGroups.set(key, { start: groupStart, end: groupEnd, left, width, doctor: entry.doctor, cards: [] });
-        stackedGroups.get(key).cards.push(markup);
-        return '';
-      }).join('') + Array.from(stackedGroups.values(), group => `
-        <div data-day-appointment-stack data-day-start-minutes="${group.start}" data-day-duration-minutes="${group.end - group.start}" class="appointment-day-stack" role="group" tabindex="0" aria-label="${escapeAppointmentText(group.doctor)}, ${group.cards.length} ${currentUiLanguage === 'ar' ? 'مواعيد متزامنة' : 'concurrent appointments'}" style="top:${group.start / 60 * appointmentDayHourHeight}px;height:${(group.end - group.start) / 60 * appointmentDayHourHeight}px;left:calc(${group.left}% + 2px);width:calc(${group.width}% - 4px)">${group.cards.join('')}</div>
-      `).join('');
+        return markup;
+      }).join('');
 
       const activeDoctorIdForOffHours = normaliseAppointmentDoctorFilter(appointmentDoctorFilter);
       const nonWorkingIntervals = activeDoctorIdForOffHours !== 'all'
@@ -36196,6 +36140,7 @@
         <div data-day-end-line class="absolute inset-x-0 border-t border-slate-200" style="top:${timelineHeight}px"></div>
         <div data-appointment-slot-surface class="appointment-slot-surface absolute bottom-0 right-3 top-0 left-[3.5rem]" style="--appointment-quarter-hour-height:${appointmentDayHourHeight / 4}px" title="Press and hold, then drag to select the appointment time and duration" aria-label="Press and hold an empty time, then drag to select the appointment duration">${offHoursBlocks}${eventBlocks}<div data-appointment-current-time-line data-current-time-mode="day" data-current-date="${dateKey}" class="appointment-current-time-line inset-x-0 hidden" aria-hidden="true"></div></div>
       `;
+      syncAppointmentDayHorizontalScroll();
       if (window.lucide) lucide.createIcons();
 
       const slotSurface = timeline.querySelector('[data-appointment-slot-surface]');
@@ -36739,7 +36684,7 @@
         ghost.setAttribute('aria-hidden', 'true');
         ghost.tabIndex = -1;
         ghost.querySelector('[data-appointment-resize-handle]')?.remove();
-        ghost.classList.remove('is-popover-anchor', 'is-drag-source', 'is-stacked');
+        ghost.classList.remove('is-popover-anchor', 'is-drag-source');
         ghost.classList.add('appointment-day-drag-ghost', 'is-dragging');
         ghost.style.top = `${blockBounds.top / gesture.rootZoom}px`;
         ghost.style.left = `${blockBounds.left / gesture.rootZoom}px`;
@@ -36836,8 +36781,6 @@
       event.preventDefault();
       const originalStart = appointmentMinuteOfDay(entry);
       const originalDuration = entry.duration;
-      const stacked = block.classList.contains('is-stacked');
-      const originalCardHeight = block.offsetHeight;
       const maximumDuration = Math.max(1, 1440 - originalStart);
       const minimumDuration = Math.min(APPOINTMENT_MIN_DURATION, maximumDuration);
       const surface = block.closest('[data-appointment-slot-surface]');
@@ -36858,13 +36801,12 @@
         resized = resized || nextDuration !== originalDuration;
 
         const currentHeight = Math.max(nextDuration / 60 * appointmentDayHourHeight, 24);
-        if (stacked) block.style.flexBasis = `${Math.max(44, originalCardHeight + (nextDuration - originalDuration) / 60 * appointmentDayHourHeight)}px`;
-        else block.style.height = `${currentHeight}px`;
+        block.style.height = `${currentHeight}px`;
         block.style.setProperty('--appointment-card-height', `${currentHeight}px`);
         const end = Math.min(1440, originalStart + nextDuration);
         const range = `${appointmentTimeFromMinutes(originalStart)}–${appointmentTimeFromMinutes(end)}`;
         const label = block.querySelector('[data-drag-time]');
-        if (label) label.textContent = stacked ? appointmentTimeRange({ ...entry, duration: nextDuration }, true) : `${range} · ${appointmentDurationLabel(nextDuration)}`;
+        if (label) label.textContent = `${range} · ${appointmentDurationLabel(nextDuration)}`;
         block.setAttribute('aria-label', `${entry.patient}, ${range}, ${appointmentDurationLabel(nextDuration)}`);
       };
 
@@ -37408,7 +37350,6 @@
       const slotSurface = timeline.querySelector('[data-appointment-slot-surface]');
       slotSurface?.style.setProperty('--appointment-quarter-hour-height', `${appointmentDayHourHeight / 4}px`);
       timeline.querySelectorAll('[data-timeline-appointment-id]').forEach(block => {
-        if (block.classList.contains('is-stacked')) return;
         const startMinutes = Number(block.dataset.dayStartMinutes);
         const durationMinutes = Number(block.dataset.dayDurationMinutes);
         if (!Number.isFinite(startMinutes) || !Number.isFinite(durationMinutes)) return;
@@ -37416,10 +37357,6 @@
         const currentHeight = Math.max(durationMinutes / 60 * appointmentDayHourHeight, 24);
         block.style.height = `${currentHeight}px`;
         block.style.setProperty('--appointment-card-height', `${currentHeight}px`);
-      });
-      timeline.querySelectorAll('[data-day-appointment-stack]').forEach(stack => {
-        stack.style.top = `${Number(stack.dataset.dayStartMinutes) / 60 * appointmentDayHourHeight}px`;
-        stack.style.height = `${Number(stack.dataset.dayDurationMinutes) / 60 * appointmentDayHourHeight}px`;
       });
       timeline.querySelectorAll('[data-day-off-hours]').forEach(block => {
         const startMinutes = Number(block.dataset.startMinutes);
@@ -37709,7 +37646,10 @@
     }
 
     function appointmentDaySwipeTargetIsInteractive(target) {
-      return Boolean(target?.closest?.('button, a, input, select, textarea, [data-timeline-appointment-id], [data-appointment-resize-handle]'));
+      if (target?.closest?.('button, a, input, select, textarea, [data-timeline-appointment-id], [data-appointment-resize-handle]')) return true;
+      // Let dense doctor columns scroll horizontally without changing the selected date.
+      const scroll = target?.closest?.('#appointments-day-timeline-scroll');
+      return Boolean(scroll && scroll.scrollWidth > scroll.clientWidth + 2);
     }
 
     function beginAppointmentDaySwipe(event) {
