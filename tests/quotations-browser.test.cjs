@@ -328,7 +328,7 @@ test('patient Quotations tab supports editing, deletion, pagination and patient 
   assert.deepEqual(payload.selected_ids,[id(2)]);assert.ok(new Date(payload.expires_at)>new Date());
   assert.equal(payload.language,'ar');
   assert.match(await page.locator('.q-link-field input').inputValue(),/quotation\.html\?q=[b]{64}$/);
-  await page.evaluate(()=>{window.open=url=>{window.sharedQuotationUrl=url;};});
+  await page.evaluate(()=>{window.openWhatsAppLink=url=>{window.sharedQuotationUrl=url;};});
   await page.locator('[data-quote-action=whatsapp]').click();
   const message=new URL(await page.evaluate(()=>window.sharedQuotationUrl)).searchParams.get('text');
   assert.match(message,/مرحباً Omar Hassan، إليك عرض أسعار علاجك/);

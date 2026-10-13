@@ -278,7 +278,10 @@
         const international=phone.startsWith('00')?phone.slice(2):phone.startsWith('0')?'20'+phone.slice(1):phone;
         if(!/^[1-9][0-9]{6,14}$/.test(international))throw new Error(t('Add a valid patient phone number before opening WhatsApp.','أضف رقم هاتف صحيحاً للمريض قبل فتح واتساب.'));
         const message=view().text(quotationLanguage,`Hello ${ui.patient.name}, here is your treatment quotation from ${ui.settings.clinic_name}:`,`مرحباً ${ui.patient.name}، إليك عرض أسعار علاجك من ${ui.settings.clinic_name}:`);
-        window.open(`https://wa.me/${international}?text=${encodeURIComponent(message+'\n'+quoteLink(record))}`,'_blank','noopener,noreferrer');return;
+        const url=`https://wa.me/${international}?text=${encodeURIComponent(message+'\n'+quoteLink(record))}`;
+        if(typeof openWhatsAppLink==='function')openWhatsAppLink(url);
+        else window.open(url,'_blank','noopener,noreferrer');
+        return;
       }
       if(!['save','revoke','delete'].includes(name))return;
       const request=ui.request,id=ui.patient.id;
