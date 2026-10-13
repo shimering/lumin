@@ -5,7 +5,7 @@ select set_config('request.jwt.claim.sub',(select profile.user_id::text
   where profile.active and role.is_admin limit 1),true);
 set local role authenticated;
 do $$
-declare report jsonb; payroll jsonb; doctor record; test_day date; expected numeric; zone text; amount numeric;
+declare report jsonb; payroll jsonb; doctor record; test_day date; expected numeric; zone text;
 begin
   select coalesce(nullif(attendance_timezone,''),'Africa/Cairo') into zone from public.clinic_settings where id=1;
   report:=public.get_clinic_management_overview('2026-10-01','2026-10-13');
