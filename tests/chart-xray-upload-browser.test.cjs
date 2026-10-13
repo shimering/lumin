@@ -73,9 +73,10 @@ test('chart X-ray filters prefill uploads, allow multiple teeth, and save withou
       upload={}; status=200;
       open() {} setRequestHeader() {}
       send(form) {
+        const file=form.get('file');
         const category=form.get('category'), patientId=form.get('patientId'), filename='film-'+(window.uploads.length+1)+'.png';
         const relativePath=patientId+'/'+category+'/'+filename;
-        window.uploads.push({category,patientId,relativePath});
+        window.uploads.push({category,patientId,relativePath,file:file ? {name:file.name,size:file.size,type:file.type} : null});
         window.mediaFiles.push({filename,relativePath,category,uploadedAt:new Date().toISOString()});
         this.responseText=JSON.stringify({relativePath}); queueMicrotask(()=>this.onload());
       }
@@ -166,6 +167,7 @@ test('chart X-ray filters prefill uploads, allow multiple teeth, and save withou
   await page.locator('#btn-submit-media-upload').click();
   await page.waitForFunction(()=>pendingPatientMediaUpload && !document.getElementById('btn-submit-media-upload').disabled);
   assert.match(await page.locator('#upload-media-error').textContent(),/without uploading a duplicate/);
+  assert.equal(await page.locator('#upload-progress-container').isVisible(),false);
   await page.evaluate(()=>{failDetails=false; activeWorkspacePatientId='patient-2';});
   await page.locator('#btn-submit-media-upload').click();
   await page.waitForSelector('#patient-media-upload-modal',{state:'hidden'});
@@ -173,6 +175,7 @@ test('chart X-ray filters prefill uploads, allow multiple teeth, and save withou
   assert.equal(await page.evaluate(()=>window.savedDetails[0].patient_id),'patient-1','Upload retains the patient captured when opened');
   assert.equal(await page.evaluate(()=>window.uploads.length),1,'Retry does not duplicate the image');
   assert.equal(await page.evaluate(()=>window.uploads[0].category),'Periapical');
+  assert.deepEqual(await page.evaluate(()=>window.uploads[0].file),{name:'test.png',size:68,type:'image/png'},'Selected images use the shared file upload field');
   assert.equal(await page.evaluate(()=>window.galleryRefreshes),0);
   assert.equal(await page.locator('.chart-media-caption h4').textContent(),'Shared X-ray');
   assert.equal(await page.locator('.chart-media-thumbnail').count(),1,'Shared image appears once in a multiple-tooth filter');
@@ -188,5 +191,22 @@ test('chart X-ray filters prefill uploads, allow multiple teeth, and save withou
   assert.ok(!(await page.locator('#patient-media-upload-modal').isVisible()),'Changing patient closes an unsaved chart upload');
   assert.deepEqual(await page.evaluate(()=>chartPatientMedia.filterToothIds),[]);
   assert.equal(await page.locator('.chart-tooth-xray-indicator:not(.is-unassigned)').count(),0);
+  await page.evaluate(()=>{chartPatientMedia.collapsed=false;renderChartMediaPanel();});
+  await page.locator('[data-chart-add-xray]').click();
+  await page.evaluate(()=>{
+    const bytes=Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jP1sAAAAASUVORK5CYII='),c=>c.charCodeAt(0));
+    const clipboardData=new DataTransfer();
+    clipboardData.items.add(new File([bytes],'image.png',{type:'image/png'}));
+    document.dispatchEvent(new ClipboardEvent('paste',{clipboardData,bubbles:true,cancelable:true}));
+  });
+  assert.equal(await page.locator('#upload-media-file-input').inputValue(),'','Pasted uploads retain their file independently of the file input');
+  assert.match(await page.locator('#upload-preview-name').textContent(),/^clipboard-.*\.png$/);
+  await page.locator('#btn-submit-media-upload').click();
+  await page.waitForSelector('#patient-media-upload-modal',{state:'hidden'});
+  const pasted=await page.evaluate(()=>window.uploads.at(-1));
+  assert.match(pasted.file.name,/^clipboard-.*\.png$/);
+  assert.equal(pasted.file.size,68);
+  assert.equal(pasted.file.type,'image/png');
+  assert.equal(pasted.patientId,'patient-2');
   assert.deepEqual(errors,[]);
 });

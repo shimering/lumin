@@ -50,6 +50,38 @@ Deno.test("uploads preserve Arabic patient/category folders and notes survive pa
   assert((await f.request("/files/" + path, "doctor", undefined, "GET")).status === 404);
   assert([...f.google.files.values()].some(r => r.name === ".Lumin_Recovery"));
 });
+Deno.test("X-ray uploads accept the app's image field and the shared file field without losing bytes or notes", async () => {
+  for (const field of ["image", "file"]) {
+    const f = await fixture(), bytes = new Uint8Array(545260).fill(127);
+    const name = field === "image" ? "clipboard-2026-10-13T17-51-47-555Z.png" : "selected-xray.png";
+    const form = new FormData();
+    form.set(field, new File([bytes], name, {type: "image/png"}));
+    form.set("patientId", PID); form.set("patientName", "untrusted-name");
+    form.set("category", "Periapical"); form.set("note", "أشعة السن");
+    const response = await f.request("/api/upload", "doctor", form);
+    assert(response.ok, await response.clone().text());
+    const uploaded = await response.json();
+    assert(uploaded.sizeBytes === bytes.length && uploaded.relativePath.startsWith("أحمد_علي/Periapical/"));
+    const downloaded = await f.request("/files/" + uploaded.relativePath, "doctor", undefined, "GET");
+    assert(downloaded.ok && downloaded.headers.get("Content-Type") === "image/png");
+    assert(await sha256(new Uint8Array(await downloaded.arrayBuffer())) === await sha256(bytes));
+    const listed = await (await f.request(`/api/patient/${PID}/files`, "doctor", undefined, "GET")).json();
+    assert(listed.total === 1 && listed.files[0].mediaDetails.note === "أشعة السن");
+    assert(listed.files[0].mediaDetails.display_name === name && listed.files[0].mediaDetails.patient_id === PID);
+  }
+});
+Deno.test("missing upload files are distinguished from empty or oversized images", async () => {
+  const f = await fixture();
+  for (const value of [null, "not a file", new File([], "empty.png"), new File([new Uint8Array(MAX_UPLOAD + 1)], "large.png")]) {
+    const form = new FormData(); form.set("patientId", PID);
+    if (value !== null) form.set("image", value);
+    const response = await f.request("/api/upload", "doctor", form), body = await response.json();
+    const missing = value === null || typeof value === "string";
+    assert(response.status === (missing ? 400 : 413), JSON.stringify(body));
+    assert(body.code === (missing ? "missing_file" : "file_too_large"), JSON.stringify(body));
+    assert((f.db.tables.google_drive_files || []).length === 0);
+  }
+});
 Deno.test("sync handles checksums, expected revisions, missing Drive files and explicit trash without silent deletions", async () => {
   const f = await fixture(), upload = await f.upload(), store = new DriveStore(f.db, f.config, f.google.fetch);
   const row = await store.row(upload.relativePath);

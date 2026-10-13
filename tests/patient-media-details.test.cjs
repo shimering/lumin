@@ -27,6 +27,7 @@ function createHarness() {
   const rows = new Map();
   const calls = { uploads: 0, saves: 0, moves: [] };
   let saveError = false;
+  let uploadError = false;
   function node(id) {
     if (!nodes.has(id)) nodes.set(id, {
       value: '', innerHTML: '', textContent: '', style: {}, files: [], disabled: false,
@@ -71,7 +72,11 @@ function createHarness() {
     XMLHttpRequest: class {
       upload = {}; status = 200; responseText = JSON.stringify({ relativePath: filePath });
       open() {} setRequestHeader() {}
-      send() { calls.uploads++; this.onload(); }
+      send(form) {
+        calls.uploads++; calls.lastUpload = form;
+        if (uploadError) { this.status = 400; this.responseText = JSON.stringify({code:'missing_file',error:'Choose a file or paste an image before uploading.'}); }
+        this.onload();
+      }
     },
   };
   vm.createContext(context);
@@ -83,7 +88,7 @@ function createHarness() {
     node(prefix + '-media-tooth-ids').value = '["3","4","A"]';
   }
   node('upload-media-category').value = 'Periapical';
-  return { context, node, rows, calls, failSaves: value => { saveError = value; } };
+  return { context, node, rows, calls, failSaves: value => { saveError = value; }, failUploads: value => { uploadError = value; } };
 }
 const submit = { preventDefault() {} };
 
@@ -121,6 +126,8 @@ test('upload saves the name, tooth, and multiline note; reloading the gallery re
   const { context, node, rows, calls } = createHarness();
   await context.handlePatientMediaUploadSubmit(submit);
   assert.equal(calls.uploads, 1);
+  assert.equal(calls.lastUpload.get('file').name, 'film.png');
+  assert.equal(await calls.lastUpload.get('file').text(), 'photo');
   const row = rows.get('patient-1:' + filePath);
   assert.equal(row.tooth_id, '3');
   assert.deepEqual(row.tooth_ids, ['3','4','A']);
@@ -132,6 +139,24 @@ test('upload saves the name, tooth, and multiline note; reloading the gallery re
   context.currentPatientMediaFiles = [];
   await context.renderPatientMedia();
   assert.equal(context.currentPatientMediaFiles[0].mediaDetails.note, row.note);
+});
+
+test('a missing-file server response is localized and leaves the image available for retry', async () => {
+  for (const language of ['en', 'ar']) {
+    const harness = createHarness();
+    harness.context.currentUiLanguage = language;
+    harness.failUploads(true);
+    await harness.context.handlePatientMediaUploadSubmit(submit);
+    assert.equal(harness.node('upload-media-error').textContent, language === 'ar'
+      ? 'اختر ملفاً أو الصق صورة قبل الرفع.' : 'Choose a file or paste an image before uploading.');
+    assert.equal(harness.calls.saves, 0);
+    assert.equal(harness.context.pendingPatientMediaUpload, null);
+    assert.equal(harness.node('btn-submit-media-upload').disabled, false);
+    harness.failUploads(false);
+    await harness.context.handlePatientMediaUploadSubmit(submit);
+    assert.equal(harness.calls.saves, 1);
+    assert.equal(harness.calls.uploads, 2);
+  }
 });
 
 test('retrying after details fail saves the already-uploaded photo without a duplicate', async () => {

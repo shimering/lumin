@@ -28648,10 +28648,12 @@
 
       if (errorEl) errorEl.classList.add('hidden');
       if (progressContainer) progressContainer.classList.remove('hidden');
+      if (progressBar) progressBar.style.width = '0%';
+      if (progressPct) progressPct.textContent = '0%';
       if (submitBtn) submitBtn.disabled = true;
 
       const formData = new FormData();
-      formData.append('image', file);
+      formData.append('file', file);
       formData.append('patientId', patient.id);
       formData.append('patientName', patient.name || 'Patient');
       formData.append('category', categorySelect?.value || 'General');
@@ -28684,7 +28686,10 @@
             } else {
               try {
                 const errData = JSON.parse(xhr.responseText);
-                reject(new Error(errData.error || `Upload failed with HTTP ${xhr.status}`));
+                const message = errData.code === 'missing_file'
+                  ? (currentUiLanguage === 'ar' ? 'اختر ملفاً أو الصق صورة قبل الرفع.' : 'Choose a file or paste an image before uploading.')
+                  : (errData.error || `Upload failed with HTTP ${xhr.status}`);
+                reject(new Error(message));
               } catch (e) {
                 reject(new Error(`Upload failed with HTTP ${xhr.status}`));
               }
@@ -28710,6 +28715,7 @@
         }
       } catch (err) {
         console.error('Upload failed:', err);
+        if (progressContainer) progressContainer.classList.add('hidden');
         if (errorEl) {
           errorEl.textContent = pendingPatientMediaUpload
             ? (currentUiLanguage === 'ar' ? 'تم رفع الصورة، لكن تعذر حفظ تفاصيلها. اضغط الرفع مرة أخرى لإعادة حفظ التفاصيل دون رفع نسخة جديدة.' : 'The photo was uploaded, but its details could not be saved. Tap Upload again to retry saving details without uploading a duplicate.')

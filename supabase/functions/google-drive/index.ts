@@ -132,8 +132,10 @@ async function mediaRoute(route: string, request: Request, url: URL, store: Driv
   }
   if (route === "/api/upload" && request.method === "POST") {
     const length = Number(request.headers.get("Content-Length")); if (length > MAX_UPLOAD + 1024 * 1024) throw new DriveError("Drive uploads are limited to 24 MB per file.", 413, "file_too_large");
-    const form = await request.formData(), file = form.get("file");
-    if (!(file instanceof File) || file.size === 0 || file.size > MAX_UPLOAD) throw new DriveError("Choose a file between 1 byte and 24 MB.", 413, "file_too_large");
+    // Cached app versions use "image"; local storage accepts both upload fields.
+    const form = await request.formData(), file = form.get("file") ?? form.get("image");
+    if (!(file instanceof File)) throw new DriveError("Choose a file or paste an image before uploading.", 400, "missing_file");
+    if (file.size === 0 || file.size > MAX_UPLOAD) throw new DriveError("Choose a file between 1 byte and 24 MB.", 413, "file_too_large");
     const p = await patient(db, String(form.get("patientId") || form.get("patient_id") || ""));
     const category = cleanName(String(form.get("category") || "General")) || "General", name = cleanName(file.name);
     const bytes = new Uint8Array(await file.arrayBuffer());
