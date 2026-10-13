@@ -208,7 +208,7 @@ test('appointment picker animates and saves accessibly across responsive layouts
     assert.equal(await listbox.count(), 0);
   });
 
-  await t.test('save and refresh frames keep the glass control connected, focused and stationary', async () => {
+  await t.test('save and refresh frames keep the status control connected, focused and stationary', async () => {
     for (const [width, height] of [[390, 844], [820, 1180], [1440, 900]]) {
       await page.setViewportSize({ width, height });
       for (const dir of ['ltr', 'rtl']) for (const theme of ['flat', 'raised']) {
@@ -228,8 +228,13 @@ test('appointment picker animates and saves accessibly across responsive layouts
           const style = getComputedStyle(element);
           return { blur: style.backdropFilter || style.webkitBackdropFilter, background: style.backgroundImage };
         });
-        assert.match(glass.blur, /blur\(24px\)/);
-        assert.match(glass.background, /rgba/);
+        if (width < 1024) {
+          assert.equal(glass.blur, 'none', 'mobile menus do not filter the scrolling page');
+          assert.ok(!glass.background.includes('rgba'), 'mobile menu gradient is opaque');
+        } else {
+          assert.match(glass.blur, /blur\(24px\)/);
+          assert.match(glass.background, /rgba/);
+        }
         await page.evaluate(() => {
           const button = document.querySelector('[data-appointment-id="a"]');
           window.originalAncestors = [];
@@ -263,8 +268,8 @@ test('appointment picker animates and saves accessibly across responsive layouts
           assert.equal(frame.connected, true);
           assert.equal(frame.sameChevron, true, 'icon refreshes never replace the chevron');
           assert.equal(frame.focused, true);
-          assert.equal(frame.opacity, '1', 'saving never dims the glass control');
-          assert.equal(frame.background, 'rgba(0, 0, 0, 0)', 'the control has no solid fill');
+          assert.equal(frame.opacity, '1', 'saving never dims the status control');
+          assert.equal(frame.background, width < 1024 ? 'rgb(248, 250, 252)' : 'rgba(0, 0, 0, 0)', 'mobile opaque backing and desktop glass persist during saves');
         }
       }
     }

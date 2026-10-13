@@ -56,7 +56,7 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
   await page.addScriptTag({ url: `http://127.0.0.1:${server.address().port}/lumin-mobile-nav.js?v=2` });
   await page.addScriptTag({ content: `
     let appointmentCalendarResizeFrame = null, patientQueryResizeFrame = null, dashboardResizeFrame = null;
-    let currentUiTheme = 'flat', currentUiTint = 'blue', currentUiScale = 100;
+    let currentUiTheme = 'flat', currentUiTint = 'blue', currentUiScale = 100, currentUiBackground = 'default';
     let mobileHeaderOverlayOpen = false;
     let activePatientsTab = 'browse';
     const patientWorkspaceSwipe = null;
@@ -113,6 +113,7 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
     function normaliseWhatsAppPhone(value) { return value; }
     function normaliseUiTint(value) { return value; }
     function normaliseUiScale(value) { return Number(value); }
+    function normaliseUiBackground(value) { return value || 'default'; }
     function syncUiThemeToggle() {}
     function updateAppointmentMonthCardVisibility() {}
     ${viewportHelpers}
@@ -648,7 +649,7 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
     await showView('patients', 100);
   });
 
-  await t.test('glass dock respects safe areas, dark mode, and keyboards that also shrink innerHeight', async () => {
+  await t.test('opaque dock respects safe areas, dark mode, and keyboards that also shrink innerHeight', async () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await showView('patients', 125);
     await page.evaluate(() => {
@@ -663,9 +664,10 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
     const safe = await bounds('patients');
     assert.ok(safe.nav.bottom <= 811 && safe.nav.left >= 19 && safe.nav.right <= 371, 'dock clears home indicator and side insets');
     assertFits(safe, 'dark dock with safe areas');
-    const glass = await page.locator('.lumin-mobile-nav-bar').evaluate(el => ({ background: getComputedStyle(el).backgroundColor, blur: getComputedStyle(el).backdropFilter }));
-    assert.match(glass.background, /rgba\(15, 23, 42,/);
-    assert.match(glass.blur, /blur\(24px\)/);
+    const surface = await page.locator('.lumin-mobile-nav-bar').evaluate(el => ({ background: getComputedStyle(el).backgroundImage, blur: getComputedStyle(el).backdropFilter }));
+    assert.match(surface.background, /rgb\(15, 23, 42\)/);
+    assert.ok(!surface.background.includes('rgba'), 'dark gradient is opaque');
+    assert.equal(surface.blur, 'none');
     await page.waitForFunction(() => getComputedStyle(document.getElementById('mobile-nav-patients')).color === 'rgb(147, 197, 253)', null, { timeout: 2000 });
     const activeColor = await page.locator('#mobile-nav-patients').evaluate(el => ({ color: getComputedStyle(el).color, current: el.getAttribute('aria-current'), root: document.documentElement.className, focus: document.activeElement.id }));
     assert.equal(activeColor.color, 'rgb(147, 197, 253)', 'active dock text remains readable in raised dark mode: ' + JSON.stringify(activeColor));

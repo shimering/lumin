@@ -114,6 +114,23 @@ body.lumin-raised .lumin-status-menu .lumin-status-option:focus-visible { outlin
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .lumin-status-menu-panel { background: rgba(248, 250, 252, .96); }
 }
+/* Keep scrolling schedules on the normal paint layer on phones and tablets.
+   Repeated live backdrop filters can leave missing tiles in Samsung Internet. */
+@media (max-width: 1023px) {
+  #view-dashboard .lumin-status-trigger,
+  body.lumin-raised #view-dashboard [data-dashboard-appointment-status] .lumin-status-trigger {
+    background-color: #f8fafc;
+    background-image: linear-gradient(145deg, #ffffff, rgba(var(--status-rgb), .1));
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .lumin-status-menu-panel {
+    border-color: #e2e8f0;
+    background: linear-gradient(145deg, #ffffff, #f1f5f9);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .lumin-status-trigger, .lumin-status-option, .lumin-status-chevron,
   body.lumin-raised #view-dashboard .lumin-status-trigger { transition: none; }

@@ -7,6 +7,12 @@
   to { opacity: 1; }
 }
 
+/* The mobile dashboard scrolls as one long page. A filled opacity animation
+   retains an accelerated layer for that entire page after the fade finishes. */
+@media (max-width: 1023px) {
+  #view-dashboard:not(.hidden) { animation: none; }
+}
+
 #modal-payment.has-dashboard-motion {
   isolation: isolate;
   background: transparent;
