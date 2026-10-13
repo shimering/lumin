@@ -17,6 +17,8 @@ A modern, high-performance Progressive Web Application (PWA) for comprehensive d
 - **Backend-as-a-Service**: Supabase (PostgreSQL, Auth, Edge Functions, Row-Level Security)
 - **Notifications**: OneSignal Web Push
 
+Diagnosis fees automatically enter the assigned doctor's HR salary calculation once the appointment is completed and the fee is invoiced. The existing Diagnosis compensation rule (or universal rule) determines the amount. Saving a fee before completion, changing its doctor before payment, and existing eligible fees are covered automatically; ordinary chart procedures still use **Transfer to salary**. Paid diagnosis fees retain their expense deletion safeguards. Apply `auto_transfer_diagnosis_fees_to_salary` before publishing the frontend. Run `node --test tests/diagnosis-fee-auto-salary.test.cjs` and `supabase/tests/diagnosis_fee_auto_salary.test.sql`; the database fixtures and test settlements roll back.
+
 ## Patient quotations
 
 Shared quotation pages and their WhatsApp introduction default to Arabic, regardless of the staff interface language. Patients can switch the page to English. Procedure names use the shared clinical Arabic dictionary, treatment badges show Palmer tooth notation, and prices display whole Egyptian pounds while calculation precision is preserved.
