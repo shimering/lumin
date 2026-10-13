@@ -96,7 +96,7 @@
   <link rel="stylesheet" href="lumin-chart-dates.css?v=2" />
   <script src="lumin-media-teeth.js?v=2"></script>
   <script src="lumin-nav-motion.js?v=1"></script>
-  <script src="lumin-mobile-nav.js?v=2"></script>
+  <script src="lumin-mobile-nav.js?v=3"></script>
   <script src="lumin-appointment-status.js?v=2"></script>
   <script src="lumin-dashboard-motion.js?v=3"></script>
   <script src="lumin-whatsapp-actions.js?v=2"></script>
@@ -33110,11 +33110,7 @@
     function updateAppViewportDimensions() {
       const root = document.documentElement;
       const zoom = Number.parseFloat(getComputedStyle(root).zoom) || 1;
-      const viewport = window.matchMedia('(max-width: 1023px)').matches ? window.visualViewport : null;
-      const width = viewport?.width > 0 ? viewport.width : window.innerWidth;
-      const height = viewport?.height > 0 ? viewport.height : window.innerHeight;
-      const left = viewport?.offsetLeft || 0;
-      const bottom = (viewport?.offsetTop || 0) + height;
+      const { width, height, offsetLeft: left, bottom } = getAppViewportBounds();
       // These are live CSS dimensions, compensated once for the app's zoom.
       // A standalone Android app's visible viewport can be smaller than its layout viewport.
       root.style.setProperty('--lumin-app-viewport-width', `${width / zoom}px`);
@@ -33123,7 +33119,31 @@
       root.style.setProperty('--lumin-app-viewport-bottom-offset', `${Math.max(0, window.innerHeight - bottom) / zoom}px`);
     }
 
+    function getAppViewportBounds() {
+      const viewport = window.visualViewport;
+      const ua = navigator.userAgent || '';
+      const appleTouch = /iPad|iPhone|iPod/i.test(ua)
+        || (/Macintosh|MacIntel/i.test(ua + ' ' + navigator.platform) && navigator.maxTouchPoints > 1);
+      const focused = document.activeElement;
+      const editing = focused?.isContentEditable || focused?.matches('textarea, input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]):not([type="image"])');
+      const validHeight = Number.isFinite(viewport?.height) && viewport.height > 0;
+      // Installed iPad apps can retain a keyboard-sized visual viewport after dismissal/rotation.
+      // https://bugs.webkit.org/show_bug.cgi?id=218983
+      // Keep ordinary browser chrome insets and real keyboard layouts; discard a stale large inset.
+      const staleKeyboard = appleTouch && !editing && window.innerHeight - viewport?.height > 140;
+      const useVisualViewport = validHeight && !staleKeyboard;
+      const mobile = window.matchMedia('(max-width: 1023px)').matches;
+      const width = mobile && useVisualViewport && Number.isFinite(viewport.width) && viewport.width > 0
+        ? viewport.width : window.innerWidth;
+      const height = useVisualViewport ? Math.min(window.innerHeight, viewport.height) : window.innerHeight;
+      const offsetTop = useVisualViewport && Number.isFinite(viewport.offsetTop) ? Math.max(0, viewport.offsetTop) : 0;
+      const offsetLeft = mobile && useVisualViewport && Number.isFinite(viewport.offsetLeft) ? viewport.offsetLeft : 0;
+      return { width, height, offsetTop, offsetLeft, bottom: Math.min(window.innerHeight, offsetTop + height) };
+    }
+
     function setupAppViewportDimensions() {
+      let settleTimers = [];
+      let settleFrame = null;
       const update = () => {
         updateAppViewportDimensions();
         scheduleDashboardViewportUpdate();
@@ -33131,13 +33151,25 @@
         scheduleAppointmentCalendarViewportUpdate();
         scheduleWhatsAppMobileViewportUpdate();
       };
+      const recover = () => {
+        settleTimers.forEach(timer => window.clearTimeout(timer));
+        window.cancelAnimationFrame(settleFrame);
+        update();
+        settleFrame = window.requestAnimationFrame(update);
+        // Keyboard, foreground, and rotation dimensions can settle after the browser event.
+        // Bounded retries also handle WebKit updating its metrics without another resize.
+        settleTimers = [120, 400, 800].map(delay => window.setTimeout(update, delay));
+      };
       window.addEventListener('resize', update, { passive: true });
-      window.addEventListener('orientationchange', update, { passive: true });
-      window.addEventListener('pageshow', update, { passive: true });
+      window.addEventListener('orientationchange', recover, { passive: true });
+      window.addEventListener('pageshow', recover, { passive: true });
+      window.addEventListener('focus', recover, { passive: true });
       window.visualViewport?.addEventListener('resize', update, { passive: true });
       window.visualViewport?.addEventListener('scroll', update, { passive: true });
+      document.addEventListener('focusin', recover);
+      document.addEventListener('focusout', recover);
       document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) update();
+        if (!document.hidden) recover();
       });
       updateAppViewportDimensions();
     }
@@ -33178,10 +33210,7 @@
       const appShell = document.getElementById('app-shell');
       if (!appointmentsView || appointmentsView.classList.contains('hidden') || !toolbar || !main || !appShell) return;
 
-      const visualViewport = window.visualViewport;
-      const viewportBottom = visualViewport
-        ? visualViewport.offsetTop + visualViewport.height
-        : window.innerHeight;
+      const viewportBottom = getAppViewportBounds().bottom;
       const isMobile = window.matchMedia('(max-width: 1023px)').matches;
       const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
       if (isMobile) {
@@ -33271,10 +33300,7 @@
         updateAppViewportDimensions();
         syncNavMountLocation();
       }
-      const visualViewport = window.visualViewport;
-      const viewportBottom = visualViewport
-        ? visualViewport.offsetTop + visualViewport.height
-        : window.innerHeight;
+      const viewportBottom = getAppViewportBounds().bottom;
       const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
       if (isMobile) {
         const contentBottom = mobileViewContentBottom(appShell, viewportBottom);
@@ -33415,10 +33441,7 @@
         return;
       }
 
-      const visualViewport = window.visualViewport;
-      const viewportBottom = visualViewport
-        ? visualViewport.offsetTop + visualViewport.height
-        : window.innerHeight;
+      const viewportBottom = getAppViewportBounds().bottom;
       const mobileNavigationHeight = Number.parseFloat(getComputedStyle(appShell).paddingBottom) || 0;
       const mainBottomPadding = Number.parseFloat(getComputedStyle(main).paddingBottom) || 0;
       const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
@@ -33469,7 +33492,7 @@
         return;
       }
 
-      const vv = window.visualViewport;
+      const vv = getAppViewportBounds();
       const windowH = window.innerHeight;
       const viewportH = vv ? vv.height : windowH;
       const keyboardHeight = Math.max(0, windowH - viewportH);
@@ -33486,7 +33509,7 @@
         whatsAppView.style.setProperty('--whatsapp-mobile-viewport-height', `${targetHeight}px`);
         resetWhatsAppWindowScroll();
       } else {
-        const viewportBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+        const viewportBottom = vv.bottom;
         const contentBottom = mobileViewContentBottom(appShell, viewportBottom);
         const whatsAppTop = whatsAppView.getBoundingClientRect().top;
         const availableHeight = Math.floor((contentBottom - whatsAppTop) / zoom);

@@ -114,7 +114,7 @@
       const phone = isPhone();
       root.classList.toggle('lumin-phone-nav', phone);
       const zoom = Number.parseFloat(getComputedStyle(root).zoom) || 1;
-      const viewport = window.visualViewport;
+      const viewport = window.getAppViewportBounds?.() || window.visualViewport;
       const width = viewport?.width > 0 ? viewport.width : innerWidth;
       const height = viewport?.height > 0 ? viewport.height : innerHeight;
       const left = viewport?.offsetLeft || 0;
