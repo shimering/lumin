@@ -1,7 +1,7 @@
 /* Clinic overview and day settlement. Uses existing HR payment confirmation and server guards. */
 (function (host) {
   'use strict';
-  const state = { actor:'', token:0, payrollToken:0, report:null, payroll:null, team:null, alerts:[], alertView:'alerts', transferring:new Set(), start:'', end:'', day:'', doctor:'', page:1, onlyPending:false, loading:false, payrollLoading:false,paying:false,loadedAt:0,error:'',payrollError:'' };
+  const state = { actor:'', token:0, payrollToken:0, report:null, payroll:null, team:null, alerts:[], alertView:'alerts', start:'', end:'', day:'', doctor:'', page:1, onlyUnpaid:false, loading:false, payrollLoading:false,paying:false,loadedAt:0,error:'',payrollError:'' };
   const el = id => document.getElementById(id);
   const text = (en,ar) => typeof currentUiLanguage !== 'undefined' && currentUiLanguage === 'ar' ? ar : en;
   const esc = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -21,7 +21,7 @@
   const empty = (title,description,name='circle-check',action='') => `<div class="cm-empty"><span class="cm-icon">${icon(name)}</span><h4>${title}</h4><p>${description}</p>${action}</div>`;
   function reset() {
     state.token++;state.payrollToken++;closeAlerts(false);
-    Object.assign(state,{actor:'',report:null,payroll:null,team:null,alerts:[],alertView:'alerts',transferring:new Set(),loadedAt:0,error:'',payrollError:'',loading:false,payrollLoading:false,paying:false,doctor:'',day:'',start:'',end:'',page:1,onlyPending:false});
+    Object.assign(state,{actor:'',report:null,payroll:null,team:null,alerts:[],alertView:'alerts',loadedAt:0,error:'',payrollError:'',loading:false,payrollLoading:false,paying:false,doctor:'',day:'',start:'',end:'',page:1,onlyUnpaid:false});
     for(const id of ['cm-stats','cm-payroll-rows','cm-team-content','cm-expense-breakdown','cm-cash-chart','cm-alert-body'])if(el(id))el(id).replaceChildren();
     if(el('cm-alert-bell')){el('cm-alert-bell').classList.remove('has-alerts');el('cm-alert-count').hidden=true;}
   }
@@ -45,7 +45,7 @@
     el('cm-payroll-panel').hidden=!allowed('hr');el('cm-team-panel').hidden=!allowed('hr');
     const financial=allowed('finances')||allowed('analytics');el('cm-cash-panel').hidden=!financial;el('cm-expense-panel').hidden=!financial;
     el('cm-payroll-title').innerHTML=`<div class="cm-heading-icon"><span class="cm-icon">${icon('stethoscope')}</span><div><h3 id="cm-payroll-heading">${text('Doctor day payroll','راتب الطبيب ليوم واحد')}</h3><p>${text("Review patient invoices and settle one doctor's completed procedures for a single day.",'راجع فواتير المرضى وسدد إجراءات طبيب واحد المكتملة في يوم محدد.')}</p></div></div>`;
-    el('cm-payroll-note').innerHTML=`${icon('info')}<span>${text('Only transferred, unpaid procedures are included in the day payment.','يشمل دفع اليوم الإجراءات المحولة للراتب وغير المدفوعة فقط.')}</span>`;
+    el('cm-payroll-note').innerHTML=`${icon('info')}<span>${text('Completed, invoiced procedures enter payroll automatically and wait for payment in HR.','تُضاف الإجراءات المكتملة والمفوترة للراتب تلقائياً وتنتظر الدفع في الموارد البشرية.')}</span>`;
     el('cm-cash-title').innerHTML=`<div><h3 id="cm-cash-heading">${text('Cash performance','الأداء النقدي')}</h3><p>${text('Cumulative recorded receipts and paid expenses in the selected period','المقبوضات والمصروفات المدفوعة التراكمية خلال الفترة المحددة')}</p></div>${allowed('analytics')?button(text('Open Analytics','فتح التحليلات'),"navigate('analytics')",'chart-no-axes-combined'):''}`;
     el('cm-expense-title').innerHTML=`<div><h3 id="cm-expense-heading">${text('Expense breakdown','تفصيل المصروفات')}</h3><p>${text('Paid in this period','المدفوع خلال هذه الفترة')}</p></div>${allowed('finances')?button(text('View expenses','عرض المصروفات'),"navigate('expenses')",'receipt-text','cm-button-quiet'):''}`;
     el('cm-team-title').innerHTML=`<div><h3 id="cm-team-heading">${text('Team & payroll','الفريق والرواتب')}</h3><p>${text('Payroll month','شهر الرواتب')}: ${typeof currentHrMonth==='function'?esc(currentHrMonth()):''}</p></div>${button(text('Open HR','فتح الموارد البشرية'),"navigate('hr')",'users-round','cm-button-quiet')}`;
@@ -78,25 +78,25 @@
     // Preserve active controls during background refreshes.
     if(!controls.querySelector('#cm-doctor')||controls.dataset.language!==text('en','ar')||controls.dataset.doctors!==JSON.stringify(doctors)){
       controls.dataset.language=text('en','ar');controls.dataset.doctors=JSON.stringify(doctors);
-      controls.innerHTML=`<label>${text('Doctor','الطبيب')}<select id="cm-doctor" class="cm-select" onchange="LuminClinicManagement.setDoctor(this.value)">${doctors.length?doctors.map(d=>`<option value="${esc(d.id)}" ${d.id===state.doctor?'selected':''}>${esc(d.name)}</option>`).join(''):`<option value="">${text('Choose a doctor','اختر طبيبًا')}</option>`}</select></label><label>${text('Completion date','تاريخ الإكمال')}<input id="cm-payroll-day" class="cm-input" type="date" value="${esc(state.day)}" onchange="LuminClinicManagement.setDay(this.value)"></label><span class="cm-pill">${text('Single day','يوم واحد')}</span><label><select id="cm-payroll-filter" class="cm-select" aria-label="${text('Transfer status','حالة التحويل')}" onchange="LuminClinicManagement.setPending(this.value==='pending')"><option value="all">${text('All procedures','جميع الإجراءات')}</option><option value="pending" ${state.onlyPending?'selected':''}>${text('Not transferred','لم تُحول للراتب')}</option></select></label>`;
+      controls.innerHTML=`<label>${text('Doctor','الطبيب')}<select id="cm-doctor" class="cm-select" onchange="LuminClinicManagement.setDoctor(this.value)">${doctors.length?doctors.map(d=>`<option value="${esc(d.id)}" ${d.id===state.doctor?'selected':''}>${esc(d.name)}</option>`).join(''):`<option value="">${text('Choose a doctor','اختر طبيبًا')}</option>`}</select></label><label>${text('Completion date','تاريخ الإكمال')}<input id="cm-payroll-day" class="cm-input" type="date" value="${esc(state.day)}" onchange="LuminClinicManagement.setDay(this.value)"></label><span class="cm-pill">${text('Single day','يوم واحد')}</span><label><select id="cm-payroll-filter" class="cm-select" aria-label="${text('Payment status','حالة الدفع')}" onchange="LuminClinicManagement.setUnpaid(this.value==='unpaid')"><option value="all">${text('All procedures','جميع الإجراءات')}</option><option value="unpaid" ${state.onlyUnpaid?'selected':''}>${text('Awaiting payment','بانتظار الدفع')}</option></select></label>`;
       if(focused?.startsWith('cm-'))el(focused)?.focus();
     }
     el('cm-doctor').disabled=state.paying;el('cm-payroll-day').disabled=state.paying;el('cm-payroll-filter').disabled=state.paying;
-    el('cm-payroll-summary').innerHTML=`<div><span>${text('Ready to pay','جاهز للدفع')}</span><strong>${state.payrollLoading?'—':esc(money(data?.ready_amount))}</strong></div><div><span>${text('Not transferred','لم تُحول للراتب')}</span><strong>${state.payrollLoading?'—':esc(money(data?.untransferred_amount))}</strong></div><div><span>${text('Invoices','الفواتير')}</span><strong>${state.payrollLoading?'—':number(data?.invoice_count)}</strong></div>`;
+    el('cm-payroll-summary').innerHTML=`<div><span>${text('Ready to pay','جاهز للدفع')}</span><strong>${state.payrollLoading?'—':esc(money(data?.ready_amount))}</strong></div><div><span>${text('Awaiting payment','بانتظار الدفع')}</span><strong>${state.payrollLoading?'—':number(data?.ready_count)}</strong></div><div><span>${text('Invoices','الفواتير')}</span><strong>${state.payrollLoading?'—':number(data?.invoice_count)}</strong></div>`;
     const rows=el('cm-payroll-rows');rows.setAttribute('aria-busy',String(state.payrollLoading));rows.setAttribute('aria-label',text('Doctor invoice procedures','إجراءات فواتير الطبيب'));
     if(state.payrollLoading&&!data)rows.innerHTML='<div class="cm-skeleton cm-skeleton-row"></div><div class="cm-skeleton cm-skeleton-row"></div><div class="cm-skeleton cm-skeleton-row"></div>';
     else if(state.payrollError)rows.innerHTML=empty(text('Could not load doctor payroll','تعذر تحميل راتب الطبيب'),text('Retry to review this day before payment.','أعد المحاولة لمراجعة هذا اليوم قبل الدفع.'),'triangle-alert',button(text('Retry','إعادة المحاولة'),'loadPayroll()','refresh-cw'));
     else if(!data?.rows?.length)rows.innerHTML=empty(text('No procedures for this day','لا توجد إجراءات لهذا اليوم'),text('Choose another completion date or doctor to review their invoices.','اختر تاريخ إكمال أو طبيبًا آخر لمراجعة فواتيره.'),'receipt-text',button(text('Open doctor in HR','فتح الطبيب في الموارد البشرية'),'openDoctor()','external-link'));
     else {
-      const headers=[text('Patient / Invoice','المريض / الفاتورة'),text('Procedure','الإجراء'),text('Invoice item','بند الفاتورة'),text('Doctor amount','مستحق الطبيب'),text('Transfer','التحويل')];
+      const headers=[text('Patient / Invoice','المريض / الفاتورة'),text('Procedure','الإجراء'),text('Invoice item','بند الفاتورة'),text('Doctor amount','مستحق الطبيب'),text('Payroll','الراتب')];
       const oldScroll=rows.scrollTop;
       rows.innerHTML=`<div class="cm-invoice-header" aria-hidden="true">${headers.map((label,i)=>`<span ${i===2||i===3?'class="cm-amount"':''}>${label}</span>`).join('')}<span></span></div>`+data.rows.map(row=>{
-        const paid=Boolean(row.payment_id);const status=paid?text('Paid','مدفوع'):row.transferred?text('Transferred','محوّل للراتب'):text('Not transferred','لم يُحول للراتب');
+        const paid=Boolean(row.payment_id);const status=paid?text('Paid','مدفوع'):row.transferred?text('Awaiting payment','بانتظار الدفع'):text('Needs HR review','تحتاج مراجعة الموارد البشرية');
         const name=String(row.patient_name || text('Patient','مريض'));const initials=name.trim().split(/\s+/).slice(0,2).map(s=>Array.from(s)[0]).join('');
         const operation=typeof dentalTranslate==='function'?dentalTranslate(row.operation_name,currentUiLanguage):row.operation_name;
         const invoiceLabel=typeof invoiceNumber==='function'?invoiceNumber(row.invoice_id):'#'+row.invoice_id;
         const view=typeof canViewPatientInvoices==='function'&&canViewPatientInvoices();
-        return `<article class="cm-invoice-row"><div class="cm-patient"><span class="cm-avatar" aria-hidden="true">${esc(initials)}</span><div><strong>${esc(name)}</strong><small>${esc(invoiceLabel)}</small></div></div><div class="cm-procedure">${esc(operation)}${row.tooth?`<small>${text('Tooth','السن')} ${esc(row.tooth)}</small>`:''}</div><div class="cm-amount" data-label="${headers[2]}">${esc(money(row.invoice_amount))}</div><div class="cm-amount" data-label="${headers[3]}"><strong>${esc(money(row.doctor_amount))}</strong></div><div class="cm-transfer"><span class="cm-pill ${paid||row.transferred?'cm-pill-green':'cm-pill-amber'}">${status}</span>${row.transferred&&!paid?`<small>${text('Unpaid','غير مدفوع')}</small>`:''}</div>${view?`<button type="button" class="cm-button cm-button-icon" data-patient="${esc(row.patient_id)}" data-invoice="${esc(row.invoice_id)}" onclick="LuminClinicManagement.openInvoice(this.dataset.patient,this.dataset.invoice)" aria-label="${esc(text('View invoice','عرض الفاتورة')+' '+invoiceLabel)}">${icon('external-link')}</button>`:'<span></span>'}</article>`;
+        return `<article class="cm-invoice-row"><div class="cm-patient"><span class="cm-avatar" aria-hidden="true">${esc(initials)}</span><div><strong>${esc(name)}</strong><small>${esc(invoiceLabel)}</small></div></div><div class="cm-procedure">${esc(operation)}${row.tooth?`<small>${text('Tooth','السن')} ${esc(row.tooth)}</small>`:''}</div><div class="cm-amount" data-label="${headers[2]}">${esc(money(row.invoice_amount))}</div><div class="cm-amount" data-label="${headers[3]}"><strong>${esc(money(row.doctor_amount))}</strong></div><div class="cm-transfer"><span class="cm-pill ${paid?'cm-pill-green':'cm-pill-amber'}">${status}</span>${row.transferred&&!paid?`<small>${text('Unpaid','غير مدفوع')}</small>`:''}</div>${view?`<button type="button" class="cm-button cm-button-icon" data-patient="${esc(row.patient_id)}" data-invoice="${esc(row.invoice_id)}" onclick="LuminClinicManagement.openInvoice(this.dataset.patient,this.dataset.invoice)" aria-label="${esc(text('View invoice','عرض الفاتورة')+' '+invoiceLabel)}">${icon('external-link')}</button>`:'<span></span>'}</article>`;
       }).join('');rows.scrollTop=oldScroll;
     }
     const pages=Math.max(1,Math.ceil(number(data?.total_count)/20));
@@ -142,7 +142,7 @@
   }
   function buildAlerts() {
     const alerts=[];const finance=state.report?.finance,hr=state.report?.hr,team=state.team;
-    if(allowed('hr')&&number(hr?.untransferred_invoice_count)>0)alerts.push({key:'transfers',name:'receipt-text',tint:'amber',title:text('Doctor payments not transferred','مستحقات أطباء لم تُحول للراتب'),detail:`${number(hr.untransferred_invoice_count)} ${text('invoices','فاتورة')} · ${number(hr.untransferred_doctor_count)} ${text('doctors','أطباء')} · ${money(hr.untransferred_amount)}`,note:text('Not yet included in payroll','لم تُدرج في الرواتب بعد'),action:text('Review invoice transfers','مراجعة تحويل الفواتير')});
+    if(allowed('hr')&&number(hr?.payroll_invoice_count)>0)alerts.push({key:'payments',name:'receipt-text',tint:'amber',title:text('Doctor payroll awaiting payment','رواتب أطباء بانتظار الدفع'),detail:`${number(hr.payroll_invoice_count)} ${text('invoices','فاتورة')} · ${number(hr.payroll_doctor_count)} ${text('doctors','أطباء')} · ${money(hr.payroll_amount)}`,note:text('Included automatically after completion and invoicing','تُضاف تلقائياً بعد الإكمال والفوترة'),action:text('Review doctor payments','مراجعة مستحقات الأطباء')});
     if(allowed('finances')&&number(finance?.debt_patient_count)>0)alerts.push({key:'balances',name:'users-round',tint:'rose',title:text('Patient balance follow-ups','متابعة أرصدة المرضى'),detail:`${number(finance.debt_patient_count)} ${text('patients','مريض')} · ${money(finance.debt_total)}`,action:text('Review balances','مراجعة الأرصدة')});
     if(allowed('finances')&&number(finance?.unpaid_expense_count)>0)alerts.push({key:'expenses',name:'receipt',tint:'amber',title:text('Expenses awaiting payment','مصروفات بانتظار الدفع'),detail:`${number(finance.unpaid_expense_count)} ${text('expenses','مصروف')} · ${money(finance.unpaid_expense_total)}`,action:text('Review expenses','مراجعة المصروفات')});
     if(allowed('hr')&&team?.pending>0&&team.status==='draft')alerts.push({key:'payroll',name:'users-round',tint:'violet',title:text('Payroll needs review','الرواتب تحتاج إلى مراجعة'),detail:`${team.pending} ${text('team members','أعضاء الفريق')} · ${team.month}`,action:text('Open payroll','فتح الرواتب')});
@@ -155,7 +155,7 @@
     bell.setAttribute('aria-label',`${text('Action center','مركز التنبيهات')}: ${state.alerts.length} ${text('alerts','تنبيهات')}`);
     el('cm-alert-body').innerHTML=state.alerts.length?state.alerts.map(a=>`<article class="cm-alert-row"><span class="cm-icon cm-icon-${a.tint}">${icon(a.name)}</span><div><h4>${a.title}</h4><p>${esc(a.detail)}</p>${a.note?`<p>${a.note}</p>`:''}${button(a.action,`reviewAlert('${a.key}')`,'arrow-up-right','cm-button-quiet')}</div></article>`).join(''):empty(text('All caught up','لا توجد تنبيهات'),text('No actionable alerts in the current clinic records.','لا توجد تنبيهات تحتاج إجراء في سجلات العيادة الحالية.'),'circle-check');
     if(state.error)el('cm-alert-body').innerHTML=`<div class="cm-error">${text('Alerts could not be refreshed.','تعذر تحديث التنبيهات.')}${button(text('Retry','إعادة المحاولة'),'refresh({force:true})','refresh-cw')}</div>`+el('cm-alert-body').innerHTML;
-    if(state.alertView==='transfers')renderTransferPreview();
+    if(state.alertView==='payments')renderPaymentPreview();
     if(!el('cm-alert-menu').hidden)positionAlerts();
   }
   async function refresh(options={}) {
@@ -181,7 +181,7 @@
     const token=++state.payrollToken,context=signature(),doctor=state.doctor,day=state.day;
     state.payrollLoading=true;state.payrollError='';renderPayroll();icons();
     try{
-      const {data,error}=await db.rpc('get_clinic_doctor_day_payroll',{p_day:day,p_user_id:doctor||null,p_page:state.page,p_page_size:20,p_untransferred_only:state.onlyPending});
+      const {data,error}=await db.rpc('get_clinic_doctor_day_payroll',{p_day:day,p_user_id:doctor||null,p_page:state.page,p_page_size:20,p_untransferred_only:state.onlyUnpaid});
       if(token!==state.payrollToken||context!==signature()||doctor!==state.doctor||day!==state.day)return;
       if(error)throw error;state.payroll=data;state.doctor=data?.doctor_id||'';
     }catch(_){if(token!==state.payrollToken||context!==signature())return;state.payroll=null;state.payrollError='load';}
@@ -194,7 +194,7 @@
   }
   function setDoctor(value){if(state.paying)return;state.doctor=value;state.page=1;state.payroll=null;void loadPayroll();}
   function setDay(value){if(state.paying)return;if(!validDay(value)){el('cm-payroll-day').value=state.day;return;}state.day=value;state.page=1;state.payroll=null;void loadPayroll();}
-  function setPending(value){if(state.paying)return;state.onlyPending=Boolean(value);state.page=1;void loadPayroll();}
+  function setUnpaid(value){if(state.paying)return;state.onlyUnpaid=Boolean(value);state.page=1;void loadPayroll();}
   function setPage(delta){if(state.payrollLoading||state.paying)return;const pages=Math.max(1,Math.ceil(number(state.payroll?.total_count)/20));state.page=Math.min(pages,Math.max(1,state.page+delta));el('cm-payroll-rows').scrollTop=0;void loadPayroll();}
   async function payDay() {
     if(!canModifyHr()||state.payrollLoading||state.paying||!state.doctor||!validDay(state.day)||state.payrollError||number(state.payroll?.ready_amount)<=0)return;
@@ -235,64 +235,39 @@
     const focus=()=>{if(context!==signature()||window.location.hash!=='#invoices')return;const node=document.querySelector(`#view-invoices [data-refresh-key="${String(Number(invoice))}"]`);if(node){node.scrollIntoView({block:'center',behavior:'smooth'});return;}if(++attempts<15)setTimeout(focus,100);};setTimeout(focus,100);
   }
   async function reviewAlert(key) {
-    if(key==='transfers'){
-      if(!allowed('hr'))return;state.alertView='transfers';renderTransferPreview();icons();positionAlerts();return;
+    if(key==='payments'){
+      if(!allowed('hr'))return;state.alertView='payments';renderPaymentPreview();icons();positionAlerts();return;
     }
     if(key==='balances')return navigate('balances');if(key==='expenses')return navigate('expenses');if(key==='payroll'||key==='attendance')return navigate('hr');
   }
-  async function reviewTransfer(index) {
-    const row=state.report?.hr?.untransferred_preview?.[index];if(!row||!allowed('hr'))return;
-    closeAlerts(false);state.doctor=row.doctor_id;state.day=row.day;state.onlyPending=true;state.page=1;state.payroll=null;
-    el('cm-payroll-controls').replaceChildren();await switchClinicManagementTab('overview');await loadPayroll();el('cm-payroll-panel').scrollIntoView({block:'start',behavior:'smooth'});
+  async function reviewPayment(index) {
+    const row=state.report?.hr?.payroll_preview?.[index];if(!row||!allowed('hr'))return;
+    state.doctor=row.doctor_id;state.day=row.day;await openDoctor();
   }
   function showAlerts() {state.alertView='alerts';renderAlerts();icons();}
-  function renderTransferPreview() {
+  function renderPaymentPreview() {
     if(!allowed('hr'))return;
-    const rows=state.report?.hr?.untransferred_preview||[],canTransfer=allowed('patients')||allowed('chart'),body=el('cm-alert-body');
+    const rows=state.report?.hr?.payroll_preview||[],body=el('cm-alert-body');
     body.replaceChildren();
     const back=document.createElement('button');back.type='button';back.className='cm-button cm-button-quiet';
     back.innerHTML=icon('arrow-left')+text('Back to alerts','العودة للتنبيهات');back.onclick=showAlerts;body.appendChild(back);
     const note=document.createElement('p');note.className='cm-note';
     if(state.error){const warning=document.createElement('p');warning.className='cm-error';warning.setAttribute('role','alert');warning.textContent=text('Alerts could not be refreshed. Please retry.','تعذر تحديث التنبيهات. يرجى إعادة المحاولة.');body.appendChild(warning);}
-    note.textContent=text('Oldest pending procedures. Transfer a procedure to payroll or open its doctor day for details.','أقدم الإجراءات المعلقة. حوّل الإجراء للراتب أو افتح يوم الطبيب للتفاصيل.');body.appendChild(note);
-    const list=document.createElement('div');list.className='cm-transfer-preview';body.appendChild(list);
-    if(!rows.length){list.innerHTML=empty(text('No pending transfers','لا توجد تحويلات معلقة'),text('Refresh to review the latest pending invoice procedures.','حدّث لمراجعة أحدث إجراءات الفواتير المعلقة.'),'circle-check');return;}
+    note.textContent=text('Procedures enter payroll automatically. Open the doctor in HR to review and pay.','تُضاف الإجراءات للراتب تلقائياً. افتح الطبيب في الموارد البشرية للمراجعة والدفع.');body.appendChild(note);
+    const list=document.createElement('div');list.className='cm-payment-preview';body.appendChild(list);
+    if(!rows.length){list.innerHTML=empty(text('No doctor payments awaiting payment','لا توجد مستحقات أطباء بانتظار الدفع'),text('Refresh to review the latest pending invoice procedures.','حدّث لمراجعة أحدث إجراءات الفواتير المعلقة.'),'circle-check');return;}
     rows.forEach((row,index)=>{
-      const itemId=Number(row.invoice_item_id),validId=Number.isSafeInteger(itemId)&&itemId>0,busy=state.transferring.has(itemId);
-      const entry=document.createElement('article');entry.className='cm-transfer-preview-row';
+      const entry=document.createElement('article');entry.className='cm-payment-preview-row';
       const detail=document.createElement('div'),name=document.createElement('strong'),procedure=document.createElement('p'),date=document.createElement('p');
       name.textContent=(row.patient_name||'')+' · '+(row.doctor_name||'');
       procedure.textContent=(row.operation_name||'')+' · '+money(row.doctor_amount);date.textContent=(row.day||'')+' · #'+row.invoice_id;
       detail.append(name,procedure,date);
-      const actions=document.createElement('div');actions.className='cm-transfer-preview-actions';
-      const transfer=document.createElement('button');transfer.type='button';transfer.className='cm-button cm-button-transfer';
-      if(validId)transfer.dataset.salaryTransferItem=String(itemId);
-      transfer.disabled=!canTransfer||!validId||busy;transfer.setAttribute('aria-busy',String(busy));
-      transfer.innerHTML=icon(busy?'loader-circle':'arrow-right-left')+(busy?text('Transferring…','جارٍ التحويل…'):text('Transfer to payroll','تحويل للراتب'));
-      if(!canTransfer)transfer.title=text('Patient or chart access is required to transfer payroll.','يلزم الوصول إلى المرضى أو المخطط لتحويل الرواتب.');
-      transfer.onclick=()=>void transferPayroll(index);
+      const actions=document.createElement('div');actions.className='cm-payment-preview-actions';
       const redirect=document.createElement('button');redirect.type='button';redirect.className='cm-button cm-button-icon';
-      redirect.setAttribute('aria-label',text('Review doctor day','مراجعة يوم الطبيب'));redirect.innerHTML=icon('arrow-up-right');
-      redirect.onclick=()=>void reviewTransfer(index);
-      actions.append(transfer,redirect);entry.append(detail,actions);list.appendChild(entry);
+      redirect.setAttribute('aria-label',text('Open doctor in HR','فتح الطبيب في الموارد البشرية'));redirect.innerHTML=icon('arrow-up-right');
+      redirect.onclick=()=>void reviewPayment(index);
+      actions.append(redirect);entry.append(detail,actions);list.appendChild(entry);
     });
-  }
-  async function transferPayroll(index) {
-    if(!actor()||!allowed('hr')||(!allowed('patients')&&!allowed('chart')))return;
-    const row=state.report?.hr?.untransferred_preview?.[index],itemId=Number(row?.invoice_item_id);
-    if(!row||!Number.isSafeInteger(itemId)||itemId<=0||state.transferring.has(itemId))return;
-    const context=signature(),pending=state.transferring;
-    pending.add(itemId);renderTransferPreview();icons();
-    try{
-      const transferred=await transferDoctorSalaryInvoiceItem(itemId,{refreshPatientWorkspace:false});
-      if(!transferred||context!==signature())return;
-      state.report.hr.untransferred_preview=state.report.hr.untransferred_preview.filter(item=>Number(item.invoice_item_id)!==itemId);
-      state.loadedAt=0;
-      await refresh({force:true});
-    }finally{
-      pending.delete(itemId);
-      if(context===signature()&&state.alertView==='transfers'){renderTransferPreview();icons();positionAlerts();}
-    }
   }
   function toggleAlerts() {
     if(!allowed('clinic-management'))return;if(!el('cm-alert-menu'))init();const menu=el('cm-alert-menu');
@@ -320,7 +295,7 @@
     const next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(index+delta+tabs.length)%tabs.length;
     event.preventDefault();tabs[next].click();tabs[next].focus();
   }
-  const api={init,refresh,reset,invalidate,languageChanged,tabKeydown,closeAlerts,toggleAlerts,positionAlerts,applyRange,setDoctor,setDay,setPage,setPending,loadPayroll,payDay,openDoctor,openInvoice,navigate,reviewAlert,reviewTransfer,transferPayroll,showAlerts,renderAlerts,validRange,cumulativeDays,payrollTotals};
+  const api={init,refresh,reset,invalidate,languageChanged,tabKeydown,closeAlerts,toggleAlerts,positionAlerts,applyRange,setDoctor,setDay,setPage,setUnpaid,loadPayroll,payDay,openDoctor,openInvoice,navigate,reviewAlert,reviewPayment,showAlerts,renderAlerts,validRange,cumulativeDays,payrollTotals};
   host.LuminClinicManagement=api;
   if(typeof module!=='undefined'&&module.exports)module.exports={validRange,cumulativeDays,payrollTotals};
   if(typeof document!=='undefined'){

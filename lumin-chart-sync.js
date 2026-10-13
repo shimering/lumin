@@ -129,6 +129,7 @@ async function drainPatientChartSaves(state) {
         state.confirmed = chart;
         state.lastError = null;
         hrDirectoryLoaded = false;
+        if (typeof hrDoctorSettlementRangeKey !== 'undefined') hrDoctorSettlementRangeKey = '';
         saved = true;
       } catch (error) {
         state.lastError = error;

@@ -76,8 +76,8 @@
   <script src="lumin-loyalty.js?v=5"></script>
   <script src="lumin-finance-sync.js?v=2"></script>
   <script src="lumin-cash-flow.js?v=1"></script>
-  <script src="lumin-clinic-management.js?v=2"></script>
-  <link rel="stylesheet" href="lumin-clinic-management.css?v=2" />
+  <script src="lumin-clinic-management.js?v=3"></script>
+  <link rel="stylesheet" href="lumin-clinic-management.css?v=3" />
   <script src="lumin-patient-scans.js?v=6"></script>
   <link rel="stylesheet" href="lumin-patient-scans.css?v=4" />
   <link rel="stylesheet" href="lumin-cash-flow.css?v=1" />
@@ -87,7 +87,7 @@
   <link rel="stylesheet" href="lumin-storage-sync.css?v=8" />
   <script src="lumin-patient-swipe.js?v=1"></script>
   <script src="lumin-patients.js?v=4"></script>
-  <script src="lumin-chart-sync.js?v=1"></script>
+  <script src="lumin-chart-sync.js?v=2"></script>
   <script src="lumin-chart-media.js?v=19"></script>
   <script src="lumin-xray-rotation.js?v=1"></script>
   <script src="lumin-tooth-notes.js?v=3"></script>
@@ -1336,7 +1336,6 @@
 
     #findings-container .finding-doctor-group { display: flex; flex-direction: column; align-items: stretch; gap: 6px; min-width: 0; }
     #findings-container .finding-doctor-control { width: 100% !important; min-width: 0 !important; min-height: 44px; flex: none; }
-    #findings-container .finding-salary-transfer-button { width: 100%; min-width: 44px; min-height: 44px; white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
     #findings-container .finding-separate-button { width: 100%; min-height: 44px; justify-content: center; margin-block-start: 4px; }
     #findings-container .finding-invoice-control {
       grid-column: 6;
@@ -20710,8 +20709,8 @@
         ? formatInvoiceDate(range.start)
         : new Intl.DateTimeFormat(currentUiLanguage === 'ar' ? 'ar-EG' : 'en-GB', { month: 'long', year: 'numeric' }).format(new Date(`${range.start}T12:00:00`));
       document.getElementById('hr-doctor-payroll-month-label').textContent = range.scope === 'cases'
-        ? `${rangeLabel} · ${currentUiLanguage === 'ar' ? 'اختر الإجراءات المكتملة والمفوتَرة والمحوّلة غير المدفوعة.' : 'Select unpaid cases transferred from completed invoice procedures.'}`
-        : `${rangeLabel} · ${currentUiLanguage === 'ar' ? 'تظهر هنا الإجراءات المكتملة والمفوتَرة بعد تحويلها للراتب.' : 'Completed, invoiced procedures appear here after salary transfer.'}`;
+        ? `${rangeLabel} · ${currentUiLanguage === 'ar' ? 'اختر الإجراءات المكتملة والمفوترة التي تنتظر الدفع.' : 'Select completed, invoiced procedures awaiting payment.'}`
+        : `${rangeLabel} · ${currentUiLanguage === 'ar' ? 'تُضاف الإجراءات المكتملة والمفوترة تلقائياً وتنتظر الدفع هنا.' : 'Completed, invoiced procedures are included automatically and await payment here.'}`;
       document.getElementById('hr-doctor-procedure-count').textContent = String(hrDoctorSettlementCases.length);
       document.getElementById('hr-doctor-procedure-value').textContent = formatInvoiceMoney(metrics.grossAmount);
       document.getElementById('hr-doctor-calculated-salary').textContent = formatInvoiceMoney(metrics.payableAmount);
@@ -20758,7 +20757,7 @@
           ? `<span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700"><i data-lucide="circle-check" class="h-3.5 w-3.5"></i>Paid</span>`
           : '<span class="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black text-amber-700">Ready</span>';
         return `<tr class="${isPaid ? 'bg-emerald-50/20' : ''}"><td class="px-4 py-3 text-center">${selection}</td><td class="whitespace-nowrap px-4 py-3 text-[11px] font-bold text-slate-600">${escapeHtml(formatHrDoctorCaseCompletion(line.completed_at))}</td><td class="px-4 py-3"><p class="font-black text-slate-800">${escapeHtml(line.patient_name || 'Patient')}</p></td><td class="px-4 py-3"><p class="font-black text-slate-800">${escapeHtml(line.operation_name || line.operation_code || 'Procedure')}</p><p class="mt-1 text-[10px] font-bold text-slate-400">${escapeHtml(line.operation_code || '')}</p></td><td class="px-4 py-3 font-black text-blue-700">${escapeHtml(formatInvoiceMoney(line.gross_amount))}</td><td class="px-4 py-3"><span class="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-black text-violet-700">${escapeHtml(method)}</span></td><td class="px-4 py-3 text-right font-black text-emerald-700">${escapeHtml(formatInvoiceMoney(line.salary_amount))}</td><td class="px-4 py-3">${paymentStatus}</td></tr>`;
-      }).join('') : `<tr><td colspan="8" class="px-5 py-10 text-center text-xs font-bold text-slate-400">${currentUiLanguage === 'ar' ? 'لا توجد إجراءات مكتملة ومفوتَرة ومحوّلة للراتب ولها قاعدة تعويض في هذا التاريخ.' : 'No completed, invoiced cases transferred to salary with a compensation rule in this date selection.'}</td></tr>`;
+      }).join('') : `<tr><td colspan="8" class="px-5 py-10 text-center text-xs font-bold text-slate-400">${currentUiLanguage === 'ar' ? 'لا توجد إجراءات مكتملة ومفوترة ولها قاعدة تعويض في هذا التاريخ.' : 'No completed, invoiced procedures with a compensation rule in this date selection.'}</td></tr>`;
       lucide.createIcons();
     }
 
@@ -23714,31 +23713,6 @@
         : `Delete the following doctor salary expense in Finances first, then delete the invoice or procedure:\n${lines.join('\n')}`;
     }
 
-    async function transferDoctorSalaryInvoiceItem(itemId, options = {}) {
-      if (!hasPageAccess('patients') && !hasPageAccess('chart')) return false;
-      const buttons = [...document.querySelectorAll(`[data-salary-transfer-item="${Number(itemId)}"]`)];
-      buttons.forEach(button => { button.disabled = true; });
-      try {
-        const { error } = await db.rpc('transfer_doctor_salary_invoice_item', { p_item_id: Number(itemId) });
-        if (error) throw error;
-        if (options.refreshPatientWorkspace !== false) await renderPatientInvoices();
-        if (options.refreshPatientWorkspace !== false && activePatientId && !document.getElementById('view-chart')?.classList.contains('hidden')) {
-          await refreshChartFindingInvoiceState(activePatientId);
-        }
-        hrDirectoryLoaded = false;
-        showAppointmentNotificationToast(
-          currentUiLanguage === 'ar' ? 'تم تحويل الإجراء' : 'Procedure transferred',
-          currentUiLanguage === 'ar' ? 'أصبح الإجراء متاحاً لحساب راتب الطبيب.' : 'The procedure is now available for doctor salary calculation.'
-        );
-        return true;
-      } catch (error) {
-        alert((currentUiLanguage === 'ar' ? 'تعذر تحويل الإجراء: ' : 'Could not transfer the procedure: ') + (error?.message || 'Unknown error'));
-        return false;
-      } finally {
-        buttons.forEach(button => { if (button.isConnected) button.disabled = false; });
-      }
-    }
-
     function formatInvoiceMoney(value) {
       const amount = Number(value) || 0;
       return 'EGP ' + amount.toLocaleString('en-EG', {
@@ -26268,16 +26242,11 @@
 
     function invoiceDoctorSalaryActionMarkup(item) {
       const salaryStatus = item.salaryTransfer?.transfer_status;
-      const isDiagnosisFee = item.operationCode === 'diagnosis_fee';
-      if (salaryStatus === 'eligible' && !isDiagnosisFee && hasPageAccess('patients')) {
-        return '<button type="button" data-salary-transfer-item="' + item.id + '" onclick="transferDoctorSalaryInvoiceItem(' + item.id + ')" class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-blue-50 px-3 text-[10px] font-black text-blue-700 transition-all duration-150 ease-out hover:bg-blue-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50" title="' + (currentUiLanguage === 'ar' ? 'تحويل الإجراء لحساب راتب الطبيب' : 'Transfer to doctor salary calculation') + '"><i data-lucide="arrow-right-left" class="h-4 w-4"></i>' + (currentUiLanguage === 'ar' ? 'تحويل للراتب' : 'Transfer to salary') + '</button>';
-      }
       if (salaryStatus !== 'transferred' && salaryStatus !== 'paid') return '';
       const paid = salaryStatus === 'paid';
       const label = paid ? (currentUiLanguage === 'ar' ? 'تم دفع الراتب' : 'Salary paid')
-        : isDiagnosisFee ? (currentUiLanguage === 'ar' ? 'مضاف للراتب تلقائياً' : 'Added to salary automatically')
-        : (currentUiLanguage === 'ar' ? 'محول للراتب' : 'Transferred');
-      return '<span class="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-[10px] font-black ' + (paid ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700') + '"><i data-lucide="' + (paid ? 'circle-check' : 'arrow-right-left') + '" class="h-4 w-4"></i>' + label + '</span>';
+        : (currentUiLanguage === 'ar' ? 'مضاف للراتب تلقائياً' : 'Added to salary automatically');
+      return '<span class="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-[10px] font-black ' + (paid ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700') + '"><i data-lucide="' + (paid ? 'circle-check' : 'badge-check') + '" class="h-4 w-4"></i>' + label + '</span>';
     }
 
     function invoiceItemMarkup(item, invoice) {
@@ -31561,8 +31530,8 @@
             : (currentUiLanguage === 'ar' ? 'تم تحديث خطوة الإجراء' : 'Procedure step updated'),
           field === 'doctor'
             ? doctor
-              ? (currentUiLanguage === 'ar' ? `سيُحتسب نصيب خطوة ${step?.name || 'الإجراء'} للطبيب ${doctor.fullName} بعد اكتمال الإجراء وفوترته وتحويله.` : `${doctor.fullName} receives this step's share after the procedure is completed, invoiced, and transferred.`)
-              : (currentUiLanguage === 'ar' ? 'عيّن طبيباً لكل خطوة قبل تحويل الإجراء للراتب.' : 'Assign a doctor to every step before salary transfer.')
+              ? (currentUiLanguage === 'ar' ? `سيُحتسب نصيب خطوة ${step?.name || 'الإجراء'} للطبيب ${doctor.fullName} تلقائياً بعد اكتمال الإجراء وفوترته.` : `${doctor.fullName} receives this step's share automatically after the procedure is completed and invoiced.`)
+              : (currentUiLanguage === 'ar' ? 'عيّن طبيباً لكل خطوة لإضافته تلقائياً للراتب.' : 'Assign a doctor to every step for automatic payroll inclusion.')
             : `${step?.name || 'The step'} is now ${operationStatusDefinition(step?.status || 'P').label.toLowerCase()}.`
         );
       } catch (error) {
@@ -31621,7 +31590,7 @@
         showAppointmentNotificationToast(
           doctor ? 'Doctor assigned' : 'Doctor unassigned',
           doctor
-            ? (currentUiLanguage === 'ar' ? `سيُحتسب كامل سعر الإجراء للطبيب ${doctor.fullName} بعد اكتماله وفوترته وتحويله للراتب.` : `${doctor.fullName} receives the whole procedure value after completion, invoicing, and salary transfer.`)
+            ? (currentUiLanguage === 'ar' ? `سيُحتسب كامل سعر الإجراء للطبيب ${doctor.fullName} تلقائياً بعد اكتماله وفوترته.` : `${doctor.fullName} receives the whole procedure value automatically after completion and invoicing.`)
             : normaliseChartFindingSteps(group?.steps).length
               ? (currentUiLanguage === 'ar' ? 'يمكنك الآن تعيين أطباء للخطوات، أو ترك الإجراء دون طبيب.' : 'You can now assign doctors to individual steps.')
               : (currentUiLanguage === 'ar' ? 'لم يعد هناك طبيب معين لهذا الإجراء.' : 'This procedure has no assigned doctor.')
@@ -32337,6 +32306,8 @@
           p_invoice_date: appointmentDateKey(new Date())
         });
         if (error) throw error;
+        hrDirectoryLoaded = false;
+        hrDoctorSettlementRangeKey = '';
         const result = data?.[0] || {};
         const addedCount = Number(result.added_count) || 0;
         const totalAmount = Number(result.total_amount) || 0;
@@ -32879,10 +32850,6 @@
               .map(member => member.id);
         const isInvoiced = isOrthoPackage ? isOrthoLocked : invoicedMemberIds.length > 0;
         const isFullyInvoiced = isOrthoPackage ? isOrthoFullyInvoiced : Boolean(findingIds.length && invoicedMemberIds.length === findingIds.length);
-        const eligibleSalaryItems = memberFindings
-          .map(member => ({ member, transfer: chartSalaryTransfersByFindingId.get(member.id) }))
-          .filter(({ transfer }) => transfer?.transfer_status === 'eligible');
-        const doctorSalaryActionMarkup = eligibleSalaryItems.map(({ member, transfer }) => `<button type="button" data-salary-transfer-item="${Number(transfer.invoiceItemId)}" onclick="transferDoctorSalaryInvoiceItem(${Number(transfer.invoiceItemId)})" class="finding-salary-transfer-button inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-blue-50 px-3 text-[10px] font-black text-blue-700 transition-all duration-150 ease-out hover:bg-blue-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50" title="${currentUiLanguage === 'ar' ? 'تحويل الإجراء المكتمل والمفوتر لحساب راتب الطبيب' : 'Transfer this completed, invoiced procedure to doctor salary'}${eligibleSalaryItems.length > 1 ? ` · ${escapeHtml(chartFindingNoteTargetLabel(member))}` : ''}"><i data-lucide="arrow-right-left" class="h-4 w-4"></i>${currentUiLanguage === 'ar' ? 'تحويل للراتب' : 'Transfer to salary'}</button>`).join('');
         const separateBatchMarkup = isBatch ? `<button type="button" onclick="separateFindingBatch(this)" class="finding-separate-button inline-flex shrink-0 items-center gap-1 rounded-lg bg-violet-50 px-2.5 py-1.5 text-[10px] font-semibold text-violet-700 transition-all duration-150 ease-out hover:bg-violet-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50" aria-label="${currentUiLanguage === 'ar' ? 'فصل المجموعة إلى إجراء مستقل لكل سن' : 'Separate this batch into one row per tooth'}" title="${currentUiLanguage === 'ar' ? 'إنشاء إجراء مستقل لكل سن' : 'Create one independent documented row for each tooth'}"><i data-lucide="split" class="h-3 w-3"></i>${currentUiLanguage === 'ar' ? 'فصل المجموعة' : 'Separate'}</button>` : '';
         const invoiceColumnMarkup = chartFindingInvoiceColumn(invoicedMemberIds, {
           partial: !isFullyInvoiced,
@@ -32991,7 +32958,6 @@
                   <span class="border-r ${wholeDoctorLocked ? 'border-slate-200 bg-slate-100 text-slate-500' : 'border-cyan-100 bg-cyan-50 text-cyan-700'} px-2 py-1.5 text-[9px] font-black">${procedureSteps.length ? (currentUiLanguage === 'ar' ? 'الإجراء بالكامل' : 'Whole procedure') : (currentUiLanguage === 'ar' ? 'الطبيب' : 'Doctor')}</span>
                   <select onchange="updateFindingDoctorFromControl(this)" ${wholeDoctorLocked ? 'disabled' : ''} class="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-[11px] font-bold text-slate-700 outline-none disabled:text-slate-400" aria-label="${currentUiLanguage === 'ar' ? 'الطبيب المكلف بالإجراء' : 'Assigned doctor for'} ${escapeHtml(dentalOperationLabel(finding.code))}">${chartDoctorSelectOptions(finding, { wholeProcedure: Boolean(procedureSteps.length) })}</select>
                 </label>
-                ${doctorSalaryActionMarkup}
               </div>
               ${isOrthoPackage ? `
                 <div class="finding-pricing-group flex flex-col items-end justify-center shrink-0">

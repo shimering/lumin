@@ -11,7 +11,7 @@ function source(name) {
   return tail.slice(0, tail.indexOf('\n    }') + 6);
 }
 
-test('diagnosis fees show automatic salary inclusion and never require the invoice transfer button in either language', () => {
+test('invoiced procedures and diagnosis fees never require manual salary transfer in either language', () => {
   const ctx = vm.createContext({ currentUiLanguage: 'en', hasPageAccess: () => true });
   vm.runInContext(source('invoiceDoctorSalaryActionMarkup'), ctx);
   for (const language of ['en', 'ar']) {
@@ -23,8 +23,10 @@ test('diagnosis fees show automatic salary inclusion and never require the invoi
       if (status === 'paid') assert.match(markup, language === 'ar' ? /تم دفع الراتب/ : /Salary paid/);
     }
     const regular = ctx.invoiceDoctorSalaryActionMarkup({ id: 10, operationCode: 'filling', salaryTransfer: { transfer_status: 'eligible' } });
-    assert.match(regular, /transferDoctorSalaryInvoiceItem\(10\)/);
-    assert.match(regular, language === 'ar' ? /تحويل للراتب/ : /Transfer to salary/);
+    assert.equal(regular, '');
+    const included = ctx.invoiceDoctorSalaryActionMarkup({ id: 10, operationCode: 'filling', salaryTransfer: { transfer_status: 'transferred' } });
+    assert.match(included, language === 'ar' ? /تلقائياً/ : /Added to salary automatically/);
+    assert.doesNotMatch(included, /<button|transferDoctorSalaryInvoiceItem/);
   }
   ctx.hasPageAccess = () => false;
   assert.equal(ctx.invoiceDoctorSalaryActionMarkup({ id: 10, operationCode: 'filling', salaryTransfer: { transfer_status: 'eligible' } }), '');

@@ -228,9 +228,7 @@ test('invoice column stays beside the tick and below the badge without overlappi
       assert.equal(await page.locator('.finding-row-actions > [data-salary-transfer-item]').count(),0);
       assert.equal(await page.locator('.finding-row-actions > .finding-separate-button').count(),0);
       assert.equal(await page.locator('[data-refresh-key="steps"] [data-salary-transfer-item]').count(),0,'Transferred procedures do not offer another transfer');
-      assert.equal((await paid.locator('.finding-doctor-group [data-salary-transfer-item="10"]').textContent()).trim(),language==='ar'?'تحويل للراتب':'Transfer to salary');
-      await paid.locator('[data-salary-transfer-item="10"]').click();
-      assert.equal(await page.evaluate(()=>window.lastSalaryTransfer),10);
+      assert.equal(await page.locator('[data-salary-transfer-item]').count(),0,'Chart procedures enter payroll automatically without manual transfer buttons');
       await page.locator('[data-refresh-key="b1"] .finding-pricing-group .finding-separate-button').click();
       assert.equal(await page.evaluate(()=>window.lastSeparate),'b1');
       await paid.locator('[data-item-id="10"]').click();
