@@ -16,8 +16,9 @@ test('clinic overview, dropdown, payroll payment, permissions and bilingual layo
   await page.goto('http://127.0.0.1:'+server.address().port+'/');
   await page.addScriptTag({path:path.join(root,'vendor/lucide.min.js')});
   await page.addScriptTag({content:
-    "let currentUiLanguage='en',currentSession={user:{id:'actor'}},currentUserAccess={active:true,isAdmin:true,permissions:new Set(['finances','analytics','hr','finance_depts'])},activeClinicManagementTab='overview',activeFinanceTab='invoices',activeHrDoctorDetailsId=null;"+
+    "let currentUiLanguage='en',currentSession={user:{id:'actor'}},currentUserAccess={active:true,isAdmin:true,permissions:new Set(['finances','analytics','hr','finance_depts','patients'])},activeClinicManagementTab='overview',activeFinanceTab='invoices',activeHrDoctorDetailsId=null,hrDirectoryLoaded=true;"+
     "window.calls=[];window.paymentCancelled=true;window.payrollPaid=false;window.failPayroll=false;window.empty=false;window.deferDoctor=false;window.deferred=[];"+
+    "window.transferComplete=false;window.transferFailure=false;window.deferTransfer=false;window.transferResolvers=[];window.patientRefreshes=0;function renderPatientInvoices(){patientRefreshes++}"+
     "function hasPageAccess(page){return page==='clinic-management'?['finances','analytics','hr'].some(key=>currentUserAccess.permissions.has(key)):currentUserAccess.permissions.has(page)}"+
     "function canModifyHr(){return hasPageAccess('hr')&&currentUserAccess.isAdmin}"+
     "function formatInvoiceMoney(value){return 'EGP '+Number(value).toLocaleString('en-US')}"+
@@ -29,9 +30,10 @@ test('clinic overview, dropdown, payroll payment, permissions and bilingual layo
     "async function switchFinanceTab(tab){activeFinanceTab=tab}async function refreshActiveAnalyticsTab(){}function openPatientInvoices(patient,view){window.invoiceOpened={patient,view}}"+
     "const patientRows=Array.from({length:25},(_,i)=>({invoice_id:1042+i,invoice_item_id:1042+i,patient_id:'patient-'+i,patient_name:i===0?'Mariam Hassan':'Patient '+i,doctor_id:'a',doctor_name:'Dr. Ahmed',finding_id:'finding-'+i,operation_name:'Composite',tooth:'14',invoice_amount:1200,doctor_amount:i===2?180:360,transferred:i!==2,payment_id:null}));"+
     "const db={rpc:async(name,args)=>{calls.push({name,args});if(name==='hr_pay_doctor_procedures_with_method'){payrollPaid=true;return{data:true}}"+
-    "if(name==='get_clinic_management_overview'){const financial=hasPageAccess('finances')||hasPageAccess('analytics');return{data:{finance:financial?{income_total:184600,expense_total:112400,net_total:72200,debt_total:hasPageAccess('finances')?126000:null,debt_patient_count:hasPageAccess('finances')?34:null,unpaid_expense_count:3,unpaid_expense_total:18200,expense_types:[{name:'Payroll',amount:48000},{name:'Materials',amount:64400}],days:[{day:'2026-10-01',income:100000,expense:60000},{day:'2026-10-13',income:84600,expense:52400}]}:null,hr:hasPageAccess('hr')?{untransferred_invoice_count:4,untransferred_doctor_count:3,untransferred_amount:980,untransferred_preview:[{doctor_id:'a',doctor_name:'Dr. Ahmed',patient_name:'Mariam Hassan',patient_id:'patient-0',invoice_id:1042,operation_name:'Composite',doctor_amount:180,day:'2026-10-12'}]}:null}}}"+
+    "if(name==='transfer_doctor_salary_invoice_item'){if(transferFailure)return{error:{message:'fixture transfer failure'}};if(deferTransfer)await new Promise(resolve=>transferResolvers.push(resolve));transferComplete=true;return{data:true}}"+
+    "if(name==='get_clinic_management_overview'){const financial=hasPageAccess('finances')||hasPageAccess('analytics');return{data:{finance:financial?{income_total:184600,expense_total:112400,net_total:72200,debt_total:hasPageAccess('finances')?126000:null,debt_patient_count:hasPageAccess('finances')?34:null,unpaid_expense_count:3,unpaid_expense_total:18200,expense_types:[{name:'Payroll',amount:48000},{name:'Materials',amount:64400}],days:[{day:'2026-10-01',income:100000,expense:60000},{day:'2026-10-13',income:84600,expense:52400}]}:null,hr:hasPageAccess('hr')?{untransferred_invoice_count:transferComplete?0:4,untransferred_doctor_count:transferComplete?0:3,untransferred_amount:transferComplete?0:980,untransferred_preview:transferComplete?[]:[{doctor_id:'a',doctor_name:'Dr. Ahmed',patient_name:'Mariam Hassan',patient_id:'patient-0',invoice_id:1042,invoice_item_id:1042,operation_name:'Composite',doctor_amount:180,day:'2026-10-12'}]}:null}}}"+
     "if(name==='get_clinic_doctor_day_payroll'){if(failPayroll)return{error:{message:'failure'}};const doctor=args.p_user_id||'a';const rows=(empty?[]:patientRows).filter(row=>!args.p_untransferred_only||!row.transferred);const data={doctor_id:doctor,doctors:[{id:'a',name:'Dr. Ahmed'},{id:'b',name:'Dr. Sara'}],day:args.p_day,rows:rows.slice((args.p_page-1)*20,args.p_page*20).map(row=>({...row,doctor_id:doctor,patient_name:doctor==='b'?'Sara patient':row.patient_name,payment_id:payrollPaid?'paid':null})),invoice_count:rows.length,total_count:rows.length,ready_amount:empty||payrollPaid?0:1260,ready_count:2,untransferred_amount:180};if(deferDoctor&&doctor==='a')await new Promise(resolve=>deferred.push(resolve));return{data}}return{data:null}}};"+
-    source('firstAuthorizedClinicManagementTab')+source('switchClinicManagementTab')+
+    source('firstAuthorizedClinicManagementTab')+source('switchClinicManagementTab')+source('transferDoctorSalaryInvoiceItem')+
     "document.getElementById('auth-gate').classList.add('hidden');document.getElementById('app-shell').classList.remove('hidden');document.querySelectorAll('main>section').forEach(node=>node.classList.add('hidden'));document.getElementById('view-clinic-management').classList.remove('hidden');window.location.hash='clinic-management';"
   });
   await page.addScriptTag({path:path.join(root,'lumin-clinic-management.js')});
@@ -42,6 +44,27 @@ test('clinic overview, dropdown, payroll payment, permissions and bilingual layo
   assert.equal(await page.locator('.cm-alert-row').count(),5);await page.keyboard.press('Escape');
   assert.equal(await page.locator('#cm-alert-menu').isVisible(),false);assert.equal(await page.locator('#cm-alert-bell').evaluate(node=>node===document.activeElement),true);
   await page.locator('#cm-alert-bell').click();await page.locator('#cm-payroll-heading').click();assert.equal(await page.locator('#cm-alert-menu').isVisible(),false);
+  await page.locator('#cm-alert-bell').click();await page.locator('.cm-alert-row .cm-button').first().click();
+  assert.equal(await page.locator('.cm-transfer-preview-actions button').count(),2,'Transfer and redirect appear together');
+  assert.equal(await page.locator('.cm-button-transfer').isEnabled(),true);
+  await page.evaluate(()=>{transferFailure=true});
+  page.once('dialog',dialog=>dialog.accept());await page.locator('.cm-button-transfer').click();
+  await page.waitForFunction(()=>document.querySelector('.cm-button-transfer')?.getAttribute('aria-busy')==='false');
+  assert.equal(await page.locator('.cm-transfer-preview-row').count(),1,'Failure retains the invoice for retry');
+  await page.evaluate(()=>{transferFailure=false;deferTransfer=true});
+  await page.locator('.cm-button-transfer').click();await page.waitForFunction(()=>transferResolvers.length===1);
+  assert.equal(await page.locator('.cm-button-transfer').isDisabled(),true);
+  await page.evaluate(()=>{void LuminClinicManagement.transferPayroll(0);LuminClinicManagement.renderAlerts()});
+  assert.equal(await page.evaluate(()=>calls.filter(c=>c.name==='transfer_doctor_salary_invoice_item').length),2,'Double clicks do not add a request');
+  assert.equal(await page.locator('.cm-button-transfer').isDisabled(),true,'Background rendering preserves the busy state');
+  await page.evaluate(()=>{deferTransfer=false;transferResolvers.splice(0).forEach(resolve=>resolve())});
+  await page.waitForFunction(()=>!document.querySelector('.cm-transfer-preview-row'));
+  assert.equal(await page.locator('#cm-alert-count').textContent(),'4','Alerts refresh after the successful transfer');
+  assert.equal(await page.evaluate(()=>patientRefreshes),0,'Clinic transfer does not render an unrelated patient workspace');
+  const transferCalls=await page.evaluate(()=>calls.filter(c=>c.name==='transfer_doctor_salary_invoice_item'));
+  assert.deepEqual(transferCalls[1].args,{p_item_id:1042});
+  await page.evaluate(async()=>{transferComplete=false;await LuminClinicManagement.refresh({force:true})});
+  await page.locator('#cm-alert-menu-header button').click();
   await page.locator('#cm-payroll-footer .cm-button-primary').click();
   assert.equal(await page.evaluate(()=>calls.filter(c=>c.name==='hr_pay_doctor_procedures_with_method').length),0,'Cancel must never record a payment');
   await page.evaluate(()=>{paymentCancelled=false});await page.locator('#cm-payroll-footer .cm-button-primary').click();
@@ -67,12 +90,23 @@ test('clinic overview, dropdown, payroll payment, permissions and bilingual layo
     await page.locator('#cm-alert-bell').click();const box=await page.locator('#cm-alert-menu').boundingBox();
     assert.ok(box.x>=0&&box.x+box.width<=width+1&&box.y+box.height<=1101,'Dropdown stays inside viewport');
     assert.match(await page.locator('#cm-alert-menu').textContent(),language==='ar'?/مستحقات أطباء/:/Doctor payments/);
+    await page.locator('.cm-alert-row .cm-button').first().click();
+    assert.match(await page.locator('.cm-button-transfer').textContent(),language==='ar'?/تحويل للراتب/:/Transfer to payroll/);
+    const actionBoxes=await page.locator('.cm-transfer-preview-actions button').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().toJSON()));
+    assert.ok(actionBoxes.every(box=>box.width>=44&&box.height>=44&&box.x>=0&&box.x+box.width<=width+1),'Transfer actions fit and have 44px touch targets');
     await page.keyboard.press('Escape');
     const targets=await page.locator('#view-clinic-management button:visible').evaluateAll(nodes=>nodes.map(n=>({width:n.getBoundingClientRect().width,height:n.getBoundingClientRect().height})));
     assert.ok(targets.every(n=>n.width>=43.9&&n.height>=43.9),'44px touch targets');
   }
   await page.emulateMedia({reducedMotion:'reduce'});
   assert.equal(await page.locator('#cm-alert-bell').evaluate(node=>getComputedStyle(node,'::before').animationName),'none');
+  await page.evaluate(()=>{currentUserAccess.permissions.delete('patients')});
+  await page.locator('#cm-alert-bell').click();await page.locator('.cm-alert-row .cm-button').first().click();
+  assert.equal(await page.locator('.cm-button-transfer').isDisabled(),true,'HR viewing access alone cannot transfer salary');
+  const requestsBefore=await page.evaluate(()=>calls.filter(c=>c.name==='transfer_doctor_salary_invoice_item').length);
+  await page.evaluate(()=>LuminClinicManagement.transferPayroll(0));
+  assert.equal(await page.evaluate(()=>calls.filter(c=>c.name==='transfer_doctor_salary_invoice_item').length),requestsBefore);
+  await page.keyboard.press('Escape');
   await page.evaluate(async()=>{currentUiLanguage='en';document.documentElement.dir='ltr';failPayroll=true;await LuminClinicManagement.loadPayroll()});
   assert.match(await page.locator('#cm-payroll-rows').textContent(),/Could not load/);assert.equal(await page.locator('#cm-payroll-footer .cm-button-primary').isDisabled(),true);
   await page.evaluate(async()=>{failPayroll=false;currentUserAccess.permissions=new Set(['analytics']);LuminClinicManagement.reset();await LuminClinicManagement.refresh({force:true})});
@@ -83,5 +117,14 @@ test('clinic overview, dropdown, payroll payment, permissions and bilingual layo
   await page.evaluate(async()=>{currentSession={user:{id:'other'}};currentUserAccess.permissions=new Set(['analytics']);deferDoctor=false;LuminClinicManagement.reset();await LuminClinicManagement.refresh({force:true});deferred.splice(0).forEach(resolve=>resolve())});
   assert.equal(await page.locator('#cm-payroll-rows').textContent(),'','A response from the previous account cannot populate the payroll list');
   assert.deepEqual(errors,[]);
-  if(process.env.LUMIN_CM_SCREENSHOT_DIR){fs.mkdirSync(process.env.LUMIN_CM_SCREENSHOT_DIR,{recursive:true});await page.evaluate(async()=>{currentUserAccess.permissions=new Set(['finances','analytics','hr','finance_depts']);LuminClinicManagement.reset();await LuminClinicManagement.refresh({force:true})});await page.setViewportSize({width:1440,height:1100});await page.screenshot({path:path.join(process.env.LUMIN_CM_SCREENSHOT_DIR,'clinic-overview.png'),fullPage:true});await page.locator('#cm-alert-bell').click();await page.screenshot({path:path.join(process.env.LUMIN_CM_SCREENSHOT_DIR,'clinic-alerts.png'),fullPage:true});}
+  if(process.env.LUMIN_CM_SCREENSHOT_DIR){
+    fs.mkdirSync(process.env.LUMIN_CM_SCREENSHOT_DIR,{recursive:true});
+    await page.evaluate(async()=>{currentUserAccess.permissions=new Set(['finances','analytics','hr','finance_depts','patients']);LuminClinicManagement.reset();await LuminClinicManagement.refresh({force:true})});
+    await page.setViewportSize({width:1440,height:1100});
+    await page.screenshot({path:path.join(process.env.LUMIN_CM_SCREENSHOT_DIR,'clinic-overview.png'),fullPage:true});
+    await page.locator('#cm-alert-bell').click();
+    await page.screenshot({path:path.join(process.env.LUMIN_CM_SCREENSHOT_DIR,'clinic-alerts.png'),fullPage:true});
+    await page.evaluate(()=>LuminClinicManagement.reviewAlert('transfers'));
+    await page.screenshot({path:path.join(process.env.LUMIN_CM_SCREENSHOT_DIR,'clinic-transfer-alerts.png'),fullPage:true});
+  }
 });

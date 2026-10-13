@@ -70,6 +70,12 @@
 .cm-alert-menu-header { display:flex; align-items:center; gap:12px; padding:16px; border-bottom:1px solid #f1f5f9; }.cm-alert-menu-header>div:nth-child(2) { flex:1; min-width:0; }.cm-alert-menu h3 { margin:0; color:#0f172a; font-size:14px; font-weight:600; }
 .cm-alert-body { max-height:var(--cm-menu-body-height,480px); overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }.cm-alert-row { display:flex; gap:12px; padding:16px; border-bottom:1px solid #f1f5f9; }.cm-alert-row>.cm-icon { width:36px; height:36px; }.cm-alert-row>div:last-child { min-width:0; flex:1; }.cm-alert-row h4 { font-size:13px; line-height:1.5; font-weight:600; color:#0f172a; margin:0; }.cm-alert-row p { font-size:12px; color:#64748b; line-height:1.5; margin:4px 0; }.cm-alert-row .cm-button { justify-content:flex-start; padding-inline:0; font-size:12px; }
 .cm-alert-menu .cm-transfer-preview { border-top:1px solid #e2e8f0; }.cm-transfer-preview-row { padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:12px; color:#475569; }.cm-transfer-preview-row>div { min-width:0; }.cm-transfer-preview-row strong { color:#0f172a; }.cm-transfer-preview-row p { margin:4px 0; overflow-wrap:anywhere; }
+.cm-transfer-preview-row { flex-wrap:wrap; }
+.cm-transfer-preview-actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex:1 0 100%; }
+.cm-button-transfer { color:#2563eb; background:#eff6ff; font-size:12px; }
+.cm-button-transfer[aria-busy="true"] svg { animation:cm-transfer-spin 1s linear infinite; }
+@keyframes cm-transfer-spin { to { transform:rotate(360deg); } }
+@media(prefers-reduced-motion:reduce) { .cm-button-transfer[aria-busy="true"] svg { animation:none; } }
 body.lumin-raised .cm-panel,body.lumin-raised .cm-alert-menu { background:var(--lumin-face); border-top-color:#fff; box-shadow:var(--lumin-raised); }
 body.lumin-raised .cm-button:not(.cm-button-quiet),body.lumin-raised .cm-input,body.lumin-raised .cm-select { background:var(--lumin-face); border-top-color:#fff; box-shadow:var(--lumin-small-raised); }
 body.lumin-raised .cm-button.cm-button-primary { background:linear-gradient(145deg,#7ac5ff,#3699f4 55%,#2f83e2); color:#fff; }

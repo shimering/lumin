@@ -76,8 +76,8 @@
   <script src="lumin-loyalty.js?v=5"></script>
   <script src="lumin-finance-sync.js?v=2"></script>
   <script src="lumin-cash-flow.js?v=1"></script>
-  <script src="lumin-clinic-management.js?v=1"></script>
-  <link rel="stylesheet" href="lumin-clinic-management.css?v=1" />
+  <script src="lumin-clinic-management.js?v=2"></script>
+  <link rel="stylesheet" href="lumin-clinic-management.css?v=2" />
   <script src="lumin-patient-scans.js?v=6"></script>
   <link rel="stylesheet" href="lumin-patient-scans.css?v=4" />
   <link rel="stylesheet" href="lumin-cash-flow.css?v=1" />
@@ -19417,7 +19417,7 @@
         }
         if (hrChanged && (attendanceStateLoadedAt || realtimeViewIsVisible('dashboard'))) await refreshMyAttendanceState({ force: true });
         const doctorSalaryChanged = invoicesChanged || expensesChanged || dentalCustomizationChanged || changedTables.has('appointments');
-        if (window.LuminClinicManagement && (accessChanged || hrChanged || doctorSalaryChanged || changedTables.has('patients'))) {
+        if (typeof LuminClinicManagement !== 'undefined' && (accessChanged || hrChanged || doctorSalaryChanged || changedTables.has('patients'))) {
           LuminClinicManagement.invalidate();
         }
         if (accessChanged || hrChanged || doctorSalaryChanged || changedTables.has('patients')) {
@@ -23779,15 +23779,15 @@
         : `Delete the following doctor salary expense in Finances first, then delete the invoice or procedure:\n${lines.join('\n')}`;
     }
 
-    async function transferDoctorSalaryInvoiceItem(itemId) {
-      if (!hasPageAccess('patients') && !hasPageAccess('chart')) return;
+    async function transferDoctorSalaryInvoiceItem(itemId, options = {}) {
+      if (!hasPageAccess('patients') && !hasPageAccess('chart')) return false;
       const buttons = [...document.querySelectorAll(`[data-salary-transfer-item="${Number(itemId)}"]`)];
       buttons.forEach(button => { button.disabled = true; });
       try {
         const { error } = await db.rpc('transfer_doctor_salary_invoice_item', { p_item_id: Number(itemId) });
         if (error) throw error;
-        await renderPatientInvoices();
-        if (activePatientId && !document.getElementById('view-chart')?.classList.contains('hidden')) {
+        if (options.refreshPatientWorkspace !== false) await renderPatientInvoices();
+        if (options.refreshPatientWorkspace !== false && activePatientId && !document.getElementById('view-chart')?.classList.contains('hidden')) {
           await refreshChartFindingInvoiceState(activePatientId);
         }
         hrDirectoryLoaded = false;
@@ -23795,8 +23795,10 @@
           currentUiLanguage === 'ar' ? 'تم تحويل الإجراء' : 'Procedure transferred',
           currentUiLanguage === 'ar' ? 'أصبح الإجراء متاحاً لحساب راتب الطبيب.' : 'The procedure is now available for doctor salary calculation.'
         );
+        return true;
       } catch (error) {
         alert((currentUiLanguage === 'ar' ? 'تعذر تحويل الإجراء: ' : 'Could not transfer the procedure: ') + (error?.message || 'Unknown error'));
+        return false;
       } finally {
         buttons.forEach(button => { if (button.isConnected) button.disabled = false; });
       }
