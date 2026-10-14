@@ -3,6 +3,43 @@ const appointmentOperationState = {
   patientId: '', selected: [], choices: [], draft: new Set(), open: false,
   status: 'idle', sequence: 0, trigger: null, bodyOverflow: ''
 };
+const appointmentOperationCatalog = { entries: new Map(), userId: null, expiresAt: 0, pending: null, generation: 0 };
+
+function resetAppointmentOperationCatalog() {
+  Object.assign(appointmentOperationCatalog, { entries: new Map(), userId: null, expiresAt: 0,
+    pending: null, generation: appointmentOperationCatalog.generation + 1 });
+}
+
+function appointmentOperationCatalogNeedsLoad() {
+  return appointmentOperationCatalog.userId !== currentSession?.user?.id || appointmentOperationCatalog.expiresAt <= Date.now();
+}
+
+function ensureAppointmentOperationCatalog() {
+  if (!currentSession || !hasPageAccess('appointments')) return Promise.resolve(false);
+  const catalog = appointmentOperationCatalog, userId = currentSession.user.id;
+  if (catalog.userId !== userId) { resetAppointmentOperationCatalog(); catalog.userId = userId; }
+  if (catalog.pending) return catalog.pending;
+  if (!appointmentOperationCatalogNeedsLoad()) return Promise.resolve(true);
+  const generation = catalog.generation;
+  const isCurrent = () => catalog.userId === userId && currentSession?.user?.id === userId && catalog.generation === generation;
+  const pending = (async () => {
+    try {
+      const { data, error } = await db.rpc('get_appointment_operation_catalog');
+      if (!isCurrent()) return false;
+      if (error) throw error;
+      catalog.entries = new Map((Array.isArray(data) ? data : []).map(item => [item.code, item]));
+      catalog.expiresAt = Date.now() + 15000;
+      return true;
+    } catch (error) {
+      if (isCurrent()) catalog.expiresAt = Date.now() + 5000;
+      return false;
+    } finally {
+      if (isCurrent()) catalog.pending = null;
+    }
+  })();
+  catalog.pending = pending;
+  return pending;
+}
 
 function appointmentOperationText(en, ar) {
   return currentUiLanguage === 'ar' ? ar : en;
@@ -25,7 +62,7 @@ function normaliseAppointmentOperations(value) {
 }
 
 function appointmentOperationName(operation) {
-  const name = operation.name || operation.code;
+  const name = appointmentOperationCatalog.entries.get(operation.code)?.name || operation.name || operation.code;
   return currentUiLanguage === 'ar' && window.LuminDentalI18n
     ? window.LuminDentalI18n.translate(name, 'ar') : name;
 }
@@ -33,8 +70,35 @@ function appointmentOperationName(operation) {
 function appointmentOperationLocation(operation) {
   const teeth = operation.tooth_ids;
   return teeth.length
-    ? `${appointmentOperationText(teeth.length > 1 ? 'Teeth' : 'Tooth', teeth.length > 1 ? 'الأسنان' : 'السن')} ${teeth.join(', ')}${operation.surfaces.length ? ' · ' + operation.surfaces.join(', ') : ''}`
+    ? `${appointmentOperationText(teeth.length > 1 ? 'Teeth' : 'Tooth', teeth.length > 1 ? 'الأسنان' : 'السن')} ${teeth.map(tooth => palmerQuadrantLabel(tooth)).join(', ')}${operation.surfaces.length ? ' · ' + operation.surfaces.join(', ') : ''}`
     : appointmentOperationText('Whole mouth', 'الفم بالكامل');
+}
+
+function appointmentOperationLocationMarkup(operation) {
+  const teeth = operation.tooth_ids;
+  const notation = teeth.length ? teeth.map(tooth => {
+    const slot = Number(SLOT_BY_PRIMARY_TOOTH[tooth.toUpperCase()] || tooth);
+    const quadrant = palmerQuadrantForSlot(slot).abbreviation;
+    const labels = { UR: ['upper right', 'علوي أيمن'], UL: ['upper left', 'علوي أيسر'], LL: ['lower left', 'سفلي أيسر'], LR: ['lower right', 'سفلي أيمن'] };
+    const label = `${isPrimaryToothId(tooth) ? appointmentOperationText('Primary tooth', 'سن لبني') : appointmentOperationText('Permanent tooth', 'سن دائم')} ${palmerToothNotation(tooth, slot)} · ${appointmentOperationText(...(labels[quadrant] || ['', '']))}`;
+    return `<span class="appointment-operation-tooth" dir="ltr" role="img" aria-label="${escapeAppointmentText(label)}" title="${escapeAppointmentText(label)}"><span aria-hidden="true">${palmerNotationSVG(tooth, slot)}</span></span>`;
+  }).join('') : `<span class="appointment-operation-mouth"><span aria-hidden="true">${wholeMouthIconSVG()}</span>${appointmentOperationText('Whole mouth', 'الفم بالكامل')}</span>`;
+  return `<span class="appointment-operation-locations">${notation}${operation.surfaces.length ? `<span class="appointment-operation-surfaces" dir="ltr">${escapeAppointmentText(operation.surfaces.join(' · '))}</span>` : ''}</span>`;
+}
+
+function appointmentOperationCategoryMarkup(operation) {
+  const configuredOperation = typeof dentalOperations !== 'undefined' ? dentalOperations.find(item => item.code === operation.code) : null;
+  const specialty = configuredOperation && typeof dentalSpecialties !== 'undefined'
+    ? dentalSpecialties.find(item => item.id === configuredOperation.specialtyId) : null;
+  const entry = appointmentOperationCatalog.entries.get(operation.code);
+  const category = specialty?.name || entry?.category_name || appointmentOperationText('Clinical operation', 'عملية سريرية');
+  const name = currentUiLanguage === 'ar' && window.LuminDentalI18n ? window.LuminDentalI18n.translate(category, 'ar') : category;
+  const icon = specialtyIconMarkup(specialty?.iconName || entry?.icon_name, null, 'compact');
+  return `<span class="appointment-operation-category" data-operation-category="${escapeAppointmentText(category)}" title="${escapeAppointmentText(name)}">${icon}</span>`;
+}
+
+function appointmentOperationIdentityMarkup(operation) {
+  return `<span class="appointment-operation-title">${appointmentOperationCategoryMarkup(operation)}<strong dir="auto">${escapeAppointmentText(appointmentOperationName(operation))}</strong></span>${appointmentOperationLocationMarkup(operation)}`;
 }
 
 function appointmentOperationStatusMarkup(operation) {
@@ -70,7 +134,7 @@ function renderAppointmentOperations() {
   const state = appointmentOperationState;
   const editable = canModifyAppointments() && document.getElementById('btn-save-appointment')?.dataset.saving !== 'true';
   section.innerHTML = `<div class="appointment-operations-heading"><div><h4>${appointmentOperationText('Appointment operations', 'عمليات الموعد')} <span class="appointment-operation-optional">${appointmentOperationText('Optional', 'اختياري')}</span></h4><p>${appointmentOperationText('Assign planned or ongoing treatment to this visit.', 'اربط العلاج المخطط أو الجاري بهذه الزيارة.')}</p></div></div>
-    <div class="appointment-operation-selected">${state.selected.map((operation, index) => `<div class="appointment-operation-row"><span class="appointment-operation-icon"><i data-lucide="tooth" class="dental-chart-icon" aria-hidden="true"></i></span><div class="appointment-operation-copy"><strong dir="auto">${escapeAppointmentText(appointmentOperationName(operation))}</strong><small dir="auto">${escapeAppointmentText(appointmentOperationLocation(operation))}</small>${appointmentOperationStatusMarkup(operation)}</div><button type="button" class="appointment-operation-button appointment-operation-remove" onclick="removeAppointmentOperation(${index})" ${editable ? '' : 'disabled'} aria-label="${escapeAppointmentText(appointmentOperationText('Remove', 'إزالة') + ' ' + appointmentOperationName(operation))}"><i data-lucide="x" aria-hidden="true"></i></button></div>`).join('')}</div>
+    <div class="appointment-operation-selected">${state.selected.map((operation, index) => `<div class="appointment-operation-row"><div class="appointment-operation-copy">${appointmentOperationIdentityMarkup(operation)}${appointmentOperationStatusMarkup(operation)}</div><button type="button" class="appointment-operation-button appointment-operation-remove" onclick="removeAppointmentOperation(${index})" ${editable ? '' : 'disabled'} aria-label="${escapeAppointmentText(appointmentOperationText('Remove', 'إزالة') + ' ' + appointmentOperationName(operation))}"><i data-lucide="x" aria-hidden="true"></i></button></div>`).join('')}</div>
     <button id="appointment-operations-choose" type="button" class="appointment-operation-button appointment-operation-choose" onclick="openAppointmentOperationPicker(this)" ${state.patientId && editable ? '' : 'disabled'} aria-haspopup="dialog"><i data-lucide="${state.selected.length ? 'list-filter' : 'plus'}" aria-hidden="true"></i>${state.selected.length ? appointmentOperationText('Edit operations', 'تعديل العمليات') : appointmentOperationText('Choose operations', 'اختيار العمليات')}</button>
     ${state.patientId ? '' : `<p class="appointment-operation-hint">${appointmentOperationText('Choose a patient first.', 'اختر المريض أولاً.')}</p>`}`;
   if (window.lucide) lucide.createIcons();
@@ -154,7 +218,9 @@ async function loadAppointmentOperationChoices() {
   const isCurrent = () => state.open && state.sequence === sequence && state.patientId === patientId
     && currentSession?.user?.id === userId && canModifyAppointments();
   try {
-    const { data, error } = await db.rpc('get_patient_appointment_operations', { p_patient_id: patientId });
+    const [{ data, error }] = await Promise.all([
+      db.rpc('get_patient_appointment_operations', { p_patient_id: patientId }), ensureAppointmentOperationCatalog()
+    ]);
     if (!isCurrent()) return;
     if (error) throw error;
     state.choices = normaliseAppointmentOperations(data);
@@ -182,11 +248,11 @@ function renderAppointmentOperationOptions() {
   const query = document.getElementById('appointment-operation-search').value.trim().toLocaleLowerCase();
   const linked = new Set(state.selected.map(operation => operation.key));
   const options = state.choices.filter(operation => ['P', 'In'].includes(operation.status) || linked.has(operation.key));
-  const matches = options.filter(operation => `${appointmentOperationName(operation)} ${operation.name} ${operation.code} ${appointmentOperationLocation(operation)}`.toLocaleLowerCase().includes(query));
+  const matches = options.filter(operation => `${appointmentOperationName(operation)} ${operation.name} ${operation.code} ${appointmentOperationLocation(operation)} ${operation.tooth_ids.join(' ')}`.toLocaleLowerCase().includes(query));
   if (state.status === 'loading') list.innerHTML = `<div class="appointment-operation-skeleton" aria-label="${appointmentOperationText('Loading operations', 'جارٍ تحميل العمليات')}">${'<span></span>'.repeat(3)}</div>`;
   else if (state.status === 'error') list.innerHTML = `<div class="appointment-operation-empty"><span class="appointment-operation-icon"><i data-lucide="cloud-off" aria-hidden="true"></i></span><h4>${appointmentOperationText('Could not load operations', 'تعذر تحميل العمليات')}</h4><p>${appointmentOperationText('Try again to view this patient’s treatment.', 'أعد المحاولة لعرض علاج هذا المريض.')}</p><button type="button" class="appointment-operation-button appointment-operation-primary" onclick="loadAppointmentOperationChoices()">${appointmentOperationText('Try again', 'إعادة المحاولة')}</button></div>`;
   else if (!matches.length) list.innerHTML = `<div class="appointment-operation-empty"><span class="appointment-operation-icon"><i data-lucide="${query ? 'search' : 'clipboard-list'}" aria-hidden="true"></i></span><h4>${query ? appointmentOperationText('No matching operations', 'لا توجد عمليات مطابقة') : appointmentOperationText('No planned operations yet', 'لا توجد عمليات مخططة بعد')}</h4><p>${query ? appointmentOperationText('Try another operation name or tooth number.', 'جرّب اسم عملية آخر أو رقم سن آخر.') : appointmentOperationText('Document planned treatment in the dental chart, or save this appointment without operations.', 'أضف العلاج المخطط في مخطط الأسنان، أو احفظ الموعد دون عمليات.')}</p>${!query && hasPageAccess('chart') ? `<button type="button" class="appointment-operation-button" onclick="openAppointmentOperationChart()"><i data-lucide="tooth" class="dental-chart-icon" aria-hidden="true"></i>${appointmentOperationText('Open dental chart', 'فتح مخطط الأسنان')}</button>` : ''}</div>`;
-  else list.innerHTML = matches.map(operation => `<label class="appointment-operation-option ${state.draft.has(operation.key) ? 'is-selected' : ''}"><input type="checkbox" data-operation-key="${escapeAppointmentText(operation.key)}" ${state.draft.has(operation.key) ? 'checked' : ''} /><span class="appointment-operation-copy"><strong dir="auto">${escapeAppointmentText(appointmentOperationName(operation))}</strong><small dir="auto">${escapeAppointmentText(appointmentOperationLocation(operation))}</small></span>${appointmentOperationStatusMarkup(operation)}</label>`).join('');
+  else list.innerHTML = matches.map(operation => `<label class="appointment-operation-option ${state.draft.has(operation.key) ? 'is-selected' : ''}"><input type="checkbox" data-operation-key="${escapeAppointmentText(operation.key)}" ${state.draft.has(operation.key) ? 'checked' : ''} /><span class="appointment-operation-copy">${appointmentOperationIdentityMarkup(operation)}</span>${appointmentOperationStatusMarkup(operation)}</label>`).join('');
   updateAppointmentOperationCount();
   if (window.lucide) lucide.createIcons();
 }
@@ -222,15 +288,30 @@ async function openAppointmentOperationChart() {
 
 async function editAppointmentOperations(appointmentId) {
   if (!canModifyAppointments()) return;
+  if (typeof closeAppointmentCardPopover === 'function') closeAppointmentCardPopover(false, false);
   await openAppointmentModal(appointmentId);
   if (editingAppointmentId === appointmentId && !document.getElementById('modal-appointment').classList.contains('hidden')) {
     await openAppointmentOperationPicker();
   }
 }
 
-function dashboardAppointmentOperationsMarkup(entry) {
+function appointmentOperationsSummaryMarkup(entry, returnView) {
   const operations = normaliseAppointmentOperations(entry.operations);
   if (entry.isNote || !operations.length) return '';
   const canOpen = hasPageAccess('chart');
-  return `<section class="dashboard-appointment-operations" aria-label="${appointmentOperationText('Appointment operations', 'عمليات الموعد')}"><div class="appointment-operations-heading"><h4><i data-lucide="clipboard-list" aria-hidden="true"></i>${appointmentOperationText('Treatment for this visit', 'علاج هذه الزيارة')}</h4>${canModifyAppointments() ? `<button type="button" class="appointment-operation-button" data-operation-appointment="${escapeAppointmentText(entry.id)}" onclick="editAppointmentOperations(this.dataset.operationAppointment)" aria-label="${appointmentOperationText('Edit appointment operations', 'تعديل عمليات الموعد')}"><i data-lucide="pencil" aria-hidden="true"></i></button>` : ''}</div><div class="dashboard-operation-links">${operations.map(operation => `<${canOpen ? 'button type="button"' : 'div'} class="dashboard-operation-link" data-operation-patient="${escapeAppointmentText(entry.patientId)}" ${canOpen ? 'onclick="openPatientChart(this.dataset.operationPatient, \'dashboard\')"' : ''}><span class="appointment-operation-copy"><strong dir="auto">${escapeAppointmentText(appointmentOperationName(operation))}</strong><small dir="auto">${escapeAppointmentText(appointmentOperationLocation(operation))}</small></span>${appointmentOperationStatusMarkup(operation)}${canOpen ? '<i data-lucide="arrow-up-right" class="appointment-operation-arrow" aria-hidden="true"></i>' : ''}</${canOpen ? 'button' : 'div'}>`).join('')}</div></section>`;
+  return `<section class="dashboard-appointment-operations ${returnView === 'appointments' ? 'appointment-popover-operations' : ''}" ${returnView === 'appointments' ? 'data-appointment-detail-card="operations"' : ''} aria-label="${appointmentOperationText('Appointment operations', 'عمليات الموعد')}"><div class="appointment-operations-heading"><h4><i data-lucide="clipboard-list" aria-hidden="true"></i>${appointmentOperationText('Treatment for this visit', 'علاج هذه الزيارة')}</h4>${canModifyAppointments() ? `<button type="button" class="appointment-operation-button" data-operation-appointment="${escapeAppointmentText(entry.id)}" onclick="editAppointmentOperations(this.dataset.operationAppointment)" aria-label="${appointmentOperationText('Edit appointment operations', 'تعديل عمليات الموعد')}"><i data-lucide="pencil" aria-hidden="true"></i></button>` : ''}</div><div class="dashboard-operation-links">${operations.map(operation => `<${canOpen ? 'button type="button"' : 'div'} class="dashboard-operation-link" data-operation-patient="${escapeAppointmentText(entry.patientId)}" data-operation-return-view="${returnView}" ${canOpen ? 'onclick="openAppointmentOperationCardChart(this)"' : ''}><span class="appointment-operation-copy">${appointmentOperationIdentityMarkup(operation)}</span>${appointmentOperationStatusMarkup(operation)}${canOpen ? '<i data-lucide="arrow-up-right" class="appointment-operation-arrow" aria-hidden="true"></i>' : ''}</${canOpen ? 'button' : 'div'}>`).join('')}</div></section>`;
+}
+
+function dashboardAppointmentOperationsMarkup(entry) {
+  return appointmentOperationsSummaryMarkup(entry, 'dashboard');
+}
+
+function appointmentPopoverOperationsMarkup(entry) {
+  return appointmentOperationsSummaryMarkup(entry, 'appointments');
+}
+
+async function openAppointmentOperationCardChart(button) {
+  if (!hasPageAccess('chart')) return;
+  if (button.dataset.operationReturnView === 'appointments') closeAppointmentCardPopover(false, false);
+  await openPatientChart(button.dataset.operationPatient, button.dataset.operationReturnView);
 }

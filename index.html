@@ -100,7 +100,7 @@
   <script src="lumin-nav-motion.js?v=1"></script>
   <script src="lumin-mobile-nav.js?v=3"></script>
   <script src="lumin-appointment-status.js?v=2"></script>
-  <script src="lumin-appointment-operations.js?v=1"></script>
+  <script src="lumin-appointment-operations.js?v=2"></script>
   <script src="lumin-dashboard-motion.js?v=3"></script>
   <script src="lumin-whatsapp-actions.js?v=2"></script>
   <script src="lumin-quotation-model.js?v=1"></script>
@@ -5325,7 +5325,7 @@
   <link rel="stylesheet" href="lumin-whatsapp-actions.css?v=2" />
   <link rel="stylesheet" href="lumin-dashboard-motion.css?v=2" />
   <link rel="stylesheet" href="lumin-appointment-status.css?v=3" />
-  <link rel="stylesheet" href="lumin-appointment-operations.css?v=1" />
+  <link rel="stylesheet" href="lumin-appointment-operations.css?v=2" />
   <link rel="stylesheet" href="lumin-patients.css?v=3" />
   <link rel="stylesheet" href="lumin-finance-sync.css?v=2" />
   <link rel="stylesheet" href="lumin-mobile-nav.css?v=3" />
@@ -26598,6 +26598,7 @@
       workspaceNavigationToken += 1;
       appointmentModalOpenSequence += 1;
       if (typeof resetAppointmentOperations === 'function') resetAppointmentOperations();
+      if (typeof resetAppointmentOperationCatalog === 'function') resetAppointmentOperationCatalog();
       resetAppointmentPatientSearch(true);
       patientDetailFreshness.clear();
       patientDetailReads.clear();
@@ -34963,6 +34964,12 @@
       refreshWhatsAppTemplatePickerAnchor();
       lucide.createIcons();
       ensureAppointmentWaitIndicatorTimer();
+      if (entries.some(entry => entry.operations?.length) && typeof appointmentOperationCatalogNeedsLoad === 'function' && appointmentOperationCatalogNeedsLoad()) {
+        const userId = currentSession?.user?.id;
+        void ensureAppointmentOperationCatalog().then(ready => {
+          if (ready && currentSession?.user?.id === userId && realtimeViewIsVisible('dashboard')) renderDashboard();
+        });
+      }
     }
 
     function legacyDashboardInvoiceCardMarkup(invoice) {
@@ -37119,6 +37126,7 @@
               ${whatsAppSplitControlMarkup(entry, { fullWidth: true })}
             </div>
           </section>`}
+          ${typeof appointmentPopoverOperationsMarkup === 'function' ? appointmentPopoverOperationsMarkup(entry) : ''}
           ${entry.notes ? `<section data-appointment-detail-card="notes" class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-amber-950"><p class="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-amber-700"><i data-lucide="notebook-pen" class="h-3.5 w-3.5"></i>${appointmentPopoverText('Notes', 'ملاحظات')}</p><p class="mt-1.5 text-xs leading-5 text-amber-900/80">${escapeAppointmentText(entry.notes)}</p></section>` : ''}
           ${entry.isNote ? '' : `<section data-appointment-detail-card="status" class="rounded-xl border border-indigo-200 bg-indigo-50 p-2.5">
             <label class="block">
@@ -37157,6 +37165,12 @@
       if (!refreshOpenPopover) requestAnimationFrame(() => closeButton?.focus({ preventScroll: true }));
       lucide.createIcons();
       ensureAppointmentWaitIndicatorTimer();
+      if (entry.operations?.length && typeof appointmentOperationCatalogNeedsLoad === 'function' && appointmentOperationCatalogNeedsLoad()) {
+        const userId = currentSession?.user?.id;
+        void ensureAppointmentOperationCatalog().then(ready => {
+          if (ready && currentSession?.user?.id === userId && appointmentCardPopoverId === appointmentId) openAppointmentCardPopover(appointmentId);
+        });
+      }
     }
 
     async function changeAppointmentCardStatus(appointmentId, select) {
@@ -38162,7 +38176,8 @@
       const generation = targetedLoadingGeneration;
       const selectedDate = new Date(appointmentSelectedDate);
       resetAppointmentPatientSearch(true);
-      await Promise.all([ensureAppointmentsLoaded(), ensureAppointmentVisitTypesLoaded()]);
+      await Promise.all([ensureAppointmentsLoaded(), ensureAppointmentVisitTypesLoaded(),
+        typeof ensureAppointmentOperationCatalog === 'function' ? ensureAppointmentOperationCatalog() : Promise.resolve()]);
       if (openSequence !== appointmentModalOpenSequence || generation !== targetedLoadingGeneration
         || currentSession?.user?.id !== userId || !canModifyAppointments()) return;
       const modal = document.getElementById('modal-appointment');

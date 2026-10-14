@@ -11,6 +11,16 @@
 .appointment-operation-copy { display:flex; flex-direction:column; gap:4px; min-width:0; flex:1; }
 .appointment-operation-copy strong { color:#334155; font-size:13px; line-height:1.45; font-weight:600; overflow-wrap:anywhere; }
 .appointment-operation-copy small { color:#64748b; font-size:11px; line-height:1.5; overflow-wrap:anywhere; }
+.appointment-operation-title { display:flex; align-items:center; gap:8px; min-width:0; }
+.appointment-operation-title strong { flex:1; min-width:0; }
+.appointment-operation-category { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; width:32px; height:32px; border:0; }
+.appointment-operation-category .dental-specialty-icon { width:32px; height:32px; object-fit:contain; }
+.appointment-operation-locations { display:flex; flex-wrap:wrap; align-items:center; gap:6px; min-width:0; }
+.appointment-operation-tooth { display:inline-flex; align-items:center; justify-content:center; width:44px; min-height:32px; flex-shrink:0; border:0; border-radius:8px; background:#eff6ff; color:#2563eb; }
+.appointment-operation-tooth .palmer-symbol { width:40px; height:28px; }
+.appointment-operation-mouth { display:inline-flex; flex-wrap:wrap; align-items:center; gap:8px; border:0; border-radius:10px; padding:4px 8px; background:#eff6ff; color:#1d4ed8; font-size:11px; }
+.appointment-operation-mouth .whole-mouth-symbol { width:32px; height:24px; }
+.appointment-operation-surfaces { padding:4px 8px; border:0; border-radius:999px; background:#f1f5f9; color:#64748b; font-size:11px; }
 .appointment-operation-status { align-self:flex-start; flex-shrink:0; max-width:100%; border:0; border-radius:999px; padding:4px 8px; background:#fef3c7; color:#92400e; font-size:10px; font-weight:600; line-height:1.4; }
 .appointment-operation-status[data-status="In"] { background:#eff6ff; color:#1d4ed8; }
 .appointment-operation-status[data-status="C"] { background:#ecfdf5; color:#047857; }
@@ -55,6 +65,9 @@
 .appointment-operation-skeleton { display:grid; gap:12px; }
 .appointment-operation-skeleton span { height:80px; border-radius:16px; background:#e2e8f0; animation:appointment-operation-pulse 1.5s ease-in-out infinite; }
 .dashboard-appointment-operations { margin-top:16px; padding:12px; border:0; border-radius:16px; background:#f8fafc; }
+.appointment-popover-operations { margin-top:0; background:#fff; }
+.appointment-popover-operations .dashboard-operation-link { background:#f8fafc; }
+.appointment-popover-operations button.dashboard-operation-link:hover { background:#eff6ff; }
 .dashboard-appointment-operations .appointment-operations-heading h4 { font-size:11px; color:#64748b; }
 .dashboard-appointment-operations .appointment-operations-heading h4 svg { width:14px; height:14px; }
 .dashboard-appointment-operations .appointment-operations-heading>.appointment-operation-button { background:transparent; margin-block:-8px 0; }

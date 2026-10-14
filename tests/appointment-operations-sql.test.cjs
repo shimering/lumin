@@ -15,12 +15,14 @@ test('appointment operation links are optional, patient-specific and follow clin
     create function private.is_active_user() returns boolean language sql as $$select coalesce(current_setting('test.active',true),'true')='true'$$;
     create function private.has_page_permission(p text) returns boolean language sql as $$select p=any(string_to_array(current_setting('test.pages',true),','))$$;
     create table public.patients(id uuid primary key, chart_state jsonb);
-    create table public.dental_operations(code text primary key, name text);
+    create table public.dental_specialties(id uuid primary key,name text,icon_name text);
+    create table public.dental_operations(code text primary key, name text,specialty_id uuid,price numeric);
     create table public.appointments(id uuid primary key, patient_id uuid references public.patients(id),status text default 'Scheduled');
     grant usage on schema public,private,auth to authenticated,anon;
     grant select,insert,update,delete on public.appointments to authenticated;
     grant select,update on public.patients to authenticated;
     grant select on public.dental_operations to authenticated;
+    grant select on public.dental_specialties to authenticated;
     alter table public.appointments enable row level security;
     create policy appointment_read on public.appointments for select to authenticated using(private.has_page_permission('appointments') or private.has_page_permission('chart'));
     create policy appointment_insert on public.appointments for insert to authenticated with check(private.has_page_permission('appointments'));
@@ -31,6 +33,7 @@ test('appointment operation links are optional, patient-specific and follow clin
   `);
   await db.exec(fs.readFileSync(path.join(__dirname, 'fixtures/appointment-chart-parser.sql'), 'utf8'));
   await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/20261014120830_appointment_operations.sql'), 'utf8'));
+  await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/20261014124000_appointment_operation_catalog.sql'), 'utf8'));
   const finding = (id, code = 'filling', status = 'P', extra = {}) => ({ id: uuid(id), code, status, ...extra });
   const chart = {
     '11': { wholeOperations: [finding(11, 'crown', 'In')], surfaces: { B: [finding(12)], O: [finding(12)] } },
@@ -39,7 +42,7 @@ test('appointment operation links are optional, patient-specific and follow clin
     _meta: { mouthOperations: [finding(18, 'scaling')] }
   };
   await db.query('insert into public.patients values($1,$2),($3,$4)', [uuid(1), JSON.stringify(chart), uuid(2), JSON.stringify({ '21': { wholeOperations: [finding(21)] } })]);
-  await db.exec("insert into public.dental_operations values('filling','Composite restoration'),('crown','Crown'),('scaling','Scaling and polishing')");
+  await db.exec("insert into public.dental_operations(code,name) values('filling','Composite restoration'),('crown','Crown'),('scaling','Scaling and polishing')");
   await db.exec(`set role authenticated; select set_config('test.actor','${uuid(99)}',false); select set_config('test.pages','appointments',false)`);
   const choices = async id => (await db.query('select public.get_patient_appointment_operations($1) result', [uuid(id)])).rows[0].result;
   const insert = async (id, ops, patient = 1) => db.query('insert into public.appointments(id,patient_id,operations) values($1,$2,$3) returning operations', [uuid(id), uuid(patient), JSON.stringify(ops)]);
@@ -87,6 +90,26 @@ test('appointment operation links are optional, patient-specific and follow clin
     assert.deepEqual(await stored(101), []);
     await assert.rejects(insert(104, [link(11)], 2), /changed or was deleted/);
   });
+  await t.test('appointment-only staff can read category icons and names without access to clinical prices', async () => {
+    await db.exec(`reset role; insert into public.dental_specialties values('${uuid(30)}','Restoration','dental-restorative');
+      update public.dental_operations set specialty_id='${uuid(30)}',price=800 where code='filling';
+      alter table public.dental_operations enable row level security;
+      alter table public.dental_specialties enable row level security;
+      create policy catalog_chart_only on public.dental_operations for select to authenticated using(private.has_page_permission('chart'));
+      create policy category_chart_only on public.dental_specialties for select to authenticated using(private.has_page_permission('chart'));
+      set role authenticated;
+    `);
+    assert.equal((await db.query('select * from public.dental_operations')).rows.length,0);
+    const read=async()=>(await db.query('select public.get_appointment_operation_catalog() result')).rows[0].result;
+    const catalog=await read(),filling=catalog.find(o=>o.code==='filling');
+    assert.deepEqual(filling,{code:'filling',name:'Composite restoration',category_name:'Restoration',icon_name:'dental-restorative'});
+    assert.ok(catalog.every(o=>!('price' in o)&&!('chart_state' in o)));
+    await db.exec("select set_config('test.pages','chart',false)");
+    await assert.rejects(read(),/Appointment access required/);
+    await db.exec("select set_config('test.pages','appointments',false); select set_config('test.active','false',false)");
+    await assert.rejects(read(),/Appointment access required/);
+    await db.exec("select set_config('test.active','true',false)");
+  });
   await t.test('calendar notes have no links and unauthenticated or inactive users cannot read choices', async () => {
     await db.query('insert into public.appointments(id,operations) values($1,$2)', [uuid(105), JSON.stringify([link(11)])]);
     assert.deepEqual(await stored(105), []);
@@ -94,5 +117,6 @@ test('appointment operation links are optional, patient-specific and follow clin
     await assert.rejects(choices(1), /Appointment access required/);
     await db.exec('reset role; set role anon');
     await assert.rejects(choices(1), /permission denied/);
+    await assert.rejects(db.query('select public.get_appointment_operation_catalog()'),/permission denied/);
   });
 });

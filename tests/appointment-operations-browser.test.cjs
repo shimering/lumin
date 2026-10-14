@@ -38,7 +38,10 @@ test('optional appointment operations save, edit and open the chart across deskt
   await page.addScriptTag({url: base + '/lumin-appointment-operations.js'});
   const helpers = ['appointmentModalUsesNote','setAppointmentModalEntryMode','selectAppointmentPatient','syncAppointmentSaveButton',
     'appointmentDateFromInput','setAppointmentDurationSelection','updateAppointmentModalDateLabel',
-    'openAppointmentModal','closeAppointmentModal','saveAppointment','normaliseAppointmentRecord','renderDashboard'];
+    'openAppointmentModal','closeAppointmentModal','saveAppointment','normaliseAppointmentRecord','renderDashboard',
+    'isPrimaryToothId','palmerPositionForSlot','palmerQuadrantForSlot','palmerToothNotation','palmerQuadrantLabel','palmerNotationSVG','wholeMouthIconSVG',
+    'normaliseSpecialtyIconName','specialtyIconMarkup','appointmentPopoverText','appointmentPopoverAnchor',
+    'positionAppointmentCardPopover','closeAppointmentCardPopover','openAppointmentCardPopover'];
   await page.addScriptTag({content: `
     let currentUiLanguage='en', currentSession={user:{id:'staff'}}, targetedLoadingGeneration=0, allowed=true;
     let editingAppointmentId=null, appointmentModalEntryMode='patient',appointmentModalOpenSequence=0,patientModalReturnToAppointment=false;
@@ -50,6 +53,11 @@ test('optional appointment operations save, edit and open the chart across deskt
     const currentUserAccess={isDoctor:true},appointmentToday=appointmentSelectedDate,dashboardSelectedDate=appointmentSelectedDate;
     const appointmentDayFormatter=new Intl.DateTimeFormat('en',{dateStyle:'long'}),appointmentTimeFormatter=new Intl.DateTimeFormat('en',{hour:'numeric',minute:'2-digit'});
     let dashboardInvoiceRenderToken=0,expandedDashboardAppointmentId=null,appointmentsLoaded=true;
+    let appointmentCardPopoverId=null,appointmentCalendarMode='day',whatsappTemplatePickerScope=null;
+    ${html.slice(html.indexOf('    const PRIMARY_TOOTH_BY_SLOT ='),html.indexOf('    const CONDITION_LABELS ='))}
+    ${html.slice(html.indexOf('    const SPECIALTY_ICON_OPTIONS ='),html.indexOf('    const DEFAULT_SPECIALTY_ACCENT_COLOR ='))}
+    ${html.match(/    const APPOINTMENT_STATUSES = [^\n]+/)[0]}
+    const appointmentShortDateFormatter=appointmentDayFormatter;
     const dashboardDayCache=new Map(),dashboardStatusPicker={markup:entry=>'<span>'+entry.status+'</span>',retainTrigger(){}};
     window.fixture={writes:[],alerts:[],chart:null,fail:false,pending:false,resolvers:[],options:[
       {finding_ids:['f1'],code:'filling',name:'Composite restoration',status:'P',tooth_ids:['11'],surfaces:['B','O']},
@@ -72,6 +80,8 @@ test('optional appointment operations save, edit and open the chart across deskt
     function appointmentVisitTypeForEntry(){return appointmentVisitTypes[0]}
     function appointmentStaffMember(){return appointmentStaff[0]} function normaliseHexColor(c){return c}
     function canonicalAppointmentStatus(s){return s} function markLocalAppointmentChange(){}
+    function appointmentTimeRange(entry){return entry.time} function arabicUiPhrase(value){return value}
+    function whatsAppSplitControlMarkup(){return ''} function changeAppointmentCardStatus(){}
     function queueGoogleCalendarAppointmentSync(){} function queueAppointmentPushNotification(){}
     function renderAppointments(){renderDashboard()} function realtimeViewIsVisible(){return false}
     function replaceAppointmentRecord(row){const entry=normaliseAppointmentRecord(row);appointments=appointments.filter(a=>a.id!==row.id);appointments.push(entry);return entry}
@@ -84,11 +94,12 @@ test('optional appointment operations save, edit and open the chart across deskt
     function appointmentColorRgba(){return '#eff6ff'} function appointmentTextColor(){return '#1d4ed8'}
     function checkedInWaitIndicatorMarkup(){return ''} function appointmentVisitTypeBadgeMarkup(){return '<span>Check-up</span>'}
     function dashboardMobileContactActionsMarkup(){return ''} function refreshWhatsAppTemplatePickerAnchor(){} function ensureAppointmentWaitIndicatorTimer(){}
-    function setStableHtml(node,markup){node.innerHTML=markup}
+    function setStableHtml(node,markup){node.innerHTML=markup;return true}
     window.alert=message=>fixture.alerts.push(message);
     function savedRow(payload,id){return {...payload,id,operations:(payload.operations||[]).flatMap(link=>fixture.options.filter(o=>JSON.stringify(o.finding_ids)===JSON.stringify(link.finding_ids))),patients:patients.find(p=>p.id===payload.patient_id)}}
     function updateAppointmentRecordWithRetry(id,payload){fixture.writes.push(payload);return Promise.resolve({data:savedRow(payload,id)})}
     const db={rpc(name,args){
+      if(name==='get_appointment_operation_catalog')return Promise.resolve({data:fixture.options.map(o=>({code:o.code,name:o.name,category_name:o.code==='crown'?'Crown':'Restoration',icon_name:o.code==='crown'?'dental-crown':'dental-restorative'}))});
       if(name!=='get_patient_appointment_operations')throw Error(name);
       if(fixture.pending)return new Promise(resolve=>fixture.resolvers.push(resolve));
       return Promise.resolve(fixture.fail?{error:Error('offline')}:{data:args.p_patient_id==='p1'?fixture.options:[]});
@@ -109,6 +120,10 @@ test('optional appointment operations save, edit and open the chart across deskt
   assert.equal(await page.locator('.dashboard-appointment-operations').count(),0);
   await open(); await choose.click();
   assert.equal(await page.locator('.appointment-operation-option').count(),2,'only planned and in-progress operations are available');
+  assert.equal(await page.locator('.appointment-operation-option .dental-specialty-icon').count(),2);
+  assert.match(await page.locator('.appointment-operation-option').first().locator('img').getAttribute('src'),/dental-restorative/);
+  assert.equal(await page.locator('.appointment-operation-option').first().locator('.palmer-value').textContent(),'3');
+  assert.equal(await page.locator('.appointment-operation-option').first().locator('.palmer-bracket').getAttribute('d'),'M7 4 V23 H36');
   await page.locator('.appointment-operation-option').first().click();
   await page.locator('[data-operation-cancel]').click();
   assert.equal(await page.locator('.appointment-operation-selected .appointment-operation-row').count(),0,'cancel discards draft links');
@@ -129,6 +144,38 @@ test('optional appointment operations save, edit and open the chart across deskt
   await page.evaluate(()=>saveAppointment({preventDefault(){}}));
   assert.equal(await page.locator('.dashboard-operation-link').count(),1,'removal persists after saving');
   await page.locator('.dashboard-appointment-operations').screenshot({path:path.join(screenshots,'dashboard-desktop.png')});
+  await page.evaluate(()=>{
+    fixture.options[1].tooth_ids=['8','9','24','25','E','F','O','P'];
+    appointments.find(a=>a.id==='a2').operations=[structuredClone(fixture.options[1])];
+    const anchor=document.createElement('button');anchor.type='button';anchor.dataset.timelineAppointmentId='a2';anchor.textContent='Appointment';document.body.append(anchor);
+  });
+
+  for(const [width,height] of [[1440,1000],[834,1112],[390,844],[320,568]]) for(const language of ['en','ar']) {
+    await page.setViewportSize({width,height});
+    await page.evaluate(language=>{currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';openAppointmentCardPopover('a2');},language);
+    const popup=page.locator('#appointment-card-popover'),operations=popup.locator('[data-appointment-detail-card="operations"]');
+    assert.equal(await operations.isVisible(),true,'appointment page popup includes linked treatments');
+    assert.equal(await operations.locator('.palmer-symbol').count(),8);
+    assert.deepEqual(await operations.locator('.palmer-value').allTextContents(),['1','1','1','1','A','A','A','A']);
+    assert.deepEqual(await operations.locator('.palmer-bracket').evaluateAll(nodes=>nodes.map(node=>node.getAttribute('d'))),
+      ['M33 4 V23 H4','M7 4 V23 H36','M7 24 V5 H36','M33 24 V5 H4','M33 4 V23 H4','M7 4 V23 H36','M7 24 V5 H36','M33 24 V5 H4']);
+    assert.match(await operations.locator('img').getAttribute('src'),/dental-crown/);
+    assert.equal(await operations.locator('img').evaluate(image=>image.complete&&image.naturalWidth>0),true);
+    assert.equal(await operations.locator('.appointment-operation-tooth').first().evaluate(node=>getComputedStyle(node).direction),'ltr','Palmer brackets keep their anatomical orientation in Arabic');
+    assert.equal(await popup.evaluate(node=>node.scrollWidth>node.clientWidth),false,'operation details never cause popup horizontal scroll');
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    await operations.scrollIntoViewIfNeeded();
+    if(width===1440||width===390)await popup.screenshot({path:path.join(screenshots,`appointment-popup-${width}-${language}.png`)});
+    await operations.locator('.dashboard-operation-link').click();
+    assert.deepEqual(await page.evaluate(()=>fixture.chart),{patientId:'p1',view:'appointments'});
+    assert.equal(await popup.isVisible(),false,'chart navigation closes appointment details');
+  }
+  await page.evaluate(()=>openAppointmentCardPopover('a2'));
+  await page.locator('#appointment-card-popover [data-operation-appointment]').click();
+  assert.equal(await page.locator('#appointment-card-popover').isVisible(),false,'editing closes the appointment popup');
+  assert.equal(await picker.isVisible(),true);
+  await page.locator('[data-operation-cancel]').click();
+  await page.evaluate(()=>closeAppointmentModal());
 
   for (const [width,height] of [[1440,1000],[834,1112],[390,844],[320,568]]) {
     await page.setViewportSize({width,height});
