@@ -76,8 +76,8 @@
   <script src="lumin-loyalty.js?v=5"></script>
   <script src="lumin-finance-sync.js?v=2"></script>
   <script src="lumin-cash-flow.js?v=1"></script>
-  <script src="lumin-clinic-management.js?v=3"></script>
-  <link rel="stylesheet" href="lumin-clinic-management.css?v=3" />
+  <script src="lumin-clinic-management.js?v=4"></script>
+  <link rel="stylesheet" href="lumin-clinic-management.css?v=4" />
   <script src="lumin-patient-scans.js?v=6"></script>
   <link rel="stylesheet" href="lumin-patient-scans.css?v=4" />
   <link rel="stylesheet" href="lumin-cash-flow.css?v=1" />
@@ -5862,16 +5862,18 @@
         <div id="cm-range-toolbar" class="cm-toolbar"></div>
         <div id="cm-overview-error" hidden></div>
         <div id="cm-stats" class="cm-stats" aria-live="polite"></div>
-        <section id="cm-payroll-panel" class="cm-panel" aria-labelledby="cm-payroll-heading">
-          <div id="cm-payroll-title" class="cm-panel-heading"></div>
-          <div id="cm-payroll-controls" class="cm-controls"></div>
-          <div id="cm-payroll-summary" class="cm-payroll-summary" aria-live="polite"></div>
-          <div id="cm-payroll-rows" class="cm-scrollbox" role="region" aria-label="Doctor invoice procedures" tabindex="0"></div>
-          <div id="cm-payroll-pager" class="cm-pager"></div>
-          <p id="cm-payroll-note" class="cm-note"></p>
-          <div id="cm-payroll-footer" class="cm-footer"></div>
-        </section>
-        <section id="cm-cash-panel" class="cm-panel" aria-labelledby="cm-cash-heading"><div id="cm-cash-title" class="cm-panel-heading"></div><div id="cm-cash-chart" class="cm-chart"></div></section>
+        <div class="cm-performance-grid">
+          <section id="cm-payroll-panel" class="cm-panel" aria-labelledby="cm-payroll-heading">
+            <div id="cm-payroll-title" class="cm-panel-heading"></div>
+            <div id="cm-payroll-controls" class="cm-controls"></div>
+            <div id="cm-payroll-summary" class="cm-payroll-summary" aria-live="polite"></div>
+            <div id="cm-payroll-rows" class="cm-scrollbox" role="region" aria-label="Doctor invoice procedures" tabindex="0"></div>
+            <div id="cm-payroll-pager" class="cm-pager"></div>
+            <p id="cm-payroll-note" class="cm-note"></p>
+            <div id="cm-payroll-footer" class="cm-footer"></div>
+          </section>
+          <section id="cm-cash-panel" class="cm-panel" aria-labelledby="cm-cash-heading"><div id="cm-cash-title" class="cm-panel-heading"></div><div id="cm-cash-chart" class="cm-chart"></div></section>
+        </div>
         <div class="cm-bottom-grid">
           <section id="cm-expense-panel" class="cm-panel" aria-labelledby="cm-expense-heading"><div id="cm-expense-title" class="cm-panel-heading"></div><div id="cm-expense-breakdown" class="cm-breakdown"></div></section>
           <section id="cm-team-panel" class="cm-panel" aria-labelledby="cm-team-heading"><div id="cm-team-title" class="cm-panel-heading"></div><div id="cm-team-content" class="cm-team-content"></div></section>

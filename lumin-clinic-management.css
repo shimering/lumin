@@ -16,7 +16,7 @@
 .cm-button { display:inline-flex; gap:8px; align-items:center; justify-content:center; font-weight:600; }
 .cm-button svg { width:16px; height:16px; flex:none; }
 .cm-button:hover,.cm-select:hover,.cm-input:hover { background:#f8fafc; border-color:#cbd5e1; }
-.cm-button:active { transform:scale(.98); }
+.cm-button:active,.cm-select:active,.cm-input:active { transform:scale(.98); }
 .cm-button:focus-visible,.cm-input:focus-visible,.cm-select:focus-visible,.cm-invoice-row:focus-within { outline:2px solid #3b82f6; outline-offset:3px; }
 .cm-button:disabled,.cm-select:disabled,.cm-input:disabled { opacity:.5; pointer-events:none; }
 .cm-button-primary { background:linear-gradient(145deg,#38bdf8,#2563eb); border-color:#bfdbfe; color:#fff; }
@@ -26,9 +26,11 @@
 .cm-controls { justify-content:flex-start; padding:0 24px 16px; }
 .cm-controls label { display:grid; gap:6px; font-size:12px; color:#64748b; min-width:0; }
 .cm-controls .cm-select { min-width:180px; max-width:100%; }
-.cm-range { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-.cm-range label { display:grid; gap:4px; font-size:11px; color:#64748b; }
+#cm-range-toolbar { justify-content:flex-end; }
+.cm-range { display:flex; gap:12px; align-items:center; flex-wrap:wrap; min-width:0; }
+.cm-range label { display:flex; align-items:center; gap:8px; min-width:0; font-size:12px; color:#64748b; }
 .cm-range .cm-input { width:154px; }
+.cm-range .cm-select { width:160px; }
 .cm-stats { display:grid; grid-template-columns:repeat(var(--cm-stat-count,4),minmax(0,1fr)); gap:16px; }
 .cm-stat { padding:20px; display:flex; gap:16px; align-items:flex-start; min-width:0; }
 .cm-stat-label { color:#475569; font-size:13px; font-weight:500; }
@@ -56,6 +58,28 @@
 .cm-pager { display:flex; align-items:center; gap:8px; padding:8px 24px; justify-content:flex-end; font-size:12px; color:#64748b; }
 .cm-bottom-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; min-width:0; }
 .cm-bottom-grid:has(>section[hidden]) { grid-template-columns:1fr; }
+.cm-performance-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:20px; min-width:0; align-items:start; }
+#cm-payroll-panel { container:cm-payroll / inline-size; }
+#cm-payroll-title { padding:20px 20px 12px; }
+#cm-payroll-title .cm-icon { width:32px; height:32px; border-radius:10px; }
+#cm-payroll-controls { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(124px,.9fr) minmax(0,1fr); gap:8px; padding:0 20px 12px; }
+#cm-payroll-controls .cm-input,#cm-payroll-controls .cm-select { width:100%; min-width:0; padding-inline:10px; text-overflow:ellipsis; }
+#cm-payroll-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:0 20px 12px; padding:12px; }
+#cm-payroll-summary span { font-size:11px; }
+#cm-payroll-summary strong { font-size:16px; overflow-wrap:anywhere; }
+#cm-payroll-rows { margin-inline:20px; max-height:260px; }
+#cm-payroll-rows .cm-empty { padding:20px 16px 12px; }
+#cm-payroll-rows .cm-empty .cm-icon { width:32px; height:32px; margin-bottom:8px; }
+#cm-payroll-rows .cm-empty h4 { margin-bottom:4px; }
+#cm-payroll-pager { padding:8px 20px 0; }
+#cm-payroll-pager:empty { display:none; }
+#cm-payroll-note { margin:12px 20px; font-size:11px; }
+#cm-payroll-footer { gap:8px; padding:12px 20px; padding-bottom:max(12px,env(safe-area-inset-bottom)); }
+#cm-payroll-footer .cm-button { min-width:0; max-width:100%; font-size:12px; overflow-wrap:anywhere; }
+@media(min-width:1024px) and (orientation:landscape) {
+  .cm-performance-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .cm-performance-grid:has(>section[hidden]) { grid-template-columns:minmax(0,1fr); }
+}
 .cm-chart { padding:0 24px 20px; min-width:0; }.cm-chart svg { display:block; width:100%; overflow:visible; }.cm-chart-svg text { font:12px system-ui,sans-serif; fill:#64748b; }.cm-chart-svg .cm-grid-line { stroke:#e2e8f0; stroke-width:1; }
 .cm-legend { display:flex; flex-wrap:wrap; gap:20px; font-size:12px; color:#64748b; }.cm-legend span { display:flex; gap:6px; align-items:center; }.cm-legend i { width:8px; height:8px; border-radius:50%; background:#2563eb; }.cm-legend .cm-expense-dot { background:#94a3b8; }
 .cm-breakdown,.cm-team-content { padding:0 24px 20px; display:grid; gap:14px; }.cm-breakdown-row { display:grid; grid-template-columns:minmax(100px,1fr) 1fr minmax(100px,auto); align-items:center; gap:16px; font-size:13px; color:#475569; }
@@ -83,3 +107,38 @@ body.lumin-raised .cm-invoice-row { background:#f7fbff; }body.lumin-raised .cm-i
 @media(prefers-reduced-motion:reduce) { .cm-alert-bell.has-alerts::before,.cm-skeleton { animation:none; }.cm-button { transition:none; } }
 @media(max-width:1199px) { .cm-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }.cm-invoice-header,.cm-invoice-row { gap:12px; grid-template-columns:minmax(150px,1.2fr) minmax(130px,1fr) 100px 100px 130px 44px; }.cm-stat-value { font-size:22px; } }
 @media(max-width:767px) { .cm-overview { gap:16px; padding-top:16px; }.cm-panel-heading { padding:16px; }.cm-title-actions { gap:6px; }.cm-range .cm-input { width:100%; font-size:16px; }.cm-range { width:100%; }.cm-range label { flex:1; min-width:0; }.cm-controls { padding:0 16px 16px; }.cm-controls label { flex:1 1 130px; }.cm-controls .cm-select { min-width:0; font-size:16px; }.cm-input { font-size:16px; }.cm-stats { gap:12px; }.cm-stat { padding:16px; display:block; }.cm-stat .cm-icon { width:32px; height:32px; margin-bottom:12px; }.cm-stat-value { font-size:20px; }.cm-stat-label { font-size:12px; }.cm-stat-detail { font-size:11px; }.cm-payroll-summary { margin:0 16px 12px; gap:12px; }.cm-payroll-summary div { flex:1 1 90px; }.cm-payroll-summary strong { font-size:16px; }.cm-scrollbox { margin:0 16px; max-height:380px; }.cm-invoice-header { display:none; }.cm-invoice-row { grid-template-columns:minmax(0,1fr) 44px; gap:12px; padding:16px; }.cm-patient { grid-column:1; }.cm-invoice-row>.cm-procedure { grid-column:1; }.cm-invoice-row>.cm-amount { grid-column:1; display:flex; justify-content:space-between; text-align:start; }.cm-invoice-row>.cm-amount::before { content:attr(data-label); color:#64748b; }.cm-transfer { grid-column:1; }.cm-invoice-row>.cm-button { grid-column:2; grid-row:1 / 3; }.cm-note { margin:12px 16px; }.cm-footer { position:sticky; bottom:0; z-index:2; padding:12px 16px; padding-bottom:max(16px,env(safe-area-inset-bottom)); }.cm-footer .cm-button { flex:1 1 150px; }.cm-pager { padding-inline:16px; }.cm-bottom-grid { grid-template-columns:1fr; gap:16px; }.cm-chart { padding-inline:12px; }.cm-breakdown,.cm-team-content { padding:0 16px 16px; }.cm-breakdown-row { grid-template-columns:minmax(90px,1fr) .8fr minmax(90px,auto); gap:8px; font-size:12px; }.cm-alert-menu { width:calc(100vw - 24px); }.cm-alert-row { padding:12px; }.cm-alert-menu-header { padding:12px; }.cm-panel-heading .cm-button { font-size:12px; }.cm-toolbar { gap:8px; } }
+@media(max-width:767px) {
+  .cm-range { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .cm-range .cm-select { width:100%; font-size:16px; }
+  .cm-range label { display:grid; gap:4px; grid-row:2; }
+  .cm-range label .cm-input { min-width:0; padding-inline:8px; }
+  .cm-range>.cm-button { grid-column:2; grid-row:1; }
+  .cm-performance-grid { gap:16px; }
+  #cm-payroll-title { padding:16px 16px 12px; }
+  #cm-payroll-controls { padding-inline:16px; }
+  #cm-payroll-summary,#cm-payroll-rows { margin-inline:16px; }
+  #cm-payroll-note { margin-inline:16px; }
+  #cm-payroll-footer { padding-inline:16px; padding-bottom:max(16px,env(safe-area-inset-bottom)); }
+}
+/* Payroll uses cards whenever its own pane is narrow, including desktop split views. */
+@container cm-payroll (max-width:1023px) {
+  .cm-invoice-header { display:none; }
+  .cm-invoice-row { grid-template-columns:repeat(2,minmax(0,1fr)) 44px; gap:8px 12px; padding:12px; }
+  .cm-patient,.cm-invoice-row>.cm-procedure,.cm-transfer { grid-column:1 / 3; }
+  .cm-invoice-row>.cm-amount { grid-column:auto; display:block; text-align:start; }
+  .cm-invoice-row>.cm-amount::before { content:attr(data-label); display:block; margin-bottom:4px; color:#64748b; font-size:11px; }
+  .cm-invoice-row>.cm-amount:nth-child(3) { grid-column:1; }
+  .cm-invoice-row>.cm-amount:nth-child(4) { grid-column:2 / 4; }
+  .cm-invoice-row>.cm-button { grid-column:3; grid-row:1 / 3; }
+  .cm-transfer small { display:none; }
+}
+@container cm-payroll (min-width:480px) and (max-width:1023px) {
+  .cm-patient { grid-column:1; }
+  .cm-invoice-row>.cm-procedure { grid-column:2; }
+  .cm-invoice-row>.cm-button { grid-row:1; }
+}
+@container cm-payroll (max-width:399px) {
+  #cm-payroll-controls { grid-template-columns:minmax(124px,1fr) minmax(0,1fr); }
+  #cm-doctor { grid-column:1 / -1; }
+  #cm-payroll-footer .cm-button { flex:1 1 100%; }
+}

@@ -12,6 +12,24 @@ test('cash chart sums daily payments, retaining zero-activity days',()=>{
   assert.deepEqual(api.cumulativeDays([{day:'2026-10-01',income:120,expense:10},{day:'2026-10-02',income:0,expense:0},{day:'2026-10-03',income:30,expense:70}]),[
     {day:'2026-10-01',income:120,expense:10},{day:'2026-10-02',income:120,expense:10},{day:'2026-10-03',income:150,expense:80}]);
 });
+
+test('date presets follow clinic calendar days across year and leap-month boundaries',()=>{
+  const cases=[
+    ['today','2026-10-15','2026-10-15','2026-10-15'],
+    ['yesterday','2026-01-01','2025-12-31','2025-12-31'],
+    ['last7','2026-01-03','2025-12-28','2026-01-03'],
+    ['month','2024-02-29','2024-02-01','2024-02-29'],
+    ['lastMonth','2024-03-31','2024-02-01','2024-02-29'],
+    ['lastMonth','2026-01-01','2025-12-01','2025-12-31'],
+    ['year','2024-12-31','2024-01-01','2024-12-31']
+  ];
+  for(const [preset,day,start,end] of cases){
+    assert.deepEqual(api.presetRange(preset,day),{start,end});
+    assert.equal(api.validRange(start,end),true);
+  }
+  assert.equal(api.presetRange('custom','2026-10-15'),null);
+  assert.equal(api.presetRange('today','2026-02-29'),null);
+});
 test('day payroll separates untransferred and already-paid compensation',()=>{
   assert.deepEqual(api.payrollTotals([{transferred:true,doctor_amount:900},{transferred:true,doctor_amount:360},{transferred:false,doctor_amount:180},{transferred:true,payment_id:'paid',doctor_amount:250}]),{ready:1260,pending:180,paid:250});
 });

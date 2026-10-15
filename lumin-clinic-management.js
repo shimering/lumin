@@ -1,7 +1,7 @@
 /* Clinic overview and day settlement. Uses existing HR payment confirmation and server guards. */
 (function (host) {
   'use strict';
-  const state = { actor:'', token:0, payrollToken:0, report:null, payroll:null, team:null, alerts:[], alertView:'alerts', start:'', end:'', day:'', doctor:'', page:1, onlyUnpaid:false, loading:false, payrollLoading:false,paying:false,loadedAt:0,error:'',payrollError:'' };
+  const state = { actor:'', token:0, payrollToken:0, report:null, payroll:null, team:null, alerts:[], alertView:'alerts', start:'', end:'', preset:'today', day:'', doctor:'', page:1, onlyUnpaid:false, loading:false, payrollLoading:false,paying:false,loadedAt:0,error:'',payrollError:'' };
   const el = id => document.getElementById(id);
   const text = (en,ar) => typeof currentUiLanguage !== 'undefined' && currentUiLanguage === 'ar' ? ar : en;
   const esc = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -15,13 +15,28 @@
   const today = () => typeof hrClinicDateValue === 'function' ? hrClinicDateValue() : new Date().toISOString().slice(0,10);
   const validDay = value => { if(!/^\d{4}-\d{2}-\d{2}$/.test(value || ''))return false;const d=new Date(value+'T12:00:00Z');return !Number.isNaN(d.valueOf())&&d.toISOString().slice(0,10)===value; };
   function validRange(start,end) { return validDay(start)&&validDay(end)&&start<=end&&(new Date(end+'T12:00Z')-new Date(start+'T12:00Z'))/86400000<=365; }
+  function presetRange(preset,day=today()) {
+    if(!validDay(day))return null;
+    const date=new Date(day+'T12:00:00Z');
+    const shift=days=>new Date(date.valueOf()+days*86400000).toISOString().slice(0,10);
+    if(preset==='today')return {start:day,end:day};
+    if(preset==='yesterday')return {start:shift(-1),end:shift(-1)};
+    if(preset==='last7')return {start:shift(-6),end:day};
+    if(preset==='month')return {start:day.slice(0,7)+'-01',end:day};
+    if(preset==='lastMonth'){
+      date.setUTCDate(0);const end=date.toISOString().slice(0,10);
+      return {start:end.slice(0,7)+'-01',end};
+    }
+    if(preset==='year')return {start:day.slice(0,4)+'-01-01',end:day};
+    return null;
+  }
   function cumulativeDays(days) { let income=0,expense=0; return (Array.isArray(days)?days:[]).map(row=>({day:row.day,income:income+=number(row.income),expense:expense+=number(row.expense)})); }
   function payrollTotals(rows) { return rows.reduce((totals,row)=>{if(row.payment_id)totals.paid+=number(row.doctor_amount);else if(row.transferred)totals.ready+=number(row.doctor_amount);else totals.pending+=number(row.doctor_amount);return totals;},{ready:0,pending:0,paid:0}); }
   const button = (label, action, name='arrow-up-right', extra='') => `<button type="button" class="cm-button ${extra}" onclick="LuminClinicManagement.${action}">${icon(name)}${label}</button>`;
   const empty = (title,description,name='circle-check',action='') => `<div class="cm-empty"><span class="cm-icon">${icon(name)}</span><h4>${title}</h4><p>${description}</p>${action}</div>`;
   function reset() {
     state.token++;state.payrollToken++;closeAlerts(false);
-    Object.assign(state,{actor:'',report:null,payroll:null,team:null,alerts:[],alertView:'alerts',loadedAt:0,error:'',payrollError:'',loading:false,payrollLoading:false,paying:false,doctor:'',day:'',start:'',end:'',page:1,onlyUnpaid:false});
+    Object.assign(state,{actor:'',report:null,payroll:null,team:null,alerts:[],alertView:'alerts',loadedAt:0,error:'',payrollError:'',loading:false,payrollLoading:false,paying:false,doctor:'',day:'',start:'',end:'',preset:'today',page:1,onlyUnpaid:false});
     for(const id of ['cm-stats','cm-payroll-rows','cm-team-content','cm-expense-breakdown','cm-cash-chart','cm-alert-body'])if(el(id))el(id).replaceChildren();
     if(el('cm-alert-bell')){el('cm-alert-bell').classList.remove('has-alerts');el('cm-alert-count').hidden=true;}
   }
@@ -33,7 +48,7 @@
       menu.innerHTML='<div id="cm-alert-menu-header" class="cm-alert-menu-header"></div><div id="cm-alert-body" class="cm-alert-body"></div>';
       document.body.appendChild(menu);
     }
-    if(!state.start){state.day=today();state.start=state.day.slice(0,7)+'-01';state.end=state.day;}
+    if(!state.start){state.day=today();state.start=state.day;state.end=state.day;}
     renderStatic();render();
   }
   function renderStatic() {
@@ -41,10 +56,11 @@
     el('clinic-management-tab-overview').querySelector('span').textContent=text('Overview','نظرة عامة');
     el('cm-refresh').setAttribute('aria-label',text('Refresh clinic overview','تحديث نظرة عامة على العيادة'));
     const focused=document.activeElement?.id;
-    el('cm-range-toolbar').innerHTML=`<div><span class="cm-muted">${text('Clinic performance','أداء العيادة')}</span></div><div class="cm-range"><label>${text('From','من')}<input id="cm-start-date" class="cm-input" type="date" value="${esc(state.start)}"></label><label>${text('To','إلى')}<input id="cm-end-date" class="cm-input" type="date" value="${esc(state.end)}"></label>${button(text('Apply','تطبيق'),'applyRange()','check')}</div>`;
+    const presets=[['today',text('Today','اليوم')],['yesterday',text('Yesterday','أمس')],['last7',text('Last 7 days','آخر ٧ أيام')],['month',text('This month','هذا الشهر')],['lastMonth',text('Last month','الشهر الماضي')],['year',text('This year','هذا العام')],['custom',text('Custom','فترة مخصصة')]];
+    el('cm-range-toolbar').innerHTML=`<div class="cm-range"><select id="cm-range-preset" class="cm-select" aria-label="${text('Date range','الفترة الزمنية')}" onchange="LuminClinicManagement.setRangePreset(this.value)">${presets.map(([value,label])=>`<option value="${value}" ${state.preset===value?'selected':''}>${label}</option>`).join('')}</select><label><span>${text('From','من')}</span><input id="cm-start-date" class="cm-input" type="date" value="${esc(state.start)}" oninput="LuminClinicManagement.rangeChanged()"></label><label><span>${text('To','إلى')}</span><input id="cm-end-date" class="cm-input" type="date" value="${esc(state.end)}" oninput="LuminClinicManagement.rangeChanged()"></label>${button(text('Apply','تطبيق'),'applyRange()','check')}</div>`;
     el('cm-payroll-panel').hidden=!allowed('hr');el('cm-team-panel').hidden=!allowed('hr');
     const financial=allowed('finances')||allowed('analytics');el('cm-cash-panel').hidden=!financial;el('cm-expense-panel').hidden=!financial;
-    el('cm-payroll-title').innerHTML=`<div class="cm-heading-icon"><span class="cm-icon">${icon('stethoscope')}</span><div><h3 id="cm-payroll-heading">${text('Doctor day payroll','راتب الطبيب ليوم واحد')}</h3><p>${text("Review patient invoices and settle one doctor's completed procedures for a single day.",'راجع فواتير المرضى وسدد إجراءات طبيب واحد المكتملة في يوم محدد.')}</p></div></div>`;
+    el('cm-payroll-title').innerHTML=`<div class="cm-heading-icon"><span class="cm-icon">${icon('stethoscope')}</span><h3 id="cm-payroll-heading">${text('Doctor day payroll','راتب الطبيب ليوم واحد')}</h3></div>`;
     el('cm-payroll-note').innerHTML=`${icon('info')}<span>${text('Completed, invoiced procedures enter payroll automatically and wait for payment in HR.','تُضاف الإجراءات المكتملة والمفوترة للراتب تلقائياً وتنتظر الدفع في الموارد البشرية.')}</span>`;
     el('cm-cash-title').innerHTML=`<div><h3 id="cm-cash-heading">${text('Cash performance','الأداء النقدي')}</h3><p>${text('Cumulative recorded receipts and paid expenses in the selected period','المقبوضات والمصروفات المدفوعة التراكمية خلال الفترة المحددة')}</p></div>${allowed('analytics')?button(text('Open Analytics','فتح التحليلات'),"navigate('analytics')",'chart-no-axes-combined'):''}`;
     el('cm-expense-title').innerHTML=`<div><h3 id="cm-expense-heading">${text('Expense breakdown','تفصيل المصروفات')}</h3><p>${text('Paid in this period','المدفوع خلال هذه الفترة')}</p></div>${allowed('finances')?button(text('View expenses','عرض المصروفات'),"navigate('expenses')",'receipt-text','cm-button-quiet'):''}`;
@@ -78,7 +94,7 @@
     // Preserve active controls during background refreshes.
     if(!controls.querySelector('#cm-doctor')||controls.dataset.language!==text('en','ar')||controls.dataset.doctors!==JSON.stringify(doctors)){
       controls.dataset.language=text('en','ar');controls.dataset.doctors=JSON.stringify(doctors);
-      controls.innerHTML=`<label>${text('Doctor','الطبيب')}<select id="cm-doctor" class="cm-select" onchange="LuminClinicManagement.setDoctor(this.value)">${doctors.length?doctors.map(d=>`<option value="${esc(d.id)}" ${d.id===state.doctor?'selected':''}>${esc(d.name)}</option>`).join(''):`<option value="">${text('Choose a doctor','اختر طبيبًا')}</option>`}</select></label><label>${text('Completion date','تاريخ الإكمال')}<input id="cm-payroll-day" class="cm-input" type="date" value="${esc(state.day)}" onchange="LuminClinicManagement.setDay(this.value)"></label><span class="cm-pill">${text('Single day','يوم واحد')}</span><label><select id="cm-payroll-filter" class="cm-select" aria-label="${text('Payment status','حالة الدفع')}" onchange="LuminClinicManagement.setUnpaid(this.value==='unpaid')"><option value="all">${text('All procedures','جميع الإجراءات')}</option><option value="unpaid" ${state.onlyUnpaid?'selected':''}>${text('Awaiting payment','بانتظار الدفع')}</option></select></label>`;
+      controls.innerHTML=`<select id="cm-doctor" class="cm-select" aria-label="${text('Doctor','الطبيب')}" onchange="LuminClinicManagement.setDoctor(this.value)">${doctors.length?doctors.map(d=>`<option value="${esc(d.id)}" ${d.id===state.doctor?'selected':''}>${esc(d.name)}</option>`).join(''):`<option value="">${text('Choose a doctor','اختر طبيبًا')}</option>`}</select><input id="cm-payroll-day" class="cm-input" aria-label="${text('Completion date','تاريخ الإكمال')}" type="date" value="${esc(state.day)}" onchange="LuminClinicManagement.setDay(this.value)"><select id="cm-payroll-filter" class="cm-select" aria-label="${text('Payment status','حالة الدفع')}" onchange="LuminClinicManagement.setUnpaid(this.value==='unpaid')"><option value="all">${text('All procedures','جميع الإجراءات')}</option><option value="unpaid" ${state.onlyUnpaid?'selected':''}>${text('Awaiting payment','بانتظار الدفع')}</option></select>`;
       if(focused?.startsWith('cm-'))el(focused)?.focus();
     }
     el('cm-doctor').disabled=state.paying;el('cm-payroll-day').disabled=state.paying;el('cm-payroll-filter').disabled=state.paying;
@@ -86,7 +102,7 @@
     const rows=el('cm-payroll-rows');rows.setAttribute('aria-busy',String(state.payrollLoading));rows.setAttribute('aria-label',text('Doctor invoice procedures','إجراءات فواتير الطبيب'));
     if(state.payrollLoading&&!data)rows.innerHTML='<div class="cm-skeleton cm-skeleton-row"></div><div class="cm-skeleton cm-skeleton-row"></div><div class="cm-skeleton cm-skeleton-row"></div>';
     else if(state.payrollError)rows.innerHTML=empty(text('Could not load doctor payroll','تعذر تحميل راتب الطبيب'),text('Retry to review this day before payment.','أعد المحاولة لمراجعة هذا اليوم قبل الدفع.'),'triangle-alert',button(text('Retry','إعادة المحاولة'),'loadPayroll()','refresh-cw'));
-    else if(!data?.rows?.length)rows.innerHTML=empty(text('No procedures for this day','لا توجد إجراءات لهذا اليوم'),text('Choose another completion date or doctor to review their invoices.','اختر تاريخ إكمال أو طبيبًا آخر لمراجعة فواتيره.'),'receipt-text',button(text('Open doctor in HR','فتح الطبيب في الموارد البشرية'),'openDoctor()','external-link'));
+    else if(!data?.rows?.length)rows.innerHTML=empty(text('No procedures for this day','لا توجد إجراءات لهذا اليوم'),text('Choose another completion date or doctor to review their invoices.','اختر تاريخ إكمال أو طبيبًا آخر لمراجعة فواتيره.'),'receipt-text');
     else {
       const headers=[text('Patient / Invoice','المريض / الفاتورة'),text('Procedure','الإجراء'),text('Invoice item','بند الفاتورة'),text('Doctor amount','مستحق الطبيب'),text('Payroll','الراتب')];
       const oldScroll=rows.scrollTop;
@@ -162,7 +178,7 @@
     if(!allowed('clinic-management')||!actor())return;
     if(!el('cm-alert-menu'))init();
     const context=signature();if(state.actor&&state.actor!==context){reset();init();}state.actor=context;
-    if(!state.start){state.start=today().slice(0,7)+'-01';state.end=today();state.day=today();}
+    if(!state.start){state.day=today();state.start=state.day;state.end=state.day;}
     renderStatic();
     if(!options.force&&state.report&&Date.now()-state.loadedAt<30000){render();if(allowed('hr')&&!state.payroll)await loadPayroll();return;}
     const token=++state.token;state.loading=true;render();el('cm-refresh').disabled=true;
@@ -193,6 +209,12 @@
     state.start=start;state.end=end;state.report=null;await refresh({force:true});
   }
   function setDoctor(value){if(state.paying)return;state.doctor=value;state.page=1;state.payroll=null;void loadPayroll();}
+  function rangeChanged(){state.preset='custom';el('cm-range-preset').value='custom';}
+  async function setRangePreset(value) {
+    if(value==='custom'){state.preset=value;return;}
+    const range=presetRange(value);if(!range)return;
+    state.preset=value;state.start=range.start;state.end=range.end;state.report=null;await refresh({force:true});
+  }
   function setDay(value){if(state.paying)return;if(!validDay(value)){el('cm-payroll-day').value=state.day;return;}state.day=value;state.page=1;state.payroll=null;void loadPayroll();}
   function setUnpaid(value){if(state.paying)return;state.onlyUnpaid=Boolean(value);state.page=1;void loadPayroll();}
   function setPage(delta){if(state.payrollLoading||state.paying)return;const pages=Math.max(1,Math.ceil(number(state.payroll?.total_count)/20));state.page=Math.min(pages,Math.max(1,state.page+delta));el('cm-payroll-rows').scrollTop=0;void loadPayroll();}
@@ -295,9 +317,9 @@
     const next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(index+delta+tabs.length)%tabs.length;
     event.preventDefault();tabs[next].click();tabs[next].focus();
   }
-  const api={init,refresh,reset,invalidate,languageChanged,tabKeydown,closeAlerts,toggleAlerts,positionAlerts,applyRange,setDoctor,setDay,setPage,setUnpaid,loadPayroll,payDay,openDoctor,openInvoice,navigate,reviewAlert,reviewPayment,showAlerts,renderAlerts,validRange,cumulativeDays,payrollTotals};
+  const api={init,refresh,reset,invalidate,languageChanged,tabKeydown,closeAlerts,toggleAlerts,positionAlerts,applyRange,rangeChanged,setRangePreset,setDoctor,setDay,setPage,setUnpaid,loadPayroll,payDay,openDoctor,openInvoice,navigate,reviewAlert,reviewPayment,showAlerts,renderAlerts,validRange,presetRange,cumulativeDays,payrollTotals};
   host.LuminClinicManagement=api;
-  if(typeof module!=='undefined'&&module.exports)module.exports={validRange,cumulativeDays,payrollTotals};
+  if(typeof module!=='undefined'&&module.exports)module.exports={validRange,presetRange,cumulativeDays,payrollTotals};
   if(typeof document!=='undefined'){
     document.addEventListener('DOMContentLoaded',init);
     document.addEventListener('pointerdown',event=>{if(!el('cm-alert-menu')?.hidden&&!el('cm-alert-menu')?.contains(event.target)&&!el('cm-alert-bell')?.contains(event.target))closeAlerts(false);});

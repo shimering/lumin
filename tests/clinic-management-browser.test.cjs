@@ -38,6 +38,26 @@ test('clinic overview, dropdown, payroll payment, permissions and bilingual layo
   });
   await page.addScriptTag({path:path.join(root,'lumin-clinic-management.js')});
   await page.evaluate(async()=>{LuminClinicManagement.init();await switchClinicManagementTab('overview')});
+  assert.equal(await page.locator('#cm-range-preset').inputValue(),'today');
+  assert.equal(await page.locator('#cm-start-date').inputValue(),'2026-10-13');
+  assert.equal(await page.locator('#cm-end-date').inputValue(),'2026-10-13');
+  assert.deepEqual(await page.evaluate(()=>calls.find(call=>call.name==='get_clinic_management_overview').args),{p_start_date:'2026-10-13',p_end_date:'2026-10-13'});
+  for(const [preset,start,end] of [['yesterday','2026-10-12','2026-10-12'],['last7','2026-10-07','2026-10-13'],['month','2026-10-01','2026-10-13'],['lastMonth','2026-09-01','2026-09-30'],['year','2026-01-01','2026-10-13']]){
+    await page.locator('#cm-range-preset').selectOption(preset);
+    await page.waitForFunction(([start,end])=>calls.filter(call=>call.name==='get_clinic_management_overview').at(-1)?.args.p_start_date===start&&calls.filter(call=>call.name==='get_clinic_management_overview').at(-1)?.args.p_end_date===end,[start,end]);
+    assert.equal(await page.locator('#cm-start-date').inputValue(),start);
+    assert.equal(await page.locator('#cm-end-date').inputValue(),end);
+    assert.equal(await page.locator('#cm-payroll-day').inputValue(),'2026-10-13','Overview range keeps payroll completion date independent');
+  }
+  await page.locator('#cm-start-date').fill('2026-10-14');
+  assert.equal(await page.locator('#cm-range-preset').inputValue(),'custom');
+  const beforeInvalid=await page.evaluate(()=>calls.filter(call=>call.name==='get_clinic_management_overview').length);
+  await page.locator('#cm-range-toolbar button').click();
+  assert.match(await page.locator('#cm-overview-error').textContent(),/valid date range/);
+  assert.equal(await page.evaluate(()=>calls.filter(call=>call.name==='get_clinic_management_overview').length),beforeInvalid);
+  await page.locator('#cm-start-date').fill('2026-10-01');await page.locator('#cm-range-toolbar button').click();
+  await page.waitForFunction(()=>calls.filter(call=>call.name==='get_clinic_management_overview').at(-1)?.args.p_start_date==='2026-10-01');
+  await page.locator('#cm-range-preset').selectOption('today');
   assert.deepEqual(errors,[]);assert.equal(await page.locator('.cm-invoice-row').count(),20);assert.equal(await page.locator('#cm-alert-count').textContent(),'5');
   assert.equal(await page.locator('#cm-payroll-rows').evaluate(node=>node.scrollHeight>node.clientHeight),true,'Invoice entries scroll inside their own box');
   await page.locator('#cm-alert-bell').click();assert.equal(await page.locator('#cm-alert-menu').isVisible(),true);
@@ -72,13 +92,25 @@ test('clinic overview, dropdown, payroll payment, permissions and bilingual layo
   await page.locator('#cm-payroll-filter').selectOption('unpaid');
   await page.waitForFunction(()=>calls.some(call=>call.name==='get_clinic_doctor_day_payroll'&&call.args.p_untransferred_only===true));
   await page.locator('#cm-payroll-filter').selectOption('all');
-  for(const language of ['en','ar'])for(const width of [320,390,820,1440]){
-    await page.setViewportSize({width,height:1100});
+  for(const language of ['en','ar'])for(const width of [320,390,820,1024,1440,1920]){
+    const height=width>=1024?884:1100;
+    await page.setViewportSize({width,height});
     await page.evaluate(language=>{currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';document.body.classList.add('lumin-raised');LuminClinicManagement.languageChanged()},language);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),true,'No shell overflow: '+language+' '+width);
+    assert.equal(await page.locator('#cm-payroll-rows').evaluate(node=>node.scrollWidth<=node.clientWidth+1),true,'Invoice cards fit their pane: '+language+' '+width);
+    const fields=await page.locator('#view-clinic-overview input:visible,#view-clinic-overview select:visible').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().toJSON()));
+    assert.ok(fields.every(box=>box.width>=44&&box.height>=44&&box.x>=0&&box.x+box.width<=width+1),'Date and payroll fields fit with 44px touch targets');
+    const payrollBox=await page.locator('#cm-payroll-panel').boundingBox(),cashBox=await page.locator('#cm-cash-panel').boundingBox();
+    if(width>=1024){
+      assert.ok(Math.abs(payrollBox.y-cashBox.y)<1&&Math.abs(payrollBox.width-cashBox.width)<1,'Payroll and cash share the landscape row equally');
+      const controls=await page.locator('#cm-payroll-controls input,#cm-payroll-controls select').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().top));
+      assert.ok(Math.max(...controls)-Math.min(...controls)<1,'Payroll controls align on a single row');
+      const rangeControls=await page.locator('#cm-range-toolbar input,#cm-range-toolbar select,#cm-range-toolbar button').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().top));
+      assert.ok(Math.max(...rangeControls)-Math.min(...rangeControls)<1,'Preset, dates and Apply align on a single row');
+    }else assert.ok(cashBox.y>=payrollBox.y+payrollBox.height,'Narrow layouts stack payroll and cash');
     assert.equal(await page.locator('#cm-alert-bell').evaluate(node=>getComputedStyle(node).color),'rgb(225, 29, 72)','Alert bell retains red status in the raised theme');
     await page.locator('#cm-alert-bell').click();const box=await page.locator('#cm-alert-menu').boundingBox();
-    assert.ok(box.x>=0&&box.x+box.width<=width+1&&box.y+box.height<=1101,'Dropdown stays inside viewport');
+    assert.ok(box.x>=0&&box.x+box.width<=width+1&&box.y+box.height<=height+1,'Dropdown stays inside viewport');
     assert.match(await page.locator('#cm-alert-menu').textContent(),language==='ar'?/رواتب أطباء/:/Doctor payroll/);
     await page.locator('.cm-alert-row .cm-button').first().click();
     assert.match(await page.locator('.cm-payment-preview-row').textContent(),/Mariam Hassan/);
@@ -86,10 +118,20 @@ test('clinic overview, dropdown, payroll payment, permissions and bilingual layo
     const actionBoxes=await page.locator('.cm-payment-preview-actions button').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().toJSON()));
     assert.ok(actionBoxes.every(box=>box.width>=44&&box.height>=44&&box.x>=0&&box.x+box.width<=width+1),'Transfer actions fit and have 44px touch targets');
     await page.keyboard.press('Escape');
+    if(process.env.LUMIN_CM_SCREENSHOT_DIR){
+      fs.mkdirSync(process.env.LUMIN_CM_SCREENSHOT_DIR,{recursive:true});
+      await page.locator('#cm-range-toolbar').scrollIntoViewIfNeeded();
+      await page.screenshot({path:path.join(process.env.LUMIN_CM_SCREENSHOT_DIR,`clinic-${language}-${width}.png`),fullPage:true});
+    }
     const targets=await page.locator('#view-clinic-management button:visible').evaluateAll(nodes=>nodes.map(n=>({width:n.getBoundingClientRect().width,height:n.getBoundingClientRect().height})));
     assert.ok(targets.every(n=>n.width>=43.9&&n.height>=43.9),'44px touch targets');
   }
   await page.emulateMedia({reducedMotion:'reduce'});
+  await page.evaluate(async()=>{empty=true;await LuminClinicManagement.loadPayroll()});
+  assert.match(await page.locator('#cm-payroll-rows').textContent(),/No procedures|لا توجد إجراءات/);
+  assert.ok((await page.locator('#cm-payroll-panel').boundingBox()).height<500,'Empty payroll panel stays compact');
+  if(process.env.LUMIN_CM_SCREENSHOT_DIR)await page.screenshot({path:path.join(process.env.LUMIN_CM_SCREENSHOT_DIR,'clinic-empty.png'),fullPage:true});
+  await page.evaluate(async()=>{empty=false;await LuminClinicManagement.loadPayroll()});
   assert.equal(await page.locator('#cm-alert-bell').evaluate(node=>getComputedStyle(node,'::before').animationName),'none');
   await page.evaluate(()=>{currentUserAccess.permissions.delete('patients')});
   await page.locator('#cm-alert-bell').click();await page.locator('.cm-alert-row .cm-button').first().click();
