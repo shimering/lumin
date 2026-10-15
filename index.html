@@ -648,6 +648,54 @@
       outline: 2px solid rgba(37, 99, 235, 0.45);
       outline-offset: 2px;
     }
+    .admin-visit-types-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    #admin-appointment-visit-types-list {
+      max-height: 20rem;
+      overflow-y: auto;
+      overscroll-behavior-y: contain;
+      scrollbar-gutter: stable;
+      scrollbar-width: thin;
+      touch-action: pan-y;
+      -webkit-overflow-scrolling: touch;
+    }
+    .admin-visit-type-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.5rem 1.25rem;
+    }
+    .admin-visit-type-details { display: flex; min-width: 0; align-items: center; gap: 0.75rem; }
+    .admin-visit-type-icon { display: grid; place-items: center; width: 2rem; height: 2rem; flex-shrink: 0; border-radius: 50%; }
+    .admin-visit-type-actions { display: flex; flex-shrink: 0; gap: 0.5rem; }
+    .admin-visit-types-card :is(button, .appointment-visit-type-badge),
+    .admin-visit-type-status { border: 0; }
+    .admin-visit-types-card .appointment-visit-type-badge { padding: 0.25rem 0.5rem; font-size: 0.75rem; font-weight: 600; line-height: 1.2; }
+    .admin-visit-types-card button { min-height: 44px; min-width: 44px; }
+    .admin-visit-types-card button:focus-visible,
+    #admin-appointment-visit-types-list:focus-visible { outline: 2px solid #2563eb; outline-offset: -3px; }
+    .admin-visit-types-card button:active:not(:disabled) { transform: scale(0.98); }
+    .admin-visit-types-card button:disabled { opacity: 0.5; pointer-events: none; }
+    .admin-visit-type-active-toggle:focus-within { outline: 2px solid #2563eb; outline-offset: 2px; }
+    .admin-visit-type-active-toggle input { accent-color: #2563eb; }
+    .admin-visit-types-card, #modal-appointment-visit-type-form { text-align: start; }
+    #modal-appointment-visit-type-form { margin: 0; }
+    #admin-appointment-visit-type-form :focus-visible { outline: 2px solid rgba(37, 99, 235, 0.35); outline-offset: 2px; }
+    #admin-appointment-visit-type-form input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15); outline: none; }
+    @media (max-width: 639px) {
+      .admin-visit-types-header { padding: 1rem; }
+      .admin-visit-types-header > div { width: 100%; }
+      .admin-visit-type-row { align-items: stretch; flex-direction: column; gap: 0.5rem; padding: 0.75rem 1rem; }
+      .admin-visit-type-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
     @media (min-width: 640px) {
       .admin-dental-dialog-layer {
         align-items: center;
@@ -659,6 +707,9 @@
       }
       #admin-dental-specialty-form {
         max-width: 42rem;
+      }
+      #admin-appointment-visit-type-form {
+        max-width: 32rem;
       }
       #admin-dental-operation-form {
         max-width: 56rem;
@@ -7650,26 +7701,38 @@
           </div>
         </form>
 
-        <div class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(18rem,0.8fr)_minmax(0,1.2fr)]">
-          <form id="admin-appointment-visit-type-form" onsubmit="saveAppointmentVisitType(event)" class="space-y-4 rounded-2xl border border-blue-200 bg-white p-5 shadow-xs">
-            <div class="border-b border-blue-100 pb-4">
-              <span class="text-[11px] font-bold uppercase tracking-wider text-blue-700">Appointment customization</span>
-              <h4 id="admin-appointment-visit-type-form-title" class="mt-1 text-sm font-black text-slate-800">Add visit type</h4>
-              <p class="mt-1 text-xs text-slate-400">Create the visit labels shown on appointment cards.</p>
+        <div class="admin-visit-types-card min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+          <div class="admin-visit-types-header">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2"><h4 id="admin-appointment-visit-types-title" class="text-sm font-semibold tracking-tight text-slate-900">Visit types</h4><span id="admin-appointment-visit-type-count" class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">0 types</span></div>
+              <p class="mt-1 text-xs text-slate-500">Manage the visit labels shown on appointment cards.</p>
             </div>
-            <label class="block"><span class="mb-1.5 block text-xs font-bold text-slate-600">Visit type name</span><input id="admin-appointment-visit-type-name" required minlength="2" maxlength="80" placeholder="e.g. Emergency" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" /></label>
-            <div class="grid grid-cols-[minmax(0,1fr)_7rem] gap-3">
-              <label class="block"><span class="mb-1.5 block text-xs font-bold text-slate-600">Badge color</span><input id="admin-appointment-visit-type-color" type="color" value="#2563EB" class="h-11 w-full cursor-pointer rounded-xl border border-slate-200 bg-white p-1.5" /></label>
-              <label class="block"><span class="mb-1.5 block text-xs font-bold text-slate-600">Order</span><input id="admin-appointment-visit-type-sort-order" type="number" min="0" max="9999" value="10" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500" /></label>
-            </div>
-            <label class="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3"><span><span class="block text-xs font-black text-slate-700">Active</span><span class="mt-0.5 block text-[10px] font-bold text-slate-400">Available for new appointments</span></span><span class="relative inline-flex shrink-0 items-center"><input id="admin-appointment-visit-type-active" type="checkbox" checked class="peer sr-only" /><span class="h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-blue-600"></span><span class="pointer-events-none absolute left-1 h-4 w-4 rounded-full bg-white shadow-sm transition peer-checked:translate-x-5"></span></span></label>
-            <p id="admin-appointment-visit-type-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="status"></p>
-            <div class="flex flex-wrap justify-end gap-2"><button id="admin-appointment-visit-type-cancel-button" type="button" onclick="resetAppointmentVisitTypeForm()" class="hidden rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 hover:bg-slate-50">Cancel</button><button id="admin-appointment-visit-type-save-button" type="submit" class="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-black text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"><i data-lucide="save" class="h-4 w-4"></i> Save visit type</button></div>
-          </form>
-          <div class="overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-xs">
-            <div class="flex items-center justify-between gap-3 border-b border-blue-100 p-5"><div><h4 class="text-sm font-black text-slate-800">Visit types</h4><p class="mt-1 text-xs text-slate-400">Edit names and colors, or deactivate a type while preserving its appointments.</p></div><span id="admin-appointment-visit-type-count" class="rounded-lg bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-600">0 types</span></div>
-            <div id="admin-appointment-visit-types-list" class="divide-y divide-slate-100"><div class="p-10 text-center text-sm font-bold text-slate-400">Loading visit types...</div></div>
+            <button id="admin-add-visit-type-button" type="button" onclick="openAppointmentVisitTypeDialog()" aria-haspopup="dialog" aria-controls="modal-appointment-visit-type-form" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-50 px-4 py-2.5 text-xs font-semibold text-blue-700 transition-all duration-150 ease-out hover:bg-blue-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50"><i data-lucide="plus" class="h-4 w-4"></i><span>Add visit type</span></button>
           </div>
+          <p id="admin-appointment-visit-types-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="status"></p>
+          <div id="admin-appointment-visit-types-list" role="region" aria-labelledby="admin-appointment-visit-types-title" tabindex="0" class="divide-y divide-slate-100"><div class="space-y-3 p-5" role="status"><span class="sr-only">Loading visit types...</span><div class="h-11 animate-pulse rounded-lg bg-slate-100"></div><div class="h-11 animate-pulse rounded-lg bg-slate-100"></div><div class="h-11 animate-pulse rounded-lg bg-slate-100"></div></div></div>
+        </div>
+
+        <div id="modal-appointment-visit-type-form" onclick="if (event.target === this) closeAppointmentVisitTypeDialog()" class="admin-dental-dialog-layer fixed inset-0 z-[90] hidden items-end justify-center bg-slate-900/40 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+          <form id="admin-appointment-visit-type-form" role="dialog" aria-modal="true" aria-labelledby="admin-appointment-visit-type-form-title" onkeydown="handleAdminDentalDialogKeydown(event, 'visit-type')" onsubmit="saveAppointmentVisitType(event)" class="admin-dental-dialog relative flex max-h-[90vh] w-full min-w-0 flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:rounded-2xl">
+            <div class="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 p-5">
+              <div class="min-w-0"><h4 id="admin-appointment-visit-type-form-title" class="text-lg font-semibold tracking-tight text-slate-900">Add visit type</h4><p class="mt-1 text-xs text-slate-500">Create the visit labels shown on appointment cards.</p></div>
+              <button type="button" onclick="closeAppointmentVisitTypeDialog()" aria-label="Close visit type dialog" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-500 transition-all duration-150 ease-out hover:bg-slate-50 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50"><i data-lucide="x" class="h-5 w-5"></i></button>
+            </div>
+            <div class="admin-dental-dialog-body min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-y-contain p-5">
+              <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-600">Visit type name</span><input id="admin-appointment-visit-type-name" required minlength="2" maxlength="80" placeholder="e.g. Emergency" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none transition-all duration-150 ease-out hover:border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" /></label>
+              <div class="grid grid-cols-[minmax(0,1fr)_7rem] gap-3">
+                <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-600">Badge color</span><input id="admin-appointment-visit-type-color" type="color" value="#2563EB" class="h-11 w-full cursor-pointer rounded-xl border border-slate-200 bg-white p-1.5 transition-all duration-150 ease-out hover:border-slate-300" /></label>
+                <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-600">Order</span><input id="admin-appointment-visit-type-sort-order" type="number" min="0" max="9999" value="10" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none transition-all duration-150 ease-out hover:border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" /></label>
+              </div>
+              <label class="admin-visit-type-active-toggle flex cursor-pointer items-center justify-between gap-3 rounded-xl bg-slate-50 px-3.5 py-3"><span><span class="block text-xs font-semibold text-slate-700">Active</span><span class="mt-0.5 block text-xs text-slate-500">Available for new appointments</span></span><input id="admin-appointment-visit-type-active" type="checkbox" checked class="h-5 w-5 accent-blue-600" /></label>
+              <p id="admin-appointment-visit-type-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="status"></p>
+            </div>
+            <div class="flex shrink-0 justify-end gap-2 border-t border-slate-100 bg-slate-50 p-4" style="padding-bottom:max(1rem, env(safe-area-inset-bottom));">
+              <button id="admin-appointment-visit-type-cancel-button" type="button" onclick="closeAppointmentVisitTypeDialog()" class="inline-flex items-center justify-center rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-600 transition-all duration-150 ease-out hover:bg-slate-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50">Cancel</button>
+              <button id="admin-appointment-visit-type-save-button" type="submit" class="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-50 px-4 py-2.5 text-xs font-semibold text-blue-700 transition-all duration-150 ease-out hover:bg-blue-100 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:pointer-events-none disabled:opacity-50"><i data-lucide="save" class="h-4 w-4"></i><span>Save visit type</span></button>
+            </div>
+          </form>
         </div>
 
         <div class="rounded-2xl border border-cyan-200 bg-gradient-to-br from-white to-cyan-50/70 p-4 shadow-xs sm:p-5">
@@ -10899,6 +10962,26 @@
       'Previous month': 'الشهر السابق',
       'Next month': 'الشهر التالي',
       'Other categories': 'فئات أخرى',
+      'Visit types': 'أنواع الزيارات',
+      'Add visit type': 'إضافة نوع زيارة',
+      'Edit visit type': 'تعديل نوع الزيارة',
+      'Manage the visit labels shown on appointment cards.': 'إدارة تسميات الزيارات التي تظهر على بطاقات المواعيد.',
+      'Create the visit labels shown on appointment cards.': 'أنشئ تسميات الزيارات التي تظهر على بطاقات المواعيد.',
+      'Visit type name': 'اسم نوع الزيارة',
+      'e.g. Emergency': 'مثال: طوارئ',
+      'Badge color': 'لون الشارة',
+      'Order': 'الترتيب',
+      'Available for new appointments': 'متاح للمواعيد الجديدة',
+      'Active': 'نشط',
+      'Close visit type dialog': 'إغلاق نافذة نوع الزيارة',
+      'Save visit type': 'حفظ نوع الزيارة',
+      'Loading visit types...': 'جارٍ تحميل أنواع الزيارات...',
+      'No visit types yet': 'لا توجد أنواع زيارات بعد',
+      'Add your first visit type to label appointments.': 'أضف أول نوع زيارة لتسمية المواعيد.',
+      'Saving visit type...': 'جارٍ حفظ نوع الزيارة...',
+      'Visit type saved. Appointment cards update instantly.': 'تم حفظ نوع الزيارة. تُحدّث بطاقات المواعيد فورًا.',
+      'Could not save the visit type.': 'تعذر حفظ نوع الزيارة.',
+      'Could not load appointment visit types.': 'تعذر تحميل أنواع زيارات المواعيد.',
       'Delete clinical operation': 'حذف الإجراء السريري',
       'Affected patients': 'المرضى المتأثرون',
       'Assigned findings': 'الإجراءات المسندة',
@@ -11473,6 +11556,7 @@
 
     function isUiTranslationExcluded(node) {
       const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+      if (element?.closest('.admin-visit-types-card, #modal-appointment-visit-type-form')) return Boolean(element.closest('[data-visit-type-name]'));
       return Boolean(element?.closest('#view-chart, #view-admin, #view-prices, #view-patient-scans, #patient-media-tooth-picker, .patient-workspace-name, [data-storage-connection-badge], [data-storage-server-dialog], [data-media-user-content]'));
     }
 
@@ -11644,6 +11728,7 @@
         time: appointmentTimeFormatter.format(new Date(entry.startAt))
       }));
       translateUiTree(document.body, currentUiLanguage);
+      renderAdminAppointmentVisitTypes();
       if (typeof refreshQuotationLanguage === 'function') refreshQuotationLanguage();
       if (window.LuminClinicManagement) LuminClinicManagement.languageChanged();
       if (typeof renderChartMediaPanel === 'function') renderChartMediaPanel();
@@ -12737,17 +12822,35 @@
       const list = document.getElementById('admin-appointment-visit-types-list');
       const count = document.getElementById('admin-appointment-visit-type-count');
       if (!list || !count) return;
-      count.textContent = `${appointmentVisitTypes.length} type${appointmentVisitTypes.length === 1 ? '' : 's'}`;
+      const isArabic = currentUiLanguage === 'ar';
+      for (const element of [list.closest('.admin-visit-types-card'), document.getElementById('modal-appointment-visit-type-form')]) {
+        element?.setAttribute('dir', isArabic ? 'rtl' : 'ltr');
+        element?.setAttribute('lang', currentUiLanguage);
+      }
+      count.textContent = isArabic ? `${appointmentVisitTypes.length} أنواع` : `${appointmentVisitTypes.length} type${appointmentVisitTypes.length === 1 ? '' : 's'}`;
+      if (!appointmentVisitTypesLoaded) return;
       list.innerHTML = appointmentVisitTypes.map(type => `
-        <article class="flex flex-wrap items-center justify-between gap-3 p-4">
-          <div class="flex min-w-0 items-center gap-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style="background-color:${appointmentColorRgba(type.color, 0.14)};color:${appointmentTextColor(type.color)}"><i data-lucide="calendar-heart" class="h-4 w-4"></i></span>
-            <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><span class="appointment-visit-type-badge" style="--appointment-visit-type-rgb:${appointmentColorRgbChannels(type.color)};--appointment-visit-type-text:${appointmentTextColor(type.color)}">${escapeHtml(type.name)}</span><span class="rounded-md px-2 py-0.5 text-[10px] font-black ${type.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">${type.active ? 'Active' : 'Inactive'}</span></div><p class="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Display order ${type.sortOrder} · ${type.color}</p></div>
+        <article class="admin-visit-type-row">
+          <div class="admin-visit-type-details">
+            <span class="admin-visit-type-icon" style="background-color:${appointmentColorRgba(type.color, 0.14)};color:${appointmentTextColor(type.color)}"><i data-lucide="calendar-heart" class="h-4 w-4"></i></span>
+            <div class="min-w-0"><div class="flex min-w-0 items-center gap-2"><span data-visit-type-name class="appointment-visit-type-badge truncate" title="${escapeHtml(type.name)}" style="--appointment-visit-type-rgb:${appointmentColorRgbChannels(type.color)};--appointment-visit-type-text:${appointmentTextColor(type.color)}">${escapeHtml(type.name)}</span><span class="admin-visit-type-status shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${type.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}">${isArabic ? (type.active ? 'نشط' : 'غير نشط') : (type.active ? 'Active' : 'Inactive')}</span></div><p class="mt-1 text-xs font-medium text-slate-400">${isArabic ? 'الترتيب' : 'Order'} ${type.sortOrder} · <span dir="ltr">${type.color}</span></p></div>
           </div>
-          <div class="flex shrink-0 flex-wrap gap-2"><button type="button" onclick="setAppointmentVisitTypeActive('${type.id}', ${!type.active})" class="rounded-lg border px-2.5 py-2 text-[10px] font-black ${type.active ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}">${type.active ? 'Deactivate' : 'Activate'}</button><button type="button" onclick="editAppointmentVisitType('${type.id}')" class="rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-black text-slate-600 hover:bg-slate-50">Edit</button><button type="button" onclick="deleteAppointmentVisitType('${type.id}')" class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[10px] font-black text-red-600 hover:bg-red-100">Delete</button></div>
+          <div class="admin-visit-type-actions"><button type="button" onclick="setAppointmentVisitTypeActive('${type.id}', ${!type.active})" class="rounded-lg px-3 py-2 text-xs font-semibold transition-all duration-150 ease-out ${type.active ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}">${isArabic ? (type.active ? 'تعطيل' : 'تفعيل') : (type.active ? 'Deactivate' : 'Activate')}</button><button type="button" onclick="editAppointmentVisitType('${type.id}')" class="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600 transition-all duration-150 ease-out hover:bg-slate-200">${isArabic ? 'تعديل' : 'Edit'}</button><button type="button" onclick="deleteAppointmentVisitType('${type.id}')" class="rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition-all duration-150 ease-out hover:bg-rose-100">${isArabic ? 'حذف' : 'Delete'}</button></div>
         </article>
-      `).join('') || '<div class="p-10 text-center text-sm font-bold text-slate-400">No appointment visit types yet.</div>';
-      lucide.createIcons();
+      `).join('') || `<div class="flex flex-col items-center gap-3 p-6 text-center"><span class="flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-700"><i data-lucide="calendar-heart" class="h-5 w-5"></i></span><div><h5 class="text-sm font-semibold text-slate-900">${isArabic ? 'لا توجد أنواع زيارات بعد' : 'No visit types yet'}</h5><p class="mt-1 text-xs text-slate-500">${isArabic ? 'أضف أول نوع زيارة لتسمية المواعيد.' : 'Add your first visit type to label appointments.'}</p></div><button type="button" onclick="openAppointmentVisitTypeDialog()" class="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-700 transition-all duration-150 ease-out hover:bg-blue-100"><i data-lucide="plus" class="h-4 w-4"></i>${isArabic ? 'إضافة نوع زيارة' : 'Add visit type'}</button></div>`;
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function openAppointmentVisitTypeDialog() {
+      if (!hasPageAccess('admin')) return;
+      resetAppointmentVisitTypeForm();
+      setAdminMessage('admin-appointment-visit-types-message', '');
+      showAdminDentalDialog('modal-appointment-visit-type-form', 'admin-appointment-visit-type-name');
+    }
+
+    function closeAppointmentVisitTypeDialog() {
+      hideAdminDentalDialog('modal-appointment-visit-type-form');
+      resetAppointmentVisitTypeForm();
     }
 
     function resetAppointmentVisitTypeForm() {
@@ -12759,11 +12862,11 @@
       document.getElementById('admin-appointment-visit-type-sort-order').value = String((appointmentVisitTypes.at(-1)?.sortOrder || 0) + 10);
       document.getElementById('admin-appointment-visit-type-active').checked = true;
       document.getElementById('admin-appointment-visit-type-form-title').textContent = 'Add visit type';
-      document.getElementById('admin-appointment-visit-type-cancel-button').classList.add('hidden');
       setAdminMessage('admin-appointment-visit-type-message', '');
     }
 
     function editAppointmentVisitType(typeId) {
+      if (!hasPageAccess('admin')) return;
       const type = appointmentVisitTypes.find(item => item.id === typeId);
       if (!type) return;
       editingAppointmentVisitTypeId = type.id;
@@ -12772,9 +12875,9 @@
       document.getElementById('admin-appointment-visit-type-sort-order').value = String(type.sortOrder);
       document.getElementById('admin-appointment-visit-type-active').checked = type.active;
       document.getElementById('admin-appointment-visit-type-form-title').textContent = 'Edit visit type';
-      document.getElementById('admin-appointment-visit-type-cancel-button').classList.remove('hidden');
       setAdminMessage('admin-appointment-visit-type-message', '');
-      document.getElementById('admin-appointment-visit-type-name').focus();
+      setAdminMessage('admin-appointment-visit-types-message', '');
+      showAdminDentalDialog('modal-appointment-visit-type-form', 'admin-appointment-visit-type-name');
     }
 
     async function saveAppointmentVisitType(event) {
@@ -12795,8 +12898,8 @@
           : await db.from('appointment_visit_types').insert(payload).select('id').single();
         if (result.error) throw result.error;
         await fetchAppointmentVisitTypes();
-        resetAppointmentVisitTypeForm();
-        setAdminMessage('admin-appointment-visit-type-message', 'Visit type saved. Appointment cards update instantly.');
+        closeAppointmentVisitTypeDialog();
+        setAdminMessage('admin-appointment-visit-types-message', 'Visit type saved. Appointment cards update instantly.');
         if (appointmentsLoaded) {
           if (!document.getElementById('view-dashboard').classList.contains('hidden')) renderDashboard();
           if (!document.getElementById('view-appointments').classList.contains('hidden')) renderAppointments();
@@ -15677,6 +15780,7 @@
         event.preventDefault();
         event.stopPropagation();
         if (dialogType === 'specialty') closeDentalSpecialtyDialog();
+        else if (dialogType === 'visit-type') closeAppointmentVisitTypeDialog();
         else closeDentalOperationDialog();
         return;
       }
@@ -17156,7 +17260,7 @@
         renderAdminDentalCustomization();
         if (!appointmentVisitTypesLoaded) {
           void ensureAppointmentVisitTypesLoaded().catch(error => {
-            setAdminMessage('admin-appointment-visit-type-message', error.message || 'Could not load appointment visit types.', 'error');
+            setAdminMessage('admin-appointment-visit-types-message', error.message || 'Could not load appointment visit types.', 'error');
           });
         }
       }

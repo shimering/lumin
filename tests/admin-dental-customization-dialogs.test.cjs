@@ -40,3 +40,15 @@ test('existing add and edit actions open the new dialogs', () => {
   assert.match(addOperation, /openDentalOperationDialog\(specialtyId\)/);
   assert.doesNotMatch(`${editSpecialty}${editOperation}${addOperation}`, /scrollIntoView/);
 });
+
+test('appointment visit type form is a modal dialog with accessible trigger and actions', () => {
+  assert.match(html, /onclick="openAppointmentVisitTypeDialog\(\)"[^>]*aria-controls="modal-appointment-visit-type-form"/);
+  const visitTypeLayer = html.indexOf('id="modal-appointment-visit-type-form"');
+  const visitTypeForm = html.indexOf('id="admin-appointment-visit-type-form"');
+  assert.ok(visitTypeLayer >= 0 && visitTypeForm > visitTypeLayer, 'visit type form is inside its modal layer');
+  assert.match(html.slice(visitTypeForm, visitTypeForm + 500), /role="dialog" aria-modal="true"/);
+
+  const editVisitType = html.slice(html.indexOf('function editAppointmentVisitType('), html.indexOf('async function saveAppointmentVisitType('));
+  assert.match(editVisitType, /showAdminDentalDialog\('modal-appointment-visit-type-form'/);
+  assert.match(html, /else if \(dialogType === 'visit-type'\) closeAppointmentVisitTypeDialog\(\);/);
+});
