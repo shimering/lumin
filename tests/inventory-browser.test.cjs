@@ -52,6 +52,30 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   const categories=await db.query('select id,key from public.inventory_categories');
   const anesthesia=categories.rows.find(c=>c.key==='anaesthesia').id,surgical=categories.rows.find(c=>c.key==='surgical').id;
   const anesthesiaItem=(await db.query("select id from public.inventory_items where name='Anasthesia (Blue)'")).rows[0].id;
+  const stockStep=operation=>page.locator(`#inv-stock-${operation}-${anesthesiaItem}`);
+  const waitStock=async quantity=>{
+    await page.waitForFunction(({id,quantity})=>{const node=document.getElementById('inv-stock-receive-'+id);return node&&!node.disabled&&node.parentElement.querySelector('.inv-number').textContent===String(quantity);},{id:anesthesiaItem,quantity});
+    assert.equal(Number((await db.query('select quantity from public.inventory_items where id=$1',[anesthesiaItem])).rows[0].quantity),quantity);
+  };
+  const firstQuickWrite=requests.length;
+  await page.evaluate(id=>{window.dropReceiptReply=true;document.getElementById('inv-stock-receive-'+id).click();document.getElementById('inv-stock-receive-'+id).click();},anesthesiaItem);
+  await page.waitForFunction(()=>document.querySelector('#view-inventory [data-inv-action="retry-stock"]')&&!document.querySelector('.inv-stock-stepper[aria-busy="true"]'));
+  assert.equal(requests.slice(firstQuickWrite).filter(r=>r.name==='inventory_write').length,1,'Rapid clicks post once');
+  await page.evaluate(()=>LuminInventory.refresh({force:true}));
+  await waitStock(3);
+  await stockStep('receive').click();await waitStock(3);
+  const retries=requests.slice(firstQuickWrite).filter(r=>r.name==='inventory_write');
+  assert.equal(retries.length,2);assert.equal(retries[0].args.p_request_id,retries[1].args.p_request_id,'A lost reply reuses its request even after realtime refresh');
+  assert.equal(await page.locator('#inventory-overlay').count(),0,'Stock buttons update without opening a dialog');
+  for(const quantity of [2,1,0]){await stockStep('use').click();await waitStock(quantity);}
+  assert.equal(await stockStep('use').isDisabled(),true,'Zero stock cannot be decreased');
+  for(const quantity of [1,2]){await stockStep('receive').click();await waitStock(quantity);}
+  const concurrentItem=(await db.query('select revision from public.inventory_items where id=$1',[anesthesiaItem])).rows[0];
+  await page.evaluate(async({id,revision,request})=>{const result=await window.fixtureRPC('inventory_write',{p_operation:'use',p_payload:{id,revision,quantity:1},p_request_id:request},currentSession.user.id);if(result.error)throw Error(result.error.message);},{id:anesthesiaItem,revision:concurrentItem.revision,request:uuid(9000)});
+  await stockStep('receive').click();await waitStock(1);
+  assert.match(await page.locator('#view-inventory [role="alert"]').textContent(),/record changed/);
+  assert.equal(await page.locator('[data-inv-action="retry-stock"]').count(),0,'Stale stock requires a fresh click, never automatic replay');
+  await stockStep('receive').click();await waitStock(2);
   await page.locator(`[data-inv-category="${anesthesia}"]`).click();
   await page.waitForFunction(()=>!document.querySelector('#view-inventory [aria-busy="true"]'));
   assert.ok(await page.locator('.inv-table tbody tr').count()>=1);
@@ -82,8 +106,12 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   await page.waitForFunction(()=>document.querySelectorAll('.inv-movement').length>0);
   assert.ok((await page.locator('.inv-movement').allTextContents()).some(text=>text.includes('Usage')));
   await page.locator('[data-inv-action="stock"]').click();
+  await page.locator('#inv-search').fill('Napkin');
+  await page.waitForFunction(()=>document.querySelector('.inv-item')?.textContent==='Napkin');
+  assert.equal(await page.locator('.inv-stock-step:enabled').count(),0,'Missing stock units cannot be inferred');
   await page.locator('#inv-search').fill('Cotton pack');
   await page.waitForFunction(()=>document.querySelector('.inv-item')?.textContent==='Cotton pack');
+  assert.equal(await page.locator('.inv-stock-step:enabled').count(),0,'Unknown opening stock cannot be incremented or decremented');
   await page.locator('.inv-item').click();
   assert.equal(await page.locator('#inventory-overlay [data-inv-action="receive"]').isDisabled(),true);
   await page.locator('#inventory-overlay [data-inv-action="count"]').click();
@@ -105,8 +133,9 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
     await page.evaluate(lang=>{currentUiLanguage=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';LuminInventory.languageChanged();},language);
     const overflow=await page.locator('#view-inventory').evaluate(node=>node.scrollWidth>node.clientWidth+1);assert.equal(overflow,false,`${language} ${width}`);
     const controls=await page.locator('#view-inventory button:visible').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect()).filter(r=>r.width<43||r.height<43));assert.equal(controls.length,0,`Touch sizes ${language} ${width}`);
+    const brokenSteppers=await page.locator('.inv-stock-stepper').evaluateAll(nodes=>nodes.filter(node=>{const [minus,value,plus]=[...node.children].map(child=>child.getBoundingClientRect()),cell=node.closest('td').getBoundingClientRect();return minus.left>=value.left||value.right>plus.left+1||plus.right>cell.right+1||minus.left<cell.left-1;}).length);assert.equal(brokenSteppers,0,`Stock buttons surround the quantity within its cell: ${language} ${width}`);
     if(width<1024){assert.equal(await page.locator('#inv-mobile-category').isVisible(),true);await page.locator('#inv-mobile-category').selectOption(surgical);await page.waitForFunction(()=>!document.querySelector('#view-inventory [aria-busy="true"]'));await page.locator('#inv-mobile-category').selectOption('all');await page.waitForFunction(()=>!document.querySelector('#view-inventory [aria-busy="true"]'));}
-    if(process.env.LUMIN_INVENTORY_SCREENSHOTS&&((language==='en'&&width===1440)||(language==='ar'&&width===390))){fs.mkdirSync(process.env.LUMIN_INVENTORY_SCREENSHOTS,{recursive:true});await page.screenshot({path:path.join(process.env.LUMIN_INVENTORY_SCREENSHOTS,`inventory-${language}-${width}.png`),fullPage:true});}
+    if(process.env.LUMIN_INVENTORY_SCREENSHOTS&&((language==='en'&&width===1440)||(language==='ar'&&width===390))){fs.mkdirSync(process.env.LUMIN_INVENTORY_SCREENSHOTS,{recursive:true});await page.screenshot({path:path.join(process.env.LUMIN_INVENTORY_SCREENSHOTS,`inventory-${language}-${width}.png`),fullPage:width>=768});}
   }
   await page.setViewportSize({width:390,height:900});
   await page.locator('[data-inv-action="add"]:visible').click();
@@ -117,8 +146,14 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   assert.equal(await page.locator('#clinic-management-tab-overview').isVisible(),false);
   assert.equal(await page.locator('#view-inventory [data-inv-action="add"]').count(),0);
   assert.equal(await page.locator('#view-inventory [data-inv-action="choose-receive"]').count(),0);
+  assert.equal(await page.locator('.inv-stock-step:enabled').count(),0,'Read-only staff cannot use stock buttons');
   await page.locator('.inv-item').first().click();assert.equal(await page.locator('#inv-dialog-submit').count(),0);
   await page.keyboard.press('Escape');
+  for(const [who,capability]of [[4,'receive'],[5,'use']]){
+    await page.evaluate(async({who,capability})=>{currentSession={user:{id:'00000000-0000-4000-8000-'+String(who).padStart(12,'0')}};currentUserAccess={active:true,isAdmin:false,permissions:new Set(['inventory','inventory_'+capability])};LuminInventory.reset();await switchClinicManagementTab('inventory');},{who,capability});
+    assert.equal(await stockStep(capability).isEnabled(),true,`${capability} permission enables only its stock button`);
+    assert.equal(await stockStep(capability==='receive'?'use':'receive').isDisabled(),true);
+  }
   await page.evaluate(()=>{currentUserAccess.active=false;LuminInventory.invalidate();});assert.equal(await page.locator('#view-inventory').textContent(),'');
   assert.ok(requests.some(r=>r.name==='inventory_write'&&r.args.p_operation==='import'));assert.deepEqual(errors,[]);
 });
