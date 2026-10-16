@@ -175,7 +175,7 @@
     if(!el('cm-alert-menu').hidden)positionAlerts();
   }
   async function refresh(options={}) {
-    if(!allowed('clinic-management')||!actor())return;
+    if(!allowed('clinic-management')||!actor()||!['finances','analytics','hr'].some(allowed))return;
     if(!el('cm-alert-menu'))init();
     const context=signature();if(state.actor&&state.actor!==context){reset();init();}state.actor=context;
     if(!state.start){state.day=today();state.start=state.day;state.end=state.day;}

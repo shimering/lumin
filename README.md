@@ -8,6 +8,7 @@ A modern, high-performance Progressive Web Application (PWA) for comprehensive d
 - Patient directory and records management
 - Appointment scheduling & calendar synchronization
 - Invoice, payment, and financial ledger tracking
+- Category-based clinic inventory with CSV import, stock movements, and role permissions
 - Loyalty and referral program tracking
 - Multi-provider authentication and RBAC
 - Cloud database powered by Supabase
@@ -16,6 +17,18 @@ A modern, high-performance Progressive Web Application (PWA) for comprehensive d
 - **Frontend**: Vanilla HTML5, CSS3, ES6+, Tailwind utility classes, Lucide Icons, Service Worker PWA
 - **Backend-as-a-Service**: Supabase (PostgreSQL, Auth, Edge Functions, Row-Level Security)
 - **Notifications**: OneSignal Web Push
+
+## Clinic inventory
+
+Open **Clinic Management → Inventory** to manage item categories, stock quantities, minimum levels, receiving, usage, counts, wastage, and movement reversals. Inventory has no expiry-date fields or expiry-based rules. English and Arabic layouts include mobile item cards, bottom sheets, and a pinned stock-action bar.
+
+Apply `20261016203800_clinic_inventory.sql` before serving the new frontend. Administrators have access automatically. Other staff need **Inventory** plus the relevant action permissions in **Admin → User types**: manage items/categories, receive stock, record usage, or count/adjust. Importing opening balances and setting a new item's opening quantity additionally require count/adjust permission. Inventory-only staff can use the workspace without financial or HR access.
+
+Use **Import CSV** to select the clinic's inventory file, review category suggestions and the opening-balance date, then confirm the import. Arabic and English column labels are supported. Missing quantities/minimums stay unknown and missing units remain blank. Original file values and notes stay in each item's import details. Imports are atomic, retries do not duplicate balances, and previously imported item identities cannot be silently overwritten. Imported units such as Box or pack are preserved; the app does not infer their piece counts. Complete missing units and perform an opening stock count before receiving or using stock for an uncounted item.
+
+Category assignments can be changed individually or for selected items. Categories and items can be archived while posted movements remain available. Unit changes after posting are blocked, except completing a previously missing unit. Stock changes use server-side permissions, current revisions, locked balances, and persistent request identifiers. Receipts do not create financial expenses or payments. Supplier purchasing, pack conversions, automatic treatment consumption, and valuation remain later phases.
+
+Run `node --test tests/inventory.test.cjs tests/inventory-sql.test.cjs tests/inventory-browser.test.cjs` with Node 24+, PGlite, Playwright, and Chrome. The browser test executes the real migration and ledger functions in an isolated database. Set `LUMIN_INVENTORY_CSV` to test a specific CSV and `LUMIN_INVENTORY_SCREENSHOTS` to capture the UI. The production smoke test in `supabase/tests/clinic_inventory.test.sql` rolls back its test records.
 
 Diagnosis fees automatically enter the assigned doctor's HR salary calculation once the appointment is completed and the fee is invoiced. The existing Diagnosis compensation rule (or universal rule) determines the amount. Saving a fee before completion, changing its doctor before payment, and existing eligible fees are covered automatically; ordinary chart procedures still use **Transfer to salary**. Paid diagnosis fees retain their expense deletion safeguards. Apply `auto_transfer_diagnosis_fees_to_salary` before publishing the frontend. Run `node --test tests/diagnosis-fee-auto-salary.test.cjs` and `supabase/tests/diagnosis_fee_auto_salary.test.sql`; the database fixtures and test settlements roll back.
 

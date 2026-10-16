@@ -76,7 +76,10 @@
   <script src="lumin-loyalty.js?v=5"></script>
   <script src="lumin-finance-sync.js?v=2"></script>
   <script src="lumin-cash-flow.js?v=1"></script>
-  <script src="lumin-clinic-management.js?v=4"></script>
+  <script src="lumin-clinic-management.js?v=5"></script>
+  <script src="lumin-inventory-model.js?v=1"></script>
+  <script src="lumin-inventory.js?v=1"></script>
+  <link rel="stylesheet" href="lumin-inventory.css?v=1" />
   <link rel="stylesheet" href="lumin-clinic-management.css?v=4" />
   <script src="lumin-patient-scans.js?v=6"></script>
   <link rel="stylesheet" href="lumin-patient-scans.css?v=4" />
@@ -5890,7 +5893,7 @@
         <div class="app-page-bar app-page-bar-embedded">
           <div class="app-page-heading"><span class="app-page-icon" aria-hidden="true"><i data-lucide="building-2"></i></span><h2 class="app-page-title">Clinic Management</h2></div>
           <div class="cm-title-actions">
-            <button id="cm-refresh" type="button" class="cm-button cm-button-icon" onclick="LuminClinicManagement.refresh({ force: true })" aria-label="Refresh clinic overview"><i data-lucide="refresh-cw" aria-hidden="true"></i></button>
+            <button id="cm-refresh" type="button" class="cm-button cm-button-icon" onclick="activeClinicManagementTab === 'inventory' ? LuminInventory.refresh({ force: true }) : LuminClinicManagement.refresh({ force: true })" aria-label="Refresh clinic overview"><i data-lucide="refresh-cw" aria-hidden="true"></i></button>
             <button id="cm-alert-bell" type="button" class="cm-button cm-button-icon cm-alert-bell" onclick="LuminClinicManagement.toggleAlerts()" aria-label="Action center" aria-haspopup="dialog" aria-controls="cm-alert-menu" aria-expanded="false"><i data-lucide="bell" aria-hidden="true"></i><span id="cm-alert-count" class="cm-alert-count" hidden></span></button>
           </div>
         </div>
@@ -5900,6 +5903,7 @@
             <button id="clinic-management-tab-finances" data-clinic-management-tab="finances" type="button" role="tab" aria-selected="true" aria-controls="view-finances" onclick="switchClinicManagementTab('finances')" class="inline-flex shrink-0 min-h-10 items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-[11px] font-black text-emerald-700 shadow-xs sm:px-4 sm:text-xs">
               <i data-lucide="landmark" class="h-4 w-4"></i><span>Finances</span>
             </button>
+            <button id="clinic-management-tab-inventory" data-clinic-management-tab="inventory" type="button" role="tab" aria-selected="false" aria-controls="view-inventory" onclick="switchClinicManagementTab('inventory')" class="cm-button cm-button-quiet"><i data-lucide="package" aria-hidden="true"></i><span>Inventory</span></button>
             <button id="clinic-management-tab-analytics" data-clinic-management-tab="analytics" type="button" role="tab" aria-selected="false" aria-controls="view-analytics" onclick="switchClinicManagementTab('analytics')" class="inline-flex shrink-0 min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-[11px] font-black text-slate-500 transition hover:bg-white/70 hover:text-indigo-700 sm:px-4 sm:text-xs">
               <i data-lucide="chart-no-axes-combined" class="h-4 w-4"></i><span>Analytics</span>
             </button>
@@ -5909,6 +5913,7 @@
           </div>
         </div>
       </div>
+      <section id="view-inventory" class="hidden" role="tabpanel" aria-labelledby="clinic-management-tab-inventory"></section>
       <section id="view-clinic-overview" class="cm-overview" role="tabpanel" aria-labelledby="clinic-management-tab-overview" hidden>
         <div id="cm-range-toolbar" class="cm-toolbar"></div>
         <div id="cm-overview-error" hidden></div>
@@ -7254,6 +7259,7 @@
             <legend class="mb-2 text-xs font-bold text-slate-600">Pages this type can view</legend>
             <div id="new-role-permissions" class="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <div class="rounded-xl border border-blue-200 bg-blue-50/50 p-3"><label class="flex cursor-pointer items-center gap-2 text-xs font-bold text-slate-600"><input type="checkbox" value="patients" onchange="syncNewRoleLoyaltyToggle()" class="h-4 w-4 rounded border-slate-300 text-blue-600" /> Patients</label><label class="mt-2 flex min-h-11 cursor-pointer items-center justify-between gap-2 border-t border-blue-200 pt-2 text-sm font-bold text-blue-800"><span><span class="block">Show Loyalty tab</span><span class="mt-1 block text-xs font-normal">Includes managing patient membership, points, and rewards.</span></span><span class="relative inline-flex shrink-0 items-center"><input id="admin-role-loyalty" type="checkbox" role="switch" disabled class="peer sr-only" /><span class="h-5 w-9 rounded-full bg-slate-300 transition peer-checked:bg-blue-600 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-disabled:opacity-50"></span><span class="pointer-events-none absolute left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition peer-checked:translate-x-4"></span></span></label></div>
+              <div class="inv-permissions"><label><input type="checkbox" value="inventory">Inventory</label><label><input type="checkbox" value="inventory_manage">Manage inventory items and categories</label><label><input type="checkbox" value="inventory_receive">Receive inventory stock</label><label><input type="checkbox" value="inventory_use">Record inventory usage</label><label><input type="checkbox" value="inventory_adjust">Count and adjust inventory</label></div>
               <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 p-3 text-xs font-bold text-slate-600"><input type="checkbox" value="chart" class="h-4 w-4 rounded border-slate-300 text-blue-600" /> Clinical Chart</label>
               <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 p-3 text-xs font-bold text-slate-600"><input type="checkbox" value="appointments" onchange="syncNewRoleAppointmentModifyToggle()" class="h-4 w-4 rounded border-slate-300 text-blue-600" /> Appointments</label>
               <div class="rounded-xl border border-violet-200 bg-violet-50/50 p-3">
@@ -10345,12 +10351,13 @@
       { key: 'chart', label: 'Clinical Chart' },
       { key: 'appointments', label: 'Appointments' },
       { key: 'finances', label: 'Finances' },
+      { key: 'inventory', label: 'Inventory' },
       { key: 'analytics', label: 'Analytics' },
       { key: 'hr', label: 'HR' },
       { key: 'implants', label: 'Implant Progress' },
       { key: 'prices', label: 'Prices' }
     ]);
-    const ROLE_PERMISSION_PAGES = Object.freeze([...APP_PAGES, { key: 'dashboard_invoices', label: 'Dashboard invoices' }, { key: 'loyalty', label: 'Patient Loyalty tab' }, { key: 'finance_depts', label: 'Finance Depts tab' }, { key: 'whatsapp_notifications', label: 'Incoming WhatsApp message notifications' }]);
+    const ROLE_PERMISSION_PAGES = Object.freeze([...APP_PAGES, ...LuminInventoryModel.permissions, { key: 'dashboard_invoices', label: 'Dashboard invoices' }, { key: 'loyalty', label: 'Patient Loyalty tab' }, { key: 'finance_depts', label: 'Finance Depts tab' }, { key: 'whatsapp_notifications', label: 'Incoming WhatsApp message notifications' }]);
     const WHATSAPP_TEMPLATE_VARIABLES = Object.freeze([
       '{{patient_name}}',
       '{{doctor_name}}',
@@ -10874,6 +10881,11 @@
       'Clinical Chart': 'مخطط الأسنان',
       'Appointments': 'المواعيد',
       'Clinic Management': 'إدارة العيادة',
+      'Inventory': 'المخزون',
+      'Manage inventory items and categories': 'إدارة أصناف المخزون وتصنيفاته',
+      'Receive inventory stock': 'استلام المخزون',
+      'Record inventory usage': 'تسجيل استهلاك المخزون',
+      'Count and adjust inventory': 'جرد المخزون وتسويته',
       'Clinic operations': 'عمليات العيادة',
       'Finance, performance, and team information in one workspace.': 'المالية والأداء ومعلومات الفريق في مساحة عمل واحدة.',
       'Clinic management sections': 'أقسام إدارة العيادة',
@@ -11731,6 +11743,7 @@
       renderAdminAppointmentVisitTypes();
       if (typeof refreshQuotationLanguage === 'function') refreshQuotationLanguage();
       if (window.LuminClinicManagement) LuminClinicManagement.languageChanged();
+      if (window.LuminInventory) LuminInventory.languageChanged();
       if (typeof renderChartMediaPanel === 'function') renderChartMediaPanel();
       if (typeof renderChartAppointmentsPanel === 'function') renderChartAppointmentsPanel();
       if (typeof syncClinicalActionsPanel === 'function') { syncClinicalActionsPanel(); updateClinicalOperationPreview(); }
@@ -12046,6 +12059,7 @@
           || currentUserAccess.permissions.has('finances')
           || currentUserAccess.permissions.has('analytics')
           || currentUserAccess.permissions.has('hr')
+          || currentUserAccess.permissions.has('inventory')
         );
       }
       if (pageKey === 'implants') {
@@ -13188,6 +13202,7 @@
         activeFinanceTab = 'invoices';
         activeClinicManagementTab = 'overview';
         if (window.LuminClinicManagement) LuminClinicManagement.reset();
+        if (window.LuminInventory) LuminInventory.reset();
         hrDirectoryUsers = [];
         hrDirectoryLoaded = false;
         hrDirectoryLoadPromise = null;
@@ -13361,6 +13376,7 @@
         activeFinanceTab = 'invoices';
         activeClinicManagementTab = 'overview';
         if (window.LuminClinicManagement) LuminClinicManagement.reset();
+        if (window.LuminInventory) LuminInventory.reset();
         hrDirectoryUsers = [];
         hrDirectoryLoaded = false;
         hrDirectoryLoadPromise = null;
@@ -18224,6 +18240,8 @@
                   <span class="relative inline-flex shrink-0 items-center"><input data-role-finance-depts="${role.id}" type="checkbox" role="switch" ${roleHasPermission(role, 'finances') && roleShowsFinanceDepts(role) ? 'checked' : ''} ${role.is_system || !roleHasPermission(role, 'finances') ? 'disabled' : ''} class="peer sr-only" /><span class="h-5 w-9 rounded-full bg-slate-300 transition peer-checked:bg-violet-600 peer-disabled:opacity-50"></span><span class="pointer-events-none absolute left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition peer-checked:translate-x-4 peer-disabled:opacity-70"></span></span>
                 </label>
               </div>
+            ` : page.key === 'inventory' ? `
+              <div class="inv-permissions"><label><input data-role-permission="${role.id}" value="inventory" type="checkbox" ${roleHasPermission(role, 'inventory') ? 'checked' : ''} ${role.is_system ? 'disabled' : ''}>${escapeHtml(page.label)}</label>${LuminInventoryModel.permissions.map(permission => `<label><input data-role-permission="${role.id}" value="${permission.key}" type="checkbox" ${roleHasPermission(role, permission.key) ? 'checked' : ''} ${role.is_system ? 'disabled' : ''}>${escapeHtml(currentUiLanguage === 'ar' ? permission.ar : permission.label)}</label>`).join('')}</div>
             ` : page.key === 'hr' ? `
               <div class="rounded-lg border border-rose-200 bg-rose-50/50 px-3 py-2">
                 <label class="flex items-center gap-2 text-[11px] font-bold text-slate-600"><input data-role-permission="${role.id}" value="hr" type="checkbox" onchange="syncRoleHrModifyToggle('${role.id}')" ${roleHasPermission(role, page.key) ? 'checked' : ''} ${role.is_system ? 'disabled' : ''} class="h-4 w-4 rounded border-slate-300 text-rose-600" />${escapeHtml(page.label)}</label>
@@ -19123,7 +19141,7 @@
     const REALTIME_PRESCRIPTION_TABLES = new Set(['prescription_print_settings', 'medication_catalog', 'prescription_templates', 'prescriptions', 'prescription_items']);
     const REALTIME_IMPLANT_TABLES = new Set(['implant_progress']);
     const REALTIME_WHATSAPP_TABLES = new Set(['whatsapp_conversations', 'whatsapp_messages']);
-    const REALTIME_APP_TABLES = new Set(['patients', 'patient_quotations', 'appointments', 'message_templates', 'clinic_settings', 'payment_methods', ...REALTIME_PRESCRIPTION_TABLES, ...REALTIME_LOYALTY_TABLES, ...REALTIME_APPOINTMENT_CONFIGURATION_TABLES, ...REALTIME_EXPENSE_TABLES, ...REALTIME_HR_TABLES, ...REALTIME_INVOICE_TABLES, ...REALTIME_DENTAL_CUSTOMIZATION_TABLES, ...REALTIME_ACCESS_TABLES, ...REALTIME_IMPLANT_TABLES, ...REALTIME_WHATSAPP_TABLES]);
+    const REALTIME_APP_TABLES = new Set(['patients', 'patient_quotations', 'appointments', 'message_templates', 'clinic_settings', 'payment_methods', 'inventory_categories', 'inventory_items', 'inventory_movements', ...REALTIME_PRESCRIPTION_TABLES, ...REALTIME_LOYALTY_TABLES, ...REALTIME_APPOINTMENT_CONFIGURATION_TABLES, ...REALTIME_EXPENSE_TABLES, ...REALTIME_HR_TABLES, ...REALTIME_INVOICE_TABLES, ...REALTIME_DENTAL_CUSTOMIZATION_TABLES, ...REALTIME_ACCESS_TABLES, ...REALTIME_IMPLANT_TABLES, ...REALTIME_WHATSAPP_TABLES]);
 
     function setRealtimeIndicator(status) {
       const indicator = document.getElementById('sync-status');
@@ -19230,6 +19248,8 @@
             .forEach(tableName => realtimePendingTables.add(tableName));
         } else if (activeClinicManagementTab === 'hr') {
           REALTIME_HR_TABLES.forEach(tableName => realtimePendingTables.add(tableName));
+        } else if (activeClinicManagementTab === 'inventory') {
+          ['inventory_categories','inventory_items','inventory_movements'].forEach(tableName => realtimePendingTables.add(tableName));
         }
       }
       if (realtimeViewIsVisible('patients') && activePatientsTab === 'procedures') {
@@ -19311,6 +19331,7 @@
         if (invoicesChanged) dashboardInvoiceCache.clear();
         const accessChanged = [...changedTables].some(table => REALTIME_ACCESS_TABLES.has(table));
         if (accessChanged && !(await refreshCurrentAccessFromRealtime())) return;
+        if (typeof LuminInventory !== 'undefined' && (accessChanged || ['inventory_categories','inventory_items','inventory_movements'].some(table => changedTables.has(table)))) LuminInventory.invalidate();
         const adminVisible = hasPageAccess('admin') && realtimeViewIsVisible('admin');
         const refreshLoadedResourcesForAccess = accessChanged && !adminVisible;
         if (changedTables.has('clinic_settings')) {
@@ -29394,13 +29415,13 @@
     }
 
     function firstAuthorizedClinicManagementTab(preferredTab = activeClinicManagementTab) {
-      const orderedTabs = [preferredTab, 'overview', 'finances', 'analytics', 'hr'].filter(tab => ['overview', 'finances', 'analytics', 'hr'].includes(tab));
-      return orderedTabs.find((tabName, index) => orderedTabs.indexOf(tabName) === index && hasPageAccess(tabName === 'overview' ? 'clinic-management' : tabName)) || null;
+      const orderedTabs = [preferredTab, 'overview', 'finances', 'inventory', 'analytics', 'hr'].filter(tab => ['overview', 'finances', 'inventory', 'analytics', 'hr'].includes(tab));
+      return orderedTabs.find((tabName, index) => orderedTabs.indexOf(tabName) === index && (tabName === 'overview' ? ['finances','analytics','hr'].some(page => hasPageAccess(page)) : hasPageAccess(tabName))) || null;
     }
 
     async function switchClinicManagementTab(tabName, options = {}) {
       const { updateHash = true } = options;
-      const authorizedTab = ['overview', 'finances', 'analytics', 'hr'].includes(tabName) && hasPageAccess(tabName === 'overview' ? 'clinic-management' : tabName) ? tabName : firstAuthorizedClinicManagementTab();
+      const authorizedTab = ['overview', 'finances', 'inventory', 'analytics', 'hr'].includes(tabName) && (tabName === 'overview' ? ['finances','analytics','hr'].some(page => hasPageAccess(page)) : hasPageAccess(tabName)) ? tabName : firstAuthorizedClinicManagementTab();
       if (!authorizedTab) {
         const fallbackView = firstAuthorizedView();
         if (fallbackView && fallbackView !== 'clinic-management') await switchView(fallbackView);
@@ -29410,15 +29431,17 @@
       const tabStyles = {
         overview: 'text-blue-700',
         finances: 'text-emerald-700',
+        inventory: 'text-blue-700',
         analytics: 'text-indigo-700',
         hr: 'text-rose-700'
       };
-      ['overview', 'finances', 'analytics', 'hr'].forEach(candidate => {
-        const allowed = hasPageAccess(candidate === 'overview' ? 'clinic-management' : candidate);
+      ['overview', 'finances', 'inventory', 'analytics', 'hr'].forEach(candidate => {
+        const allowed = candidate === 'overview' ? ['finances','analytics','hr'].some(page => hasPageAccess(page)) : hasPageAccess(candidate);
         const isActive = candidate === authorizedTab;
         const button = document.getElementById(`clinic-management-tab-${candidate}`);
         const panel = document.getElementById(candidate === 'overview' ? 'view-clinic-overview' : `view-${candidate}`);
         if (button) {
+          button.hidden = !allowed;
           button.className = `${allowed ? '' : 'hidden '}inline-flex shrink-0 min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-[11px] font-black transition sm:px-4 sm:text-xs ${isActive ? `bg-white ${tabStyles[candidate]} shadow-xs` : 'text-slate-500 hover:bg-white/70 hover:text-slate-800'}`;
           button.setAttribute('aria-selected', isActive ? 'true' : 'false');
           button.tabIndex = allowed && isActive ? 0 : -1;
@@ -29431,9 +29454,13 @@
       }
       else if (authorizedTab === 'analytics') await refreshActiveAnalyticsTab();
       else if (authorizedTab === 'hr') await Promise.allSettled([refreshHrDirectory(), ensureDentalCustomizationLoaded()]);
+      else if (authorizedTab === 'inventory' && window.LuminInventory) { LuminInventory.init(); await LuminInventory.refresh(); }
+      if (authorizedTab !== 'inventory' && window.LuminInventory) LuminInventory.leave();
+      document.getElementById('cm-alert-bell')?.classList.toggle('hidden', !['finances','analytics','hr'].some(page => hasPageAccess(page)));
+      if (document.getElementById('cm-alert-bell')) document.getElementById('cm-alert-bell').hidden = !['finances','analytics','hr'].some(page => hasPageAccess(page));
       if (window.LuminClinicManagement) {
         LuminClinicManagement.closeAlerts(false);
-        await LuminClinicManagement.refresh();
+        if (authorizedTab !== 'inventory') await LuminClinicManagement.refresh();
       }
       if (updateHash) window.location.hash = 'clinic-management';
       lucide.createIcons();
@@ -29966,6 +29993,7 @@
     }
 
     async function switchView(viewName) {
+      if (window.LuminInventory) LuminInventory.leave();
       if (window.LuminClinicManagement) LuminClinicManagement.closeAlerts(false);
       if (typeof closeClinicalSpecialtyPicker === 'function') closeClinicalSpecialtyPicker();
       closeChartFindingDateDialog({ force: true, restoreFocus: false });
@@ -29977,7 +30005,7 @@
         activePatientsTab = 'implants';
         viewName = 'patients';
       }
-      if (['finances', 'analytics', 'hr'].includes(viewName)) {
+      if (['finances', 'inventory', 'analytics', 'hr'].includes(viewName)) {
         activeClinicManagementTab = viewName;
         viewName = 'clinic-management';
       }
