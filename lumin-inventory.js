@@ -462,7 +462,9 @@
       }else if(['receive','use'].includes(mode)){
         payload={id:item.id,revision:item.revision,quantity:model.numeric(form.get('quantity'))};
       }else if(mode==='category_save'){
-        payload={name:String(form.get('name')||'').trim(),name_ar:String(form.get('name_ar')||'').trim(),parent_id:String(form.get('parent_id')||'')};if(dialog.category){payload.id=dialog.category.id;payload.revision=dialog.category.revision;}
+        payload={name:String(form.get('name')||'').trim(),name_ar:String(form.get('name_ar')||'').trim()};
+        if(dialog.category){payload.id=dialog.category.id;payload.revision=dialog.category.revision;}
+        else payload.parent_id=String(form.get('parent_id')||'');
       }else if(mode==='category_archive'){payload={id:dialog.category.id,revision:dialog.category.revision};}
       else if(mode==='assign'){payload={category_id:String(form.get('category_id')||''),items:[...state.selected.values()].map(i=>({id:i.id,revision:i.revision}))};}
       else return;

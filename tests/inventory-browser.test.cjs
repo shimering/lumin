@@ -193,6 +193,18 @@ test('inventory page retains category context, direct stock edits, management de
   }
   await page.locator('[data-inv-action="category-add"]').click();assert.equal(await page.locator(`#inventory-overlay [name="parent_id"] option[value="${parentCategory}"]`).count(),0,'Final-level categories cannot be chosen as parents');await page.keyboard.press('Escape');await page.locator('#inv-manage-tab-categories').waitFor();
   assert.ok((await page.locator('#inv-management-panel').textContent()).includes('Restorative / Composites / Ivoclar'));
+  const renameTargets=(await db.query("select id,name,name_ar,parent_id from public.inventory_categories where id=$1 or name in ('Composites','Ivoclar')",[restorative])).rows;
+  for(const category of renameTargets){
+    const editCategory=()=>page.locator(`[data-inv-action="category-edit"][data-category="${category.id}"]`);
+    await editCategory().click();await page.locator('#inventory-overlay [name="name"]').fill('Renamed '+category.name);await page.locator('#inventory-overlay [name="name_ar"]').fill('اسم تصنيف معدل');await page.locator('#inv-dialog-submit').click();
+    await page.waitForFunction(()=>document.getElementById('inv-manage-tab-categories')||!document.getElementById('inv-dialog-error')?.hidden);
+    assert.equal(await page.locator('#inv-dialog-error:not([hidden])').count(),0,'Renaming succeeds at every category level');await page.locator('#inv-manage-tab-categories').waitFor();
+    const renamed=(await db.query('select name,name_ar,parent_id from public.inventory_categories where id=$1',[category.id])).rows[0];
+    assert.deepEqual(renamed,{name:'Renamed '+category.name,name_ar:'اسم تصنيف معدل',parent_id:category.parent_id},'Both names update while the existing parent remains unchanged');
+    const renameRequest=requests.filter(r=>r.name==='inventory_write'&&r.args.p_operation==='category_save').at(-1);
+    assert.equal(Object.hasOwn(renameRequest.args.p_payload,'parent_id'),false,'Rename never submits a parent change');
+    await editCategory().click();await page.locator('#inventory-overlay [name="name"]').fill(category.name);await page.locator('#inventory-overlay [name="name_ar"]').fill(category.name_ar);await page.locator('#inv-dialog-submit').click();await page.locator('#inv-manage-tab-categories').waitFor();
+  }
   await page.locator('#inv-manage-tab-items').click();
   await page.locator('#inv-management-search').fill('مخدر أزرق');
   await page.waitForFunction(()=>document.querySelectorAll('.inv-managed-item').length===1);

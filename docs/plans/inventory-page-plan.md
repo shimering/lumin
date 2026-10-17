@@ -1,6 +1,6 @@
 # Clinic inventory page
 
-Revision 8 removes movement tracking and import/export controls, inherits the active category on Add, and adds managed-list deletion.
+Revision 9 fixes category renaming at every hierarchy level while retaining the simplified inventory controls.
 
 ## Fields and daily use
 
@@ -10,7 +10,7 @@ Current stock has minus/plus buttons which post one unit of usage or receipt. Un
 
 Minimum is a plain numeric input in Item details. Changes wait for Save, require item-management permission, and do not change stock or post movements. An unset minimum stays blank until entered. Minimums cannot become negative. Stock units use a bilingual dropdown with common units including Box, Bottle, Pack, Piece, Roll, Tube, and Syringe. Existing spelling is preserved. A nonblank unit stays locked once the item has a known quantity.
 
-Add item defaults to the deepest active category, including either subcategory level, from both the page header and the Items manager. All items leaves the default category choice unchanged. An uncounted item's initial quantity can be entered in Item details with opening-stock permission. Existing balances change through stock controls. Manage inventory contains Categories and Items tabs. Categories support three levels (Category → Subcategory → Second subcategory), English/Arabic names, bulk assignment, and archiving unused categories. Parent filters and counts include descendants. Main category and Subcategory are separate filters; second-level subcategories appear as relative paths in the second dropdown. Changing the main filter resets the subcategory.
+Add item defaults to the deepest active category, including either subcategory level, from both the page header and the Items manager. All items leaves the default category choice unchanged. An uncounted item's initial quantity can be entered in Item details with opening-stock permission. Existing balances change through stock controls. Manage inventory contains Categories and Items tabs. Categories support three levels (Category → Subcategory → Second subcategory), English/Arabic names, bulk assignment, and archiving unused categories. Parent filters and counts include descendants. Main category and Subcategory are separate filters; second-level subcategories appear as relative paths in the second dropdown. Changing the main filter resets the subcategory. Category renaming submits only the English/Arabic names and expected revision; it leaves the parent unchanged. New categories choose their parent during creation, and existing subcategories use the separate Move action.
 
 Managers can drag a subcategory's grip to a new parent, retaining its descendants, or drag an item's photo-area grip to another category. The same grips open a Move dialog for touch and keyboard use. Main categories stay at the top level. The server checks expected revisions, active destinations, cycles, duplicate sibling names, and the full subtree's maximum depth. A transaction advisory lock serializes hierarchy changes. Item moves preserve stock quantities. Uncertain drops retry their original request identifier even after realtime refreshes.
 
