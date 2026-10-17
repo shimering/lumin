@@ -5,7 +5,7 @@
     {key:'inventory_manage',label:'Manage inventory items and categories',ar:'إدارة أصناف المخزون وتصنيفاته'},
     {key:'inventory_receive',label:'Receive inventory stock',ar:'استلام المخزون'},
     {key:'inventory_use',label:'Record inventory usage',ar:'تسجيل استهلاك المخزون'},
-    {key:'inventory_adjust',label:'Set opening stock and reverse movements',ar:'تحديد الرصيد الافتتاحي وعكس الحركات'}
+    {key:'inventory_adjust',label:'Set opening stock',ar:'تحديد الرصيد الافتتاحي'}
   ]);
   const units=Object.freeze([{"value":"Box","ar":"علبة","aliases":["boxes"]},{"value":"Bottle","ar":"زجاجة","aliases":[]},{"value":"Pack","ar":"عبوة","aliases":["packs"]},{"value":"Piece","ar":"قطعة","aliases":["pcs"]},{"value":"Roll","ar":"لفة","aliases":[]},{"value":"Tube","ar":"أنبوب","aliases":[]},{"value":"Syringe","ar":"سرنجة","aliases":[]},{"value":"Cartridge","ar":"خرطوشة","aliases":[]},{"value":"Vial","ar":"قارورة","aliases":[]},{"value":"Jar","ar":"مرطبان","aliases":[]},{"value":"Pair","ar":"زوج","aliases":[]},{"value":"Set","ar":"طقم","aliases":[]},{"value":"Bag","ar":"كيس","aliases":[]},{"value":"Kit","ar":"مجموعة","aliases":[]}]);
   function numeric(value) {

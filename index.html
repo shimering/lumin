@@ -77,10 +77,10 @@
   <script src="lumin-finance-sync.js?v=2"></script>
   <script src="lumin-cash-flow.js?v=1"></script>
   <script src="lumin-clinic-management.js?v=5"></script>
-  <script src="lumin-inventory-model.js?v=6"></script>
+  <script src="lumin-inventory-model.js?v=7"></script>
   <script src="lumin-inventory-images.js?v=4"></script>
-  <script src="lumin-inventory.js?v=9"></script>
-  <link rel="stylesheet" href="lumin-inventory.css?v=9" />
+  <script src="lumin-inventory.js?v=10"></script>
+  <link rel="stylesheet" href="lumin-inventory.css?v=10" />
   <link rel="stylesheet" href="lumin-clinic-management.css?v=4" />
   <script src="lumin-patient-scans.js?v=6"></script>
   <link rel="stylesheet" href="lumin-patient-scans.css?v=4" />
@@ -19142,7 +19142,7 @@
     const REALTIME_PRESCRIPTION_TABLES = new Set(['prescription_print_settings', 'medication_catalog', 'prescription_templates', 'prescriptions', 'prescription_items']);
     const REALTIME_IMPLANT_TABLES = new Set(['implant_progress']);
     const REALTIME_WHATSAPP_TABLES = new Set(['whatsapp_conversations', 'whatsapp_messages']);
-    const REALTIME_APP_TABLES = new Set(['patients', 'patient_quotations', 'appointments', 'message_templates', 'clinic_settings', 'payment_methods', 'inventory_categories', 'inventory_items', 'inventory_movements', ...REALTIME_PRESCRIPTION_TABLES, ...REALTIME_LOYALTY_TABLES, ...REALTIME_APPOINTMENT_CONFIGURATION_TABLES, ...REALTIME_EXPENSE_TABLES, ...REALTIME_HR_TABLES, ...REALTIME_INVOICE_TABLES, ...REALTIME_DENTAL_CUSTOMIZATION_TABLES, ...REALTIME_ACCESS_TABLES, ...REALTIME_IMPLANT_TABLES, ...REALTIME_WHATSAPP_TABLES]);
+    const REALTIME_APP_TABLES = new Set(['patients', 'patient_quotations', 'appointments', 'message_templates', 'clinic_settings', 'payment_methods', 'inventory_categories', 'inventory_items', ...REALTIME_PRESCRIPTION_TABLES, ...REALTIME_LOYALTY_TABLES, ...REALTIME_APPOINTMENT_CONFIGURATION_TABLES, ...REALTIME_EXPENSE_TABLES, ...REALTIME_HR_TABLES, ...REALTIME_INVOICE_TABLES, ...REALTIME_DENTAL_CUSTOMIZATION_TABLES, ...REALTIME_ACCESS_TABLES, ...REALTIME_IMPLANT_TABLES, ...REALTIME_WHATSAPP_TABLES]);
 
     function setRealtimeIndicator(status) {
       const indicator = document.getElementById('sync-status');
@@ -19250,7 +19250,7 @@
         } else if (activeClinicManagementTab === 'hr') {
           REALTIME_HR_TABLES.forEach(tableName => realtimePendingTables.add(tableName));
         } else if (activeClinicManagementTab === 'inventory') {
-          ['inventory_categories','inventory_items','inventory_movements'].forEach(tableName => realtimePendingTables.add(tableName));
+          ['inventory_categories','inventory_items'].forEach(tableName => realtimePendingTables.add(tableName));
         }
       }
       if (realtimeViewIsVisible('patients') && activePatientsTab === 'procedures') {
@@ -19332,7 +19332,7 @@
         if (invoicesChanged) dashboardInvoiceCache.clear();
         const accessChanged = [...changedTables].some(table => REALTIME_ACCESS_TABLES.has(table));
         if (accessChanged && !(await refreshCurrentAccessFromRealtime())) return;
-        if (typeof LuminInventory !== 'undefined' && (accessChanged || ['inventory_categories','inventory_items','inventory_movements'].some(table => changedTables.has(table)))) LuminInventory.invalidate();
+        if (typeof LuminInventory !== 'undefined' && (accessChanged || ['inventory_categories','inventory_items'].some(table => changedTables.has(table)))) LuminInventory.invalidate();
         const adminVisible = hasPageAccess('admin') && realtimeViewIsVisible('admin');
         const refreshLoadedResourcesForAccess = accessChanged && !adminVisible;
         if (changedTables.has('clinic_settings')) {

@@ -2,14 +2,14 @@
 (function (host) {
   'use strict';
   const model=host.LuminInventoryModel;
-  const state={quickQueue:[],quickBases:new Map(),quickEpoch:0,dataSequence:0,refreshRead:null,realtimeTimer:null,actor:'',token:0,historyToken:0,dialogToken:0,report:null,history:null,loading:false,historyLoading:false,saving:false,exporting:false,error:'',message:'',loadedAt:0,query:'',category:'all',status:'all',sort:'name',page:1,tab:'stock',selected:new Map(),historyPage:1,historyKind:'',historyStart:'',historyEnd:'',historyQuery:'',historyItem:'',dialog:null,pending:null,quickPending:null,timer:null,returnFocus:null,management:null,quickSaving:false,quickRefreshQueued:false};
+  const state={quickQueue:[],quickBases:new Map(),quickEpoch:0,dataSequence:0,refreshRead:null,realtimeTimer:null,actor:'',token:0,dialogToken:0,report:null,loading:false,saving:false,error:'',message:'',loadedAt:0,query:'',category:'all',status:'all',sort:'name',page:1,selected:new Map(),dialog:null,pending:null,quickPending:null,timer:null,returnFocus:null,management:null,quickSaving:false,quickRefreshQueued:false};
   const words={
-    mainCategory:['Main category','التصنيف الرئيسي'],subcategory:['Subcategory','التصنيف الفرعي'],allSubcategories:['All subcategories','كل التصنيفات الفرعية'],move:['Move','نقل'],moveItem:['Move item','نقل الصنف'],moveCategory:['Move subcategory','نقل التصنيف الفرعي'],destination:['Move to','النقل إلى'],dragHelp:['Drag items or subcategories to a category. Use the Move handle to choose a destination.','اسحب الأصناف أو التصنيفات الفرعية إلى تصنيف. استخدم زر النقل لاختيار الوجهة.'],retryMove:['Retry move','إعادة محاولة النقل'],deleteItem:['Delete item','حذف الصنف'],deleteBody:['Remove this item from inventory? Its recorded stock movements will remain in history.','هل تريد حذف هذا الصنف من المخزون؟ ستبقى حركات المخزون المسجلة في السجل.'],deletedItem:['Deleted item','صنف محذوف'],moveInvalid:['Choose another parent without creating a cycle or exceeding three category levels.','اختر تصنيفاً أباً آخر دون إنشاء حلقة أو تجاوز ثلاثة مستويات.'],moving:['Moving…','جار النقل…'],moved:['Moved successfully.','تم النقل بنجاح.'],itemMissing:['This item was deleted or is no longer available.','تم حذف هذا الصنف أو لم يعد متاحاً.'],chooseDestination:['Choose a destination','اختر وجهة النقل'],
+    mainCategory:['Main category','التصنيف الرئيسي'],subcategory:['Subcategory','التصنيف الفرعي'],allSubcategories:['All subcategories','كل التصنيفات الفرعية'],move:['Move','نقل'],moveItem:['Move item','نقل الصنف'],moveCategory:['Move subcategory','نقل التصنيف الفرعي'],destination:['Move to','النقل إلى'],dragHelp:['Drag items or subcategories to a category. Use the Move handle to choose a destination.','اسحب الأصناف أو التصنيفات الفرعية إلى تصنيف. استخدم زر النقل لاختيار الوجهة.'],retryMove:['Retry move','إعادة محاولة النقل'],deleteItem:['Delete item','حذف الصنف'],deleteBody:['Remove this item from inventory?','هل تريد حذف هذا الصنف من المخزون؟'],deletedItem:['Deleted item','صنف محذوف'],moveInvalid:['Choose another parent without creating a cycle or exceeding three category levels.','اختر تصنيفاً أباً آخر دون إنشاء حلقة أو تجاوز ثلاثة مستويات.'],moving:['Moving…','جار النقل…'],moved:['Moved successfully.','تم النقل بنجاح.'],itemMissing:['This item was deleted or is no longer available.','تم حذف هذا الصنف أو لم يعد متاحاً.'],chooseDestination:['Choose a destination','اختر وجهة النقل'],
     chooseUnit:['Choose a stock unit','اختر وحدة المخزون'],
     categoryDepth:['Choose a main category or first subcategory as the parent. A second subcategory is the final level.','اختر تصنيفاً رئيسياً أو تصنيفاً فرعياً أول كأب. التصنيف الفرعي الثاني هو المستوى الأخير.'],manageTitle:['Manage inventory','إدارة المخزون'],manageItems:['Items','الأصناف'],editItem:['Edit item','تعديل الصنف'],itemsEmpty:['No items found','لا توجد أصناف'],itemsHelp:['Add an item or try another name.','أضف صنفاً أو ابحث باسم آخر.'],
     nameEn:['English name','الاسم بالإنجليزية'],nameAr:['Arabic name','الاسم بالعربية'],nameHelp:['Enter at least one name. The app uses the available name if a translation is blank.','أدخل اسماً واحداً على الأقل. يستخدم التطبيق الاسم المتاح إذا كانت الترجمة فارغة.'],
     increase:['Increase stock by 1','زيادة المخزون بمقدار ١'],decrease:['Decrease stock by 1','خفض المخزون بمقدار ١'],unconfirmed:['The change could not be confirmed. Retry to check it safely.','تعذر تأكيد التغيير. أعد المحاولة للتحقق منه بأمان.'],retryStock:['Retry change','إعادة محاولة التغيير'],oneRequired:['At least one stock unit is needed to decrease by 1.','يلزم توفر وحدة مخزون واحدة على الأقل للخفض بمقدار ١.'],stockLimit:['The maximum stock quantity has been reached.','تم بلوغ الحد الأقصى لكمية المخزون.'],
-    inventory:['Inventory','المخزون'],subtitle:['Items, categories & daily stock movements','الأصناف والتصنيفات وحركات المخزون اليومية'],add:['Add item','إضافة صنف'],receive:['Receive stock','استلام مخزون'],use:['Record use','تسجيل استهلاك'],reverse:['Reverse movement','عكس الحركة'],refresh:['Refresh inventory','تحديث المخزون'],import:['Import CSV','استيراد CSV'],export:['Export CSV','تصدير CSV'],total:['Total items','إجمالي الأصناف'],categories:['Categories','التصنيفات'],low:['Low stock','مخزون منخفض'],out:['Out of stock','نفد المخزون'],unknown:['Not counted','لم يتم الجرد'],unconfigured:['Minimum not set','الحد الأدنى غير محدد'],healthy:['In stock','متاح'],review:['Needs review','تحتاج مراجعة'],threshold:['At or below minimum','عند الحد الأدنى أو أقل'],zero:['Recorded quantity is zero','الكمية المسجلة صفر'],all:['All items','كل الأصناف'],allstatus:['All statuses','كل الحالات'],allkinds:['All movements','كل الحركات'],items:['items','أصناف'],category:['Category','التصنيف'],manage:['Manage inventory','إدارة المخزون'],stock:['Stock','الأصناف'],movements:['Movements','حركات المخزون'],search:['Search items or categories','ابحث عن صنف أو تصنيف'],name:['Item name','اسم الصنف'],current:['Current quantity','الكمية الحالية'],minimum:['Minimum','الحد الأدنى'],unit:['Stock unit','وحدة المخزون'],unitmissing:['Unit not set','الوحدة غير محددة'],details:['Item details','تفاصيل الصنف'],close:['Close','إغلاق'],cancel:['Cancel','إلغاء'],save:['Save changes','حفظ التغييرات'],notset:['Not set','غير محدد'],uncategorized:['Uncategorized','غير مصنف'],empty:['Your inventory starts here','ابدأ بإضافة مخزون العيادة'],emptybody:['Add your first item or import a CSV to organize the clinic’s supplies.','أضف أول صنف أو استورد ملف CSV لتنظيم مستلزمات العيادة.'],nomatches:['No matching items','لا توجد أصناف مطابقة'],nomatchesbody:['Choose another category or clear the filters.','اختر تصنيفاً آخر أو امسح عوامل التصفية.'],clear:['Clear filters','مسح عوامل التصفية'],retry:['Try again','إعادة المحاولة'],loading:['Loading inventory','جار تحميل المخزون'],failed:['Could not refresh inventory. Your last successful view is still shown.','تعذر تحديث المخزون. ما زالت آخر بيانات تم تحميلها ظاهرة.'],notavailable:['Inventory is not available for this clinic yet. Contact your administrator.','المخزون غير متاح لهذه العيادة بعد. تواصل مع المسؤول.'],saved:['Inventory updated.','تم تحديث المخزون.'],offline:['Connect to the internet to save stock changes.','اتصل بالإنترنت لحفظ حركات المخزون.'],readOnly:['Read only','عرض فقط'],selected:['selected','محدد'],assign:['Assign category','تعيين التصنيف'],select:['Select item','تحديد الصنف'],selectpage:['Select this page','تحديد الصفحة'],sort:['Sort items','ترتيب الأصناف'],statussort:['Stock priority','أولوية المخزون'],namesort:['Name','الاسم'],quantitysort:['Quantity','الكمية'],previous:['Previous page','الصفحة السابقة'],next:['Next page','الصفحة التالية'],of:['of','من'],opening:['Opening quantity','الكمية الافتتاحية'],unknownhelp:['Leave blank if this item has not been counted.','اتركها فارغة إذا لم يتم جرد الصنف.'],optional:['Optional','اختياري'],needsetup:['Set the stock unit and opening count before receiving or recording use.','حدد وحدة المخزون والكمية الافتتاحية قبل الاستلام أو تسجيل الاستهلاك.'],quantity:['Quantity','الكمية'],observed:['Counted quantity','الكمية بعد الجرد'],date:['Movement date','تاريخ الحركة'],reason:['Reason','السبب'],reference:['Reference','المرجع'],before:['Before','قبل'],after:['After','بعد'],english:['Category name','اسم التصنيف'],arabic:['Arabic category name','اسم التصنيف بالعربية'],parent:['Parent category','التصنيف الرئيسي'],newcategory:['Add category','إضافة تصنيف'],editcategory:['Edit category','تعديل التصنيف'],archivecategory:['Archive category','أرشفة التصنيف'],archivecategorybody:['Archive this category? Move its active items and subcategories first.','هل تريد أرشفة التصنيف؟ انقل أصنافه وتصنيفاته الفرعية النشطة أولاً.'],file:['CSV file','ملف CSV'],importhelp:['Arabic or English columns: category, item (or English name and Arabic name), current quantity, minimum, unit. Blank quantities stay unknown. Category suggestions can be changed before import.','أعمدة عربية أو إنجليزية: التصنيف، الصنف (أو الاسم بالإنجليزية والاسم بالعربية)، الكمية الحالية، الحد الأدنى، الوحدة. الكمية الفارغة تبقى غير معروفة. يمكنك تعديل التصنيفات المقترحة قبل الاستيراد.'],importdate:['Opening balance date','تاريخ الرصيد الافتتاحي'],importready:['Review the rows, then import. Existing items are not overwritten.','راجع الصفوف ثم استوردها. لن يتم استبدال الأصناف الموجودة.'],nohistory:['No stock movements yet','لا توجد حركات مخزون بعد'],historybody:['Receipts, usage, counts and corrections will appear here.','ستظهر هنا حركات الاستلام والاستهلاك والجرد والتصحيح.'],staff:['Recorded by','سجلها'],openingkind:['Opening count','رصيد افتتاحي'],countkind:['Stock count','جرد المخزون'],receivekind:['Receipt','استلام'],usekind:['Usage','استهلاك'],wastekind:['Wastage','تالف'],reversalkind:['Reversal','عكس حركة'],start:['From','من'],end:['To','إلى'],apply:['Apply','تطبيق'],historysearch:['Search item, reference or staff','ابحث بالصنف أو المرجع أو الموظف'],showall:['All item movements','حركات كل الأصناف'],unitlocked:['A recorded unit cannot be changed after stock movements. Create a separate item for another unit.','لا يمكن تغيير الوحدة المسجلة بعد وجود حركات. أضف صنفاً منفصلاً لوحدة أخرى.'],lastloaded:['Last refreshed','آخر تحديث'],countdatehelp:['Use the date these opening balances were recorded.','اختر تاريخ تسجيل هذه الأرصدة الافتتاحية.'],itemrequired:['Choose an item','اختر صنفاً'],confirm:['Confirm','تأكيد'],bulkhelp:['Move the selected items without changing their stock balances.','انقل الأصناف المحددة دون تغيير أرصدتها.']
+    inventory:['Inventory','المخزون'],subtitle:['Clinic supplies, categories & stock levels','مستلزمات العيادة والتصنيفات وكميات المخزون'],add:['Add item','إضافة صنف'],receive:['Receive stock','استلام مخزون'],use:['Record use','تسجيل استهلاك'],refresh:['Refresh inventory','تحديث المخزون'],total:['Total items','إجمالي الأصناف'],categories:['Categories','التصنيفات'],low:['Low stock','مخزون منخفض'],out:['Out of stock','نفد المخزون'],unknown:['Not counted','لم يتم الجرد'],unconfigured:['Minimum not set','الحد الأدنى غير محدد'],healthy:['In stock','متاح'],review:['Needs review','تحتاج مراجعة'],threshold:['At or below minimum','عند الحد الأدنى أو أقل'],zero:['Recorded quantity is zero','الكمية المسجلة صفر'],all:['All items','كل الأصناف'],allstatus:['All statuses','كل الحالات'],items:['items','أصناف'],category:['Category','التصنيف'],manage:['Manage inventory','إدارة المخزون'],stock:['Stock','الأصناف'],search:['Search items or categories','ابحث عن صنف أو تصنيف'],name:['Item name','اسم الصنف'],current:['Current quantity','الكمية الحالية'],minimum:['Minimum','الحد الأدنى'],unit:['Stock unit','وحدة المخزون'],unitmissing:['Unit not set','الوحدة غير محددة'],details:['Item details','تفاصيل الصنف'],close:['Close','إغلاق'],cancel:['Cancel','إلغاء'],save:['Save changes','حفظ التغييرات'],notset:['Not set','غير محدد'],uncategorized:['Uncategorized','غير مصنف'],empty:['Your inventory starts here','ابدأ بإضافة مخزون العيادة'],emptybody:['Add your first item to organize the clinic’s supplies.','أضف أول صنف لتنظيم مستلزمات العيادة.'],nomatches:['No matching items','لا توجد أصناف مطابقة'],nomatchesbody:['Choose another category or clear the filters.','اختر تصنيفاً آخر أو امسح عوامل التصفية.'],clear:['Clear filters','مسح عوامل التصفية'],retry:['Try again','إعادة المحاولة'],loading:['Loading inventory','جار تحميل المخزون'],failed:['Could not refresh inventory. Your last successful view is still shown.','تعذر تحديث المخزون. ما زالت آخر بيانات تم تحميلها ظاهرة.'],notavailable:['Inventory is not available for this clinic yet. Contact your administrator.','المخزون غير متاح لهذه العيادة بعد. تواصل مع المسؤول.'],saved:['Inventory updated.','تم تحديث المخزون.'],offline:['Connect to the internet to save stock changes.','اتصل بالإنترنت لحفظ حركات المخزون.'],readOnly:['Read only','عرض فقط'],selected:['selected','محدد'],assign:['Assign category','تعيين التصنيف'],select:['Select item','تحديد الصنف'],selectpage:['Select this page','تحديد الصفحة'],sort:['Sort items','ترتيب الأصناف'],statussort:['Stock priority','أولوية المخزون'],namesort:['Name','الاسم'],quantitysort:['Quantity','الكمية'],previous:['Previous page','الصفحة السابقة'],next:['Next page','الصفحة التالية'],of:['of','من'],opening:['Opening quantity','الكمية الافتتاحية'],unknownhelp:['Leave blank if this item has not been counted.','اتركها فارغة إذا لم يتم جرد الصنف.'],optional:['Optional','اختياري'],needsetup:['Set the stock unit and opening count before receiving or recording use.','حدد وحدة المخزون والكمية الافتتاحية قبل الاستلام أو تسجيل الاستهلاك.'],quantity:['Quantity','الكمية'],english:['Category name','اسم التصنيف'],arabic:['Arabic category name','اسم التصنيف بالعربية'],parent:['Parent category','التصنيف الرئيسي'],newcategory:['Add category','إضافة تصنيف'],editcategory:['Edit category','تعديل التصنيف'],archivecategory:['Archive category','أرشفة التصنيف'],archivecategorybody:['Archive this category? Move its active items and subcategories first.','هل تريد أرشفة التصنيف؟ انقل أصنافه وتصنيفاته الفرعية النشطة أولاً.'],unitlocked:['A counted item’s unit cannot be changed. Create a separate item for another unit.','لا يمكن تغيير وحدة صنف تم جرده. أضف صنفاً منفصلاً لوحدة أخرى.'],lastloaded:['Last refreshed','آخر تحديث'],itemrequired:['Choose an item','اختر صنفاً'],confirm:['Confirm','تأكيد'],bulkhelp:['Move the selected items without changing their stock balances.','انقل الأصناف المحددة دون تغيير أرصدتها.']
   };
   const el=id=>document.getElementById(id);
   const isArabic=()=>typeof currentUiLanguage!=='undefined'?currentUiLanguage==='ar':document.documentElement.dir==='rtl';
@@ -83,9 +83,9 @@
   }
   function reset(){
     host.LuminInventoryImages?.clear();state.quickEpoch++;state.quickQueue=[];state.quickBases.clear();state.refreshRead=null;clearTimeout(state.realtimeTimer);
-    state.token++;state.historyToken++;clearTimeout(state.timer);closeDialog(false,true);
+    state.token++;clearTimeout(state.timer);closeDialog(false,true);
     state.management=null;
-    Object.assign(state,{actor:'',report:null,history:null,loading:false,historyLoading:false,saving:false,exporting:false,error:'',message:'',loadedAt:0,query:'',category:'all',status:'all',sort:'name',page:1,tab:'stock',historyPage:1,historyKind:'',historyStart:'',historyEnd:'',historyQuery:'',historyItem:'',pending:null,quickPending:null,quickSaving:false,quickRefreshQueued:false});
+    Object.assign(state,{actor:'',report:null,loading:false,saving:false,error:'',message:'',loadedAt:0,query:'',category:'all',status:'all',sort:'name',page:1,pending:null,quickPending:null,quickSaving:false,quickRefreshQueued:false});
     state.selected.clear();el('view-inventory')?.replaceChildren();
     state.organizePending=null;endDrag();
   }
@@ -131,13 +131,12 @@
     const navButton=(id,name,count,ico='folder')=>{const category=categories().find(c=>c.id===id),movable=category?.parent_id&&canManage;return `<div class="inv-category-node ${movable?'inv-category-movable':''}" style="--inv-category-depth:${category?model.categoryPath(category,categories()).length-1:0}" ${category?`data-inv-drop-category="${id}" data-inv-parent="${category.parent_id||''}"`:''}>${movable?dragHandle('category',id,name):''}<button type="button" class="inv-category ${category?.parent_id?'inv-category-child':''}" data-inv-category="${esc(id)}" aria-pressed="${state.category===id}">${movable?'':icon(ico)}<span>${esc(name)}</span><small>${number(count)}</small></button></div>`;};
     const categoryRows=orderedCategories();
     const catNav=navButton('all',t('all'),summary.total,'layers')+categoryRows.map(c=>navButton(c.id,categoryName(c),c.item_count,c.parent_id?'package':'folder-open')).join('')+navButton('uncategorized',t('uncategorized'),summary.uncategorized||0);
-    root.innerHTML=`<div class="inv-heading"><div><h2>${t('inventory')}</h2><p class="inv-muted">${t('subtitle')}</p></div><div class="inv-actions">${button('refresh',t('refresh'),'refresh-cw','',state.loading?'disabled':'')}${canManage?button('import',t('import'),'upload')+button('add',t('add'),'plus'):''}${capable('receive')?button('choose-receive',t('receive'),'package-plus','inv-primary'):''}</div></div>
+    root.innerHTML=`<div class="inv-heading"><div><h2>${t('inventory')}</h2><p class="inv-muted">${t('subtitle')}</p></div><div class="inv-actions">${button('refresh',t('refresh'),'refresh-cw','',state.loading?'disabled':'')}${canManage?button('add',t('add'),'plus'):''}${capable('receive')?button('choose-receive',t('receive'),'package-plus','inv-primary'):''}</div></div>
       <span id="inv-move-live" class="inv-visually-hidden" role="status" aria-live="polite"></span><div id="inv-feedback" data-signature="${esc(feedbackSignature())}">${feedbackHTML()}</div>
       <div class="inv-stats">${[['total','package',t('items')],['categories','folders',t('categories')],['low','triangle-alert',t('threshold')],['out','package-x',t('zero')]].map(([key,name,note])=>`<button type="button" class="inv-panel inv-stat" data-inv-stat="${key}"><span class="inv-stat-label">${icon(name)}${t(key)}</span><strong>${data?number(summary[key]):'—'}</strong><span class="inv-caption">${note}</span></button>`).join('')}</div>
       <div class="inv-mobile-category inv-category-filters">${categoryFilters()}</div>
       <div class="inv-workspace"><aside class="inv-panel inv-category-nav"><h3 class="inv-category-heading">${t('categories')}</h3>${catNav}${canManage?button('categories',t('manage'),'folder-pen','inv-category-manage'):''}</aside><div class="inv-content">
-        <div class="inv-tabs" role="group" aria-label="${t('inventory')}">${button('stock',t('stock'),'package','inv-tab',`aria-pressed="${state.tab==='stock'}"`)}${button('history',t('movements'),'history','inv-tab',`aria-pressed="${state.tab==='history'}"`)}${button('export',t('export'),'download','',state.exporting||!data?'disabled':'')}${!Object.values(data?.permissions||{}).some(Boolean)?`<span class="inv-pill">${t('readOnly')}</span>`:''}</div>
-        ${state.tab==='history'?renderHistory():renderStock()}
+        ${renderStock()}
         ${state.loadedAt?`<p id="inv-last-loaded" class="inv-muted">${t('lastloaded')}: ${esc(new Intl.DateTimeFormat(isArabic()?'ar-EG':'en-GB',{hour:'2-digit',minute:'2-digit'}).format(state.loadedAt))}</p>`:''}
       </div></div>`;
     feedbackMarkup.set(el('inv-feedback'),feedbackHTML());
@@ -166,16 +165,11 @@
   }
   function stockBulkHTML(){return state.selected.size?`<div class="inv-bulk"><span>${number(state.selected.size)} ${t('selected')}</span><select id="inv-bulk-category" class="inv-control" aria-label="${t('category')}">${categoryOptions('',false,false)}</select>${button('assign',t('assign'),'folder-input','',state.saving?'disabled':'')}${button('unselect',t('clear'),'x')}</div>`:'';}
   function stockEmptyKind(){return !state.report&&state.loading?'loading':state.report?.summary.total===0?'empty':'nomatches';}
-  function stockEmptyHTML(){return stockEmptyKind()==='loading'?Array.from({length:4},()=>'<div class="inv-skeleton"></div>').join(''):stockEmptyKind()==='empty'?empty(t('empty'),t('emptybody'),capable('manage')?button('add',t('add'),'plus','inv-primary')+button('import',t('import'),'upload'):''):empty(t('nomatches'),t('nomatchesbody'),button('clear',t('clear'),'filter-x'));}
-  function renderHistory(){
-    const history=state.history;
-    return `<section class="inv-panel" aria-busy="${state.historyLoading}"><div class="inv-list-heading"><h3>${t('movements')}</h3>${state.historyItem?button('all-history',t('showall'),'layers'):''}</div><div class="inv-tools"><label class="inv-search">${icon('search')}<input id="inv-history-query" type="search" maxlength="120" value="${esc(state.historyQuery)}" placeholder="${t('historysearch')}" aria-label="${t('historysearch')}"></label><div class="inv-filterbar"><select class="inv-control" id="inv-history-kind" aria-label="${t('movements')}"><option value="">${t('allkinds')}</option>${['opening','receive','use','count','waste','reversal'].map(k=>`<option value="${k}" ${state.historyKind===k?'selected':''}>${t(k+'kind')}</option>`).join('')}</select>${field(t('start'),input('start',state.historyStart,'id="inv-history-start" type="date"'))}${field(t('end'),input('end',state.historyEnd,'id="inv-history-end" type="date"'))}${button('history-apply',t('apply'),'check')}</div></div>
-      ${!history&&state.historyLoading?'<div class="inv-skeleton"></div>':history?.rows.length?`<div class="inv-movements">${history.rows.map(row=>`<article class="inv-movement"><div><strong><bdi>${esc(itemName({name:row.item_name,name_en:row.item_name_en,name_ar:row.item_name_ar}))}</bdi></strong> <span class="inv-pill">${t(row.kind+'kind')}</span><p class="inv-caption">${esc(row.movement_date)} · ${t('staff')}: ${esc(row.actor_name)}</p><p>${row.quantity>0?'+':''}${number(row.quantity)} <bdi>${esc(row.unit)}</bdi> · ${t('before')} ${number(row.before_quantity)} → ${t('after')} ${number(row.after_quantity)}</p>${row.reason?`<p>${esc(row.reason)}</p>`:''}${row.reference?`<p class="inv-caption"><bdi>${esc(row.reference)}</bdi></p>`:''}<span class="inv-caption">${esc(isArabic()&&row.category_name_ar?row.category_name_ar:row.category_name)}</span></div><div class="inv-actions">${row.item_deleted?`<span class="inv-pill">${t('deletedItem')}</span>`:button('movement-item',t('details'),'sliders-horizontal','',`data-id="${row.item_id}"`)}${!row.item_deleted&&capable('adjust')&&['receive','use','waste'].includes(row.kind)?button('reverse',t('reverse'),'undo-2','',`data-movement="${row.id}" data-id="${row.item_id}"`):''}</div></article>`).join('')}</div>`:empty(t('nohistory'),t('historybody'))}${history?pagination(history.total,state.historyPage,30,'history'):''}</section>`;
-  }
+  function stockEmptyHTML(){return stockEmptyKind()==='loading'?Array.from({length:4},()=>'<div class="inv-skeleton"></div>').join(''):stockEmptyKind()==='empty'?empty(t('empty'),t('emptybody'),capable('manage')?button('add',t('add'),'plus','inv-primary'):''):empty(t('nomatches'),t('nomatchesbody'),button('clear',t('clear'),'filter-x'));}
   const layoutSignature=report=>JSON.stringify([report?.permissions,report?.categories?.map(c=>[c.id,c.name,c.name_ar,c.parent_id,c.active])]);
   // Retain rows and controls so stock edits preserve focus, selection, and scroll.
   function syncStockView(){
-    const data=state.report,panel=el('inv-stock-panel');if(!data||!panel||state.tab!=='stock')return;
+    const data=state.report,panel=el('inv-stock-panel');if(!data||!panel)return;
     const setText=(node,value)=>{if(node&&node.textContent!==String(value))node.textContent=value;};
     const setAttr=(node,name,value)=>{if(node&&node.getAttribute(name)!==String(value))node.setAttribute(name,String(value));};
     syncFilterControls();const tbody=panel.querySelector('tbody');let addedIcons=false;
@@ -233,7 +227,7 @@
     if(addedIcons)icons();syncPhotos(el('view-inventory'),data.items);
   }
   function refresh(options={}){
-    const key=JSON.stringify([signature(),isArabic(),state.query,state.category,state.status,state.sort,state.page,state.tab]);
+    const key=JSON.stringify([signature(),isArabic(),state.query,state.category,state.status,state.sort,state.page]);
     if(state.refreshRead?.key===key&&state.refreshRead.sequence>=state.dataSequence)return state.refreshRead.promise;
     const read={key,sequence:state.dataSequence,promise:null};read.promise=loadReport(options);state.refreshRead=read;
     const done=()=>{if(state.refreshRead===read)state.refreshRead=null;};read.promise.then(done,done);return read.promise;
@@ -245,8 +239,8 @@
   async function loadReport(options={}){
     if(!allowed()||!actor()){if(state.report)reset();return;}
     const context=signature();if(state.actor&&state.actor!==context)reset();state.actor=context;
-    if(!options.force&&state.report&&Date.now()-state.loadedAt<30000){if(state.tab==='stock'&&el('inv-stock-panel'))syncStockView();else render();return;}
-    const token=++state.token,sequence=state.dataSequence;let stable=Boolean(state.report&&state.tab==='stock'&&el('inv-stock-panel'));const layout=layoutSignature(state.report);state.loading=true;if(!options.preserveError)state.error='';if(stable)syncStockView();else render();
+    if(!options.force&&state.report&&Date.now()-state.loadedAt<30000){if(el('inv-stock-panel'))syncStockView();else render();return;}
+    const token=++state.token,sequence=state.dataSequence;let stable=Boolean(state.report&&el('inv-stock-panel'));const layout=layoutSignature(state.report);state.loading=true;if(!options.preserveError)state.error='';if(stable)syncStockView();else render();
     try{
       const {data,error}=await db.rpc('get_inventory',{p_filters:{language:isArabic()?'ar':'en',query:state.query,category:state.category,status:state.status,sort:state.sort,page:state.page,size:20}});
       if(token!==state.token||context!==signature())return;
@@ -261,12 +255,6 @@
       if(!data.permissions?.manage)state.organizePending=null;
     }catch(error){if(token===state.token&&context===signature())state.error=error?.code==='PGRST202'||error?.code==='42P01'?t('notavailable'):t('failed');}
     finally{if(token===state.token&&context===signature()){state.loading=false;if(stable)syncStockView();else render();}}
-  }
-  async function loadHistory(){
-    if(!allowed()||!actor())return;const token=++state.historyToken,context=signature();state.historyLoading=true;render();
-    try{const {data,error}=await db.rpc('get_inventory_movements',{p_filters:{page:state.historyPage,item_id:state.historyItem,kind:state.historyKind,start:state.historyStart,end:state.historyEnd,query:state.historyQuery}});if(token!==state.historyToken||context!==signature())return;if(error)throw error;state.history=data;}
-    catch(error){if(token===state.historyToken&&context===signature())state.error=errorText(error);}
-    finally{if(token===state.historyToken&&context===signature()){state.historyLoading=false;render();}}
   }
   function quickStock(operation,id){
     if(state.saving||state.dialog||state.organizePending||!allowed()||!actor()||!capable(operation))return;
@@ -319,7 +307,7 @@
     if(state.pending?.fingerprint!==fingerprint)state.pending={fingerprint,id:newRequestId()};
     const requestId=state.pending.id,returnToManagement=Boolean(state.dialog?.returnManagement);let completed=false;state.saving=true;state.error='';setDialogBusy(true);
     try{const {error}=await db.rpc('inventory_write',{p_operation:operation,p_payload:payload,p_request_id:requestId});if(context!==signature())return false;if(error)throw error;
-      state.dataSequence++;state.pending=null;state.selected.clear();state.message=t('saved');closeDialog(true,true);await refresh({force:true});if(state.tab==='history')await loadHistory();completed=true;return true;
+      state.dataSequence++;state.pending=null;state.selected.clear();state.message=t('saved');closeDialog(true,true);await refresh({force:true});completed=true;return true;
     }catch(error){if(context===signature()){if(state.dialog)showDialogError(errorText(error));else{state.error=errorText(error);render();}}return false;}
     finally{if(context===signature()){state.saving=false;setDialogBusy(false);render();if(completed&&returnToManagement)openManagement();}}
   }
@@ -369,7 +357,7 @@
   function showDialogError(message){const node=el('inv-dialog-error');if(node){node.hidden=false;node.textContent=message;node.scrollIntoView({block:'nearest'});}}
   function closeDialog(restore=true,force=false){if(state.saving&&!force)return;state.dialogToken++;clearTimeout(state.management?.timer);el('inventory-overlay')?.remove();state.dialog=null;document.body.classList.remove('inventory-dialog-open');if(restore&&state.returnFocus?.isConnected)state.returnFocus.focus({preventScroll:true});state.returnFocus=null;}
   function openDialog(mode,extra={}){
-    if(state.saving)return;const previous=state.returnFocus,focused=el('inventory-overlay')?.contains(document.activeElement)?previous:document.activeElement;closeDialog(false);state.returnFocus=focused?.isConnected?focused:previous;state.dialog={mode,...extra};renderDialog();
+    if(state.saving)return;const previous=state.returnFocus,focused=el('inventory-overlay')?.contains(document.activeElement)?previous:document.activeElement;closeDialog(false);state.returnFocus=focused?.isConnected?focused:previous;state.dialog={mode,...(mode==='add'?{item:{category_id:categories().find(c=>c.active&&c.id===state.category)?.id||''}}:{}),...extra};renderDialog();
   }
   function renderDialog(){
     const dialog=state.dialog;if(!dialog)return;const mode=dialog.mode,item=dialog.item||{};let title=t(mode),body='',submit=true,wide=false;
@@ -389,8 +377,8 @@
     }else if(mode==='move_item'||mode==='move_category'){
       title=t(mode==='move_item'?'moveItem':'moveCategory');const list=mode==='move_category'?moveTargets(dialog.category):orderedCategories().filter(c=>c.id!==item.category_id);
       body=`<p class="inv-muted inv-move-name"><bdi>${esc(mode==='move_item'?itemName(item):categoryLabel(dialog.category))}</bdi></p>${field(t('destination'),`<select name="${mode==='move_item'?'category_id':'parent_id'}" class="inv-control" required><option value="">${t('chooseDestination')}</option>${list.map(c=>`<option value="${c.id}">${esc(categoryLabel(c))}</option>`).join('')}</select>`)}<p class="inv-caption">${t('dragHelp')}</p>`;submit=capable('manage')&&list.length>0;
-    }else if(['receive','use','reverse'].includes(mode)){
-      body=`<div class="inv-detail-stat"><div><strong><bdi>${esc(itemName(item))}</bdi></strong><p class="inv-muted">${t('current')}: ${number(item.quantity)} <bdi>${esc(item.unit)}</bdi></p></div></div><div class="inv-form-grid">${mode!=='reverse'?field(t('quantity'),numeric('quantity',null,true)):''}${field(t('date'),input('date',today(),`type="date" required min="2000-01-01" max="${today()}"`))}${mode==='reverse'?field(t('reason'),'<textarea class="inv-control" name="reason" maxlength="1000" required></textarea>',true):''}</div><div id="inv-balance-preview" class="inv-muted" aria-live="polite"></div>`;
+    }else if(['receive','use'].includes(mode)){
+      body=`<div class="inv-detail-stat"><div><strong><bdi>${esc(itemName(item))}</bdi></strong><p class="inv-muted">${t('current')}: ${number(item.quantity)} <bdi>${esc(item.unit)}</bdi></p></div></div><div class="inv-form-grid">${field(t('quantity'),numeric('quantity',null,true))}</div><div id="inv-balance-preview" class="inv-muted" aria-live="polite"></div>`;
     }else if(mode==='choose-receive'){
       title=t('receive');body=`<p class="inv-muted">${t('itemrequired')}</p><label class="inv-search">${icon('search')}<input id="inv-picker-search" type="search" maxlength="120" aria-label="${t('search')}" placeholder="${t('search')}"></label><div id="inv-picker-results" style="margin-top:16px"></div>`;submit=false;
     }else if(mode==='categories'){
@@ -399,30 +387,27 @@
     }else if(mode==='category_save'){
       title=t(dialog.category?'editcategory':'newcategory');const category=dialog.category||{};
       body=`<div class="inv-form-grid">${field(t('english'),input('name',category.name||'','required maxlength="80"'))}${field(t('arabic'),input('name_ar',category.name_ar||'','maxlength="80"'))}${!dialog.category?field(t('parent'),`<select name="parent_id" class="inv-control"><option value="">${t('notset')}</option>${orderedCategories().filter(c=>c.depth<2).map(c=>`<option value="${c.id}">${esc(categoryLabel(c))}</option>`).join('')}</select><span class="inv-caption">${t('categoryDepth')}</span>`,true):field(t('parent'),`<span class="inv-caption">${esc(categoryLabel(categories().find(c=>c.id===category.parent_id)))}</span>`,true)}</div>`;
-    }else if(mode==='import'){
-      wide=true;body=`<p class="inv-muted">${t('importhelp')}</p><div class="inv-form-grid" style="margin-top:16px">${field(t('file'),'<input class="inv-control" id="inv-import-file" type="file" accept=".csv,text/csv" required>')}${field(t('importdate'),input('date',today(),`type="date" required min="2000-01-01" max="${today()}"`)+`<span class="inv-caption">${t('countdatehelp')}</span>`)}</div><div id="inv-import-preview" class="inv-import-list"></div>`;
     }else if(mode==='category_archive'){
       title=t('archivecategory');body=`<p>${esc(t('archivecategorybody'))}</p>`;
     }else if(mode==='assign'){
       title=t('assign');body=`<p class="inv-muted">${number(state.selected.size)} ${t('selected')} · ${t('bulkhelp')}</p>${field(t('category'),`<select name="category_id" class="inv-control" required>${categoryOptions(dialog.category_id,false,false)}</select>`)}`;
     }
     const overlay=document.createElement('div');overlay.id='inventory-overlay';overlay.className='inv-overlay';overlay.setAttribute('role','presentation');
-    overlay.innerHTML=`<section role="dialog" aria-modal="true" aria-labelledby="inv-dialog-title" class="inv-dialog ${wide?'inv-wide':''}"><div class="inv-dialog-header"><div><h3 id="inv-dialog-title">${esc(title)}</h3>${itemName(item)?`<p class="inv-muted"><bdi>${esc(itemName(item))}</bdi></p>`:''}</div><button type="button" class="inv-icon-button" data-inv-action="close" aria-label="${t('close')}">${icon('x')}</button></div><form id="inv-dialog-form" class="inv-form"><div class="inv-dialog-body">${body}<div id="inv-dialog-error" class="inv-error" role="alert" hidden></div></div><div class="inv-dialog-footer">${mode==='edit'&&capable('manage')?button('delete-item',t('deleteItem'),'trash-2','inv-danger inv-delete-trigger'):''}${button('close',t(submit?'cancel':'close'),'x')}${submit?`<button type="submit" class="inv-button ${mode==='item_delete'?'inv-danger':'inv-primary'}" id="inv-dialog-submit">${icon(mode==='item_delete'?'trash-2':'check')}<span>${t(mode==='item_delete'?'deleteItem':mode==='move_item'||mode==='move_category'?'move':mode==='import'?'import':mode==='category_archive'?'confirm':'save')}</span></button>`:''}</div></form></section>`;
+    overlay.innerHTML=`<section role="dialog" aria-modal="true" aria-labelledby="inv-dialog-title" class="inv-dialog ${wide?'inv-wide':''}"><div class="inv-dialog-header"><div><h3 id="inv-dialog-title">${esc(title)}</h3>${itemName(item)?`<p class="inv-muted"><bdi>${esc(itemName(item))}</bdi></p>`:''}</div><button type="button" class="inv-icon-button" data-inv-action="close" aria-label="${t('close')}">${icon('x')}</button></div><form id="inv-dialog-form" class="inv-form"><div class="inv-dialog-body">${body}<div id="inv-dialog-error" class="inv-error" role="alert" hidden></div></div><div class="inv-dialog-footer">${mode==='edit'&&capable('manage')?button('delete-item',t('deleteItem'),'trash-2','inv-danger inv-delete-trigger'):''}${button('close',t(submit?'cancel':'close'),'x')}${submit?`<button type="submit" class="inv-button ${mode==='item_delete'?'inv-danger':'inv-primary'}" id="inv-dialog-submit">${icon(mode==='item_delete'?'trash-2':'check')}<span>${t(mode==='item_delete'?'deleteItem':mode==='move_item'||mode==='move_category'?'move':mode==='category_archive'?'confirm':'save')}</span></button>`:''}</div></form></section>`;
     el('inventory-overlay')?.remove();document.body.appendChild(overlay);document.body.classList.add('inventory-dialog-open');
     if(mode==='edit'&&!capable('manage'))overlay.querySelectorAll('input,select,textarea').forEach(node=>node.disabled=true);
     if((mode==='add'||mode==='edit')&&!capable('adjust'))overlay.querySelector('input[name="quantity"]')?.setAttribute('disabled','');
     if(mode==='edit'&&dialog.draft)for(const name of ['name_en','name_ar','category_id','unit','minimum','quantity']){const node=overlay.querySelector('[name="'+name+'"]');if(node&&name in dialog.draft)node.value=dialog.draft[name];}
-    if(mode==='import')el('inv-dialog-submit').disabled=true;
     icons();if(item.id)syncPhotos(overlay,[item]);requestAnimationFrame(()=>overlay.querySelector('input:not(:disabled),select:not(:disabled),textarea:not(:disabled),button:not(:disabled)')?.focus());
     if(mode==='choose-receive')void picker('');
     if(mode==='categories')renderManagementPanel();
   }
-  async function openItem(id,mode='edit',movementId='',returnManagement=false){
+  async function openItem(id,mode='edit',returnManagement=false){
     const context=signature(),token=++state.dialogToken;
     try{const{data,error}=await db.rpc('get_inventory',{p_filters:{id,page:1,size:1}});if(context!==signature()||token!==state.dialogToken||!visible())return;if(error)throw error;let item=data.items?.find(row=>row.id===id);
       if(!item){state.error=errorText({message:'INVENTORY_ITEM'});render();return;}
-      const cap=mode==='edit'?'view':mode==='receive'?'receive':mode==='use'?'use':'adjust';if(cap!=='view'&&!capable(cap))return;
-      openDialog(mode,{item,movementId,returnManagement});
+      const cap=mode==='edit'?'view':mode==='item_delete'?'manage':mode==='receive'?'receive':mode==='use'?'use':'adjust';if(cap!=='view'&&!capable(cap))return;
+      openDialog(mode,{item,returnManagement,deleteFromList:mode==='item_delete'&&returnManagement});
     }catch(error){if(context===signature()){state.error=errorText(error);render();}}
   }
   function openManagement(tab){
@@ -431,7 +416,7 @@
     if(tab)state.management.tab=tab;
     openDialog('categories');
   }
-  function dismissDialog(){if(state.saving)return;if(state.dialog?.mode==='item_delete'){const {item,returnManagement,draft}=state.dialog;openDialog('edit',{item,returnManagement,draft});}else if(state.dialog?.returnManagement)openManagement();else closeDialog();}
+  function dismissDialog(){if(state.saving)return;if(state.dialog?.mode==='item_delete'){const {item,returnManagement,draft,deleteFromList}=state.dialog;if(deleteFromList)openManagement('items');else openDialog('edit',{item,returnManagement,draft});}else if(state.dialog?.returnManagement)openManagement();else closeDialog();}
   function renderManagementPanel(){
     const manager=state.management,panel=el('inv-management-panel');if(!manager||!panel)return;
     document.querySelectorAll('.inv-management-tabs [role=tab]').forEach(node=>{const selected=node.id==='inv-manage-tab-'+manager.tab;node.setAttribute('aria-selected',String(selected));node.tabIndex=selected?0:-1;});
@@ -448,7 +433,7 @@
   function renderManagedItems(){
     const manager=state.management,root=el('inv-managed-items');if(!manager||!root)return;
     root.setAttribute('aria-busy',String(manager.loading));
-    root.innerHTML=manager.loading?'<div class="inv-skeleton"></div><div class="inv-skeleton"></div>':manager.error?`<div class="inv-error" role="alert"><span>${esc(manager.error)}</span>${button('manage-retry',t('retry'),'refresh-cw')}</div>`:manager.report?.items.length?manager.report.items.map(item=>`<div class="inv-managed-item"><div><strong><bdi>${esc(itemName(item))}</bdi></strong><span class="inv-caption">${esc(categoryName(categories().find(c=>c.id===item.category_id)))} · ${number(item.quantity)} <bdi>${esc(item.unit||t('unitmissing'))}</bdi></span></div>${button('managed-edit',t('editItem'),'pencil','',`data-id="${item.id}" aria-label="${esc(t('editItem')+': '+itemName(item))}"`)}</div>`).join('')+pagination(manager.report.total,manager.page,20,'manage'):empty(t('itemsEmpty'),t('itemsHelp'));
+    root.innerHTML=manager.loading?'<div class="inv-skeleton"></div><div class="inv-skeleton"></div>':manager.error?`<div class="inv-error" role="alert"><span>${esc(manager.error)}</span>${button('manage-retry',t('retry'),'refresh-cw')}</div>`:manager.report?.items.length?manager.report.items.map(item=>`<div class="inv-managed-item"><div><strong><bdi>${esc(itemName(item))}</bdi></strong><span class="inv-caption">${esc(categoryName(categories().find(c=>c.id===item.category_id)))} · ${number(item.quantity)} <bdi>${esc(item.unit||t('unitmissing'))}</bdi></span></div><div class="inv-actions inv-managed-actions">${button('managed-edit',t('editItem'),'pencil','',`data-id="${item.id}" aria-label="${esc(t('editItem')+': '+itemName(item))}"`)}${button('managed-delete',t('deleteItem'),'trash-2','inv-danger',`data-id="${item.id}" aria-label="${esc(t('deleteItem')+': '+itemName(item))}"`)}</div></div>`).join('')+pagination(manager.report.total,manager.page,20,'manage'):empty(t('itemsEmpty'),t('itemsHelp'));
     icons();
   }
   async function loadManagedItems(){
@@ -461,13 +446,6 @@
   }
   let pickerToken=0;
   async function picker(query){const token=++pickerToken,context=signature();try{const{data,error}=await db.rpc('get_inventory',{p_filters:{language:isArabic()?'ar':'en',query,sort:'name',page:1,size:20}});if(context!==signature()||token!==pickerToken||state.dialog?.mode!=='choose-receive')return;if(error)throw error;el('inv-picker-results').innerHTML=data.items.map(i=>`<div class="inv-category-row inv-picker-row"><div><strong><bdi>${esc(itemName(i))}</bdi></strong><p class="inv-muted">${number(i.quantity)} <bdi>${esc(i.unit||t('unitmissing'))}</bdi></p></div>${button('receive-picked',t('receive'),'package-plus','',`data-id="${i.id}" ${i.quantity==null||!i.unit?'disabled':''}`)}</div>`).join('')||empty(t('nomatches'),t('nomatchesbody'));icons();}catch(error){if(token===pickerToken)showDialogError(errorText(error));}}
-  async function previewImport(file){
-    if(!file||state.dialog?.mode!=='import')return;const dialog=state.dialog,context=signature();el('inv-dialog-submit').disabled=true;
-    try{if(file.size>1048576)throw new Error('INVENTORY_CSV_SIZE');const rows=model.parseCSV(await file.text(),categories());if(context!==signature()||state.dialog!==dialog)return;dialog.rows=rows;
-      el('inv-import-preview').innerHTML=`<p class="inv-muted">${number(rows.length)} ${t('items')} · ${t('importready')}</p>`+rows.map((row,index)=>`<div class="inv-import-row"><div><bdi>${esc(itemName(row))}</bdi><span class="inv-caption">${esc(row.unit||t('unitmissing'))}</span></div>${field(t('category'),`<select class="inv-control" data-import-category="${index}">${categoryOptions(row.category_id,true)}</select>`)}<span><span class="inv-caption">${t('current')}</span><strong>${number(row.quantity)}</strong></span><span><span class="inv-caption">${t('minimum')}</span><strong>${number(row.minimum)}</strong></span></div>`).join('');
-      el('inv-dialog-error').hidden=true;el('inv-dialog-submit').disabled=false;
-    }catch(error){if(state.dialog===dialog){dialog.rows=null;showDialogError(errorText(error));}}
-  }
   async function submit(event){
     event.preventDefault();if(state.saving||!state.dialog)return;const dialog=state.dialog,form=new FormData(event.target),mode=dialog.mode,item=dialog.item;let operation=mode,payload={};
     try{
@@ -481,22 +459,15 @@
         if(!capable('manage'))return;const category=categories().find(c=>c.id===String(form.get(mode==='move_item'?'category_id':'parent_id')||''));if(!category)throw Error('INVENTORY_CATEGORY');
         if(mode==='move_item'){operation='assign';payload={category_id:category.id,category_revision:category.revision,items:[{id:item.id,revision:item.revision}]};}
         else {operation='category_move';payload={id:dialog.category.id,revision:dialog.category.revision,parent_id:category.id,parent_revision:category.revision};}
-      }else if(['receive','use','reverse'].includes(mode)){
-        payload={id:item.id,revision:item.revision,date:String(form.get('date')||'')};if(mode==='reverse'){payload.movement_id=dialog.movementId;payload.reason=String(form.get('reason')||'').trim();}else payload.quantity=model.numeric(form.get('quantity'));
+      }else if(['receive','use'].includes(mode)){
+        payload={id:item.id,revision:item.revision,quantity:model.numeric(form.get('quantity'))};
       }else if(mode==='category_save'){
         payload={name:String(form.get('name')||'').trim(),name_ar:String(form.get('name_ar')||'').trim(),parent_id:String(form.get('parent_id')||'')};if(dialog.category){payload.id=dialog.category.id;payload.revision=dialog.category.revision;}
       }else if(mode==='category_archive'){payload={id:dialog.category.id,revision:dialog.category.revision};}
       else if(mode==='assign'){payload={category_id:String(form.get('category_id')||''),items:[...state.selected.values()].map(i=>({id:i.id,revision:i.revision}))};}
-      else if(mode==='import'){if(!dialog.rows?.length)return;payload={date:String(form.get('date')||''),rows:dialog.rows};}
       else return;
       await write(operation,payload);
     }catch(error){showDialogError(errorText(error));}
-  }
-  async function exportCSV(){
-    if(state.exporting||!allowed())return;state.exporting=true;render();const context=signature(),collected=[];
-    try{for(let page=1;page<=1000;page++){const{data,error}=await db.rpc('get_inventory',{p_filters:{language:isArabic()?'ar':'en',query:state.query,category:state.category,status:state.status,sort:'name',page,size:100}});if(context!==signature())return;if(error)throw error;collected.push(...data.items);if(collected.length>=data.total||data.items.length===0)break;}
-      const url=URL.createObjectURL(new Blob([model.csv(collected,categories())],{type:'text/csv;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download='lumin-inventory-'+today()+'.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-    }catch(error){if(context===signature())state.error=errorText(error);}finally{if(context===signature()){state.exporting=false;render();}}
   }
   function filtersChanged(){clearTimeout(state.timer);state.page=1;state.selected.clear();state.message='';void refresh({force:true});}
   function action(event){
@@ -505,7 +476,7 @@
     if(target.dataset.invCategory){state.category=target.dataset.invCategory;filtersChanged();return;}
     if(target.dataset.invStatus){state.status=target.dataset.invStatus;filtersChanged();return;}
     if(target.dataset.invItem){void openItem(target.dataset.invItem);return;}
-    if(target.dataset.invStat){const key=target.dataset.invStat;if(key==='categories'){openManagement('categories');return;}state.tab='stock';state.query='';state.category='all';state.status=key==='total'?'all':key;filtersChanged();return;}
+    if(target.dataset.invStat){const key=target.dataset.invStat;if(key==='categories'){openManagement('categories');return;}state.query='';state.category='all';state.status=key==='total'?'all':key;filtersChanged();return;}
     const name=target.dataset.invAction;
     if(name==='move-item'||name==='move-category'){if(!capable('manage')||state.saving||state.organizePending||state.quickPending)return;const category=categories().find(c=>c.id===target.dataset.id),item=state.report?.items.find(i=>i.id===target.dataset.id);if(name==='move-item'&&item)openDialog('move_item',{item});else if(name==='move-category'&&category?.parent_id)openDialog('move_category',{category,returnManagement:state.dialog?.mode==='categories'});return;}
     if(name==='delete-item'){if(capable('manage')&&state.dialog?.item)openDialog('item_delete',{item:state.dialog.item,returnManagement:state.dialog.returnManagement,draft:Object.fromEntries(new FormData(el('inv-dialog-form')))});return;}
@@ -513,29 +484,23 @@
     if(name==='close'){dismissDialog();return;}if(state.saving)return;
     if(name==='quick-receive'||name==='quick-use'){void quickStock(name==='quick-receive'?'receive':'use',target.dataset.id);return;}
     if(name==='retry-stock'){if(state.quickPending)void quickStock(state.quickPending.operation,state.quickPending.payload.id);return;}
-    if(name==='refresh'){void refresh({force:true});if(state.tab==='history')void loadHistory();return;}
+    if(name==='refresh'){void refresh({force:true});return;}
     if(name==='clear'){Object.assign(state,{query:'',category:'all',status:'all'});filtersChanged();return;}
     if(name==='unselect'){state.selected.clear();render();return;}
     if(name==='assign'){if(capable('manage')&&state.selected.size)openDialog('assign',{category_id:el('inv-bulk-category')?.value||''});return;}
-    if(name==='stock'||name==='history'){state.tab=name;if(name==='history')void loadHistory();else render();return;}
     if(name==='stock-next'||name==='stock-previous'){state.page+=name.endsWith('next')?1:-1;void refresh({force:true});return;}
-    if(name==='history-next'||name==='history-previous'){state.historyPage+=name.endsWith('next')?1:-1;void loadHistory();return;}
-    if(name==='all-history'){state.historyItem='';state.historyPage=1;void loadHistory();return;}
-    if(name==='history-apply'){state.historyKind=el('inv-history-kind').value;state.historyStart=el('inv-history-start').value;state.historyEnd=el('inv-history-end').value;state.historyQuery=el('inv-history-query').value;state.historyPage=1;void loadHistory();return;}
-    if(name==='movement-item'){void openItem(target.dataset.id);return;}
-    if(name==='reverse'){void openItem(target.dataset.id,'reverse',target.dataset.movement);return;}
     if(['receive','use','receive-picked'].includes(name)){void openItem(target.dataset.id,name==='receive-picked'?'receive':name);return;}
     if(name==='manage-categories'||name==='manage-items'){if(capable('manage')&&state.dialog?.mode==='categories'){state.management.tab=name==='manage-items'?'items':'categories';renderManagementPanel();}return;}
     if(name==='manage-next'||name==='manage-previous'){if(capable('manage')&&state.dialog?.mode==='categories'){state.management.page+=name==='manage-next'?1:-1;void loadManagedItems();}return;}
     if(name==='managed-add'){if(capable('manage'))openDialog('add',{returnManagement:true});return;}
-    if(name==='managed-edit'){if(capable('manage'))void openItem(target.dataset.id,'edit','',true);return;}
+    if(name==='managed-delete'){if(capable('manage'))void openItem(target.dataset.id,'item_delete',true);return;}
+    if(name==='managed-edit'){if(capable('manage'))void openItem(target.dataset.id,'edit',true);return;}
     if(name==='manage-retry'){void loadManagedItems();return;}
     if(name==='category-edit'||name==='category-archive'){if(capable('manage'))openDialog(name==='category-edit'?'category_save':'category_archive',{category:categories().find(c=>c.id===target.dataset.category),returnManagement:true});return;}
     if(name==='category-add'){if(capable('manage'))openDialog('category_save',{returnManagement:true});return;}
     if(name==='choose-receive'){if(capable('receive'))openDialog(name);return;}
     if(name==='categories'){openManagement();return;}
-    if(name==='add'||name==='import'){if(capable('manage'))openDialog(name);return;}
-    if(name==='export')void exportCSV();
+    if(name==='add'){if(capable('manage'))openDialog('add');return;}
   }
   function change(event){const node=event.target;
     if(node.id==='inv-mobile-category'){state.category=node.value;filtersChanged();}
@@ -543,8 +508,6 @@
     else if(node.id==='inv-sort'){state.sort=node.value;filtersChanged();}
     else if(node.dataset.invSelect){const row=state.report?.items.find(i=>i.id===node.dataset.invSelect);if(row){if(node.checked)state.selected.set(row.id,row);else state.selected.delete(row.id);render();}}
     else if(node.id==='inv-select-page'){for(const row of state.report?.items||[])if(node.checked)state.selected.set(row.id,row);else state.selected.delete(row.id);render();}
-    else if(node.id==='inv-import-file')void previewImport(node.files[0]);
-    else if(node.dataset.importCategory!=null&&state.dialog?.rows)state.dialog.rows[Number(node.dataset.importCategory)].category_id=node.value||null;
   }
   function permissionChanged(node){const group=node.closest('.inv-permissions');if(!group||node.tagName!=='INPUT')return;const view=group.querySelector('input[value="inventory"]');if(!view)return;if(node===view&&!view.checked)group.querySelectorAll('input').forEach(input=>{input.checked=false;});else if(node.checked&&model.permissions.some(p=>p.key===node.value))view.checked=true;}
   function inputChanged(event){const node=event.target;
@@ -557,7 +520,7 @@
   function init(){host.LuminInventoryImages?.init({icons,arabic:isArabic,name:itemName,uuid:newRequestId,endpoint:()=>SUPABASE_URL+'/functions/v1/inventory-images',token:async()=>{const {data}=await db.auth.getSession();return data?.session?.access_token||'';},changed:photoChanged,refresh:()=>refresh({force:true,background:true})});const root=el('view-inventory');if(!root||root.dataset.inventoryBound)return;root.dataset.inventoryBound='true';bindDrag();host.addEventListener('beforeunload',event=>{if(state.quickSaving||state.quickPending||state.quickQueue.length){event.preventDefault();event.returnValue='';}});document.addEventListener('click',event=>{if(root.contains(event.target)||el('inventory-overlay')?.contains(event.target))action(event);if(event.target===el('inventory-overlay'))dismissDialog();});document.addEventListener('change',event=>{permissionChanged(event.target);if(root.contains(event.target)||el('inventory-overlay')?.contains(event.target))change(event);});document.addEventListener('input',event=>{if(root.contains(event.target)||el('inventory-overlay')?.contains(event.target))inputChanged(event);});document.addEventListener('submit',event=>{if(event.target.id==='inv-dialog-form')void submit(event);});document.addEventListener('keydown',keydown);}
   function invalidate(){state.loadedAt=0;if(!allowed()){reset();return;}state.dataSequence++;if(state.quickSaving){state.quickRefreshQueued=true;return;}if(visible())scheduleRefresh();}
   function languageChanged(){const label=el('clinic-management-tab-inventory')?.querySelector('span');if(label)label.textContent=t('inventory');if(state.dialog)closeDialog();state.loadedAt=0;if(visible()){render();return refresh({force:true});}}
-  function leave(){state.historyToken++;pickerToken++;closeDialog(false,true);}
-  host.LuminInventory={init,refresh,reset,invalidate,languageChanged,loadHistory,leave,summary:()=>state.report?.summary||null};
+  function leave(){pickerToken++;closeDialog(false,true);}
+  host.LuminInventory={init,refresh,reset,invalidate,languageChanged,leave,summary:()=>state.report?.summary||null};
   if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',init);
 })(typeof window==='undefined'?globalThis:window);

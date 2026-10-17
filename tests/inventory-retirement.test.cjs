@@ -1,0 +1,52 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const {PGlite}=require('@electric-sql/pglite');
+const root=path.resolve(__dirname,'..'),migrationDir=path.join(root,'supabase/migrations');
+const uuid=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
+test('retiring inventory movements preserves balances, photos, permissions and safe stock retries',async t=>{
+  const db=new PGlite();t.after(()=>db.close());
+  await db.exec(fs.readFileSync(path.join(__dirname,'fixtures/inventory.sql'),'utf8'));
+  const files=fs.readdirSync(migrationDir).filter(file=>file.includes('inventory')&&file.endsWith('.sql')).sort(),retirement=files.pop();
+  assert.match(retirement,/retire_inventory_movements/);
+  for(const file of files)await db.exec(fs.readFileSync(path.join(migrationDir,file),'utf8'));
+  const actor=async n=>db.exec(`reset role;select set_config('test.actor','${n?uuid(n):''}',false);set role authenticated`);
+  let request=5000;
+  const write=async(op,payload,id=uuid(request++))=>(await db.query('select public.inventory_write($1,$2,$3) data',[op,JSON.stringify(payload),id])).rows[0].data;
+  const read=async filters=>(await db.query('select public.get_inventory($1) data',[JSON.stringify(filters||{})])).rows[0].data;
+  const item=async id=>(await read({id})).items[0];
+  await actor(1);const category=(await read()).categories.find(c=>c.active);
+  const created=await write('item_save',{name_en:'Retirement fixture',name_ar:'اختبار المخزون',category_id:category.id,unit:'Box',minimum:2,quantity:5});
+  let current=await item(created.id);const prior={id:current.id,revision:current.revision,quantity:2,date:'2026-10-16',reason:'Old client',reference:'Old reference'},retryId=uuid(request++);
+  const priorResult=await write('receive',prior,retryId);current=await item(created.id);
+  await db.exec('reset role');await db.query("insert into public.inventory_item_images(item_id,revision,drive_file_id,sha256,mime_type,byte_size,width,height,updated_by) values($1,$2,'private-drive',repeat('a',64),'image/webp',1024,960,640,$3)",[current.id,uuid(8001),uuid(1)]);
+  const before=(await db.query('select to_jsonb(i) data from public.inventory_items i order by id')).rows;
+  assert.equal((await db.query('select count(*)::int n from public.inventory_movements')).rows[0].n,2);
+  await db.exec(fs.readFileSync(path.join(migrationDir,retirement),'utf8'));
+  assert.deepEqual((await db.query('select to_jsonb(i) data from public.inventory_items i order by id')).rows,before,'Migration leaves every quantity and item revision unchanged');
+  assert.equal((await db.query("select to_regclass('public.inventory_movements') as table_name,to_regprocedure('public.get_inventory_movements(jsonb)') as rpc")).rows[0].table_name,null);
+  assert.equal((await db.query("select to_regprocedure('public.get_inventory_movements(jsonb)') as rpc")).rows[0].rpc,null);
+  assert.equal((await db.query("select count(*)::int n from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in ('public','private') and p.prosrc like '%inventory_movements%'")).rows[0].n,0,'No live function retains a movement-table dependency');
+  assert.equal((await db.query('select count(*)::int n from public.inventory_item_images')).rows[0].n,1);
+  await actor(1);assert.deepEqual(await write('receive',prior,retryId),priorResult,'Retries posted before migration remain idempotent');
+  current=await item(current.id);assert.equal(Number(current.quantity),7);assert.equal(current.image_version,uuid(8001));
+  const fresh={id:current.id,revision:current.revision,quantity:1},freshId=uuid(request++);
+  assert.equal(Number((await write('receive',fresh,freshId)).quantity),8);await write('receive',fresh,freshId);
+  current=await item(current.id);assert.equal(Number(current.quantity),8);
+  await assert.rejects(write('receive',{...fresh,quantity:2},freshId),/REQUEST_REUSED/);
+  await assert.rejects(write('use',fresh),/STALE/);
+  await assert.rejects(write('use',{id:current.id,revision:current.revision,quantity:9}),/BALANCE/);
+  await assert.rejects(write('item_save',{...current,unit:'Bottle'}),/UNIT_LOCKED/);
+  await write('use',{id:current.id,revision:current.revision,quantity:8});current=await item(current.id);assert.equal(Number(current.quantity),0);
+  await assert.rejects(write('use',{id:current.id,revision:current.revision,quantity:1}),/BALANCE/);
+  for(const operation of ['reverse','count','waste','item_archive'])await assert.rejects(write(operation,{id:current.id,revision:current.revision,quantity:1}),/ACCESS/);
+  for(const [who,operation,permitted]of [[2,'receive',false],[3,'receive',false],[4,'receive',true],[5,'receive',false],[6,'receive',false]]){
+    await actor(who);if(permitted){await write(operation,{id:current.id,revision:current.revision,quantity:1});current=await item(current.id);}else await assert.rejects(write(operation,{id:current.id,revision:current.revision,quantity:1}),/ACCESS/);
+  }
+  await actor(5);await write('use',{id:current.id,revision:current.revision,quantity:1});current=await item(current.id);
+  await actor(3);await write('item_delete',{id:current.id,revision:current.revision});assert.equal((await read()).items.length,0,'Managers can delete without stock-adjustment permission');
+  await actor(1);await assert.rejects(write('receive',{id:current.id,revision:current.revision+1,quantity:1}),/ITEM/);
+  const unknown=await write('item_save',{name:'Unknown fixture',category_id:category.id,unit:'Box',minimum:1});let opening=await item(unknown.id);
+  await assert.rejects(write('receive',{id:opening.id,revision:opening.revision,quantity:1}),/COUNT_REQUIRED/);
+  await write('item_save',{...opening,quantity:3});assert.equal(Number((await item(opening.id)).quantity),3,'Opening quantities work without history');
+  await actor(2);await assert.rejects(db.query('update public.inventory_items set quantity=99'),/permission denied/);
+  for(const who of [0,7,8]){await actor(who);await assert.rejects(read(),/ACCESS/);}
+});

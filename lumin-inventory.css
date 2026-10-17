@@ -126,6 +126,8 @@ textarea.inv-control { resize:vertical; min-height:80px; }
 .inv-managed-item>div { min-width:0; overflow-wrap:anywhere; }
 .inv-managed-item strong { font-size:14px; font-weight:600; }
 .inv-managed-item .inv-caption { margin-top:5px; }
+.inv-managed-actions { flex-wrap:nowrap; gap:8px; }
+@media(max-width:479px) { .inv-managed-item { grid-template-columns:1fr; }.inv-managed-actions { justify-content:flex-end; } }
 .inv-management-toolbar .inv-search input { min-width:0; }
 .inv-import-list { display:grid; gap:12px; margin-top:20px; }
 .inv-import-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(130px,1fr) 80px 80px; align-items:center; gap:12px; padding:12px; background:var(--inv-inner); border-radius:12px; }

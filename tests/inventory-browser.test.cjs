@@ -4,7 +4,7 @@ const model=require('../lumin-inventory-model.js'),root=path.resolve(__dirname,'
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const uuid=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
 function source(name){const start=html.search(new RegExp('    (?:async )?function '+name+'\\('));assert.ok(start>=0,name);return html.slice(start,html.indexOf('\n    }',start)+6);}
-test('inventory page uses the real SQL ledger for imports, categories, stock flows, permissions, mobile and RTL',async t=>{
+test('inventory page retains category context, direct stock edits, management deletion, photos, permissions, mobile and RTL',async t=>{
   const db=new PGlite();t.after(()=>db.close());
   await db.exec(fs.readFileSync(path.join(__dirname,'fixtures/inventory.sql'),'utf8'));
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261016203800_clinic_inventory.sql'),'utf8'));
@@ -14,6 +14,7 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017073421_inventory_category_hierarchy.sql'),'utf8'));
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017075131_inventory_item_images.sql'),'utf8'));
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017144330_inventory_organization.sql'),'utf8'));
+  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017162033_retire_inventory_movements.sql'),'utf8'));
   let queue=Promise.resolve();const requests=[];
   const browser=await chromium.launch({headless:true,channel:process.env.LUMIN_TEST_BROWSER_CHANNEL||'chrome'});t.after(()=>browser.close());
   const page=await browser.newPage({viewport:{width:1440,height:1100},reducedMotion:'reduce'});page.setDefaultTimeout(7000);
@@ -64,14 +65,9 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   assert.match(await page.locator('#view-inventory').textContent(),/Your inventory starts here/);
   const csv=process.env.LUMIN_INVENTORY_CSV?fs.readFileSync(process.env.LUMIN_INVENTORY_CSV,'utf8'):'التصنيف,الصنف,الكمية الحالية,الحد الأدنى,الوحدة,,Reference\nConsumables (مستهلكات يومية),Anasthesia (Blue),2,3,Box,,\nConsumables (مستهلكات يومية),Cotton pack,,,pack,,\nConsumables (مستهلكات يومية),Napkin,8,235,,,\nConsumables (مستهلكات يومية),Gloves,0,1,Box,,\n';
   const expected=model.parseCSV(csv);
-  await page.locator('[data-inv-action="import"]').first().click();
-  await page.locator('#inv-import-file').setInputFiles({name:'clinic.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
-  await page.waitForFunction(()=>document.querySelectorAll('.inv-import-row').length>0);
-  assert.equal(await page.locator('.inv-import-row').count(),expected.length);
-  assert.equal(await page.locator('#inventory-overlay input[name="expiry"]').count(),0);
-  await page.locator('#inv-dialog-submit').click();
-  await page.waitForFunction(()=>!document.getElementById('inventory-overlay')||!document.getElementById('inv-dialog-error')?.hidden);
-  assert.equal(await page.locator('#inventory-overlay').count(),0,JSON.stringify({error:await page.locator('#inv-dialog-error').textContent().catch(()=>''),crypto:await page.evaluate(()=>typeof crypto.randomUUID),last:requests.at(-1)}));
+  assert.equal(await page.locator('[data-inv-action="import"],.inv-content>.inv-tabs').count(),0,'Import and stock/movements/export bar are removed');
+  const fixtureRows=model.parseCSV(csv,(await db.query('select * from public.inventory_categories')).rows);
+  await page.evaluate(async rows=>{const result=await fixtureRPC('inventory_write',{p_operation:'import',p_payload:{rows},p_request_id:'00000000-0000-4000-8000-000000009990'},currentSession.user.id);if(result.error)throw Error(result.error.message);await LuminInventory.refresh({force:true});},fixtureRows);
   await page.waitForFunction(n=>document.querySelector('[data-inv-stat="total"] strong')?.textContent===String(n),expected.length);
   assert.equal(await page.locator('.inv-table tbody tr').count(),expected.length);
   assert.equal(await page.locator('#inv-sort').inputValue(),'name','Name is the default sort');
@@ -131,7 +127,7 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   assert.equal(await page.locator('#inventory-overlay [name="name_ar"]').getAttribute('dir'),'rtl');
   await page.locator('#inventory-overlay [name="name_ar"]').fill('مخدر أزرق');
   const unitSelect=page.locator('#inventory-overlay select[name="unit"]');
-  assert.equal(await unitSelect.count(),1);assert.equal(await unitSelect.isDisabled(),true,'A unit used by posted movements stays locked');
+  assert.equal(await unitSelect.count(),1);assert.equal(await unitSelect.isDisabled(),true,'A counted stock unit stays locked');
   assert.equal(await unitSelect.inputValue(),'Box');assert.equal(await unitSelect.locator('option[value="Bottle"]').count(),1);
   assert.equal(Number((await db.query('select minimum from public.inventory_items where id=$1',[anesthesiaItem])).rows[0].minimum),3,'Minimum edits wait for Save');
   if(process.env.LUMIN_INVENTORY_SCREENSHOTS)await page.locator('.inv-dialog').screenshot({path:path.join(process.env.LUMIN_INVENTORY_SCREENSHOTS,'inventory-item-details-en.png')});
@@ -158,7 +154,7 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   await page.locator('#inv-picker-results strong').filter({hasText:'Anasthesia (Blue)'}).waitFor();
   assert.equal(await page.locator('#inv-picker-results [data-inv-action="movement-item"]').count(),0,'Receive picker has no item-details action');
   await page.locator(`[data-inv-action="receive-picked"][data-id="${anesthesiaItem}"]`).click();
-  assert.equal(await page.locator('#inventory-overlay [name="reference"],#inventory-overlay [name="reason"]').count(),0,'Receive form only needs quantity and movement date');
+  assert.equal(await page.locator('#inventory-overlay [name="reference"],#inventory-overlay [name="reason"],#inventory-overlay [name="date"]').count(),0,'Receive form only needs quantity');
   await page.locator('#inventory-overlay [name="quantity"]').fill('2');
   await page.evaluate(()=>{window.dropReceiptReply=true;});
   await page.locator('#inv-dialog-submit').click();
@@ -168,13 +164,6 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   assert.equal(Number((await db.query('select quantity from public.inventory_items where id=$1',[anesthesiaItem])).rows[0].quantity),4);
   for(const quantity of [3,2,1]){await stockStep('use').click();await waitStock(quantity);}
   assert.equal(Number((await db.query('select quantity from public.inventory_items where id=$1',[anesthesiaItem])).rows[0].quantity),1);
-  await page.locator('[data-inv-action="history"]').click();
-  await page.waitForFunction(()=>document.querySelectorAll('.inv-movement').length>0);
-  assert.ok((await page.locator('.inv-movement').allTextContents()).some(text=>text.includes('Usage')));
-  await page.evaluate(async()=>{currentUiLanguage='ar';document.documentElement.dir='rtl';await LuminInventory.languageChanged();});
-  assert.ok((await page.locator('.inv-movement strong').allTextContents()).includes('مخدر أزرق'));
-  await page.evaluate(async()=>{currentUiLanguage='en';document.documentElement.dir='ltr';await LuminInventory.languageChanged();});
-  await page.locator('[data-inv-action="stock"]').click();
   await page.locator('#inv-search').fill('Napkin');
   await page.waitForFunction(()=>document.querySelector('.inv-item')?.textContent==='Napkin');
   assert.equal(await page.locator('.inv-stock-stepper:not(.inv-minimum-stepper) button:enabled').count(),0,'Missing stock units cannot be inferred');
@@ -293,6 +282,24 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   await page.waitForFunction(()=>typeof window.releaseClipboard==='function');
   await page.evaluate(async()=>{LuminInventoryImages.clear();await LuminInventory.refresh({force:true,background:true});window.releaseClipboard();await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});
   assert.equal(photoWrites.length,beforePaste+2);assert.equal(await photo.getAttribute('aria-busy'),'false');
+  const composites=(await db.query("select id from public.inventory_categories where name='Composites'")).rows[0].id;
+  for(const categoryId of [restorative,composites,parentCategory]){
+    await page.locator(`[data-inv-category="${categoryId}"]`).click();
+    await page.waitForFunction(()=>document.querySelector('#inv-stock-panel')?.getAttribute('aria-busy')==='false');
+    await page.locator('[data-inv-action="add"]').first().click();
+    assert.equal(await page.locator('#inventory-overlay [name="category_id"]').inputValue(),categoryId,'Header Add inherits the deepest active category');
+    await page.keyboard.press('Escape');
+    await page.locator('[data-inv-action="categories"]:visible').first().click();await page.locator('#inv-manage-tab-items').click();await page.locator('[data-inv-action="managed-add"]').click();
+    assert.equal(await page.locator('#inventory-overlay [name="category_id"]').inputValue(),categoryId,'Managed Add inherits the same category path');
+    await page.keyboard.press('Escape');await page.locator('#inv-management-search').waitFor();await page.keyboard.press('Escape');
+  }
+  await page.locator('[data-inv-action="add"]').first().click();await page.locator('#inventory-overlay [name="name_en"]').fill('Inherited category fixture');await page.locator('#inventory-overlay [name="unit"]').selectOption('Box');await page.locator('#inventory-overlay [name="minimum"]').fill('1');await page.locator('#inv-dialog-submit').click();await page.waitForFunction(()=>!document.getElementById('inventory-overlay'));
+  const inheritedItem=(await db.query("select id,category_id from public.inventory_items where name_en='Inherited category fixture'")).rows[0];assert.equal(inheritedItem.category_id,parentCategory);
+  await page.locator('[data-inv-action="categories"]:visible').first().click();await page.locator('#inv-manage-tab-items').click();await page.locator('#inv-management-search').fill('Inherited category fixture');await page.waitForFunction(()=>document.querySelectorAll('.inv-managed-item').length===1);
+  await page.locator('[data-inv-action="managed-delete"]').click();await page.locator('.inv-delete-copy').waitFor();await page.keyboard.press('Escape');await page.locator('#inv-management-search').waitFor();assert.equal(await page.locator('#inv-management-search').inputValue(),'Inherited category fixture','Cancel Delete returns to the Items list with its search');
+  await page.locator('[data-inv-action="managed-delete"]').click();await page.locator('#inv-dialog-submit').click();await page.locator('#inv-management-search').waitFor();await page.waitForFunction(()=>document.querySelectorAll('.inv-managed-item').length===0);
+  assert.ok((await db.query('select deleted_at from public.inventory_items where id=$1',[inheritedItem.id])).rows[0].deleted_at,'Managed-list Delete removes the selected item');
+  await page.locator('#inv-management-search').fill('');await page.keyboard.press('Escape');await page.locator('[data-inv-category="all"]').click();
   assert.equal(await page.locator('#inv-mobile-category option[value="'+surgical+'"]').count(),0,'Main dropdown contains only main categories');
   await page.locator('#inv-mobile-category').selectOption(restorative);await page.locator('#inv-subcategory option[value="'+parentCategory+'"]').waitFor({state:'attached'});
   assert.equal(await page.locator('#inv-subcategory option[value="'+parentCategory+'"]').textContent(),'Composites / Ivoclar','Second-level paths stay in the subcategory dropdown');
@@ -306,13 +313,11 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   await waitStock(1);await categoryHandle(anesthesia).dragTo(categoryTarget(consumables));
   await page.waitForFunction(({id,parent})=>document.querySelector('.inv-category-nav [data-inv-drop-category="'+id+'"]')?.dataset.invParent===parent,{id:anesthesia,parent:consumables});await waitStock(1);
   const itemHandle=()=>page.locator('[data-inv-drag-kind="item"][data-id="'+anesthesiaItem+'"]');
-  const movementCount=(await db.query('select count(*)::int n from public.inventory_movements')).rows[0].n;
   await page.evaluate(()=>{window.dropOrganizationReply=true;window.simulateInventoryRealtime=true;window.dragEvents=[];for(const name of ['dragstart','drop','dragend'])document.addEventListener(name,event=>window.dragEvents.push({name,target:event.target.outerHTML?.slice(0,180)}),true);window.moveHeading=document.querySelector('.inv-heading');window.moveStock=document.querySelector('.inv-stock-receive');});
   const firstMove=requests.length;await itemHandle().dragTo(categoryTarget(anesthesia));await page.locator('[data-inv-action="retry-move"]').waitFor().catch(async error=>{throw Error(error.message+' '+JSON.stringify({writes:requests.slice(firstMove),feedback:await page.locator('#inv-feedback').textContent(),events:await page.evaluate(()=>window.dragEvents)}));});await page.locator('[data-inv-action="retry-move"]').click();
   await page.waitForFunction(id=>document.querySelector('[data-inv-row="'+id+'"] td:nth-child(3)')?.textContent==='Anesthesia & needles',anesthesiaItem);await waitStock(1);
   const moveRequests=requests.slice(firstMove).filter(r=>r.name==='inventory_write'&&r.args.p_operation==='assign');assert.equal(moveRequests.length,2);assert.equal(moveRequests[0].args.p_request_id,moveRequests[1].args.p_request_id,'An uncertain drop retries its original request');
   assert.equal(await page.evaluate(()=>window.moveHeading.isConnected&&window.moveStock.isConnected),true,'Item moves retain the shell and stock controls');
-  assert.equal((await db.query('select count(*)::int n from public.inventory_movements')).rows[0].n,movementCount,'Drag moves never change stock history');
   await page.evaluate(()=>{window.simulateInventoryRealtime=false;});
   await page.waitForTimeout(450);await itemHandle().click();await page.locator('#inventory-overlay [name="category_id"]').selectOption(surgical);await page.locator('#inv-dialog-submit').click();await page.waitForFunction(()=>!document.getElementById('inventory-overlay'));await waitStock(1);
   assert.equal((await db.query('select category_id from public.inventory_items where id=$1',[anesthesiaItem])).rows[0].category_id,surgical,'Move control provides the same action without dragging');
@@ -418,10 +423,10 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   await page.locator('[data-inv-action="categories"]:visible').first().click();await page.locator('#inv-manage-tab-items').click();await page.locator('[data-inv-action="managed-add"]').click();
   await page.locator('#inventory-overlay [name="name_en"]').fill('Delete browser fixture');await page.locator('#inventory-overlay [name="unit"]').selectOption('Box');await page.locator('#inventory-overlay [name="minimum"]').fill('1');await page.locator('#inventory-overlay [name="quantity"]').fill('2');await page.locator('#inv-dialog-submit').click();await page.locator('#inv-management-search').waitFor();await page.keyboard.press('Escape');
   await page.locator('#inv-search').fill('Delete browser fixture');await page.waitForFunction(()=>document.querySelectorAll('.inv-item').length===1);await page.locator('.inv-item').click();
-  await page.locator('#inventory-overlay [name="name_en"]').fill('Unsaved name before deletion');await page.locator('[data-inv-action="delete-item"]').click();assert.match(await page.locator('.inv-delete-copy').textContent(),/remain in history/);await page.keyboard.press('Escape');assert.equal(await page.locator('#inventory-overlay [name="name_en"]').inputValue(),'Unsaved name before deletion','Cancel preserves the detail draft');
+  await page.locator('#inventory-overlay [name="name_en"]').fill('Unsaved name before deletion');await page.locator('[data-inv-action="delete-item"]').click();assert.match(await page.locator('.inv-delete-copy').textContent(),/Remove this item/);await page.keyboard.press('Escape');assert.equal(await page.locator('#inventory-overlay [name="name_en"]').inputValue(),'Unsaved name before deletion','Cancel preserves the detail draft');
   const deleteId=(await db.query("select id from public.inventory_items where name_en='Delete browser fixture'")).rows[0].id;
   await page.locator('[data-inv-action="delete-item"]').click();await page.evaluate(()=>{window.dropOrganizationReply=true;});await page.locator('#inv-dialog-submit').click();await page.locator('#inv-dialog-error:not([hidden])').waitFor();await page.locator('#inv-dialog-submit').click();await page.waitForFunction(()=>!document.getElementById('inventory-overlay'));
-  assert.ok((await db.query('select deleted_at from public.inventory_items where id=$1',[deleteId])).rows[0].deleted_at);assert.equal((await db.query('select count(*)::int n from public.inventory_movements where item_id=$1',[deleteId])).rows[0].n,1);
+  assert.ok((await db.query('select deleted_at from public.inventory_items where id=$1',[deleteId])).rows[0].deleted_at);assert.equal((await db.query("select to_regclass('public.inventory_movements') name")).rows[0].name,null);
   await page.locator('#inv-search').fill('');await stockStep('receive').waitFor();
   await page.evaluate(async()=>{currentSession={user:{id:'00000000-0000-4000-8000-000000000002'}};currentUserAccess={active:true,isAdmin:false,permissions:new Set(['inventory'])};LuminInventory.reset();await switchClinicManagementTab('overview');});
   assert.equal(await page.locator('#clinic-management-tab-inventory').getAttribute('aria-selected'),'true','Inventory-only staff land on their authorized tab');
