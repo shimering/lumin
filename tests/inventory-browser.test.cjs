@@ -51,7 +51,7 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   await page.addScriptTag({path:path.join(root,'vendor/lucide.min.js')});
   await page.addScriptTag({content:`
     let currentUiLanguage='en',currentSession={user:{id:'${uuid(1)}'}},currentUserAccess={active:true,isAdmin:true,permissions:new Set(['inventory','inventory_manage','inventory_receive','inventory_use','inventory_adjust'])},activeClinicManagementTab='overview',activeFinanceTab='invoices';
-    const SUPABASE_URL='https://inventory.test';let db={auth:{getSession:async()=>({data:{session:{access_token:currentSession.user.id}}})},rpc:async(name,args)=>{const result=await window.fixtureRPC(name,args,currentSession.user.id);if(name==='inventory_write'&&!result.error&&window.simulateInventoryRealtime)window.LuminInventory.invalidate();if(name==='inventory_write'&&!result.error&&window.dropOrganizationReply&&['assign','item_delete'].includes(args.p_operation)){window.dropOrganizationReply=false;return{error:{message:'Organization response lost after commit'}};}if(name==='inventory_write'&&!result.error&&window.dropReceiptReply&&args.p_operation==='receive'){window.dropReceiptReply=false;return{error:{message:'Response lost after commit'}};}return result;}};
+    const SUPABASE_URL='https://inventory.test';let db={auth:{getSession:async()=>({data:{session:{access_token:currentSession.user.id}}})},rpc:async(name,args)=>{if(name==='get_inventory'&&window.holdInventoryReads)await new Promise(resolve=>(window.inventoryReadWaiters||=[]).push(resolve));if(name==='inventory_write'&&['receive','use'].includes(args.p_operation)&&window.holdStockWrites)await new Promise(resolve=>(window.stockWriteWaiters||=[]).push(resolve));const result=await window.fixtureRPC(name,args,currentSession.user.id);if(name==='get_inventory'&&window.holdInventoryReplies)await new Promise(resolve=>(window.inventoryReplyWaiters||=[]).push(resolve));if(name==='inventory_write'&&!result.error&&window.simulateInventoryRealtime)window.LuminInventory.invalidate();if(name==='inventory_write'&&!result.error&&window.dropOrganizationReply&&['assign','item_delete'].includes(args.p_operation)){window.dropOrganizationReply=false;return{error:{message:'Organization response lost after commit'}};}if(name==='inventory_write'&&!result.error&&window.dropReceiptReply&&args.p_operation==='receive'){window.dropReceiptReply=false;return{error:{message:'Response lost after commit'}};}return result;}};
     function firstAuthorizedView(){return 'clinic-management'}
     function hrClinicDateValue(){return '2026-10-16'}
     async function switchFinanceTab(){}async function refreshActiveAnalyticsTab(){}async function refreshHrDirectory(){}async function ensureDentalCustomizationLoaded(){}
@@ -81,13 +81,13 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   const anesthesiaItem=(await db.query("select id from public.inventory_items where name='Anasthesia (Blue)'")).rows[0].id;
   const stockStep=operation=>page.locator(`#inv-stock-${operation}-${anesthesiaItem}`);
   const waitStock=async quantity=>{
-    await page.waitForFunction(({id,quantity})=>{const node=document.getElementById('inv-stock-receive-'+id);return node&&!node.disabled&&node.parentElement.querySelector('.inv-number').textContent.replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632))===String(quantity);},{id:anesthesiaItem,quantity});
+    await page.waitForFunction(({id,quantity})=>{const node=document.getElementById('inv-stock-receive-'+id);return node&&!node.disabled&&node.parentElement.getAttribute('aria-busy')!=='true'&&node.parentElement.querySelector('.inv-number').textContent.replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632))===String(quantity);},{id:anesthesiaItem,quantity});
     assert.equal(Number((await db.query('select quantity from public.inventory_items where id=$1',[anesthesiaItem])).rows[0].quantity),quantity);
   };
   const firstQuickWrite=requests.length;
-  await page.evaluate(id=>{window.dropReceiptReply=true;document.getElementById('inv-stock-receive-'+id).click();document.getElementById('inv-stock-receive-'+id).click();},anesthesiaItem);
+  await page.evaluate(id=>{window.dropReceiptReply=true;document.getElementById('inv-stock-receive-'+id).click();},anesthesiaItem);
   await page.waitForFunction(()=>document.querySelector('#view-inventory [data-inv-action="retry-stock"]')&&!document.querySelector('.inv-stock-stepper[aria-busy="true"]'));
-  assert.equal(requests.slice(firstQuickWrite).filter(r=>r.name==='inventory_write').length,1,'Rapid clicks post once');
+  assert.equal(requests.slice(firstQuickWrite).filter(r=>r.name==='inventory_write').length,1,'An uncertain request posts once until explicitly retried');
   await page.evaluate(()=>LuminInventory.refresh({force:true}));
   await waitStock(3);
   await stockStep('receive').click();await waitStock(3);
@@ -104,7 +104,8 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   },anesthesiaItem);
   for(const quantity of [2,1,0]){await stockStep('use').click();await waitStock(quantity);}
   assert.equal(await stockStep('use').isDisabled(),true,'Zero stock cannot be decreased');
-  assert.equal(Number(await page.locator('[data-inv-stat="out"] strong').textContent()),(await db.query('select count(*)::int n from public.inventory_items where quantity=0')).rows[0].n,'Summary counts update in place');
+  const expectedOut=(await db.query('select count(*)::int n from public.inventory_items where quantity=0')).rows[0].n;await page.waitForFunction(expected=>Number(document.querySelector('[data-inv-stat="out"] strong').textContent)===expected,expectedOut);
+  assert.equal(Number(await page.locator('[data-inv-stat="out"] strong').textContent()),expectedOut,'Summary counts update in place');
   for(const quantity of [1,2]){await stockStep('receive').click();await waitStock(quantity);}
   const stable=await page.evaluate(()=>{const n=window.stockStableNodes;window.stockObserver.disconnect();window.simulateInventoryRealtime=false;return{changes:window.stockRootChanges,connected:[n.heading,n.search,n.row,n.button,n.number,n.summary].every(node=>node.isConnected),scroll:Math.abs(window.scrollY-n.scroll),top:Math.abs(n.button.getBoundingClientRect().top-n.top)};});
   assert.equal(stable.changes,0,'Stock clicks and their realtime events never replace the page shell');
@@ -280,6 +281,59 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   await page.evaluate(()=>{window.simulateInventoryRealtime=false;});
   await page.waitForTimeout(450);await itemHandle().click();await page.locator('#inventory-overlay [name="category_id"]').selectOption(surgical);await page.locator('#inv-dialog-submit').click();await page.waitForFunction(()=>!document.getElementById('inventory-overlay'));await waitStock(1);
   assert.equal((await db.query('select category_id from public.inventory_items where id=$1',[anesthesiaItem])).rows[0].category_id,surgical,'Move control provides the same action without dragging');
+  // Delay responses to reproduce the visible refresh loops on a real connection.
+  await page.evaluate(()=>{
+    window.holdInventoryReads=true;window.inventoryReadWaiters=[];
+    window.stableFilters={main:document.getElementById('inv-mobile-category'),sub:document.getElementById('inv-subcategory'),mainOption:document.querySelector('#inv-mobile-category option[value="all"]'),search:document.getElementById('inv-search'),sort:document.getElementById('inv-sort'),icon:document.querySelector('#view-inventory svg')};
+    window.filterRootChanges=0;window.filterObserver=new MutationObserver(records=>window.filterRootChanges+=records.length);window.filterObserver.observe(document.getElementById('view-inventory'),{childList:true});
+  });
+  await page.locator('#inv-mobile-category').selectOption(restorative);await page.locator('#inv-subcategory').selectOption(parentCategory);
+  await page.locator('#inv-mobile-category').selectOption(consumables);await page.locator('#inv-subcategory').selectOption(surgical);
+  await page.evaluate(()=>{void LuminInventory.refresh({force:true});void LuminInventory.refresh({force:true});});
+  assert.equal(await page.evaluate(()=>window.inventoryReadWaiters.length),4,'Identical in-flight filter reads are shared');
+  await page.evaluate(()=>{window.holdInventoryReads=false;window.inventoryReadWaiters.splice(0).reverse().forEach(resolve=>resolve());});
+  await page.waitForFunction(()=>document.querySelector('#inv-stock-panel')?.getAttribute('aria-busy')==='false');
+  assert.equal(await page.locator('#inv-mobile-category').inputValue(),consumables);assert.equal(await page.locator('#inv-subcategory').inputValue(),surgical);
+  assert.deepEqual(await page.evaluate(()=>{window.filterObserver.disconnect();return{same:Object.values(window.stableFilters).every(node=>node.isConnected),changes:window.filterRootChanges};}),{same:true,changes:0},'Out-of-order category responses preserve both dropdowns, options, icons and the page shell');
+  await page.locator('#inv-mobile-category').selectOption('all');await waitStock(1);
+  await page.evaluate(id=>{
+    window.holdStockWrites=true;window.stockWriteWaiters=[];window.inventoryReadWaiters=[];document.body.classList.add('lumin-raised');
+    const plus=document.getElementById('inv-stock-receive-'+id),minus=document.getElementById('inv-stock-use-'+id);
+    window.burstNodes={plus,minus,icon:plus.querySelector('svg'),photoIcon:document.querySelector('[data-inv-row="'+id+'"] .inv-photo svg'),main:document.getElementById('inv-mobile-category')};
+    window.burstStyle={opacity:getComputedStyle(plus).opacity,shadow:getComputedStyle(plus).boxShadow};window.burstValues=[];
+    for(const operation of ['receive','receive','receive','use','use','use']){document.getElementById('inv-stock-'+operation+'-'+id).click();window.burstValues.push(plus.parentElement.querySelector('.inv-number').textContent);}
+  },anesthesiaItem);
+  assert.deepEqual(await page.evaluate(()=>window.burstValues),['2','3','4','3','2','1'],'Every rapid click updates the visible quantity immediately');
+  assert.equal(await page.evaluate(()=>window.stockWriteWaiters.length),1,'Stock writes are serialized');
+  assert.equal(await page.evaluate(()=>{const event=new Event('beforeunload',{cancelable:true});window.dispatchEvent(event);return event.defaultPrevented;}),true,'Leaving the page warns while accepted stock clicks are still unsaved');
+  assert.deepEqual(await page.evaluate(()=>({enabled:!burstNodes.plus.disabled&&!burstNodes.minus.disabled,same:Object.values(burstNodes).every(node=>node.isConnected),opacity:getComputedStyle(burstNodes.plus).opacity===burstStyle.opacity,shadow:getComputedStyle(burstNodes.plus).boxShadow===burstStyle.shadow})),{enabled:true,same:true,opacity:true,shadow:true},'In-flight stock changes do not dim, depress or replace controls and icons');
+  const burstStart=requests.length;await page.evaluate(()=>{window.holdInventoryReads=true;window.holdStockWrites=false;window.stockWriteWaiters.splice(0).forEach(resolve=>resolve());});await waitStock(1);
+  assert.equal(requests.slice(burstStart).filter(r=>r.name==='inventory_write').length,6,'Every accepted click is recorded once');
+  await page.waitForFunction(()=>window.inventoryReadWaiters.length>0);
+  assert.equal(await stockStep('receive').isEnabled(),true,'Reconciliation reads do not lock stock controls');
+  await stockStep('receive').click();await waitStock(2);
+  await page.evaluate(()=>{window.holdInventoryReads=false;window.inventoryReadWaiters.splice(0).forEach(resolve=>resolve());});
+  await stockStep('use').click();await waitStock(1);
+  assert.equal(await page.evaluate(()=>Object.values(burstNodes).every(node=>node.isConnected)),true,'Delayed read replies keep the same stock, photo and dropdown nodes');await page.evaluate(()=>document.body.classList.remove('lumin-raised'));
+  const uncertainStart=requests.length;
+  await page.evaluate(id=>{window.holdStockWrites=true;window.stockWriteWaiters=[];window.dropReceiptReply=true;const button=document.getElementById('inv-stock-receive-'+id);button.click();button.click();},anesthesiaItem);
+  await page.evaluate(()=>{window.holdStockWrites=false;window.stockWriteWaiters.splice(0).forEach(resolve=>resolve());});await page.locator('[data-inv-action="retry-stock"]').waitFor();
+  assert.equal(Number((await db.query('select quantity from public.inventory_items where id=$1',[anesthesiaItem])).rows[0].quantity),2,'A lost reply stops the remaining queue until confirmation');
+  await page.locator('[data-inv-action="retry-stock"]').click();await waitStock(3);
+  const uncertainWrites=requests.slice(uncertainStart).filter(r=>r.name==='inventory_write');assert.equal(uncertainWrites.length,3);assert.equal(uncertainWrites[0].args.p_request_id,uncertainWrites[1].args.p_request_id);assert.notEqual(uncertainWrites[1].args.p_request_id,uncertainWrites[2].args.p_request_id,'Only the unsent second click gets a new request');
+  await page.evaluate(id=>{document.getElementById('inv-stock-use-'+id).click();document.getElementById('inv-stock-use-'+id).click();},anesthesiaItem);await waitStock(1);
+  const beforeConflict=(await db.query('select revision from public.inventory_items where id=$1',[anesthesiaItem])).rows[0];
+  await page.evaluate(async({id,revision,request})=>{const result=await window.fixtureRPC('inventory_write',{p_operation:'receive',p_payload:{id,revision,quantity:1},p_request_id:request},currentSession.user.id);if(result.error)throw Error(result.error.message);},{id:anesthesiaItem,revision:beforeConflict.revision,request:uuid(9001)});
+  const conflictStart=requests.length;await page.evaluate(id=>{window.holdStockWrites=true;window.stockWriteWaiters=[];const plus=document.getElementById('inv-stock-receive-'+id);plus.click();plus.click();plus.click();window.holdStockWrites=false;window.stockWriteWaiters.splice(0).forEach(resolve=>resolve());},anesthesiaItem);await waitStock(2);
+  assert.equal(requests.slice(conflictStart).filter(r=>r.name==='inventory_write').length,1,'A stale revision cancels unsent clicks instead of rebasing them onto another user’s change');assert.match(await page.locator('#view-inventory [role="alert"]').textContent(),/record changed/);
+  await stockStep('use').click();await waitStock(1);
+  assert.equal(await page.evaluate(()=>{const event=new Event('beforeunload',{cancelable:true});window.dispatchEvent(event);return event.defaultPrevented;}),false,'Confirmed stock changes do not block navigation');
+  await page.evaluate(()=>{window.holdInventoryReplies=true;window.inventoryReplyWaiters=[];void LuminInventory.refresh({force:true});});await page.waitForFunction(()=>window.inventoryReplyWaiters.length===1);
+  const realtimeBase=(await db.query('select revision from public.inventory_items where id=$1',[anesthesiaItem])).rows[0];
+  await page.evaluate(async({id,revision,request})=>{await window.fixtureRPC('inventory_write',{p_operation:'receive',p_payload:{id,revision,quantity:1},p_request_id:request},currentSession.user.id);window.holdInventoryReplies=false;LuminInventory.invalidate();},{id:anesthesiaItem,revision:realtimeBase.revision,request:uuid(9002)});
+  await waitStock(2);await page.evaluate(()=>window.inventoryReplyWaiters.splice(0).forEach(resolve=>resolve()));
+  assert.equal(await stockStep('receive').locator('..').locator('.inv-number').textContent(),'2','An older read cannot undo a newer realtime update');
+  await stockStep('use').click();await waitStock(1);
   for(const language of ['en','ar'])for(const width of [320,390,480,820,1024,1440]){
     await page.setViewportSize({width,height:1100});
     await page.evaluate(async lang=>{currentUiLanguage=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';await LuminInventory.languageChanged();},language);

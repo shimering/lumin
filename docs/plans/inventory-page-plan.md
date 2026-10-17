@@ -1,6 +1,6 @@
 # Clinic inventory page
 
-Revision 5 adds separate category filters, drag-and-drop organization, and catalog deletion.
+Revision 6 keeps filtering and stock edits stable under slow network responses.
 
 ## Fields and daily use
 
@@ -38,8 +38,10 @@ Apply inventory migrations in order, including simplify_inventory_items, retire_
 
 ## Layout and verification
 
-Desktop uses a responsive photo-card grid and category navigation. Tablet uses the category selector. Mobile uses a single card column and bottom sheets. Category and name share a row; current stock, unit/status, and minimum share the next row. Controls have at least 44 by 44 pixel touch targets; current-stock controls retain minus, number, plus order in English and Arabic. Name is the default sort. Stock changes and their realtime notifications patch existing rows and controls, preserving scroll, focus and selection.
+Desktop uses a responsive photo-card grid and category navigation. Tablet uses the category selectors. Mobile uses a single card column and bottom sheets. Category and name share a row; current stock, unit/status, and minimum share the next row. Controls have at least 44 by 44 pixel touch targets; current-stock controls retain minus, number, plus order in English and Arabic. Name is the default sort. Category changes retain both native select elements, their unchanged options, the search field, and the page shell. Empty results update the content area without replacing its controls. Identical in-flight reads are shared and stale filter responses are ignored.
 
-Integration checks cover permissions, imported blanks, duplicate prevention, safe retries after lost responses, rapid clicks, stale revisions, opening stock, minimum limits, schema cleanup, hierarchy paths/filtering, photo compression, private access, replacement/removal, and mobile/RTL stability. Drive endpoint tests use a local Google mock; live deployment checks cover authentication and database permissions.
+Stock clicks update quantities and statuses immediately. Accepted clicks enter a serial queue using the latest confirmed revision, without dimming buttons or waiting for report refreshes. A lost response retains its request ID and pauses unsent clicks until explicit retry; a stale revision cancels unsent clicks for review. Realtime events are coalesced into quiet reconciliation reads that do not lock controls. Navigation warns while stock clicks remain unsaved. Stock changes retain existing rows, icons and photo elements, preserving scroll, focus and selection. Inventory icon rendering targets only new placeholders, avoiding Lucide's repeated replacement of existing SVGs across the application.
+
+Integration checks cover permissions, imported blanks, duplicate prevention, safe retries after lost responses, rapid queued clicks, stale revisions, opening stock, minimum limits, schema cleanup, hierarchy paths/filtering, photo compression, private access, replacement/removal, and mobile/RTL stability. Delayed write/read tests verify immediate quantity updates, unchanged button appearance, persistent dropdown/icon nodes, safe queue recovery, and out-of-order filter replies. Drive endpoint tests use a local Google mock; live deployment checks cover authentication and database permissions.
 
 Purchasing, unit conversion, valuation, and automatic treatment consumption remain later phases.

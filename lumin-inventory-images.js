@@ -18,21 +18,23 @@
     if(!response.ok){const data=await response.json().catch(()=>({}));throw Object.assign(Error(),{code:response.status===401?'invalid_session':response.status===403?'access_denied':['not_connected','not_configured','reconnect_required'].includes(data.code)?'drive_not_connected':data.code||'saveFailed'});}
     return method==='GET'?response.blob():response.json();
   }
-  function paint(id){
+  function paint(id,renderIcons=true){
     const record=records.get(id);if(!record)return;const {item,manage}=record,source=cache.get(key(item)),error=errors.get(id),saving=busy.has(id),retry=pending.has(id),lang=config.arabic();
+    let changed=false;
     for(const node of frames(id)){
       const signature=JSON.stringify([item.image_version,source,error,saving,retry,manage,lang,config.name(item)]);if(node.dataset.photoState===signature)continue;node.dataset.photoState=signature;
+      changed=true;
       node.setAttribute('aria-busy',String(saving));node.setAttribute('aria-label',config.name(item));
       const controls=item.image_version&&manage?`<div class="inv-photo-actions"><button type="button" class="inv-icon-button" data-inv-photo-action="choose" aria-label="${t('change')}" title="${t('change')}" ${saving?'disabled':''}>${icon('image-up')}</button>${node.classList.contains('inv-photo-detail')?`<button type="button" class="inv-icon-button inv-danger" data-inv-photo-action="remove" aria-label="${t('remove')}" ${saving?'disabled':''}>${icon('trash-2')}</button>`:''}</div>`:'';
       node.innerHTML=(source?`<img src="${source}" alt="${esc(config.name(item))}" draggable="false" loading="lazy" decoding="async" width="${item.image_width||960}" height="${item.image_height||540}">`:item.image_version?`<div class="inv-photo-loading" ${error?'':'aria-hidden="true"'}>${error?'':icon('image')}</div>`:manage?`<button type="button" class="inv-photo-add" data-inv-photo-action="choose" ${saving?'disabled':''}>${icon('image-plus')}<span>${t('add')}</span></button>`:`<div class="inv-photo-empty">${icon('image')}<span>${t('empty')}</span></div>`)+controls+(saving?`<div class="inv-photo-progress" role="status">${t('saving')}</div>`:error?`<div class="inv-photo-error" role="alert"><span>${esc(t(error))}</span>${retry||item.image_version?`<button type="button" class="inv-button" data-inv-photo-action="retry">${icon('refresh-cw')}<span>${t(retry?'retry':'load')}</span></button>`:''}</div>`:'');
       if(item.image_version&&!source&&!error&&!saving){if(observer)observer.observe(node);else void load(id);}
     }
-    if(host.lucide)host.lucide.createIcons();
+    if(changed&&renderIcons)config.icons?.();return changed;
   }
   function sync(root,items,manage){
     if(!config||!root)return;
     if(!observer&&typeof IntersectionObserver!=='undefined')observer=new IntersectionObserver(entries=>{for(const entry of entries)if(entry.isIntersecting){observer.unobserve(entry.target);void load(entry.target.dataset.invPhoto);}},{rootMargin:'160px'});
-    for(const item of items||[]){if(!root.querySelector(`[data-inv-photo="${item.id}"]`))continue;records.set(item.id,{item:{...item},manage});paint(item.id);}
+    let changed=false;for(const item of items||[]){if(!root.querySelector(`[data-inv-photo="${item.id}"]`))continue;records.set(item.id,{item:{...item},manage});if(paint(item.id,false))changed=true;}if(changed)config.icons?.();
   }
   async function load(id){
     const item=records.get(id)?.item;if(!item?.image_version||cache.has(key(item))||loading.has(key(item)))return;
