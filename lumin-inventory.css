@@ -266,8 +266,8 @@ textarea.inv-control { resize:vertical; min-height:80px; }
   #inv-stock-panel[data-picture-size=small] td:nth-child(5) { grid-column:4; grid-row:3; border-top:1px solid var(--inv-line); }
   #inv-stock-panel[data-picture-size=small] td:nth-child(6) { grid-column:4; grid-row:2; }
 }
-/* Four Medium cards fit iPad portrait and landscape widths. */
-@media(min-width:768px) and (max-width:1366px) {
+/* Medium keeps four columns across tablet and larger landscape viewports. */
+@media(min-width:768px) {
   #inv-stock-panel[data-picture-size=medium] tbody { grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
   #inv-stock-panel[data-picture-size=medium] tr { grid-template-columns:44px minmax(0,1fr) 44px; }
   #inv-stock-panel[data-picture-size=medium] td:nth-child(2) { grid-column:2/-1; padding-inline-end:8px; }

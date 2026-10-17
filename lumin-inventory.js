@@ -151,7 +151,7 @@
     const table=picturePanel?.querySelector('tbody');if(!table)return;
     const style=getComputedStyle(table),gap=parseFloat(style.columnGap)||0,available=table.clientWidth-(parseFloat(style.paddingInlineStart)||0)-(parseFloat(style.paddingInlineEnd)||0);
     const columns=host.innerWidth<768?1:Math.max(1,Math.min(table.rows.length||1,Math.floor((available+gap)/(340+gap))));
-    const largeWidth=Math.max(0,(available-gap*(columns-1))/columns-2),mediumWidth=host.innerWidth>=768&&host.innerWidth<=1366?Math.min(largeWidth/2,Math.max(0,(available-gap*3)/4-2)):largeWidth/2;
+    const largeWidth=Math.max(0,(available-gap*(columns-1))/columns-2),mediumWidth=host.innerWidth>=768?Math.min(largeWidth/2,Math.max(0,(available-gap*3)/4-2)):largeWidth/2;
     for(const [name,width]of [['--inv-large-photo-width',largeWidth],['--inv-medium-photo-width',mediumWidth]]){const value=width+'px';if(table.style.getPropertyValue(name)!==value)table.style.setProperty(name,value);}
   }
   function syncPictureView(){
