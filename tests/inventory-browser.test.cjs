@@ -51,6 +51,8 @@ test('inventory page retains category context, direct stock edits, management de
   for(const file of ['lumin-app.css','lumin-theme.css','lumin-clinic-management.css','lumin-inventory.css'])await page.addStyleTag({path:path.join(root,file)});
   await page.addScriptTag({path:path.join(root,'vendor/lucide.min.js')});
   await page.addScriptTag({content:`
+    window.inventoryViewPreferences=new Map([['lumin.inventory.pictureSize','invalid']]);
+    Object.defineProperty(window,'localStorage',{configurable:true,value:{getItem:key=>window.inventoryViewPreferences.get(key)||null,setItem:(key,value)=>window.inventoryViewPreferences.set(key,value)}});
     let currentUiLanguage='en',currentSession={user:{id:'${uuid(1)}'}},currentUserAccess={active:true,isAdmin:true,permissions:new Set(['inventory','inventory_manage','inventory_receive','inventory_use','inventory_adjust'])},activeClinicManagementTab='overview',activeFinanceTab='invoices';
     const SUPABASE_URL='https://inventory.test';let db={auth:{getSession:async()=>({data:{session:{access_token:currentSession.user.id}}})},rpc:async(name,args)=>{if(name==='get_inventory'&&window.holdInventoryReads)await new Promise(resolve=>(window.inventoryReadWaiters||=[]).push(resolve));if(name==='inventory_write'&&['receive','use'].includes(args.p_operation)&&window.holdStockWrites)await new Promise(resolve=>(window.stockWriteWaiters||=[]).push(resolve));const result=await window.fixtureRPC(name,args,currentSession.user.id);if(name==='get_inventory'&&window.holdInventoryReplies)await new Promise(resolve=>(window.inventoryReplyWaiters||=[]).push(resolve));if(name==='inventory_write'&&!result.error&&window.simulateInventoryRealtime)window.LuminInventory.invalidate();if(name==='inventory_write'&&!result.error&&window.dropOrganizationReply&&['assign','item_delete'].includes(args.p_operation)){window.dropOrganizationReply=false;return{error:{message:'Organization response lost after commit'}};}if(name==='inventory_write'&&!result.error&&window.dropReceiptReply&&args.p_operation==='receive'){window.dropReceiptReply=false;return{error:{message:'Response lost after commit'}};}return result;}};
     function firstAuthorizedView(){return 'clinic-management'}
@@ -62,6 +64,7 @@ test('inventory page retains category context, direct stock edits, management de
   for(const file of ['lumin-inventory-model.js','lumin-inventory-images.js','lumin-inventory.js'])await page.addScriptTag({path:path.join(root,file)});
   await page.evaluate(async()=>{LuminInventory.init();await switchClinicManagementTab('inventory')});
   assert.equal(await page.locator('#view-inventory').isVisible(),true);
+  assert.equal(await page.locator('#inv-picture-size').inputValue(),'large','Unknown saved view preferences fall back to the current Large layout');
   assert.match(await page.locator('#view-inventory').textContent(),/Your inventory starts here/);
   const csv=process.env.LUMIN_INVENTORY_CSV?fs.readFileSync(process.env.LUMIN_INVENTORY_CSV,'utf8'):'التصنيف,الصنف,الكمية الحالية,الحد الأدنى,الوحدة,,Reference\nConsumables (مستهلكات يومية),Anasthesia (Blue),2,3,Box,,\nConsumables (مستهلكات يومية),Cotton pack,,,pack,,\nConsumables (مستهلكات يومية),Napkin,8,235,,,\nConsumables (مستهلكات يومية),Gloves,0,1,Box,,\n';
   const expected=model.parseCSV(csv);
@@ -245,6 +248,15 @@ test('inventory page retains category context, direct stock edits, management de
   assert.equal(await photo.locator('.inv-photo-actions [data-inv-photo-action="choose"] span').count(),0,'Change image is an icon-only control');assert.equal(await photo.locator('.inv-photo-actions [data-inv-photo-action="choose"]').getAttribute('aria-label'),'Change image');
   assert.equal(photoWrites[0].type,'image/webp');assert.ok(photoWrites[0].size<=307200&&photoWrites[0].size<sourcePhoto.length,'Uploads are compressed before transmission');
   assert.deepEqual(await photo.locator('img').evaluate(node=>({width:node.naturalWidth,height:node.naturalHeight})),{width:960,height:640});
+  const viewPicture=await photo.locator('img').elementHandle(),viewStock=await stockStep('receive').elementHandle(),viewSelector=await page.locator('#inv-picture-size').elementHandle(),largePicture=await photo.locator('img').boundingBox(),viewRequests=requests.length;
+  for(const [size,scale]of [['medium',.5],['small',.25],['large',1]]){
+    await page.locator('#inv-picture-size').selectOption(size);const picture=await photo.locator('img').boundingBox();
+    assert.ok(Math.abs(picture.width-largePicture.width*scale)<2&&Math.abs(picture.height-largePicture.height*scale)<2,'Picture dimensions follow the selected size: '+size);
+    assert.equal(await page.evaluate(()=>localStorage.getItem('lumin.inventory.pictureSize')),size,'The selection is saved on the device');
+    assert.equal(await viewPicture.evaluate(node=>node.isConnected),true);assert.equal(await viewStock.evaluate(node=>node.isConnected),true);assert.equal(await viewSelector.evaluate(node=>node.isConnected),true,'View changes retain the photo, stock buttons and native dropdown');
+    if(size==='small')assert.equal(await page.locator('.inv-table tbody').evaluate(node=>getComputedStyle(node).gridTemplateColumns.split(' ').length),1,'Small pictures use full-width rows');
+  }
+  assert.equal(requests.length,viewRequests,'Changing picture size needs no inventory reload');
   const photoLayout=await photo.evaluate(node=>{const frame=node.getBoundingClientRect(),row=node.closest('tr').getBoundingClientRect(),name=node.closest('tr').cells[1].getBoundingClientRect();return{width:Math.abs(frame.width-row.width),above:frame.bottom<=name.top+1,stable:window.photoRow.isConnected&&window.photoStockButton.isConnected};});
   assert.ok(photoLayout.width<3&&photoLayout.above&&photoLayout.stable,'Photo spans the card above its name without replacing stock controls');
   const uploadedSource=await photo.locator('img').getAttribute('src');await page.evaluate(async()=>{LuminInventoryImages.clear();await LuminInventory.refresh({force:true,background:true});});
@@ -423,6 +435,15 @@ test('inventory page retains category context, direct stock edits, management de
     }
     if(width<1024){assert.equal(await page.locator('#inv-mobile-category').isVisible(),true);await page.locator('#inv-mobile-category').selectOption(consumables);await page.waitForFunction(()=>!document.querySelector('#view-inventory [aria-busy="true"]'));await page.locator('#inv-subcategory').selectOption(surgical);await page.waitForFunction(()=>!document.querySelector('#view-inventory [aria-busy="true"]'));await page.locator('#inv-mobile-category').selectOption('all');await page.waitForFunction(()=>!document.querySelector('#view-inventory [aria-busy="true"]'));}
     if(process.env.LUMIN_INVENTORY_SCREENSHOTS&&((language==='en'&&width===1440)||(language==='ar'&&width===390))){fs.mkdirSync(process.env.LUMIN_INVENTORY_SCREENSHOTS,{recursive:true});await page.screenshot({path:path.join(process.env.LUMIN_INVENTORY_SCREENSHOTS,`inventory-${language}-${width}.png`),fullPage:width>=768});}
+    for(const size of ['medium','small']){
+      await page.locator('#inv-picture-size').selectOption(size);
+      assert.equal(await page.locator('#view-inventory').evaluate(node=>node.scrollWidth>node.clientWidth+1),false,'Picture layout fits '+size+' '+language+' '+width);
+      const smallControls=await page.locator('#view-inventory button:visible').evaluateAll(nodes=>nodes.filter(node=>{const r=node.getBoundingClientRect();return r.width<43||r.height<43;}).length);assert.equal(smallControls,0,'Picture controls retain touch targets: '+size+' '+language+' '+width);
+      const brokenStocks=await page.locator('.inv-stock-stepper').evaluateAll(nodes=>nodes.filter(node=>{const [minus,value,plus]=[...node.children].map(child=>child.getBoundingClientRect()),cell=node.closest('td').getBoundingClientRect();return minus.left>=value.left||value.right>plus.left+1||plus.right>cell.right+1||minus.left<cell.left-1;}).length);assert.equal(brokenStocks,0,'Stock controls fit the picture layout: '+size+' '+language+' '+width);
+      const pictureOverflow=await page.locator('[data-inv-photo]').evaluateAll(nodes=>nodes.filter(node=>node.scrollWidth>node.clientWidth+1).length);assert.equal(pictureOverflow,0,'Photo actions stay inside the layout: '+size+' '+language+' '+width);
+      if(process.env.LUMIN_INVENTORY_SCREENSHOTS&&[390,1440].includes(width))await page.locator('.inv-table tbody').screenshot({path:path.join(process.env.LUMIN_INVENTORY_SCREENSHOTS,`inventory-pictures-${size}-${language}-${width}.png`)});
+    }
+    await page.locator('#inv-picture-size').selectOption('large');
   }
   await page.setViewportSize({width:390,height:900});
   assert.equal(await page.locator('.inv-heading [data-inv-action="choose-receive"]').isVisible(),true,'Receive stays available in the heading');

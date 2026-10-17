@@ -1,9 +1,13 @@
-/* Category-based clinic inventory. All stock writes use the server-validated ledger. */
+/* Category-based clinic inventory. Stock changes use server-validated balances. */
 (function (host) {
   'use strict';
   const model=host.LuminInventoryModel;
-  const state={quickQueue:[],quickBases:new Map(),quickEpoch:0,dataSequence:0,refreshRead:null,realtimeTimer:null,actor:'',token:0,dialogToken:0,report:null,loading:false,saving:false,error:'',message:'',loadedAt:0,query:'',category:'all',status:'all',sort:'name',page:1,selected:new Map(),dialog:null,pending:null,quickPending:null,timer:null,returnFocus:null,management:null,quickSaving:false,quickRefreshQueued:false};
+  const pictureSizes=['small','medium','large'];
+  function savedPictureSize(){try{const value=host.localStorage.getItem('lumin.inventory.pictureSize');return pictureSizes.includes(value)?value:'large';}catch(_){return 'large';}}
+  let pictureObserver=null,picturePanel=null;
+  const state={pictureSize:savedPictureSize(),quickQueue:[],quickBases:new Map(),quickEpoch:0,dataSequence:0,refreshRead:null,realtimeTimer:null,actor:'',token:0,dialogToken:0,report:null,loading:false,saving:false,error:'',message:'',loadedAt:0,query:'',category:'all',status:'all',sort:'name',page:1,selected:new Map(),dialog:null,pending:null,quickPending:null,timer:null,returnFocus:null,management:null,quickSaving:false,quickRefreshQueued:false};
   const words={
+    viewOptions:['View options','خيارات العرض'],smallPictures:['Small pictures · Rows','صور صغيرة · صفوف'],mediumPictures:['Medium pictures','صور متوسطة'],largePictures:['Large pictures','صور كبيرة'],
     mainCategory:['Main category','التصنيف الرئيسي'],subcategory:['Subcategory','التصنيف الفرعي'],allSubcategories:['All subcategories','كل التصنيفات الفرعية'],move:['Move','نقل'],moveItem:['Move item','نقل الصنف'],moveCategory:['Move subcategory','نقل التصنيف الفرعي'],destination:['Move to','النقل إلى'],dragHelp:['Drag items or subcategories to a category. Use the Move handle to choose a destination.','اسحب الأصناف أو التصنيفات الفرعية إلى تصنيف. استخدم زر النقل لاختيار الوجهة.'],retryMove:['Retry move','إعادة محاولة النقل'],deleteItem:['Delete item','حذف الصنف'],deleteBody:['Remove this item from inventory?','هل تريد حذف هذا الصنف من المخزون؟'],deletedItem:['Deleted item','صنف محذوف'],moveInvalid:['Choose another parent without creating a cycle or exceeding three category levels.','اختر تصنيفاً أباً آخر دون إنشاء حلقة أو تجاوز ثلاثة مستويات.'],moving:['Moving…','جار النقل…'],moved:['Moved successfully.','تم النقل بنجاح.'],itemMissing:['This item was deleted or is no longer available.','تم حذف هذا الصنف أو لم يعد متاحاً.'],chooseDestination:['Choose a destination','اختر وجهة النقل'],
     chooseUnit:['Choose a stock unit','اختر وحدة المخزون'],
     categoryDepth:['Choose a main category or first subcategory as the parent. A second subcategory is the final level.','اختر تصنيفاً رئيسياً أو تصنيفاً فرعياً أول كأب. التصنيف الفرعي الثاني هو المستوى الأخير.'],manageTitle:['Manage inventory','إدارة المخزون'],manageItems:['Items','الأصناف'],editItem:['Edit item','تعديل الصنف'],itemsEmpty:['No items found','لا توجد أصناف'],itemsHelp:['Add an item or try another name.','أضف صنفاً أو ابحث باسم آخر.'],
@@ -40,7 +44,7 @@
   function categoryFilters(){
     const path=model.categoryPath(categories().find(c=>c.id===state.category),categories()),main=path[0]?.id||state.category;
     const children=orderedCategories().filter(c=>c.parent_id&&model.categoryPath(c,categories())[0]?.id===main);
-    return field(t('mainCategory'),`<select class="inv-control" id="inv-mobile-category"><option value="all">${t('all')}</option>${orderedCategories().filter(c=>!c.parent_id).map(c=>`<option value="${c.id}" ${main===c.id?'selected':''}>${esc(categoryName(c))}</option>`).join('')}<option value="uncategorized" ${main==='uncategorized'?'selected':''}>${t('uncategorized')}</option></select>`)+field(t('subcategory'),`<select class="inv-control" id="inv-subcategory" ${!children.length?'disabled':''}><option value="">${t('allSubcategories')}</option>${children.map(c=>`<option value="${c.id}" ${state.category===c.id?'selected':''}>${esc(model.categoryPath(c,categories()).slice(1).map(categoryName).join(' / '))}</option>`).join('')}</select>`)+(capable('manage')?button('categories',t('manage'),'folder-pen'):'');
+    return field(t('mainCategory'),`<select class="inv-control" id="inv-mobile-category"><option value="all">${t('all')}</option>${orderedCategories().filter(c=>!c.parent_id).map(c=>`<option value="${c.id}" ${main===c.id?'selected':''}>${esc(categoryName(c))}</option>`).join('')}<option value="uncategorized" ${main==='uncategorized'?'selected':''}>${t('uncategorized')}</option></select>`)+field(t('subcategory'),`<select class="inv-control" id="inv-subcategory" ${!children.length?'disabled':''}><option value="">${t('allSubcategories')}</option>${children.map(c=>`<option value="${c.id}" ${state.category===c.id?'selected':''}>${esc(model.categoryPath(c,categories()).slice(1).map(categoryName).join(' / '))}</option>`).join('')}</select>`)+field(t('viewOptions'),`<select id="inv-picture-size" class="inv-control">${pictureSizes.map(size=>`<option value="${size}" ${state.pictureSize===size?'selected':''}>${t(size+'Pictures')}</option>`).join('')}</select>`)+(capable('manage')?button('categories',t('manage'),'folder-pen'):'');
   }
   function syncFilterControls(){
     const root=document.querySelector('.inv-category-filters'),signature=JSON.stringify([state.category,state.sort,state.status,isArabic(),categories().map(c=>[c.id,c.name,c.name_ar,c.parent_id,c.active])]);
@@ -82,7 +86,7 @@
     return isArabic()?'تعذر إتمام العملية. راجع البيانات وحاول مجدداً.':'Could not complete the operation. Check the values and try again.';
   }
   function reset(){
-    host.LuminInventoryImages?.clear();state.quickEpoch++;state.quickQueue=[];state.quickBases.clear();state.refreshRead=null;clearTimeout(state.realtimeTimer);
+    pictureObserver?.disconnect();pictureObserver=null;picturePanel=null;host.LuminInventoryImages?.clear();state.quickEpoch++;state.quickQueue=[];state.quickBases.clear();state.refreshRead=null;clearTimeout(state.realtimeTimer);
     state.token++;clearTimeout(state.timer);closeDialog(false,true);
     state.management=null;
     Object.assign(state,{actor:'',report:null,loading:false,saving:false,error:'',message:'',loadedAt:0,query:'',category:'all',status:'all',sort:'name',page:1,pending:null,quickPending:null,quickSaving:false,quickRefreshQueued:false});
@@ -141,7 +145,19 @@
       </div></div>`;
     feedbackMarkup.set(el('inv-feedback'),feedbackHTML());
     if(canManage){const note=document.createElement('p');note.className='inv-caption inv-drag-help';note.textContent=t('dragHelp');root.querySelector('.inv-category-nav')?.appendChild(note);}
-    icons();syncPhotos(root,data?.items);restoreFocus(focused);
+    icons();syncPhotos(root,data?.items);syncPictureView();restoreFocus(focused);
+  }
+  function pictureMetrics(){
+    const table=picturePanel?.querySelector('tbody');if(!table)return;
+    const style=getComputedStyle(table),gap=parseFloat(style.columnGap)||0,available=table.clientWidth-(parseFloat(style.paddingInlineStart)||0)-(parseFloat(style.paddingInlineEnd)||0);
+    const columns=host.innerWidth<768?1:Math.max(1,Math.min(table.rows.length||1,Math.floor((available+gap)/(340+gap))));
+    const width=Math.max(0,(available-gap*(columns-1))/columns-2)+'px';if(table.style.getPropertyValue('--inv-large-photo-width')!==width)table.style.setProperty('--inv-large-photo-width',width);
+  }
+  function syncPictureView(){
+    const panel=el('inv-stock-panel'),select=el('inv-picture-size');if(select&&select.value!==state.pictureSize)select.value=state.pictureSize;
+    if(!panel)return;panel.dataset.pictureSize=state.pictureSize;
+    if(panel!==picturePanel){pictureObserver?.disconnect();picturePanel=panel;if(typeof ResizeObserver!=='undefined'){pictureObserver=new ResizeObserver(pictureMetrics);pictureObserver.observe(panel);}}
+    pictureMetrics();
   }
   const photoFrame=(item,detail=false)=>`<div class="inv-photo ${detail?'inv-photo-detail':''}" data-inv-photo="${item.id}"></div>`;
   function syncPhotos(root,items){host.LuminInventoryImages?.sync(root,items,capable('manage'));}
@@ -156,7 +172,7 @@
   function renderStock(){
     const data=state.report,rows=data?.items||[],manage=capable('manage');
     const title=state.category==='all'?t('all'):categoryLabel(categories().find(c=>c.id===state.category));
-    return `<section id="inv-stock-panel" class="inv-panel" aria-busy="${state.loading}"><div class="inv-list-heading"><h3>${esc(title)}</h3><span class="inv-caption" aria-live="polite">${data?`${number(data.total)} ${t('items')}`:t('loading')}</span></div>
+    return `<section id="inv-stock-panel" class="inv-panel" data-picture-size="${state.pictureSize}" aria-busy="${state.loading}"><div class="inv-list-heading"><h3>${esc(title)}</h3><span class="inv-caption" aria-live="polite">${data?`${number(data.total)} ${t('items')}`:t('loading')}</span></div>
       <div class="inv-tools"><label class="inv-search">${icon('search')}<input id="inv-search" type="search" maxlength="120" value="${esc(state.query)}" placeholder="${t('search')}" aria-label="${t('search')}"></label><div class="inv-filterbar">${['all','low','out','unknown','review'].map(key=>`<button class="inv-tab" type="button" data-inv-status="${key}" aria-pressed="${state.status===key}">${t(key==='all'?'allstatus':key)}</button>`).join('')}<select id="inv-sort" class="inv-control" aria-label="${t('sort')}">${[['name','namesort'],['status','statussort'],['quantity','quantitysort']].map(([key,label])=>`<option value="${key}" ${state.sort===key?'selected':''}>${t(label)}</option>`).join('')}</select></div></div>
       <div id="inv-stock-bulk" data-selection="${[...state.selected.keys()].join(',')}">${stockBulkHTML()}</div>
       <table class="inv-table" ${!rows.length?'hidden':''}><thead><tr><th>${manage?`<label class="inv-check"><input type="checkbox" id="inv-select-page" aria-label="${t('selectpage')}" ${rows.length&&rows.every(i=>state.selected.has(i.id))?'checked':''}></label>`:''}</th><th>${t('name')}</th><th>${t('category')}</th><th>${t('current')}</th><th>${t('minimum')}</th><th>${t('details')}</th></tr></thead><tbody>${rows.map(stockRow).join('')}</tbody></table>
@@ -224,7 +240,7 @@
     });
     const feedback=el('inv-feedback'),key=feedbackSignature();if(feedback&&feedback.dataset.signature!==key){const html=feedbackHTML();if(feedbackMarkup.get(feedback)!==html){feedback.innerHTML=html;feedbackMarkup.set(feedback,html);addedIcons=true;}feedback.dataset.signature=key;}
     setText(el('inv-last-loaded'),t('lastloaded')+': '+new Intl.DateTimeFormat(isArabic()?'ar-EG':'en-GB',{hour:'2-digit',minute:'2-digit'}).format(state.loadedAt));
-    if(addedIcons)icons();syncPhotos(el('view-inventory'),data.items);
+    if(addedIcons)icons();syncPhotos(el('view-inventory'),data.items);syncPictureView();
   }
   function refresh(options={}){
     const key=JSON.stringify([signature(),isArabic(),state.query,state.category,state.status,state.sort,state.page]);
@@ -505,6 +521,7 @@
     if(name==='add'){if(capable('manage'))openDialog('add');return;}
   }
   function change(event){const node=event.target;
+    if(node.id==='inv-picture-size'){if(!pictureSizes.includes(node.value))return;state.pictureSize=node.value;try{host.localStorage.setItem('lumin.inventory.pictureSize',node.value);}catch(_){}syncPictureView();return;}
     if(node.id==='inv-mobile-category'){state.category=node.value;filtersChanged();}
     else if(node.id==='inv-subcategory'){state.category=node.value||el('inv-mobile-category').value;filtersChanged();}
     else if(node.id==='inv-sort'){state.sort=node.value;filtersChanged();}
