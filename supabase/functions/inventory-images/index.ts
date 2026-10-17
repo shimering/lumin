@@ -55,7 +55,7 @@ export function createInventoryImageHandler(config: DriveConfig, db: any, fetche
       if (!["GET","POST","DELETE"].includes(request.method)) throw new DriveError("Unsupported photo operation.",405);
       const url = new URL(request.url), id = uuid(url.pathname.replace(/^.*\/inventory-images\/?/,""));
       const actor = await authorize(request,db,request.method !== "GET");
-      if (!await checked(db.from("inventory_items").select("id").eq("id",id).maybeSingle())) throw new DriveError("Inventory item not found.",404,"item_missing");
+      if (!await checked(db.from("inventory_items").select("id").eq("id",id).is("deleted_at",null).maybeSingle())) throw new DriveError("Inventory item not found.",404,"item_missing");
       const store = new DriveStore(db,config,fetcher,tokens);
       if (request.method === "GET") {
         const row = await checked(db.from("inventory_item_images").select("*").eq("item_id",id).maybeSingle());

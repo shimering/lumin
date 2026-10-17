@@ -42,6 +42,7 @@ class Query implements PromiseLike<any> {
   constructor(public db: MemoryDB, public table: string) {}
   select(_fields = "*") { return this; }
   eq(k: string, v: any) { this.filters.push(r => r[k] === v); return this; }
+  is(k: string, v: any) { this.filters.push(r => v===null?r[k]==null:r[k]===v); return this; }
   in(k: string, values: any[]) { this.filters.push(r => values.includes(r[k])); return this; }
   neq(k: string, v: any) { this.filters.push(r => r[k] !== v); return this; }
   gt(k: string, v: any) { this.filters.push(r => r[k] > v); return this; }

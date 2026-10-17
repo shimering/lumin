@@ -11,6 +11,7 @@ test('inventory ledger enforces permissions, immutable history, units, idempoten
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017063353_bilingual_inventory_names.sql'),'utf8'));
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017073421_inventory_category_hierarchy.sql'),'utf8'));
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017075131_inventory_item_images.sql'),'utf8'));
+  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017144330_inventory_organization.sql'),'utf8'));
   const actor=async n=>{await db.exec(`reset role;select set_config('test.actor','${n?uuid(n):''}',false);set role authenticated`);};
   let request=1000;
   const write=async(op,payload,id=uuid(request++))=>(await db.query('select public.inventory_write($1,$2,$3) result',[op,JSON.stringify(payload),id])).rows[0].result;
@@ -148,6 +149,49 @@ test('inventory ledger enforces permissions, immutable history, units, idempoten
     await actor(2);assert.equal((await read({category:root.id})).items[0].id,material.id);
     await assert.rejects(write('category_save',{name:'Unauthorized',parent_id:middle.id}),/ACCESS/);
     await actor(1);assert.equal(Number((await item(material.id)).quantity),2);
+  });
+  await actor(1);
+  await t.test('category moves retain subtrees, balances and snapshots and reject cycles, depth and stale drops',async()=>{
+    const a=await write('category_save',{name:'Move root A'}),b=await write('category_save',{name:'Move root B'});
+    const child=await write('category_save',{name:'Move middle',parent_id:a.id}),leaf=await write('category_save',{name:'Move leaf',parent_id:child.id});
+    const supply=await write('item_save',{name_en:'Moving supply',unit:'Box',minimum:1,quantity:2,category_id:leaf.id});
+    const before=await item(supply.id),original=(await history({item_id:supply.id})).rows;
+    const category=async id=>(await read()).categories.find(c=>c.id===id);
+    const payload={id:child.id,revision:(await category(child.id)).revision,parent_id:b.id,parent_revision:(await category(b.id)).revision},requestId=uuid(6100);
+    await actor(4);await assert.rejects(write('category_move',payload),/ACCESS/);
+    await actor(3);await write('category_move',payload,requestId);await write('category_move',payload,requestId);
+    assert.equal((await read({category:a.id})).total,0);assert.equal((await read({category:b.id})).total,1);
+    assert.deepEqual((await category(leaf.id)).path_ids,[b.id,child.id,leaf.id]);assert.deepEqual(await item(supply.id),{...before},'Category moves do not revise an item or its stock');
+    assert.deepEqual((await history({item_id:supply.id})).rows,original);
+    await assert.rejects(write('category_move',{...payload,parent_id:a.id,parent_revision:(await category(a.id)).revision}),/STALE/);
+    await assert.rejects(write('category_move',{...payload,revision:(await category(child.id)).revision,parent_id:leaf.id,parent_revision:(await category(leaf.id)).revision}),/CATEGORY_MOVE/);
+    const another=await write('category_save',{name:'Other middle',parent_id:a.id});
+    await assert.rejects(write('category_move',{id:child.id,revision:(await category(child.id)).revision,parent_id:another.id,parent_revision:(await category(another.id)).revision}),/CATEGORY_DEPTH/);
+    await assert.rejects(write('category_move',{id:b.id,revision:(await category(b.id)).revision,parent_id:a.id,parent_revision:(await category(a.id)).revision}),/CATEGORY_MOVE/);
+    await assert.rejects(write('category_move',{id:leaf.id,revision:(await category(leaf.id)).revision,parent_id:another.id,parent_revision:999}),/STALE/);
+    await assert.rejects(write('assign',{category_id:another.id,category_revision:999,items:[{id:before.id,revision:before.revision}]}),/STALE/);
+    await write('assign',{category_id:another.id,category_revision:(await category(another.id)).revision,items:[{id:before.id,revision:before.revision}]});
+    assert.equal(Number((await item(supply.id)).quantity),2);assert.deepEqual((await history({item_id:supply.id})).rows,original);
+    await actor(1);
+  });
+  await t.test('deletion removes an item from catalog counts while retaining immutable movements and blocking later writes/photos',async()=>{
+    const cat=await write('category_save',{name:'Deletion only category'}),created=await write('import',{rows:[{name_en:'Disposable deletion test',category_id:cat.id,unit:'Box',minimum:1,quantity:2}]});
+    let row=await item(created.id);const stale={id:row.id,revision:row.revision};
+    await write('item_save',{...row,minimum:3});row=await item(row.id);
+    const before=(await read()).summary,movements=await history({item_id:row.id});
+    for(const who of [2,4,5,6,8]){await actor(who);await assert.rejects(write('item_delete',{id:row.id,revision:row.revision}),/ACCESS/);}
+    await actor(3);await assert.rejects(write('item_delete',stale),/STALE/);
+    await db.exec('reset role');await db.query("insert into public.inventory_item_images(item_id,revision,drive_file_id,sha256,mime_type,byte_size,width,height,updated_by) values($1,$2,'private-deleted-photo',repeat('b',64),'image/webp',100,40,30,$3)",[row.id,uuid(6200),uuid(1)]);
+    await actor(3);const payload={id:row.id,revision:row.revision},requestId=uuid(6201);await write('item_delete',payload,requestId);await write('item_delete',payload,requestId);
+    assert.equal((await read({id:row.id})).total,0);assert.equal((await read()).summary.total,before.total-1);assert.equal((await read({category:cat.id})).total,0);
+    assert.equal((await db.query('select revision from public.inventory_item_images where item_id=$1',[row.id])).rows.length,0,'Photo metadata is hidden after deletion');
+    const retained=await history({item_id:row.id});assert.equal(retained.total,movements.total);assert.ok(retained.rows.every(m=>m.item_deleted));
+    await actor(1);
+    for(const [op,value] of [['item_save',{...row,minimum:4}],['receive',{...payload,quantity:1}],['use',{...payload,quantity:1}],['assign',{category_id:category.id,items:[payload]}]])await assert.rejects(write(op,value),/INVENTORY_ITEM/);
+    await db.exec('reset role');const stored=(await db.query('select * from public.inventory_items where id=$1',[row.id])).rows[0];assert.ok(stored.deleted_at);assert.equal(Number(stored.quantity),2);assert.equal(Number(stored.revision),Number(row.revision)+1);
+    await assert.rejects(db.query('update public.inventory_item_images set width=50 where item_id=$1',[row.id]),/INVENTORY_ITEM/,'Late uploads cannot attach to deleted items');
+    await actor(1);await write('category_archive',{id:cat.id,revision:(await read()).categories.find(c=>c.id===cat.id).revision});
+    const replacement=await write('import',{rows:[{name_en:row.name_en,category_id:category.id,unit:'Box',minimum:1,quantity:0}]});assert.notEqual(replacement.id,row.id,'The deleted identity remains separate from future imports');
   });
   await db.exec('reset role');
   assert.equal((await db.query("select count(*)::int n from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('get_inventory','get_inventory_movements','inventory_write') and p.prosecdef")).rows[0].n,0);

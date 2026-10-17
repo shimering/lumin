@@ -40,6 +40,12 @@
     });
     visit(null,0);return rows;
   }
+  function categoryMoveTargets(category,categories=[],language='en') {
+    if(!category?.parent_id)return [];
+    const descendants=new Set([category.id]);let height=0;
+    for(let depth=1;depth<=2;depth++){const children=categories.filter(c=>descendants.has(c.parent_id)&&!descendants.has(c.id));if(!children.length)break;children.forEach(c=>descendants.add(c.id));height=depth;}
+    return categoryTree(categories,language).filter(c=>!descendants.has(c.id)&&c.depth+1+height<=2);
+  }
   function resolveCategory(parts,categories) {
     let parent=null,match=null;
     for(const part of parts){
@@ -105,6 +111,6 @@
       return [path[0]?.name||'',itemName(i),i.quantity??'',i.minimum??'',i.unit,names(i).name_en,names(i).name_ar,path[1]?.name||'',path[2]?.name||''];
     })].map(row=>row.map(safe).join(',')).join('\r\n');
   }
-  const api={permissions,units,numeric,status,needsReview,names,itemName,categoryPath,categoryTree,parseCells,parseCSV,proposeCategory,csv};host.LuminInventoryModel=api;
+  const api={permissions,units,numeric,status,needsReview,names,itemName,categoryPath,categoryTree,categoryMoveTargets,parseCells,parseCSV,proposeCategory,csv};host.LuminInventoryModel=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window==='undefined'?globalThis:window);

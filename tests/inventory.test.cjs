@@ -2,6 +2,14 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const model=require('../lumin-inventory-model.js');
 const categories=['patient','anaesthesia','infection','clinical','surgical','consumables'].map(key=>({id:key,key,name:key==='consumables'?'Consumables':key,active:true}));
 const source='التصنيف,الصنف,الكمية الحالية,الحد الأدنى,الوحدة,,Reference\r\nConsumables (مستهلكات يومية),Anasthesia (Blue),2,3,Box,,\r\nConsumables (مستهلكات يومية),Cotton pack,,,pack,,\r\nConsumables (مستهلكات يومية),Napkin,8,235,,,\r\nConsumables (مستهلكات يومية),"أكواب، ورق",6,8,,,كمية جيدة ✅\r\n';
+
+test('category move targets exclude descendants, current subtree and parents that would exceed three levels',()=>{
+  const tree=[{id:'a',name:'A'},{id:'b',name:'B'},{id:'middle',name:'M',parent_id:'a'},{id:'leaf',name:'L',parent_id:'middle'},{id:'other',name:'O',parent_id:'b'}];
+  assert.deepEqual(model.categoryMoveTargets(tree[0],tree),[]);
+  assert.deepEqual(model.categoryMoveTargets(tree[2],tree).map(c=>c.id),['a','b']);
+  assert.ok(model.categoryMoveTargets(tree[3],tree).some(c=>c.id==='other'));
+  assert.equal(model.categoryMoveTargets(tree[3],tree).some(c=>c.id==='leaf'),false);
+});
 test('CSV import preserves unknowns, zero, source values, quoted text and category suggestions',()=>{
   const rows=model.parseCSV(source,categories);assert.equal(rows.length,4);
   assert.equal(rows[0].category_id,'anaesthesia');assert.equal(rows[0].unit,'Box');

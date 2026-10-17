@@ -39,6 +39,7 @@ Deno.test("inventory photos are private, revision checked, retry safe and separa
   assert((await f.request('DELETE','doctor',second.image_version)).status===200);assert((await f.request('DELETE','doctor',second.image_version)).status===200);
   assert(f.db.tables.inventory_item_images.length===0);assert(f.db.tables.inventory_items[0].quantity===3&&f.db.tables.inventory_items[0].revision===7);
   assert(JSON.stringify(f.db.tables.google_drive_metadata)===snapshot,'Patient synchronization snapshot is unchanged');
+  f.db.tables.inventory_items[0].deleted_at=new Date().toISOString();assert((await f.request('POST')).status===404,'Deleted catalog items cannot receive photos');assert((await f.request('GET','admin',requestId)).status===404);
 });
 Deno.test("photo endpoint rejects unoptimized, oversized and animated payloads before writing Drive",async()=>{
   const f=await setup(),before=f.google.files.size;
