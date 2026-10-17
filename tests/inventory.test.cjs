@@ -8,7 +8,8 @@ test('CSV import preserves unknowns, zero, source values, quoted text and catego
   assert.equal(rows[1].quantity,null);assert.equal(rows[1].minimum,null);assert.equal(model.status(rows[1]),'unknown');
   assert.equal(rows[2].minimum,235);assert.equal(rows[2].unit,'');
   assert.equal(rows[3].category_id,'patient');
-  for(const row of rows)assert.deepEqual(Object.keys(row).sort(),['category_id','minimum','name','quantity','unit']);
+  for(const row of rows)assert.deepEqual(Object.keys(row).sort(),['category_id','minimum','name','name_ar','name_en','quantity','unit']);
+  assert.equal(rows[0].name_en,'Anasthesia (Blue)');assert.equal(rows[3].name_ar,'أكواب، ورق');
   assert.deepEqual(model.parseCells('a,b\n"a, b","line\nwith ""quote"""'),[['a','b'],['a, b','line\nwith "quote"']]);
   assert.equal(model.numeric('٠'),0);assert.equal(model.numeric('١٢٫٥'),12.5);assert.equal(model.numeric(''),null);
   assert.equal(model.status({quantity:0,minimum:null}),'out');assert.equal(model.status({quantity:5,minimum:5}),'low');assert.equal(model.status({quantity:5,minimum:null}),'unconfigured');
@@ -24,4 +25,15 @@ test('CSV importer rejects malformed, duplicate and invalid rows instead of part
 test('CSV export keeps unknown quantities empty and protects spreadsheet formulas',()=>{
   const output=model.csv([{name:'=HYPERLINK("bad")',quantity:null,minimum:0,unit:'Box'}]);
   const cells=model.parseCells(output);assert.equal(cells[1][1][0],"'");assert.equal(cells[1][2],'');assert.equal(cells[1][3],'0');
+});
+test('bilingual names follow language with a fallback and survive CSV export/import',()=>{
+  const item={name:'Legacy',name_en:'Paper cups',name_ar:'أكواب ورقية',quantity:0,minimum:2,unit:'Box'};
+  assert.equal(model.itemName(item,'en'),'Paper cups');assert.equal(model.itemName(item,'ar'),'أكواب ورقية');
+  assert.equal(model.itemName({name:'قديم'},'en'),'قديم');assert.equal(model.itemName({name_en:'Box',name_ar:''},'ar'),'Box');
+  const [row]=model.parseCSV(model.csv([item]));
+  assert.equal(row.name_en,item.name_en);assert.equal(row.name_ar,item.name_ar);assert.equal(row.quantity,0);
+  const arabic=model.parseCSV('الاسم بالإنجليزية,الاسم بالعربية,الكمية الحالية,الحد الأدنى,الوحدة\n,صابون,0,1,Bottle');
+  assert.equal(arabic[0].name,'صابون');assert.equal(arabic[0].name_en,'');
+  assert.throws(()=>model.parseCSV('English name,Arabic name,Quantity,Minimum,Unit\nA,صنف,0,1,Box\nB,صنف,0,1,Box'),/DUPLICATE/);
+  assert.throws(()=>model.parseCSV('English name,Arabic name,Quantity,Minimum,Unit\n,,0,1,Box'),/ROW/);
 });

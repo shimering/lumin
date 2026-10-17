@@ -18,6 +18,15 @@
     return item.quantity==null?'unknown':Number(item.quantity)===0?'out':item.minimum==null?'unconfigured':Number(item.quantity)<=Number(item.minimum)?'low':'healthy';
   }
   function needsReview(item) { return item.quantity==null||item.minimum==null||!String(item.unit||'').trim()||!item.category_id; }
+  function names(item) {
+    if(item.name_en!=null||item.name_ar!=null)return {name_en:item.name_en||'',name_ar:item.name_ar||''};
+    const name=String(item.name||'');
+    return /[\u0600-\u06ff]/.test(name)?{name_en:'',name_ar:name}:{name_en:name,name_ar:''};
+  }
+  function itemName(item,language='en') {
+    const value=names(item);
+    return (language==='ar'?value.name_ar||value.name_en:value.name_en||value.name_ar)||item.name||'';
+  }
   function parseCells(input) {
     const text=String(input).replace(/^\uFEFF/,'');
     if(text.length>1048576)throw new Error('INVENTORY_CSV_SIZE');
@@ -51,25 +60,26 @@
     const cells=parseCells(input);if(cells.length<2)throw new Error('INVENTORY_CSV_EMPTY');
     const header=cells[0].map(c=>c.trim().toLowerCase());
     const column=(...names)=>header.findIndex(h=>names.includes(h));
-    const ix={name:column('الصنف','item','item name','name'),category:column('التصنيف','category'),quantity:column('الكمية الحالية','current quantity','quantity','current stock'),minimum:column('الحد الأدنى','الحد الادنى','minimum','minimum stock'),unit:column('الوحدة','unit','stock unit')};
-    if([ix.name,ix.quantity,ix.minimum,ix.unit].some(i=>i<0))throw new Error('INVENTORY_CSV_HEADERS');
+    const ix={name:column('الصنف','item','item name','name'),name_en:column('english name','english item name','الاسم بالإنجليزية','اسم الصنف بالإنجليزية'),name_ar:column('arabic name','arabic item name','الاسم بالعربية','اسم الصنف بالعربية'),category:column('التصنيف','category'),quantity:column('الكمية الحالية','current quantity','quantity','current stock'),minimum:column('الحد الأدنى','الحد الادنى','minimum','minimum stock'),unit:column('الوحدة','unit','stock unit')};
+    if(Math.max(ix.name,ix.name_en,ix.name_ar)<0||[ix.quantity,ix.minimum,ix.unit].some(i=>i<0))throw new Error('INVENTORY_CSV_HEADERS');
     if(cells.length>501)throw new Error('INVENTORY_CSV_SIZE');
     const seen=new Set();
     return cells.slice(1).map((r,index)=>{
       const get=key=>ix[key]<0?'':String(r[ix[key]]??'').trim();
-      const name=get('name'),source=get('category'),unit=get('unit');
-      if(!name||name.length>160||unit.length>40||r.length>header.length)throw new Error('INVENTORY_CSV_ROW:'+(index+2));
-      const key=name.toLowerCase();if(seen.has(key))throw new Error('INVENTORY_CSV_DUPLICATE:'+(index+2));seen.add(key);
+      const translated=ix.name_en>=0||ix.name_ar>=0?{name_en:get('name_en'),name_ar:get('name_ar')}:names({name:get('name')});
+      const name=itemName(translated),source=get('category'),unit=get('unit');
+      if(!name||translated.name_en.length>160||translated.name_ar.length>160||unit.length>40||r.length>header.length)throw new Error('INVENTORY_CSV_ROW:'+(index+2));
+      for(const value of new Set(Object.values(translated).filter(Boolean).map(n=>n.toLowerCase()))){if(seen.has(value))throw new Error('INVENTORY_CSV_DUPLICATE:'+(index+2));seen.add(value);}
       let quantity,minimum;try{quantity=numeric(get('quantity'));minimum=numeric(get('minimum'));}catch(_){throw new Error('INVENTORY_CSV_NUMBER:'+(index+2));}
-      return {name,quantity,minimum,unit,category_id:proposeCategory(name,source,categories)};
+      return {name,...translated,quantity,minimum,unit,category_id:proposeCategory(name,source,categories)};
     });
   }
   function csv(items,categories=[]) {
     const safe=value=>{let s=String(value??'');if(/^[=+\-@\t\r]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';};
-    return '\uFEFF'+[['Category','Item','Current quantity','Minimum','Unit'],...items.map(i=>[
-      categories.find(c=>c.id===i.category_id)?.name||'',i.name,i.quantity??'',i.minimum??'',i.unit
+    return '\uFEFF'+[['Category','Item','Current quantity','Minimum','Unit','English name','Arabic name'],...items.map(i=>[
+      categories.find(c=>c.id===i.category_id)?.name||'',itemName(i),i.quantity??'',i.minimum??'',i.unit,names(i).name_en,names(i).name_ar
     ])].map(row=>row.map(safe).join(',')).join('\r\n');
   }
-  const api={permissions,units,numeric,status,needsReview,parseCells,parseCSV,proposeCategory,csv};host.LuminInventoryModel=api;
+  const api={permissions,units,numeric,status,needsReview,names,itemName,parseCells,parseCSV,proposeCategory,csv};host.LuminInventoryModel=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window==='undefined'?globalThis:window);

@@ -8,6 +8,7 @@ test('inventory ledger enforces permissions, immutable history, units, idempoten
   await db.exec(migration);
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261016213858_simplify_inventory_items.sql'),'utf8'));
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017061336_retire_inventory_minimum_steps.sql'),'utf8'));
+  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017063353_bilingual_inventory_names.sql'),'utf8'));
   const actor=async n=>{await db.exec(`reset role;select set_config('test.actor','${n?uuid(n):''}',false);set role authenticated`);};
   let request=1000;
   const write=async(op,payload,id=uuid(request++))=>(await db.query('select public.inventory_write($1,$2,$3) result',[op,JSON.stringify(payload),id])).rows[0].result;
@@ -103,6 +104,31 @@ test('inventory ledger enforces permissions, immutable history, units, idempoten
     assert.equal(Number(cotton.quantity),4);assert.equal((await history({item_id:cotton.id})).rows[0].kind,'opening');
     await assert.rejects(write('item_save',{...cotton,quantity:5}),/USE_CONTROLS/);
   });
+  await actor(1);
+  await t.test('bilingual names validate, search both languages, preserve legacy retries and snapshot movement names',async()=>{
+    const payload={name_en:'Paper cups',name_ar:'أكواب ورقية',category_id:category.id,quantity:2,minimum:1,unit:'Box'};
+    const result=await write('item_save',payload);let row=await item(result.id);
+    assert.equal(row.name,'Paper cups');assert.equal(row.name_ar,'أكواب ورقية');
+    assert.equal((await read({query:'أكواب ورقية'})).items[0].id,row.id);
+    assert.equal((await read({query:'Paper cups'})).items[0].id,row.id);
+    const original=await history({item_id:row.id});assert.equal(original.rows[0].item_name_ar,'أكواب ورقية');
+    const edit={...row,name_en:'Cups renamed',name_ar:'أكواب جديدة'},requestId=uuid(3100);
+    await actor(3);await write('item_save',edit,requestId);await write('item_save',edit,requestId);row=await item(row.id);
+    assert.equal(row.name_en,'Cups renamed');assert.equal(Number(row.quantity),2);
+    assert.equal((await history({item_id:row.id})).total,original.total);
+    assert.equal((await history({item_id:row.id})).rows[0].item_name_ar,'أكواب ورقية','Snapshots are not renamed');
+    await assert.rejects(write('item_save',{...row,name_en:'',name_ar:' '}),/NAME/);
+    await assert.rejects(write('item_save',{...row,name_ar:'a'.repeat(161)}),/NAME/);
+    await actor(1);await write('receive',{id:row.id,revision:row.revision,quantity:1});row=await item(row.id);
+    const movements=await history({item_id:row.id,query:'أكواب جديدة'});assert.equal(movements.total,1);
+    assert.equal(movements.rows[0].item_name_en,'Cups renamed');
+    const {name_en,name_ar,...legacy}=row;
+    await write('item_save',{...legacy,minimum:4});row=await item(row.id);
+    assert.equal(row.name_ar,'أكواب جديدة','Legacy metadata edits keep both translations');
+    await write('item_save',{...row,name_en:''});row=await item(row.id);assert.equal(row.name,'أكواب جديدة');
+    await assert.rejects(write('import',{rows:[{...payload,name_en:'Different',name_ar:'أكواب جديدة'}]}),/ALREADY_IMPORTED/);
+    await actor(2);await assert.rejects(write('item_save',{...row,name_ar:'غير مصرح'}),/ACCESS/);
+  });
   await db.exec('reset role');
   assert.equal((await db.query("select count(*)::int n from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('get_inventory','get_inventory_movements','inventory_write') and p.prosecdef")).rows[0].n,0);
   assert.equal((await db.query("select has_function_privilege('anon','public.inventory_write(text,jsonb,uuid)','execute') allowed")).rows[0].allowed,false);
@@ -120,6 +146,7 @@ test('inventory cleanup removes metadata from the schema and retry cache while p
   await call('receive',{id:original.id,revision:original.revision,quantity:1},uuid(7001));
   await db.exec('reset role');await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261016213858_simplify_inventory_items.sql'),'utf8'));
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017061336_retire_inventory_minimum_steps.sql'),'utf8'));
+  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017063353_bilingual_inventory_names.sql'),'utf8'));
   const cached=(await db.query('select payload from private.inventory_requests where id=$1',[uuid(7000)])).rows[0].payload;
   assert.deepEqual(cached.rows[0],{name:'Existing material',category_id:category,quantity:2,minimum:3,unit:'Box'});
   const columns=(await db.query("select column_name from information_schema.columns where table_schema='public' and table_name='inventory_items'")).rows.map(r=>r.column_name);
@@ -128,6 +155,8 @@ test('inventory cleanup removes metadata from the schema and retry cache while p
   assert.deepEqual(await call('import',payload,uuid(7000)),imported,'Legacy retries are normalized consistently');
   const report=(await db.query("select public.get_inventory() report")).rows[0].report;
   assert.equal(report.items[0].active,true,'Already-open stock controls retain their API flag');assert.equal(report.total,1);assert.equal(Number(report.items[0].quantity),3);assert.equal(Number(report.items[0].minimum),3);assert.equal(report.items[0].unit,'Box');
+  assert.equal(report.items[0].name_en,'Existing material');assert.equal(report.items[0].name_ar,'');
+  assert.equal((await db.query('select item_name_en from public.inventory_movements limit 1')).rows[0].item_name_en,'Existing material');
   assert.equal((await db.query('select count(*)::int n from public.inventory_movements')).rows[0].n,2);
   await assert.rejects(call('import',payload,uuid(7002)),/ALREADY_IMPORTED/);
 });

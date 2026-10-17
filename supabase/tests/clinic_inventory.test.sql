@@ -11,6 +11,11 @@ begin
   v_result:=public.inventory_write('item_save',jsonb_build_object('name','Inventory smoke '||gen_random_uuid(),'category_id',v_category,'quantity',2,'minimum',3,'unit','Box'),gen_random_uuid());
   v_item:=(v_result->>'id')::uuid;
   v_report:=public.get_inventory(jsonb_build_object('id',v_item));
+  v_payload:=(v_report#>'{items,0}')||jsonb_build_object('name_en','Bilingual smoke item','name_ar','صنف اختبار بلغتين');
+  perform public.inventory_write('item_save',v_payload,gen_random_uuid());
+  v_report:=public.get_inventory(jsonb_build_object('id',v_item));
+  if v_report#>>'{items,0,name_en}'<>'Bilingual smoke item' or v_report#>>'{items,0,name_ar}'<>'صنف اختبار بلغتين' then raise exception 'Bilingual names were not saved';end if;
+  if (public.get_inventory(jsonb_build_object('query','صنف اختبار بلغتين'))->>'total')::integer<>1 then raise exception 'Arabic search failed';end if;
   v_revision:=(v_report#>>'{items,0,revision}')::bigint;
   v_payload:=jsonb_build_object('id',v_item,'revision',v_revision,'quantity',2);
   perform public.inventory_write('receive',v_payload,v_request);
@@ -19,6 +24,7 @@ begin
   begin perform public.inventory_write('use',v_payload,gen_random_uuid());raise exception 'Stale revision was accepted';exception when serialization_failure then null;end;
   v_history:=public.get_inventory_movements(jsonb_build_object('item_id',v_item));
   if (v_history->>'total')::integer<>2 then raise exception 'Unexpected movement history';end if;
+  if not exists(select 1 from jsonb_array_elements(v_history->'rows') where value->>'kind'='receive' and value->>'item_name_ar'='صنف اختبار بلغتين') then raise exception 'Bilingual movement snapshot missing';end if;
   v_report:=public.get_inventory(jsonb_build_object('id',v_item));
   v_payload:=(v_report#>'{items,0}')||jsonb_build_object('minimum',4);
   perform public.inventory_write('item_save',v_payload,v_min_request);

@@ -10,6 +10,7 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261016203800_clinic_inventory.sql'),'utf8'));
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261016213858_simplify_inventory_items.sql'),'utf8'));
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017061336_retire_inventory_minimum_steps.sql'),'utf8'));
+  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017063353_bilingual_inventory_names.sql'),'utf8'));
   let queue=Promise.resolve();const requests=[];
   const browser=await chromium.launch({headless:true,channel:process.env.LUMIN_TEST_BROWSER_CHANNEL||'chrome'});t.after(()=>browser.close());
   const page=await browser.newPage({viewport:{width:1440,height:1100},reducedMotion:'reduce'});page.setDefaultTimeout(7000);
@@ -86,6 +87,9 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   assert.equal(await page.locator('#inventory-overlay [name="sku"],#inventory-overlay [name="location"],#inventory-overlay [name="supplier"],#inventory-overlay [name="review_note"],#inventory-overlay [name="notes"],.inv-detail-actions,.inv-detail-source').count(),0,'Removed fields and sections are absent');
   assert.equal(await page.locator('[data-inv-action^="minimum-input-"]').count(),0);
   await page.locator('#inventory-overlay [name="minimum"]').fill('4');
+  assert.equal(await page.locator('#inventory-overlay [name="name_en"]').inputValue(),'Anasthesia (Blue)');
+  assert.equal(await page.locator('#inventory-overlay [name="name_ar"]').getAttribute('dir'),'rtl');
+  await page.locator('#inventory-overlay [name="name_ar"]').fill('مخدر أزرق');
   const unitSelect=page.locator('#inventory-overlay select[name="unit"]');
   assert.equal(await unitSelect.count(),1);assert.equal(await unitSelect.isDisabled(),true,'A unit used by posted movements stays locked');
   assert.equal(await unitSelect.inputValue(),'Box');assert.equal(await unitSelect.locator('option[value="Bottle"]').count(),1);
@@ -97,10 +101,21 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   assert.equal(Number((await db.query('select quantity from public.inventory_items where id=$1',[anesthesiaItem])).rows[0].quantity),2);
   assert.equal(Number((await db.query('select minimum from public.inventory_items where id=$1',[anesthesiaItem])).rows[0].minimum),4);
   await page.locator('[data-inv-category="all"]').click();
+  await page.locator('#inv-search').fill('مخدر أزرق');
+  await page.waitForFunction(()=>document.querySelectorAll('.inv-table tbody tr').length===1);
+  await page.evaluate(async()=>{currentUiLanguage='ar';document.documentElement.dir='rtl';await LuminInventory.languageChanged();});
+  assert.equal(await page.locator('.inv-item').textContent(),'مخدر أزرق');
+  await page.locator('.inv-item').click();
+  assert.equal(await page.locator('#inventory-overlay [name="name_en"]').inputValue(),'Anasthesia (Blue)');
+  assert.equal(await page.locator('#inventory-overlay [name="name_ar"]').inputValue(),'مخدر أزرق');
+  await page.keyboard.press('Escape');
+  await page.evaluate(async()=>{currentUiLanguage='en';document.documentElement.dir='ltr';await LuminInventory.languageChanged();});
+  assert.equal(await page.locator('.inv-item').textContent(),'Anasthesia (Blue)');
   await page.locator('#inv-search').fill('Anasthesia');
   await page.waitForFunction(()=>document.querySelectorAll('.inv-table tbody tr').length===1);
   await page.locator('[data-inv-action="choose-receive"]:visible').first().click();
-  await page.locator('#inv-picker-search').fill('Anasthesia');
+  await page.locator('#inv-picker-search').fill('مخدر أزرق');
+  await page.locator('#inv-picker-results strong').filter({hasText:'Anasthesia (Blue)'}).waitFor();
   await page.locator(`[data-inv-action="receive-picked"][data-id="${anesthesiaItem}"]`).click();
   await page.locator('#inventory-overlay [name="quantity"]').fill('2');
   await page.evaluate(()=>{window.dropReceiptReply=true;});
@@ -114,6 +129,9 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   await page.locator('[data-inv-action="history"]').click();
   await page.waitForFunction(()=>document.querySelectorAll('.inv-movement').length>0);
   assert.ok((await page.locator('.inv-movement').allTextContents()).some(text=>text.includes('Usage')));
+  await page.evaluate(async()=>{currentUiLanguage='ar';document.documentElement.dir='rtl';await LuminInventory.languageChanged();});
+  assert.ok((await page.locator('.inv-movement strong').allTextContents()).includes('مخدر أزرق'));
+  await page.evaluate(async()=>{currentUiLanguage='en';document.documentElement.dir='ltr';await LuminInventory.languageChanged();});
   await page.locator('[data-inv-action="stock"]').click();
   await page.locator('#inv-search').fill('Napkin');
   await page.waitForFunction(()=>document.querySelector('.inv-item')?.textContent==='Napkin');
@@ -136,12 +154,30 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   await page.waitForFunction(()=>!document.getElementById('inventory-overlay'));
   await page.locator('[data-inv-action="clear"]').count().then(async count=>{if(count)await page.locator('[data-inv-action="clear"]').first().click();else await page.locator('#inv-search').fill('');});
   await page.waitForFunction(()=>document.querySelectorAll('.inv-table tbody tr').length>1);
-  for(const language of ['en','ar'])for(const width of [320,390,820,1024,1440]){
+  await page.locator('[data-inv-action="add"]:visible').first().click();
+  await page.locator('#inventory-overlay [name="name_en"]').fill('Long clinical supply name for checking mobile cards');
+  await page.locator('#inventory-overlay [name="name_ar"]').fill('اسم طويل لمستلزمات العيادة للتأكد من عرض الأصناف على الهاتف');
+  await page.locator('#inventory-overlay [name="unit"]').selectOption('Bottle');
+  await page.locator('#inventory-overlay [name="minimum"]').fill('2');
+  await page.locator('#inv-dialog-submit').click();
+  await page.waitForFunction(()=>!document.getElementById('inventory-overlay'));
+  for(const language of ['en','ar'])for(const width of [320,390,480,820,1024,1440]){
     await page.setViewportSize({width,height:1100});
-    await page.evaluate(lang=>{currentUiLanguage=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';LuminInventory.languageChanged();},language);
+    await page.evaluate(async lang=>{currentUiLanguage=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';await LuminInventory.languageChanged();},language);
     const overflow=await page.locator('#view-inventory').evaluate(node=>node.scrollWidth>node.clientWidth+1);assert.equal(overflow,false,`${language} ${width}`);
     const controls=await page.locator('#view-inventory button:visible').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect()).filter(r=>r.width<43||r.height<43));assert.equal(controls.length,0,`Touch sizes ${language} ${width}`);
     const brokenSteppers=await page.locator('.inv-stock-stepper').evaluateAll(nodes=>nodes.filter(node=>{const [minus,value,plus]=[...node.children].map(child=>child.getBoundingClientRect()),cell=node.closest('td').getBoundingClientRect();return minus.left>=value.left||value.right>plus.left+1||plus.right>cell.right+1||minus.left<cell.left-1;}).length);assert.equal(brokenSteppers,0,`Stock buttons surround the quantity within its cell: ${language} ${width}`);
+    if(width<768){
+      const brokenCards=await page.locator('.inv-table tbody tr').evaluateAll(rows=>rows.filter(row=>{
+        const [,name,category,stock,minimum]=[...row.cells].map(cell=>cell.getBoundingClientRect());
+        return Math.abs((name.top+name.bottom)/2-(category.top+category.bottom)/2)>2||Math.abs(stock.top-minimum.top)>2;
+      }).length);assert.equal(brokenCards,0,'Mobile name/category and stock/minimum share rows: '+language+' '+width);
+      const misplacedMeta=await page.locator('.inv-stock-line').evaluateAll(nodes=>nodes.filter(node=>{
+        const [stock,meta]=[...node.children].map(child=>child.getBoundingClientRect());
+        return Math.abs((stock.top+stock.bottom)/2-(meta.top+meta.bottom)/2)>2;
+      }).length);assert.equal(misplacedMeta,0,'Unit and status sit beside stock controls: '+language+' '+width);
+      if(process.env.LUMIN_INVENTORY_SCREENSHOTS&&width===480){const card=page.locator('.inv-table tbody tr').first();await card.evaluate(node=>node.scrollIntoView({block:'start'}));await card.screenshot({path:path.join(process.env.LUMIN_INVENTORY_SCREENSHOTS,'inventory-mobile-card-'+language+'.png')});}
+    }
     if(width<1024){assert.equal(await page.locator('#inv-mobile-category').isVisible(),true);await page.locator('#inv-mobile-category').selectOption(surgical);await page.waitForFunction(()=>!document.querySelector('#view-inventory [aria-busy="true"]'));await page.locator('#inv-mobile-category').selectOption('all');await page.waitForFunction(()=>!document.querySelector('#view-inventory [aria-busy="true"]'));}
     if(process.env.LUMIN_INVENTORY_SCREENSHOTS&&((language==='en'&&width===1440)||(language==='ar'&&width===390))){fs.mkdirSync(process.env.LUMIN_INVENTORY_SCREENSHOTS,{recursive:true});await page.screenshot({path:path.join(process.env.LUMIN_INVENTORY_SCREENSHOTS,`inventory-${language}-${width}.png`),fullPage:width>=768});}
   }
