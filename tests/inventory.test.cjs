@@ -6,8 +6,9 @@ test('CSV import preserves unknowns, zero, source values, quoted text and catego
   const rows=model.parseCSV(source,categories);assert.equal(rows.length,4);
   assert.equal(rows[0].category_id,'anaesthesia');assert.equal(rows[0].unit,'Box');
   assert.equal(rows[1].quantity,null);assert.equal(rows[1].minimum,null);assert.equal(model.status(rows[1]),'unknown');
-  assert.equal(rows[2].minimum,235);assert.equal(rows[2].unit,'');assert.match(rows[2].review_note,/235/);
-  assert.equal(rows[3].source_data.reference,'كمية جيدة ✅');assert.equal(rows[3].category_id,'patient');assert.match(rows[3].review_note,/conflicts/);
+  assert.equal(rows[2].minimum,235);assert.equal(rows[2].unit,'');
+  assert.equal(rows[3].category_id,'patient');
+  for(const row of rows)assert.deepEqual(Object.keys(row).sort(),['category_id','minimum','name','quantity','unit']);
   assert.deepEqual(model.parseCells('a,b\n"a, b","line\nwith ""quote"""'),[['a','b'],['a, b','line\nwith "quote"']]);
   assert.equal(model.numeric('٠'),0);assert.equal(model.numeric('١٢٫٥'),12.5);assert.equal(model.numeric(''),null);
   assert.equal(model.status({quantity:0,minimum:null}),'out');assert.equal(model.status({quantity:5,minimum:5}),'low');assert.equal(model.status({quantity:5,minimum:null}),'unconfigured');

@@ -6,6 +6,8 @@ test('inventory ledger enforces permissions, immutable history, units, idempoten
   const db=new PGlite();t.after(()=>db.close());
   await db.exec(fs.readFileSync(path.join(__dirname,'fixtures/inventory.sql'),'utf8'));
   await db.exec(migration);
+  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261016213858_simplify_inventory_items.sql'),'utf8'));
+  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017061336_retire_inventory_minimum_steps.sql'),'utf8'));
   const actor=async n=>{await db.exec(`reset role;select set_config('test.actor','${n?uuid(n):''}',false);set role authenticated`);};
   let request=1000;
   const write=async(op,payload,id=uuid(request++))=>(await db.query('select public.inventory_write($1,$2,$3) result',[op,JSON.stringify(payload),id])).rows[0].result;
@@ -36,13 +38,13 @@ test('inventory ledger enforces permissions, immutable history, units, idempoten
   assert.equal(current.category_id,other.id);assert.equal(Number(current.quantity),4);
   assert.ok((await history()).rows.every(m=>m.category_name===category.name),'Existing movement category snapshots are retained');
   await assert.rejects(write('category_archive',{id:other.id,revision:other.revision}),/CATEGORY_IN_USE/);
-  await write('count',{id:current.id,revision:current.revision,quantity:1,reason:'Physical count'});current=await item(current.id);
+  await write('use',{id:current.id,revision:current.revision,quantity:3});current=await item(current.id);
   const sameRevision=current.revision;
   await write('use',{id:current.id,revision:sameRevision,quantity:1});
   await assert.rejects(write('use',{id:current.id,revision:sameRevision,quantity:1}),/STALE/);
   current=await item(current.id);assert.equal(Number(current.quantity),0);assert.equal(current.stock_status,'out');
-  await assert.rejects(write('count',{id:current.id,revision:current.revision,quantity:1}),/REASON/);
-  await assert.rejects(write('count',{id:current.id,revision:current.revision,quantity:1,reason:'Future',date:'2999-01-01'}),/DATE/);
+  for(const operation of ['count','waste','item_archive'])await assert.rejects(write(operation,{id:current.id,revision:current.revision,quantity:1}),/ACCESS/);
+  await assert.rejects(write('receive',{id:current.id,revision:current.revision,quantity:1,date:'2999-01-01'}),/DATE/);
   await assert.rejects(write('item_save',{name:'Invalid',quantity:-1,minimum:1,unit:'Box',category_id:category.id}),/INVALID/);
 
   await t.test('each stock capability is independent and revoked/inactive profiles cannot read or mutate',async()=>{
@@ -51,7 +53,8 @@ test('inventory ledger enforces permissions, immutable history, units, idempoten
       if(who!==3)await assert.rejects(write('category_save',{name:'Unauthorized'}),/ACCESS/);
       if(who!==4)await assert.rejects(write('receive',{id:current.id,revision:current.revision,quantity:1}),/ACCESS/);
       if(who!==5)await assert.rejects(write('use',{id:current.id,revision:current.revision,quantity:1}),/ACCESS/);
-      if(who!==6)await assert.rejects(write('count',{id:current.id,revision:current.revision,quantity:1,reason:'Count'}),/ACCESS/);
+      if(who!==6)await assert.rejects(write('reverse',{id:current.id,revision:current.revision,movement_id:use.id,reason:'Correction'}),/ACCESS/);
+      if(who===3)await assert.rejects(write('item_save',{name:'Unauthorized opening',category_id:category.id,unit:'Box',minimum:1,quantity:2}),/ACCESS/);
     }
     for(const who of [7,8,0]){await actor(who);await assert.rejects(read(),/ACCESS/);assert.equal((await db.query('select * from public.inventory_items')).rows.length,0);await assert.rejects(write('receive',{}),/ACCESS/);}
     await db.exec('reset role;set role anon');await assert.rejects(read(),/permission denied/);await assert.rejects(write('receive',{}),/permission denied/);
@@ -60,7 +63,7 @@ test('inventory ledger enforces permissions, immutable history, units, idempoten
   await t.test('CSV import is atomic, preserves unknowns and blank units, and cannot be repeated',async()=>{
     const rows=[{name:'Cotton pack',category_id:category.id,quantity:null,minimum:null,unit:'pack',source_data:{category:'Consumables',quantity:'',minimum:'',unit:'pack'}},{name:'Cups',category_id:other.id,quantity:6,minimum:8,unit:'',source_data:{category:'Consumables',quantity:'6',minimum:'8',unit:'',reference:'Original note'}}];
     const result=await write('import',{rows});assert.equal(result.imported,2);
-    const cotton=(await read({query:'Cotton'})).items[0],cups=(await read({query:'Cups'})).items[0];assert.equal(cotton.quantity,null);assert.equal(cotton.minimum,null);assert.equal(cups.unit,'');assert.equal(cups.source_data.reference,'Original note');
+    const cotton=(await read({query:'Cotton'})).items[0],cups=(await read({query:'Cups'})).items[0];assert.equal(cotton.quantity,null);assert.equal(cotton.minimum,null);assert.equal(cups.unit,'');assert.equal('source_data' in cups,false);
     await assert.rejects(write('receive',{id:cotton.id,revision:cotton.revision,quantity:1}),/COUNT_REQUIRED/);
     await assert.rejects(write('use',{id:cups.id,revision:cups.revision,quantity:1}),/UNIT_REQUIRED/);
     await write('item_save',{...cups,unit:'pack'});assert.equal((await item(cups.id)).unit,'pack','Previously blank unit can be completed without rewriting history');
@@ -72,7 +75,7 @@ test('inventory ledger enforces permissions, immutable history, units, idempoten
     assert.equal((await read({query:'Cotton',category:other.id})).total,0);
     const total=(await read()).total;assert.equal((await read({page:2,size:1})).items.length,1);assert.equal((await read({page:2,size:1})).total,total);
   });
-  await t.test('category creation, rename, archive, bulk stale rollback and item archive retain history',async()=>{
+  await t.test('category creation, rename, archive and bulk stale rollback retain history',async()=>{
     const newCat=await write('category_save',{name:'Additional',name_ar:'إضافي'});const cat=(await read()).categories.find(c=>c.id===newCat.id);
     await assert.rejects(write('category_save',{name:'Additional'}),/duplicate/);
     await write('category_save',{id:cat.id,revision:cat.revision,name:'Renamed',name_ar:'معدل'});
@@ -82,11 +85,49 @@ test('inventory ledger enforces permissions, immutable history, units, idempoten
     assert.equal((await item(a.id)).category_id,a.category_id,'Bulk edits roll back if any row is stale');
     await write('category_archive',{id:updatedCat.id,revision:updatedCat.revision});assert.equal((await read()).categories.find(c=>c.id===newCat.id).active,false);
     current=await item(current.id);const historyCount=(await history({item_id:current.id})).total;
-    await write('item_archive',{id:current.id,revision:current.revision,archived:true});
-    assert.equal((await read({archived:true})).items[0].id,current.id);assert.equal((await history({item_id:current.id})).total,historyCount);
-    await assert.rejects(write('receive',{id:current.id,revision:(await item(current.id)).revision,quantity:1}),/ARCHIVED/);
+    await assert.rejects(write('item_archive',{id:current.id,revision:current.revision,archived:true}),/ACCESS/);
+    assert.equal((await history({item_id:current.id})).total,historyCount);
+  });
+  await t.test('plain minimum edits are revision checked, idempotent, bounded and independent of stock',async()=>{
+    let cotton=(await read({query:'Cotton'})).items[0];const movements=(await history()).total;
+    const payload={...cotton,minimum:1},requestId=uuid(3000);
+    await actor(3);await write('item_save',payload,requestId);await write('item_save',payload,requestId);
+    cotton=await item(cotton.id);assert.equal(Number(cotton.minimum),1);assert.equal(cotton.quantity,null);
+    await assert.rejects(write('item_save',{...payload,minimum:2}),/STALE/);
+    await write('item_save',{...cotton,minimum:0});cotton=await item(cotton.id);assert.equal(Number(cotton.minimum),0);
+    await assert.rejects(write('item_save',{...cotton,minimum:-1}),/INVALID/);
+    await assert.rejects(write('minimum_step',{id:cotton.id,revision:cotton.revision,delta:1}),/ACCESS/);
+    assert.equal((await history()).total,movements);
+    await assert.rejects(write('item_save',{...cotton,quantity:4}),/ACCESS/);
+    await actor(1);await write('item_save',{...cotton,quantity:4});cotton=await item(cotton.id);
+    assert.equal(Number(cotton.quantity),4);assert.equal((await history({item_id:cotton.id})).rows[0].kind,'opening');
+    await assert.rejects(write('item_save',{...cotton,quantity:5}),/USE_CONTROLS/);
   });
   await db.exec('reset role');
   assert.equal((await db.query("select count(*)::int n from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('get_inventory','get_inventory_movements','inventory_write') and p.prosecdef")).rows[0].n,0);
   assert.equal((await db.query("select has_function_privilege('anon','public.inventory_write(text,jsonb,uuid)','execute') allowed")).rows[0].allowed,false);
+});
+
+test('inventory cleanup removes metadata from the schema and retry cache while preserving balances and history',async t=>{
+  const db=new PGlite();t.after(()=>db.close());
+  await db.exec(fs.readFileSync(path.join(__dirname,'fixtures/inventory.sql'),'utf8'));await db.exec(migration);
+  await db.exec(`select set_config('test.actor','${uuid(1)}',false);set role authenticated`);
+  const category=(await db.query("select id from public.inventory_categories where key='clinical'")).rows[0].id;
+  const payload={date:'2026-10-16',rows:[{name:'Existing material',category_id:category,quantity:2,minimum:3,unit:'Box',sku:'OLD-SKU',location:'Room A',supplier:'Supplier',notes:'Old note',review_note:'Old review',source_data:{category:'Consumables',reference:'Old source'}}]};
+  const call=async(op,p,id)=>(await db.query('select public.inventory_write($1,$2,$3) result',[op,JSON.stringify(p),id])).rows[0].result;
+  const imported=await call('import',payload,uuid(7000));
+  const original=(await db.query('select * from public.inventory_items where id=$1',[imported.id])).rows[0];
+  await call('receive',{id:original.id,revision:original.revision,quantity:1},uuid(7001));
+  await db.exec('reset role');await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261016213858_simplify_inventory_items.sql'),'utf8'));
+  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017061336_retire_inventory_minimum_steps.sql'),'utf8'));
+  const cached=(await db.query('select payload from private.inventory_requests where id=$1',[uuid(7000)])).rows[0].payload;
+  assert.deepEqual(cached.rows[0],{name:'Existing material',category_id:category,quantity:2,minimum:3,unit:'Box'});
+  const columns=(await db.query("select column_name from information_schema.columns where table_schema='public' and table_name='inventory_items'")).rows.map(r=>r.column_name);
+  for(const key of ['sku','location','supplier','notes','review_note','source_data','active'])assert.equal(columns.includes(key),false,key+' was dropped');
+  await db.exec('set role authenticated');
+  assert.deepEqual(await call('import',payload,uuid(7000)),imported,'Legacy retries are normalized consistently');
+  const report=(await db.query("select public.get_inventory() report")).rows[0].report;
+  assert.equal(report.items[0].active,true,'Already-open stock controls retain their API flag');assert.equal(report.total,1);assert.equal(Number(report.items[0].quantity),3);assert.equal(Number(report.items[0].minimum),3);assert.equal(report.items[0].unit,'Box');
+  assert.equal((await db.query('select count(*)::int n from public.inventory_movements')).rows[0].n,2);
+  await assert.rejects(call('import',payload,uuid(7002)),/ALREADY_IMPORTED/);
 });

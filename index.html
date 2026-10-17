@@ -77,9 +77,9 @@
   <script src="lumin-finance-sync.js?v=2"></script>
   <script src="lumin-cash-flow.js?v=1"></script>
   <script src="lumin-clinic-management.js?v=5"></script>
-  <script src="lumin-inventory-model.js?v=1"></script>
-  <script src="lumin-inventory.js?v=2"></script>
-  <link rel="stylesheet" href="lumin-inventory.css?v=2" />
+  <script src="lumin-inventory-model.js?v=3"></script>
+  <script src="lumin-inventory.js?v=4"></script>
+  <link rel="stylesheet" href="lumin-inventory.css?v=4" />
   <link rel="stylesheet" href="lumin-clinic-management.css?v=4" />
   <script src="lumin-patient-scans.js?v=6"></script>
   <link rel="stylesheet" href="lumin-patient-scans.css?v=4" />
@@ -7259,7 +7259,7 @@
             <legend class="mb-2 text-xs font-bold text-slate-600">Pages this type can view</legend>
             <div id="new-role-permissions" class="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <div class="rounded-xl border border-blue-200 bg-blue-50/50 p-3"><label class="flex cursor-pointer items-center gap-2 text-xs font-bold text-slate-600"><input type="checkbox" value="patients" onchange="syncNewRoleLoyaltyToggle()" class="h-4 w-4 rounded border-slate-300 text-blue-600" /> Patients</label><label class="mt-2 flex min-h-11 cursor-pointer items-center justify-between gap-2 border-t border-blue-200 pt-2 text-sm font-bold text-blue-800"><span><span class="block">Show Loyalty tab</span><span class="mt-1 block text-xs font-normal">Includes managing patient membership, points, and rewards.</span></span><span class="relative inline-flex shrink-0 items-center"><input id="admin-role-loyalty" type="checkbox" role="switch" disabled class="peer sr-only" /><span class="h-5 w-9 rounded-full bg-slate-300 transition peer-checked:bg-blue-600 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-disabled:opacity-50"></span><span class="pointer-events-none absolute left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition peer-checked:translate-x-4"></span></span></label></div>
-              <div class="inv-permissions"><label><input type="checkbox" value="inventory">Inventory</label><label><input type="checkbox" value="inventory_manage">Manage inventory items and categories</label><label><input type="checkbox" value="inventory_receive">Receive inventory stock</label><label><input type="checkbox" value="inventory_use">Record inventory usage</label><label><input type="checkbox" value="inventory_adjust">Count and adjust inventory</label></div>
+              <div class="inv-permissions"><label><input type="checkbox" value="inventory">Inventory</label><label><input type="checkbox" value="inventory_manage">Manage inventory items and categories</label><label><input type="checkbox" value="inventory_receive">Receive inventory stock</label><label><input type="checkbox" value="inventory_use">Record inventory usage</label><label><input type="checkbox" value="inventory_adjust">Set opening stock and reverse movements</label></div>
               <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 p-3 text-xs font-bold text-slate-600"><input type="checkbox" value="chart" class="h-4 w-4 rounded border-slate-300 text-blue-600" /> Clinical Chart</label>
               <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 p-3 text-xs font-bold text-slate-600"><input type="checkbox" value="appointments" onchange="syncNewRoleAppointmentModifyToggle()" class="h-4 w-4 rounded border-slate-300 text-blue-600" /> Appointments</label>
               <div class="rounded-xl border border-violet-200 bg-violet-50/50 p-3">
@@ -10885,7 +10885,7 @@
       'Manage inventory items and categories': 'إدارة أصناف المخزون وتصنيفاته',
       'Receive inventory stock': 'استلام المخزون',
       'Record inventory usage': 'تسجيل استهلاك المخزون',
-      'Count and adjust inventory': 'جرد المخزون وتسويته',
+      'Set opening stock and reverse movements': 'تحديد الرصيد الافتتاحي وعكس الحركات',
       'Clinic operations': 'عمليات العيادة',
       'Finance, performance, and team information in one workspace.': 'المالية والأداء ومعلومات الفريق في مساحة عمل واحدة.',
       'Clinic management sections': 'أقسام إدارة العيادة',

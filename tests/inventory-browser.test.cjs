@@ -8,6 +8,8 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   const db=new PGlite();t.after(()=>db.close());
   await db.exec(fs.readFileSync(path.join(__dirname,'fixtures/inventory.sql'),'utf8'));
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261016203800_clinic_inventory.sql'),'utf8'));
+  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261016213858_simplify_inventory_items.sql'),'utf8'));
+  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017061336_retire_inventory_minimum_steps.sql'),'utf8'));
   let queue=Promise.resolve();const requests=[];
   const browser=await chromium.launch({headless:true,channel:process.env.LUMIN_TEST_BROWSER_CHANNEL||'chrome'});t.after(()=>browser.close());
   const page=await browser.newPage({viewport:{width:1440,height:1100},reducedMotion:'reduce'});page.setDefaultTimeout(7000);
@@ -26,7 +28,7 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   await page.addScriptTag({path:path.join(root,'vendor/lucide.min.js')});
   await page.addScriptTag({content:`
     let currentUiLanguage='en',currentSession={user:{id:'${uuid(1)}'}},currentUserAccess={active:true,isAdmin:true,permissions:new Set(['inventory','inventory_manage','inventory_receive','inventory_use','inventory_adjust'])},activeClinicManagementTab='overview',activeFinanceTab='invoices';
-    let db={rpc:async(name,args)=>{const result=await window.fixtureRPC(name,args,currentSession.user.id);if(window.dropReceiptReply&&name==='inventory_write'&&args.p_operation==='receive'&&!result.error){window.dropReceiptReply=false;return{error:{message:'Response lost after commit'}};}return result;}};
+    let db={rpc:async(name,args)=>{const result=await window.fixtureRPC(name,args,currentSession.user.id);if(name==='inventory_write'&&!result.error&&window.dropReceiptReply&&args.p_operation==='receive'){window.dropReceiptReply=false;return{error:{message:'Response lost after commit'}};}return result;}};
     function firstAuthorizedView(){return 'clinic-management'}
     function hrClinicDateValue(){return '2026-10-16'}
     async function switchFinanceTab(){}async function refreshActiveAnalyticsTab(){}async function refreshHrDirectory(){}async function ensureDentalCustomizationLoaded(){}
@@ -76,19 +78,30 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   assert.match(await page.locator('#view-inventory [role="alert"]').textContent(),/record changed/);
   assert.equal(await page.locator('[data-inv-action="retry-stock"]').count(),0,'Stale stock requires a fresh click, never automatic replay');
   await stockStep('receive').click();await waitStock(2);
+  assert.equal(await page.locator('.inv-minimum-stepper').count(),0,'Minimum is a plain value');
   await page.locator(`[data-inv-category="${anesthesia}"]`).click();
   await page.waitForFunction(()=>!document.querySelector('#view-inventory [aria-busy="true"]'));
   assert.ok(await page.locator('.inv-table tbody tr').count()>=1);
   await page.locator(`[data-inv-item="${anesthesiaItem}"]`).first().click();
+  assert.equal(await page.locator('#inventory-overlay [name="sku"],#inventory-overlay [name="location"],#inventory-overlay [name="supplier"],#inventory-overlay [name="review_note"],#inventory-overlay [name="notes"],.inv-detail-actions,.inv-detail-source').count(),0,'Removed fields and sections are absent');
+  assert.equal(await page.locator('[data-inv-action^="minimum-input-"]').count(),0);
+  await page.locator('#inventory-overlay [name="minimum"]').fill('4');
+  const unitSelect=page.locator('#inventory-overlay select[name="unit"]');
+  assert.equal(await unitSelect.count(),1);assert.equal(await unitSelect.isDisabled(),true,'A unit used by posted movements stays locked');
+  assert.equal(await unitSelect.inputValue(),'Box');assert.equal(await unitSelect.locator('option[value="Bottle"]').count(),1);
+  assert.equal(Number((await db.query('select minimum from public.inventory_items where id=$1',[anesthesiaItem])).rows[0].minimum),3,'Minimum edits wait for Save');
+  if(process.env.LUMIN_INVENTORY_SCREENSHOTS)await page.locator('.inv-dialog').screenshot({path:path.join(process.env.LUMIN_INVENTORY_SCREENSHOTS,'inventory-item-details-en.png')});
   await page.locator('#inventory-overlay select[name="category_id"]').selectOption(surgical);
   await page.locator('#inv-dialog-submit').click();
   await page.waitForFunction(()=>!document.getElementById('inventory-overlay'));
   assert.equal(Number((await db.query('select quantity from public.inventory_items where id=$1',[anesthesiaItem])).rows[0].quantity),2);
+  assert.equal(Number((await db.query('select minimum from public.inventory_items where id=$1',[anesthesiaItem])).rows[0].minimum),4);
   await page.locator('[data-inv-category="all"]').click();
   await page.locator('#inv-search').fill('Anasthesia');
   await page.waitForFunction(()=>document.querySelectorAll('.inv-table tbody tr').length===1);
-  await page.locator(`[data-inv-item="${anesthesiaItem}"]`).first().click();
-  await page.locator('#inventory-overlay [data-inv-action="receive"]').click();
+  await page.locator('[data-inv-action="choose-receive"]:visible').first().click();
+  await page.locator('#inv-picker-search').fill('Anasthesia');
+  await page.locator(`[data-inv-action="receive-picked"][data-id="${anesthesiaItem}"]`).click();
   await page.locator('#inventory-overlay [name="quantity"]').fill('2');
   await page.evaluate(()=>{window.dropReceiptReply=true;});
   await page.locator('#inv-dialog-submit').click();
@@ -96,11 +109,7 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   await page.locator('#inv-dialog-submit').click();
   await page.waitForFunction(()=>!document.getElementById('inventory-overlay'));
   assert.equal(Number((await db.query('select quantity from public.inventory_items where id=$1',[anesthesiaItem])).rows[0].quantity),4);
-  await page.locator(`[data-inv-item="${anesthesiaItem}"]`).first().click();
-  await page.locator('#inventory-overlay [data-inv-action="use"]').click();
-  await page.locator('#inventory-overlay [name="quantity"]').fill('3');
-  await page.locator('#inv-dialog-submit').click();
-  await page.waitForFunction(()=>!document.getElementById('inventory-overlay'));
+  for(const quantity of [3,2,1]){await stockStep('use').click();await waitStock(quantity);}
   assert.equal(Number((await db.query('select quantity from public.inventory_items where id=$1',[anesthesiaItem])).rows[0].quantity),1);
   await page.locator('[data-inv-action="history"]').click();
   await page.waitForFunction(()=>document.querySelectorAll('.inv-movement').length>0);
@@ -108,15 +117,14 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   await page.locator('[data-inv-action="stock"]').click();
   await page.locator('#inv-search').fill('Napkin');
   await page.waitForFunction(()=>document.querySelector('.inv-item')?.textContent==='Napkin');
-  assert.equal(await page.locator('.inv-stock-step:enabled').count(),0,'Missing stock units cannot be inferred');
+  assert.equal(await page.locator('.inv-stock-stepper:not(.inv-minimum-stepper) button:enabled').count(),0,'Missing stock units cannot be inferred');
   await page.locator('#inv-search').fill('Cotton pack');
   await page.waitForFunction(()=>document.querySelector('.inv-item')?.textContent==='Cotton pack');
-  assert.equal(await page.locator('.inv-stock-step:enabled').count(),0,'Unknown opening stock cannot be incremented or decremented');
+  assert.equal(await page.locator('.inv-stock-stepper:not(.inv-minimum-stepper) button:enabled').count(),0,'Unknown opening stock cannot be incremented or decremented');
   await page.locator('.inv-item').click();
-  assert.equal(await page.locator('#inventory-overlay [data-inv-action="receive"]').isDisabled(),true);
-  await page.locator('#inventory-overlay [data-inv-action="count"]').click();
+  assert.equal(await page.locator('#inventory-overlay select[name="unit"]').inputValue(),'pack','Legacy unit spelling is preserved');
+  await page.locator('#inventory-overlay select[name="unit"]').selectOption('Bottle');
   await page.locator('#inventory-overlay [name="quantity"]').fill('10');
-  await page.locator('#inventory-overlay [name="reason"]').fill('Physical opening count');
   await page.locator('#inv-dialog-submit').click();
   await page.waitForFunction(()=>!document.getElementById('inventory-overlay'));
   assert.equal(Number((await db.query("select quantity from public.inventory_items where name='Cotton pack'")).rows[0].quantity),10);
@@ -154,6 +162,9 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
     assert.equal(await stockStep(capability).isEnabled(),true,`${capability} permission enables only its stock button`);
     assert.equal(await stockStep(capability==='receive'?'use':'receive').isDisabled(),true);
   }
+  await page.evaluate(async()=>{currentSession={user:{id:'00000000-0000-4000-8000-000000000003'}};currentUserAccess={active:true,isAdmin:false,permissions:new Set(['inventory','inventory_manage'])};LuminInventory.reset();await switchClinicManagementTab('inventory');});
+  assert.equal(await stockStep('receive').isDisabled(),true);assert.equal(await stockStep('use').isDisabled(),true);
+  await page.locator(`[data-inv-item="${anesthesiaItem}"]`).first().click();assert.equal(await page.locator('#inventory-overlay [name="minimum"]').isEnabled(),true);
   await page.evaluate(()=>{currentUserAccess.active=false;LuminInventory.invalidate();});assert.equal(await page.locator('#view-inventory').textContent(),'');
   assert.ok(requests.some(r=>r.name==='inventory_write'&&r.args.p_operation==='import'));assert.deepEqual(errors,[]);
 });
