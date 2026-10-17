@@ -257,6 +257,12 @@ test('inventory page retains category context, direct stock edits, management de
     if(size==='small')assert.equal(await page.locator('.inv-table tbody').evaluate(node=>getComputedStyle(node).gridTemplateColumns.split(' ').length),1,'Small pictures use full-width rows');
   }
   assert.equal(requests.length,viewRequests,'Changing picture size needs no inventory reload');
+  await page.setViewportSize({width:1280,height:1100});await page.locator('#inv-picture-size').selectOption('medium');
+  assert.equal(await photo.evaluate(node=>node.scrollWidth>node.clientWidth+1),false,'An uploaded photo fits its four-column iPad card');
+  await stockStep('receive').click();await waitStock(2);await stockStep('use').click();await waitStock(1);
+  assert.equal(await viewStock.evaluate(node=>node.isConnected),true,'Four-column stock edits retain their button and photo');assert.equal(await viewPicture.evaluate(node=>node.isConnected),true);
+  if(process.env.LUMIN_INVENTORY_SCREENSHOTS)await page.locator('.inv-table tbody').screenshot({path:path.join(process.env.LUMIN_INVENTORY_SCREENSHOTS,'inventory-ipad-medium-photo-en-1280.png')});
+  await page.setViewportSize({width:1440,height:1100});await page.locator('#inv-picture-size').selectOption('large');
   const photoLayout=await photo.evaluate(node=>{const frame=node.getBoundingClientRect(),row=node.closest('tr').getBoundingClientRect(),name=node.closest('tr').cells[1].getBoundingClientRect();return{width:Math.abs(frame.width-row.width),above:frame.bottom<=name.top+1,stable:window.photoRow.isConnected&&window.photoStockButton.isConnected};});
   assert.ok(photoLayout.width<3&&photoLayout.above&&photoLayout.stable,'Photo spans the card above its name without replacing stock controls');
   const uploadedSource=await photo.locator('img').getAttribute('src');await page.evaluate(async()=>{LuminInventoryImages.clear();await LuminInventory.refresh({force:true,background:true});});
@@ -398,7 +404,7 @@ test('inventory page retains category context, direct stock edits, management de
   await waitStock(2);await page.evaluate(()=>window.inventoryReplyWaiters.splice(0).forEach(resolve=>resolve()));
   assert.equal(await stockStep('receive').locator('..').locator('.inv-number').textContent(),'2','An older read cannot undo a newer realtime update');
   await stockStep('use').click();await waitStock(1);
-  for(const language of ['en','ar'])for(const width of [320,390,480,820,1024,1440]){
+  for(const language of ['en','ar'])for(const width of [320,390,480,768,820,834,1024,1180,1280,1366,1440]){
     await page.setViewportSize({width,height:1100});
     await page.evaluate(async lang=>{currentUiLanguage=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';await LuminInventory.languageChanged();},language);
     const overflow=await page.locator('#view-inventory').evaluate(node=>node.scrollWidth>node.clientWidth+1);assert.equal(overflow,false,`${language} ${width}`);
@@ -437,11 +443,15 @@ test('inventory page retains category context, direct stock edits, management de
     if(process.env.LUMIN_INVENTORY_SCREENSHOTS&&((language==='en'&&width===1440)||(language==='ar'&&width===390))){fs.mkdirSync(process.env.LUMIN_INVENTORY_SCREENSHOTS,{recursive:true});await page.screenshot({path:path.join(process.env.LUMIN_INVENTORY_SCREENSHOTS,`inventory-${language}-${width}.png`),fullPage:width>=768});}
     for(const size of ['medium','small']){
       await page.locator('#inv-picture-size').selectOption(size);
+      if(size==='medium'&&width>=768&&width<=1366){
+        assert.equal(await page.locator('.inv-table tbody').evaluate(node=>getComputedStyle(node).gridTemplateColumns.split(' ').length),4,'iPad Medium uses four columns: '+language+' '+width);
+        const firstRow=await page.locator('.inv-table tbody tr').evaluateAll(nodes=>nodes.slice(0,4).map(node=>node.getBoundingClientRect().top));assert.equal(firstRow.length,4);assert.ok(firstRow.every(top=>Math.abs(top-firstRow[0])<2),'Four items share the same row');
+      }
       assert.equal(await page.locator('#view-inventory').evaluate(node=>node.scrollWidth>node.clientWidth+1),false,'Picture layout fits '+size+' '+language+' '+width);
       const smallControls=await page.locator('#view-inventory button:visible').evaluateAll(nodes=>nodes.filter(node=>{const r=node.getBoundingClientRect();return r.width<43||r.height<43;}).length);assert.equal(smallControls,0,'Picture controls retain touch targets: '+size+' '+language+' '+width);
       const brokenStocks=await page.locator('.inv-stock-stepper').evaluateAll(nodes=>nodes.filter(node=>{const [minus,value,plus]=[...node.children].map(child=>child.getBoundingClientRect()),cell=node.closest('td').getBoundingClientRect();return minus.left>=value.left||value.right>plus.left+1||plus.right>cell.right+1||minus.left<cell.left-1;}).length);assert.equal(brokenStocks,0,'Stock controls fit the picture layout: '+size+' '+language+' '+width);
       const pictureOverflow=await page.locator('[data-inv-photo]').evaluateAll(nodes=>nodes.filter(node=>node.scrollWidth>node.clientWidth+1).length);assert.equal(pictureOverflow,0,'Photo actions stay inside the layout: '+size+' '+language+' '+width);
-      if(process.env.LUMIN_INVENTORY_SCREENSHOTS&&[390,1440].includes(width))await page.locator('.inv-table tbody').screenshot({path:path.join(process.env.LUMIN_INVENTORY_SCREENSHOTS,`inventory-pictures-${size}-${language}-${width}.png`)});
+      if(process.env.LUMIN_INVENTORY_SCREENSHOTS&&[390,768,1280,1366,1440].includes(width))await page.locator('.inv-table tbody').screenshot({path:path.join(process.env.LUMIN_INVENTORY_SCREENSHOTS,`inventory-pictures-${size}-${language}-${width}.png`)});
     }
     await page.locator('#inv-picture-size').selectOption('large');
   }
