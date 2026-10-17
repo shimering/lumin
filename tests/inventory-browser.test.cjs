@@ -11,10 +11,31 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261016213858_simplify_inventory_items.sql'),'utf8'));
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017061336_retire_inventory_minimum_steps.sql'),'utf8'));
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017063353_bilingual_inventory_names.sql'),'utf8'));
+  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017073421_inventory_category_hierarchy.sql'),'utf8'));
+  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017075131_inventory_item_images.sql'),'utf8'));
   let queue=Promise.resolve();const requests=[];
   const browser=await chromium.launch({headless:true,channel:process.env.LUMIN_TEST_BROWSER_CHANNEL||'chrome'});t.after(()=>browser.close());
   const page=await browser.newPage({viewport:{width:1440,height:1100},reducedMotion:'reduce'});page.setDefaultTimeout(7000);
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  const photoFiles=new Map(),photoWrites=[];let dropPhotoReply=false,photoReads=0;
+  await page.route('https://inventory.test/functions/v1/inventory-images/**',async route=>{
+    const request=route.request(),url=new URL(request.url()),itemId=url.pathname.split('/').at(-1),method=request.method();
+    const headers={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, content-type','Access-Control-Allow-Methods':'GET, POST, DELETE, OPTIONS'};
+    if(method==='OPTIONS')return route.fulfill({status:204,headers});
+    const result=await (queue=queue.then(async()=>{
+      await db.exec('reset role');
+      const old=(await db.query('select * from public.inventory_item_images where item_id=$1',[itemId])).rows[0];
+      if(method==='GET'){photoReads++;return old&&url.searchParams.get('v')===old.revision?{status:200,headers:{...headers,'Content-Type':old.mime_type},body:photoFiles.get(old.revision)}:{status:404,body:JSON.stringify({code:'image_changed'})};}
+      if(method==='DELETE'){await db.query('delete from public.inventory_item_images where item_id=$1',[itemId]);return{status:200,body:JSON.stringify({image_version:null,image_mime:null,image_width:null,image_height:null,image_bytes:null})};}
+      const form=await new Request(url,{method:'POST',headers:request.headers(),body:request.postDataBuffer()}).formData(),file=form.get('image'),version=form.get('version'),expected=form.get('expected');
+      if(old?.revision!==version&&(old?.revision||'')!==expected)return{status:409,body:JSON.stringify({code:'image_changed'})};
+      const bytes=Buffer.from(await file.arrayBuffer());photoWrites.push({version,expected,size:bytes.length,type:file.type});
+      if(old?.revision!==version)await db.query("insert into public.inventory_item_images(item_id,revision,drive_file_id,sha256,mime_type,byte_size,width,height,updated_by) values($1,$2,'mock-private-drive',repeat('a',64),$3,$4,960,640,$5) on conflict(item_id) do update set revision=excluded.revision,mime_type=excluded.mime_type,byte_size=excluded.byte_size",[itemId,version,file.type,bytes.length,uuid(1)]);
+      photoFiles.set(version,bytes);return{status:200,body:JSON.stringify({image_version:version,image_mime:file.type,image_width:960,image_height:640,image_bytes:bytes.length})};
+    }));
+    if(dropPhotoReply&&method==='POST'&&result.status===200){dropPhotoReply=false;return route.abort('failed');}
+    await route.fulfill({...result,headers:{...headers,...result.headers}});
+  });
   await page.exposeFunction('fixtureRPC',(name,args,actor)=>{
     const run=queue.then(async()=>{
       requests.push({name,args,actor});await db.exec('reset role');await db.query("select set_config('test.actor',$1,false)",[actor]);await db.exec('set role authenticated');
@@ -29,14 +50,14 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   await page.addScriptTag({path:path.join(root,'vendor/lucide.min.js')});
   await page.addScriptTag({content:`
     let currentUiLanguage='en',currentSession={user:{id:'${uuid(1)}'}},currentUserAccess={active:true,isAdmin:true,permissions:new Set(['inventory','inventory_manage','inventory_receive','inventory_use','inventory_adjust'])},activeClinicManagementTab='overview',activeFinanceTab='invoices';
-    let db={rpc:async(name,args)=>{const result=await window.fixtureRPC(name,args,currentSession.user.id);if(name==='inventory_write'&&!result.error&&window.simulateInventoryRealtime)window.LuminInventory.invalidate();if(name==='inventory_write'&&!result.error&&window.dropReceiptReply&&args.p_operation==='receive'){window.dropReceiptReply=false;return{error:{message:'Response lost after commit'}};}return result;}};
+    const SUPABASE_URL='https://inventory.test';let db={auth:{getSession:async()=>({data:{session:{access_token:currentSession.user.id}}})},rpc:async(name,args)=>{const result=await window.fixtureRPC(name,args,currentSession.user.id);if(name==='inventory_write'&&!result.error&&window.simulateInventoryRealtime)window.LuminInventory.invalidate();if(name==='inventory_write'&&!result.error&&window.dropReceiptReply&&args.p_operation==='receive'){window.dropReceiptReply=false;return{error:{message:'Response lost after commit'}};}return result;}};
     function firstAuthorizedView(){return 'clinic-management'}
     function hrClinicDateValue(){return '2026-10-16'}
     async function switchFinanceTab(){}async function refreshActiveAnalyticsTab(){}async function refreshHrDirectory(){}async function ensureDentalCustomizationLoaded(){}
     ${source('hasPageAccess')}${source('firstAuthorizedClinicManagementTab')}${source('switchClinicManagementTab')}
     document.getElementById('auth-gate').classList.add('hidden');document.getElementById('app-shell').classList.remove('hidden');document.querySelectorAll('main>section').forEach(node=>node.classList.add('hidden'));document.getElementById('view-clinic-management').classList.remove('hidden');
   `});
-  for(const file of ['lumin-inventory-model.js','lumin-inventory.js'])await page.addScriptTag({path:path.join(root,file)});
+  for(const file of ['lumin-inventory-model.js','lumin-inventory-images.js','lumin-inventory.js'])await page.addScriptTag({path:path.join(root,file)});
   await page.evaluate(async()=>{LuminInventory.init();await switchClinicManagementTab('inventory')});
   assert.equal(await page.locator('#view-inventory').isVisible(),true);
   assert.match(await page.locator('#view-inventory').textContent(),/Your inventory starts here/);
@@ -174,6 +195,13 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   await page.locator('#inv-dialog-submit').click();
   await page.locator('#inv-manage-tab-categories[aria-selected="true"]').waitFor();
   assert.ok((await page.locator('#inv-management-panel').textContent()).includes('Restorative'));
+  const restorative=(await db.query("select id from public.inventory_categories where name='Restorative'")).rows[0].id;
+  let parentCategory=restorative;
+  for(const name of ['Composites','Ivoclar']){
+    await page.locator('[data-inv-action="category-add"]').click();await page.locator('#inventory-overlay [name="name"]').fill(name);await page.locator('#inventory-overlay [name="parent_id"]').selectOption(parentCategory);await page.locator('#inv-dialog-submit').click();await page.locator('#inv-manage-tab-categories[aria-selected="true"]').waitFor();parentCategory=(await db.query('select id from public.inventory_categories where name=$1',[name])).rows[0].id;
+  }
+  await page.locator('[data-inv-action="category-add"]').click();assert.equal(await page.locator(`#inventory-overlay [name="parent_id"] option[value="${parentCategory}"]`).count(),0,'Final-level categories cannot be chosen as parents');await page.keyboard.press('Escape');await page.locator('#inv-manage-tab-categories').waitFor();
+  assert.ok((await page.locator('#inv-management-panel').textContent()).includes('Restorative / Composites / Ivoclar'));
   await page.locator('#inv-manage-tab-items').click();
   await page.locator('#inv-management-search').fill('مخدر أزرق');
   await page.waitForFunction(()=>document.querySelectorAll('.inv-managed-item').length===1);
@@ -203,6 +231,30 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   await page.locator('#inventory-overlay [name="minimum"]').fill('2');
   await page.locator('#inv-dialog-submit').click();
   await page.locator('#inv-management-search').waitFor();await page.keyboard.press('Escape');
+  const photo=page.locator(`[data-inv-row="${anesthesiaItem}"] [data-inv-photo]`);
+  const sourcePhoto=Buffer.from((await page.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=2400;canvas.height=1600;const ctx=canvas.getContext('2d'),gradient=ctx.createLinearGradient(0,0,2400,1600);gradient.addColorStop(0,'#e0f2fe');gradient.addColorStop(1,'#1d4ed8');ctx.fillStyle=gradient;ctx.fillRect(0,0,2400,1600);return canvas.toDataURL('image/png').split(',')[1];})),'base64');
+  const upload=async node=>{const chooser=page.waitForEvent('filechooser');await node.click();await(await chooser).setFiles({name:'clinic-item.png',mimeType:'image/png',buffer:sourcePhoto});};
+  await photo.evaluate(node=>{node.scrollIntoView({block:'center'});window.photoRow=node.closest('tr');window.photoStockButton=window.photoRow.querySelector('.inv-stock-receive');});
+  dropPhotoReply=true;await upload(photo.locator('[data-inv-photo-action="choose"]'));
+  await photo.locator('[data-inv-photo-action="retry"]').waitFor();
+  await photo.locator('[data-inv-photo-action="retry"]').click();await photo.locator('img').waitFor();
+  assert.equal(photoWrites.length,2);assert.equal(photoWrites[0].version,photoWrites[1].version,'Lost photo replies reuse the upload identifier');
+  assert.equal(photoWrites[0].type,'image/webp');assert.ok(photoWrites[0].size<=307200&&photoWrites[0].size<sourcePhoto.length,'Uploads are compressed before transmission');
+  assert.deepEqual(await photo.locator('img').evaluate(node=>({width:node.naturalWidth,height:node.naturalHeight})),{width:960,height:640});
+  const photoLayout=await photo.evaluate(node=>{const frame=node.getBoundingClientRect(),row=node.closest('tr').getBoundingClientRect(),name=node.closest('tr').cells[1].getBoundingClientRect();return{width:Math.abs(frame.width-row.width),above:frame.bottom<=name.top+1,stable:window.photoRow.isConnected&&window.photoStockButton.isConnected};});
+  assert.ok(photoLayout.width<3&&photoLayout.above&&photoLayout.stable,'Photo spans the card above its name without replacing stock controls');
+  const uploadedSource=await photo.locator('img').getAttribute('src');await page.evaluate(async()=>{LuminInventoryImages.clear();await LuminInventory.refresh({force:true,background:true});});
+  await page.waitForFunction(({id,source})=>{const image=document.querySelector(`[data-inv-photo="${id}"] img`);return image&&image.src!==source&&image.naturalWidth===960;},{id:anesthesiaItem,source:uploadedSource});assert.equal(photoReads,1,'Visible photos load privately after the memory cache is reset');
+  if(process.env.LUMIN_INVENTORY_SCREENSHOTS)await photo.locator('..').locator('..').screenshot({path:path.join(process.env.LUMIN_INVENTORY_SCREENSHOTS,'inventory-photo-card-en.png')});
+  await page.locator(`[data-inv-item="${anesthesiaItem}"]`).first().click();
+  await page.locator('#inventory-overlay [name="name_en"]').fill('Unsaved photo edit');
+  const detailPhoto=page.locator('#inventory-overlay [data-inv-photo]');await upload(detailPhoto.locator('[data-inv-photo-action="choose"]'));
+  await page.waitForFunction(()=>document.querySelector('#inventory-overlay [data-inv-photo]')?.getAttribute('aria-busy')==='false');
+  assert.equal(await page.locator('#inventory-overlay [name="name_en"]').inputValue(),'Unsaved photo edit','Replacing a photo preserves other unsaved fields');
+  assert.equal(photoWrites.at(-1).expected,photoWrites[0].version);
+  await detailPhoto.locator('[data-inv-photo-action="remove"]').click();await detailPhoto.locator('.inv-photo-add').waitFor();
+  assert.equal((await db.query('select count(*)::int n from public.inventory_item_images')).rows[0].n,0);
+  await page.keyboard.press('Escape');
   for(const language of ['en','ar'])for(const width of [320,390,480,820,1024,1440]){
     await page.setViewportSize({width,height:1100});
     await page.evaluate(async lang=>{currentUiLanguage=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';await LuminInventory.languageChanged();},language);
@@ -253,6 +305,7 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   assert.equal(await page.locator('#view-inventory [data-inv-action="add"]').count(),0);
   assert.equal(await page.locator('#view-inventory [data-inv-action="choose-receive"]').count(),0);
   assert.equal(await page.locator('.inv-stock-step:enabled').count(),0,'Read-only staff cannot use stock buttons');
+  assert.equal(await page.locator('[data-inv-photo-action="choose"]').count(),0,'Read-only staff cannot upload photos');
   await page.locator('.inv-item').first().click();assert.equal(await page.locator('#inv-dialog-submit').count(),0);
   await page.keyboard.press('Escape');
   for(const [who,capability]of [[4,'receive'],[5,'use']]){

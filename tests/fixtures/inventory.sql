@@ -1,4 +1,4 @@
-create schema auth;create schema private;create role anon;create role authenticated;
+create schema auth;create schema private;create role anon;create role authenticated;create role service_role bypassrls;
 create function auth.uid() returns uuid language sql as $$select nullif(current_setting('test.actor',true),'')::uuid$$;
 grant usage on schema public,private,auth to authenticated,anon;
 create table public.access_roles(id uuid primary key,name text,is_admin boolean default false);

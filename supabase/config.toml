@@ -8,6 +8,10 @@ verify_jwt = true
 [functions.google-drive]
 verify_jwt = false
 
+# Inventory photos verify staff JWTs and live inventory permissions inside the handler.
+[functions.inventory-images]
+verify_jwt = false
+
 # Staff JWTs and Meta HMAC signatures are verified by the handler.
 [functions.whatsapp-webhook]
 verify_jwt = false

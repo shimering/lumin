@@ -9,6 +9,8 @@ test('inventory ledger enforces permissions, immutable history, units, idempoten
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261016213858_simplify_inventory_items.sql'),'utf8'));
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017061336_retire_inventory_minimum_steps.sql'),'utf8'));
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017063353_bilingual_inventory_names.sql'),'utf8'));
+  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017073421_inventory_category_hierarchy.sql'),'utf8'));
+  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017075131_inventory_item_images.sql'),'utf8'));
   const actor=async n=>{await db.exec(`reset role;select set_config('test.actor','${n?uuid(n):''}',false);set role authenticated`);};
   let request=1000;
   const write=async(op,payload,id=uuid(request++))=>(await db.query('select public.inventory_write($1,$2,$3) result',[op,JSON.stringify(payload),id])).rows[0].result;
@@ -129,9 +131,41 @@ test('inventory ledger enforces permissions, immutable history, units, idempoten
     await assert.rejects(write('import',{rows:[{...payload,name_en:'Different',name_ar:'أكواب جديدة'}]}),/ALREADY_IMPORTED/);
     await actor(2);await assert.rejects(write('item_save',{...row,name_ar:'غير مصرح'}),/ACCESS/);
   });
+  await actor(1);
+  await t.test('two subcategory levels filter, search and total all descendants without changing balances',async()=>{
+    const root=await write('category_save',{name:'Restorative',name_ar:'حشو'});
+    const middle=await write('category_save',{name:'Composites',name_ar:'كومبوزيت',parent_id:root.id});
+    const leaf=await write('category_save',{name:'Ivoclar',name_ar:'إيفوكلار',parent_id:middle.id});
+    await assert.rejects(write('category_save',{name:'Too deep',parent_id:leaf.id}),/CATEGORY_DEPTH/);
+    const material=await write('item_save',{name_en:'Composite A1',category_id:leaf.id,unit:'syringe',minimum:1,quantity:2});
+    const report=await read({category:root.id});assert.equal(report.total,1);assert.equal(report.items[0].id,material.id);
+    assert.equal((await read({category:middle.id})).total,1);assert.equal((await read({category:leaf.id})).total,1);
+    assert.equal((await read({query:'Restorative'})).items[0].id,material.id);assert.equal((await read({query:'كومبوزيت'})).items[0].id,material.id);
+    for(const id of [root.id,middle.id,leaf.id])assert.equal(report.categories.find(c=>c.id===id).item_count,1);
+    const c=report.categories.find(c=>c.id===leaf.id);assert.equal(c.depth,2);assert.deepEqual(c.path_ids,[root.id,middle.id,leaf.id]);
+    await assert.rejects(write('category_save',{id:root.id,revision:1,name:'Cycle',parent_id:leaf.id}),/CATEGORY/);
+    await assert.rejects(write('category_archive',{id:middle.id,revision:1}),/CATEGORY_IN_USE/);
+    await actor(2);assert.equal((await read({category:root.id})).items[0].id,material.id);
+    await assert.rejects(write('category_save',{name:'Unauthorized',parent_id:middle.id}),/ACCESS/);
+    await actor(1);assert.equal(Number((await item(material.id)).quantity),2);
+  });
   await db.exec('reset role');
   assert.equal((await db.query("select count(*)::int n from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('get_inventory','get_inventory_movements','inventory_write') and p.prosecdef")).rows[0].n,0);
   assert.equal((await db.query("select has_function_privilege('anon','public.inventory_write(text,jsonb,uuid)','execute') allowed")).rows[0].allowed,false);
+  await t.test('photo metadata permits inventory readers while Drive identifiers and writes stay service-only',async()=>{
+    await actor(1);const before=await item(created.id),movements=(await history()).total;
+    await db.exec('reset role');
+    await db.query("insert into public.inventory_item_images(item_id,revision,drive_file_id,sha256,mime_type,byte_size,width,height,updated_by) values($1,$2,'private-drive-id',repeat('a',64),'image/webp',100,40,30,$3)",[created.id,uuid(6000),uuid(1)]);
+    for(const who of [1,2,3,4,5,6]){await actor(who);const row=await item(created.id);assert.equal(row.image_version,uuid(6000));assert.equal(row.image_width,40);assert.equal(row.drive_file_id,undefined);assert.equal(row.sha256,undefined);assert.equal(row.revision,before.revision);assert.equal((await history()).total,movements);
+      await assert.rejects(db.query('select drive_file_id from public.inventory_item_images'),/permission denied/);
+      await assert.rejects(db.query('delete from public.inventory_item_images'),/permission denied/);
+      await assert.rejects(db.query('select * from public.inventory_image_storage'),/permission denied/);
+    }
+    await actor(7);assert.equal((await db.query('select revision from public.inventory_item_images')).rows.length,0,'No inventory access sees no metadata');
+    await db.exec('reset role;set role anon');await assert.rejects(db.query('select revision from public.inventory_item_images'),/permission denied/);
+    await db.exec('reset role;set role service_role');await db.query('delete from public.inventory_item_images where item_id=$1',[created.id]);
+    await actor(1);assert.equal((await item(created.id)).image_version,null);assert.equal((await item(created.id)).revision,before.revision);
+  });
 });
 
 test('inventory cleanup removes metadata from the schema and retry cache while preserving balances and history',async t=>{
@@ -147,6 +181,7 @@ test('inventory cleanup removes metadata from the schema and retry cache while p
   await db.exec('reset role');await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261016213858_simplify_inventory_items.sql'),'utf8'));
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017061336_retire_inventory_minimum_steps.sql'),'utf8'));
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017063353_bilingual_inventory_names.sql'),'utf8'));
+  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017073421_inventory_category_hierarchy.sql'),'utf8'));
   const cached=(await db.query('select payload from private.inventory_requests where id=$1',[uuid(7000)])).rows[0].payload;
   assert.deepEqual(cached.rows[0],{name:'Existing material',category_id:category,quantity:2,minimum:3,unit:'Box'});
   const columns=(await db.query("select column_name from information_schema.columns where table_schema='public' and table_name='inventory_items'")).rows.map(r=>r.column_name);

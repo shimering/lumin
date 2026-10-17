@@ -37,3 +37,13 @@ test('bilingual names follow language with a fallback and survive CSV export/imp
   assert.throws(()=>model.parseCSV('English name,Arabic name,Quantity,Minimum,Unit\nA,صنف,0,1,Box\nB,صنف,0,1,Box'),/DUPLICATE/);
   assert.throws(()=>model.parseCSV('English name,Arabic name,Quantity,Minimum,Unit\n,,0,1,Box'),/ROW/);
 });
+test('three-level category paths round-trip through CSV in both languages',()=>{
+  const tree=[{id:'r',name:'Restorative',name_ar:'حشو',parent_id:null},{id:'m',name:'Composites',name_ar:'كومبوزيت',parent_id:'r'},{id:'l',name:'Ivoclar',name_ar:'إيفوكلار',parent_id:'m'}];
+  assert.deepEqual(model.categoryTree(tree.slice().reverse()).map(c=>c.depth),[0,1,2]);
+  assert.deepEqual(model.categoryPath(tree[2],tree).map(c=>c.id),['r','m','l']);
+  const [row]=model.parseCSV(model.csv([{name:'Composite A1',category_id:'l',unit:'syringe',quantity:2,minimum:1}],tree),tree);
+  assert.equal(row.category_id,'l');assert.equal(row.quantity,2);
+  const [arabic]=model.parseCSV('التصنيف,التصنيف الفرعي,التصنيف الفرعي الثاني,الصنف,الكمية الحالية,الحد الأدنى,الوحدة\nحشو,كومبوزيت,إيفوكلار,A2,0,1,syringe',tree);
+  assert.equal(arabic.category_id,'l');
+  assert.throws(()=>model.parseCSV('Category,Subcategory,Second subcategory,Item,Quantity,Minimum,Unit\nRestorative,,Ivoclar,A2,0,1,syringe',tree),/ROW/);
+});
