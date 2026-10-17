@@ -1,6 +1,6 @@
 # Clinic inventory page
 
-Revision 6 keeps filtering and stock edits stable under slow network responses.
+Revision 7 adds clipboard image uploads while keeping filtering and stock edits stable under slow network responses.
 
 ## Fields and daily use
 
@@ -26,6 +26,8 @@ Quantities, minimums, units, and blanks remain as supplied, including Napkin's m
 
 Every stock card has a full-width image area above its name/category row. Empty areas offer Add image to managers; existing photos have an icon-only Change image button with a label and tooltip. Item details supports upload, replacement, and removal. JPEG, PNG, and WebP source files up to 15 MB are resized to at most 960 px and compressed to WebP (JPEG fallback), at most 300 KiB. Canvas encoding removes source metadata. Visible photos load on demand and use a bounded, session-scoped object-URL cache cleared on reset.
 
+Managers can use Paste image on a card or in Item details, or focus its photo area and press Ctrl+V / Cmd+V. Existing photos use a compact clipboard icon; empty areas show its text label. Clipboard access is requested only from the Paste image button. Unsupported clipboard access or denied permission offers keyboard paste or file selection. Keyboard paste is limited to the target photo area and leaves text fields untouched. Pasted images use the same optimization, private upload, version checks, and retry flow as selected files. Session reset cancels delayed clipboard/file selection results, and photo updates retain focus and unsaved detail fields.
+
 Optimized bytes are stored privately in an Inventory folder in the clinic's connected Google Drive. The separate inventory-images Edge Function validates the current Supabase session and live inventory permissions on every request; patient permissions are not required or granted. Browser metadata exposes a photo version, dimensions, type and size, never Drive identifiers or credentials. Replacements use expected versions; lost replies retry the same upload identifier. Old photos are moved to Drive trash after a successful replacement or removal. Photo writes do not change stock revisions or create ledger movements. Patient sync mappings and snapshots are separate.
 
 ## Backend and permissions
@@ -42,6 +44,6 @@ Desktop uses a responsive photo-card grid and category navigation. Tablet uses t
 
 Stock clicks update quantities and statuses immediately. Accepted clicks enter a serial queue using the latest confirmed revision, without dimming buttons or waiting for report refreshes. A lost response retains its request ID and pauses unsent clicks until explicit retry; a stale revision cancels unsent clicks for review. Realtime events are coalesced into quiet reconciliation reads that do not lock controls. Navigation warns while stock clicks remain unsaved. Stock changes retain existing rows, icons and photo elements, preserving scroll, focus and selection. Inventory icon rendering targets only new placeholders, avoiding Lucide's repeated replacement of existing SVGs across the application.
 
-Integration checks cover permissions, imported blanks, duplicate prevention, safe retries after lost responses, rapid queued clicks, stale revisions, opening stock, minimum limits, schema cleanup, hierarchy paths/filtering, photo compression, private access, replacement/removal, and mobile/RTL stability. Delayed write/read tests verify immediate quantity updates, unchanged button appearance, persistent dropdown/icon nodes, safe queue recovery, and out-of-order filter replies. Drive endpoint tests use a local Google mock; live deployment checks cover authentication and database permissions.
+Integration checks cover permissions, imported blanks, duplicate prevention, safe retries after lost responses, rapid queued clicks, stale revisions, opening stock, minimum limits, schema cleanup, hierarchy paths/filtering, photo compression, clipboard button/keyboard uploads, denied/empty/unsupported clipboard states, delayed clipboard results after session reset, private access, replacement/removal, and mobile/RTL stability. Delayed write/read tests verify immediate quantity updates, unchanged button appearance, persistent dropdown/icon nodes, safe queue recovery, and out-of-order filter replies. Clipboard tests use mocked reads without accessing the system clipboard. Drive endpoint tests use a local Google mock; live deployment checks cover authentication and database permissions.
 
 Purchasing, unit conversion, valuation, and automatic treatment consumption remain later phases.

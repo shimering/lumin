@@ -258,6 +258,41 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   await detailPhoto.locator('[data-inv-photo-action="remove"]').click();await detailPhoto.locator('.inv-photo-add').waitFor();
   assert.equal((await db.query('select count(*)::int n from public.inventory_item_images')).rows[0].n,0);
   await page.keyboard.press('Escape');
+  // Clipboard reads are mocked so these checks never read or change the user's clipboard.
+  await page.evaluate(base64=>{
+    window.clipboardPhoto=new Blob([Uint8Array.from(atob(base64),c=>c.charCodeAt(0))],{type:'image/png'});window.clipboardMode='image';window.clipboardReads=0;
+    window.readClipboard=async()=>{window.clipboardReads++;if(window.clipboardMode==='denied')throw new DOMException('Denied','NotAllowedError');if(window.clipboardMode==='empty')return[{types:['text/plain']}];if(window.clipboardMode==='hold')await new Promise(resolve=>window.releaseClipboard=resolve);return[{types:['image/png'],getType:async()=>window.clipboardPhoto}];};
+    Object.defineProperty(navigator,'clipboard',{configurable:true,value:{read:window.readClipboard}});
+  },sourcePhoto.toString('base64'));
+  const beforePaste=photoWrites.length;
+  await page.evaluate(()=>{window.clipboardMode='empty';});await photo.locator('[data-inv-photo-action="paste"]').click();
+  assert.match(await photo.locator('.inv-photo-error').textContent(),/Copy an image first/);assert.equal(photoWrites.length,beforePaste);
+  await page.evaluate(()=>{window.clipboardMode='denied';});await photo.locator('[data-inv-photo-action="paste"]').click();
+  assert.match(await photo.locator('.inv-photo-error').textContent(),/Allow clipboard access/);assert.equal(photoWrites.length,beforePaste);
+  await page.evaluate(()=>{navigator.clipboard.read=undefined;});await photo.locator('[data-inv-photo-action="paste"]').click();
+  assert.match(await photo.locator('.inv-photo-error').textContent(),/Ctrl\+V/);assert.equal(photoWrites.length,beforePaste);
+  await page.evaluate(()=>{navigator.clipboard.read=window.readClipboard;window.clipboardMode='image';});
+  await photo.locator('[data-inv-photo-action="paste"]').click();await photo.locator('img').waitFor();
+  await page.waitForFunction(id=>document.querySelector(`[data-inv-photo="${id}"]`)?.getAttribute('aria-busy')==='false',anesthesiaItem);
+  assert.equal(photoWrites.length,beforePaste+1,'Paste image uses the private upload endpoint');assert.equal(photoWrites.at(-1).type,'image/webp');assert.ok(photoWrites.at(-1).size<=307200);
+  assert.equal(await photo.locator('[data-inv-photo-action="paste"] span').count(),0,'Existing photos use a compact Paste image icon');
+  assert.equal(await photo.evaluate(node=>node.contains(document.activeElement)),true,'Photo updates preserve keyboard focus');
+  await page.locator(`[data-inv-item="${anesthesiaItem}"]`).first().click();await page.locator('#inventory-overlay [name="name_en"]').fill('Unsaved clipboard edit');
+  const pasteEvent=async(node,type='image/png')=>node.evaluate((target,type)=>{const data=new DataTransfer();data.items.add(new File([window.clipboardPhoto],'clipboard.png',{type}));const event=new ClipboardEvent('paste',{clipboardData:data,bubbles:true,cancelable:true});target.dispatchEvent(event);return event.defaultPrevented;},type);
+  assert.equal(await pasteEvent(page.locator('#inventory-overlay [name="name_en"]')),false,'Pasting into a text field never uploads a photo');
+  assert.equal(photoWrites.length,beforePaste+1);
+  await detailPhoto.focus();assert.equal(await pasteEvent(detailPhoto),true);
+  await page.waitForFunction(()=>document.querySelector('#inventory-overlay [data-inv-photo]')?.getAttribute('aria-busy')==='false');
+  assert.equal(photoWrites.length,beforePaste+2,'Keyboard paste replaces the focused item photo');assert.equal(photoWrites.at(-1).expected,photoWrites.at(-2).version);
+  assert.equal(await page.locator('#inventory-overlay [name="name_en"]').inputValue(),'Unsaved clipboard edit');
+  await detailPhoto.locator('[data-inv-photo-action="remove"]').click();await detailPhoto.locator('.inv-photo-add').waitFor();
+  assert.equal(await pasteEvent(detailPhoto,'image/svg+xml'),true);assert.match(await detailPhoto.locator('.inv-photo-error').textContent(),/JPEG, PNG or WebP/);assert.equal(photoWrites.length,beforePaste+2,'Unsupported clipboard image types never leave the browser');
+  await page.keyboard.press('Escape');
+  // A clipboard permission/read response arriving after reset must never upload into the new session.
+  await page.evaluate(()=>{window.clipboardMode='hold';});await photo.locator('[data-inv-photo-action="paste"]').click();
+  await page.waitForFunction(()=>typeof window.releaseClipboard==='function');
+  await page.evaluate(async()=>{LuminInventoryImages.clear();await LuminInventory.refresh({force:true,background:true});window.releaseClipboard();await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});
+  assert.equal(photoWrites.length,beforePaste+2);assert.equal(await photo.getAttribute('aria-busy'),'false');
   assert.equal(await page.locator('#inv-mobile-category option[value="'+surgical+'"]').count(),0,'Main dropdown contains only main categories');
   await page.locator('#inv-mobile-category').selectOption(restorative);await page.locator('#inv-subcategory option[value="'+parentCategory+'"]').waitFor({state:'attached'});
   assert.equal(await page.locator('#inv-subcategory option[value="'+parentCategory+'"]').textContent(),'Composites / Ivoclar','Second-level paths stay in the subcategory dropdown');
@@ -396,6 +431,8 @@ test('inventory page uses the real SQL ledger for imports, categories, stock flo
   assert.equal(await page.locator('.inv-stock-step:enabled').count(),0,'Read-only staff cannot use stock buttons');
   assert.equal(await page.locator('[data-inv-drag-kind]').count(),0,'Read-only staff cannot move inventory');
   assert.equal(await page.locator('[data-inv-photo-action="choose"]').count(),0,'Read-only staff cannot upload photos');
+  assert.equal(await page.locator('[data-inv-photo-action="paste"]').count(),0,'Read-only staff cannot paste photos');
+  const readonlyWrites=photoWrites.length;assert.equal(await pasteEvent(page.locator('[data-inv-photo]').first()),false);assert.equal(photoWrites.length,readonlyWrites);
   await page.locator('.inv-item').first().click();assert.equal(await page.locator('#inv-dialog-submit').count(),0);
   assert.equal(await page.locator('[data-inv-action="delete-item"]').count(),0,'Read-only item details have no Delete action');
   await page.keyboard.press('Escape');
