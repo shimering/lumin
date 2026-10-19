@@ -1,4 +1,4 @@
-const LUMIN_CACHE = "lumin-dental-shell-v249";
+const LUMIN_CACHE = "lumin-dental-shell-v250";
 const LUMIN_SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -25,8 +25,10 @@ const LUMIN_SHELL = [
   "/lumin-clinic-management.js?v=5",
   "/lumin-inventory-model.js?v=7",
   "/lumin-inventory-images.js?v=4",
-  "/lumin-inventory.js?v=14",
-  "/lumin-inventory.css?v=13",
+  "/lumin-supplier-list-model.js?v=1",
+  "/lumin-inventory-supplier.js?v=1",
+  "/lumin-inventory.js?v=15",
+  "/lumin-inventory.css?v=14",
   "/lumin-clinic-management.css?v=4",
   "/lumin-patient-scans.js?v=6",
   "/lumin-patient-scans.css?v=4",
@@ -129,6 +131,12 @@ self.addEventListener("fetch", (event) => {
   ) return;
 
   // Public quotation navigations must never fall back to the clinic login or an offline copy.
+  if (["/supplier-list", "/supplier-list/", "/supplier-list.html"].includes(url.pathname)) {
+    event.respondWith(fetch(event.request,{cache:"no-store"}).catch(()=>new Response(
+      '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Supplier list unavailable</title><p>Connect to the internet to open this supplier list. / اتصل بالإنترنت لفتح قائمة المورد.</p>',
+      {status:503,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}}
+    )));return;
+  }
   if (["/quotation", "/quotation/", "/quotation.html", "/quotation-logo"].includes(url.pathname)) {
     event.respondWith(fetch(request, { cache: "no-store" }).catch(() => new Response(
       '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Quotation unavailable</title><p>Connect to the internet to open this quotation. / اتصل بالإنترنت لفتح عرض الأسعار.</p>',

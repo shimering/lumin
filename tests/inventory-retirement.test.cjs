@@ -5,7 +5,7 @@ const uuid=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
 test('retiring inventory movements preserves balances, photos, permissions and safe stock retries',async t=>{
   const db=new PGlite();t.after(()=>db.close());
   await db.exec(fs.readFileSync(path.join(__dirname,'fixtures/inventory.sql'),'utf8'));
-  const files=fs.readdirSync(migrationDir).filter(file=>file.includes('inventory')&&file.endsWith('.sql')).sort(),retirement=files.pop();
+  const files=fs.readdirSync(migrationDir).filter(file=>file.includes('inventory')&&file.endsWith('.sql')&&file<='20261017162033_retire_inventory_movements.sql').sort(),retirement=files.pop();
   assert.match(retirement,/retire_inventory_movements/);
   for(const file of files)await db.exec(fs.readFileSync(path.join(migrationDir,file),'utf8'));
   const actor=async n=>db.exec(`reset role;select set_config('test.actor','${n?uuid(n):''}',false);set role authenticated`);

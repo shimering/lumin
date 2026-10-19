@@ -7,7 +7,7 @@ if (path.relative(root,output) !== '.cloudflare-assets' || fs.existsSync(output)
 fs.rmSync(output,{recursive:true,force:true});
 fs.mkdirSync(output,{recursive:true});
 for (const entry of fs.readdirSync(root,{withFileTypes:true})) {
-  if (entry.isFile() && (/^(?:index|quotation)\.html$/.test(entry.name) || /^lumin-[\w-]+\.(?:js|mjs|css)$/.test(entry.name) || /^(?:favicon\.svg|og\.png|manifest\.webmanifest|sw\.js|OneSignalSDKWorker\.js|app-version\.json|_headers)$/.test(entry.name))) {
+  if (entry.isFile() && (/^(?:index|quotation|supplier-list)\.html$/.test(entry.name) || /^lumin-[\w-]+\.(?:js|mjs|css)$/.test(entry.name) || /^(?:favicon\.svg|og\.png|manifest\.webmanifest|sw\.js|OneSignalSDKWorker\.js|app-version\.json|_headers)$/.test(entry.name))) {
     fs.copyFileSync(path.join(root,entry.name),path.join(output,entry.name));
   }
 }

@@ -462,7 +462,8 @@ test('inventory page retains category context, direct stock edits, management de
     await page.locator('#inv-picture-size').selectOption('large');
   }
   await page.setViewportSize({width:390,height:900});
-  assert.equal(await page.locator('.inv-heading [data-inv-action="choose-receive"]').isVisible(),true,'Receive stays available in the heading');
+  assert.equal(await page.locator('.inv-heading [data-inv-action="choose-receive"]').isVisible(),false,'Mobile heading uses Add item');
+  assert.equal(await page.locator('.inv-heading [data-inv-action="add"]').isVisible(),true,'Add item is available in the mobile heading');
   await page.locator('[data-inv-action="categories"]:visible').first().click();
   await page.locator('#inv-manage-tab-items').click();
   await page.locator('[data-inv-action="managed-add"]').click();

@@ -1,6 +1,10 @@
 [functions.quotation-view]
 verify_jwt = false
 
+# The saved supplier list's unguessable token is the read capability.
+[functions.inventory-supplier-view]
+verify_jwt = false
+
 [functions.quotation-manage]
 verify_jwt = true
 
