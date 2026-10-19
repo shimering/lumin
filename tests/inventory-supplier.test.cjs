@@ -4,12 +4,13 @@ const root=path.resolve(__dirname,'..'),model=require('../lumin-supplier-list-mo
 const uuid=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
 async function database(t){
   const db=new PGlite();t.after(()=>db.close());await db.exec(fs.readFileSync(path.join(__dirname,'fixtures/inventory.sql'),'utf8'));
-  for(const file of fs.readdirSync(path.join(root,'supabase/migrations')).filter(name=>/^(20261016203800|20261016213858|20261017061336|20261017063353|20261017073421|20261017075131|20261017144330|20261017162033|20261019054001)_/.test(name)).sort())await db.exec(fs.readFileSync(path.join(root,'supabase/migrations',file),'utf8'));
+  for(const file of fs.readdirSync(path.join(root,'supabase/migrations')).filter(name=>/^(20261016203800|20261016213858|20261017061336|20261017063353|20261017073421|20261017075131|20261017144330|20261017162033|20261019054001|20261019061244)_/.test(name)).sort())await db.exec(fs.readFileSync(path.join(root,'supabase/migrations',file),'utf8'));
   await db.exec("create table public.quotation_settings(id integer primary key,clinic_name text);insert into public.quotation_settings values(1,'Lumin Clinic عيادة لومين');");
   const parent=(await db.query("select id from public.inventory_categories where key='anaesthesia'")).rows[0].id;
   await db.query("insert into public.inventory_categories(id,name,name_ar,parent_id) values($1,'Deep subcategory','تصنيف فرعي عميق',$2)",[uuid(100),parent]);
   for(let n=0;n<47;n++)await db.query("insert into public.inventory_items(id,name,name_en,name_ar,category_id,quantity,minimum,unit) values($1,$2,$2,$3,$4,$5,3,'Box')",[uuid(1000+n),'Supply '+String(n).padStart(2,'0'),`صنف ${n}`,uuid(100),n<25?0:1]);
   await db.query("insert into public.inventory_items(id,name,name_en,quantity,minimum,unit) values($1,'Healthy item','Healthy item',20,3,'Box'),($2,'Unknown item','Unknown item',null,3,'Box'),($3,'No minimum','No minimum',2,null,'Box')",[uuid(2000),uuid(2001),uuid(2002)]);
+  await db.query("insert into public.inventory_item_images(item_id,revision,drive_file_id,sha256,mime_type,byte_size,width,height,updated_by) values($1,$2,'private-test-photo',repeat('a',64),'image/jpeg',1024,160,160,$3)",[uuid(1001),uuid(3001),uuid(1)]);
   let queue=Promise.resolve();
   function rpc(name,args={},who=1,role='authenticated'){
     const run=queue.then(async()=>{await db.exec('reset role');await db.query("select set_config('test.actor',$1,false)",[who?uuid(who):'']);await db.exec('set role '+role);try{
@@ -29,7 +30,11 @@ test('supplier lists enforce scope, complete candidates, main categories, minima
   await assert.rejects(rpc('create_inventory_supplier_list',{...args,p_items:items.slice(1)}),/SUPPLIER_REQUEST/);
   const publicData=await rpc('inventory_supplier_source',{p_token:saved.token},null,'service_role');
   assert.equal(publicData.items.length,46);assert.equal(publicData.items.some(item=>item.name_en==='Supply 00'),false);
-  assert.deepEqual(Object.keys(publicData.items[0]).sort(),['category_name','category_name_ar','name_ar','name_en','requested_quantity','unit']);assert.equal(publicData.items[0].requested_quantity,3);
+  assert.deepEqual(Object.keys(publicData.items[0]).sort(),['category_name','category_name_ar','image_data_url','name_ar','name_en','requested_quantity','unit']);assert.equal(publicData.items[0].requested_quantity,3);
+  const jpeg='data:image/jpeg;base64,/9j/4P/Z',photoArgs={...args,p_request_id:uuid(5100),p_items:[{...items[0],image_version:uuid(3001),image_data_url:jpeg}]};
+  const withPhoto=await rpc('create_inventory_supplier_list',photoArgs),photoDocument=await rpc('inventory_supplier_source',{p_token:withPhoto.token},null,'service_role');assert.equal(photoDocument.items[0].image_data_url,jpeg);assert.ok(!JSON.stringify(photoDocument).includes('private-test-photo'));
+  for(const photo of ['https://private.test/image.jpg','data:image/svg+xml;base64,PHN2Zz4=',jpeg+'A','data:image/jpeg;base64,/9j/'+('a'.repeat(24000))])await assert.rejects(rpc('create_inventory_supplier_list',{...photoArgs,p_request_id:uuid(5101),p_items:[{...photoArgs.p_items[0],image_data_url:photo}]}),/INVENTORY_SUPPLIER_PHOTO/);
+  await assert.rejects(rpc('create_inventory_supplier_list',{...photoArgs,p_request_id:uuid(5102),p_items:[{...photoArgs.p_items[0],image_version:uuid(9999)}]}),/INVENTORY_SUPPLIER_STALE/);
   assert.ok(!JSON.stringify(publicData).includes('"quantity"'));assert.ok(!JSON.stringify(publicData).includes('Deep subcategory'));
   await db.query('update public.inventory_items set quantity=30,revision=revision+1 where id=$1',[items[0].id]);
   assert.deepEqual(await rpc('inventory_supplier_source',{p_token:saved.token},null,'service_role'),publicData,'Published list is immutable');
@@ -49,11 +54,13 @@ test('supplier lists enforce scope, complete candidates, main categories, minima
 test('supplier review and shared JPG/link page fit mobile, tablet, desktop, English and Arabic',async t=>{
   const{db,rpc}=await database(t);const downloadsPath=path.join(root,'.wrangler/supplier-review/downloads');fs.mkdirSync(downloadsPath,{recursive:true});const browser=await chromium.launch({headless:true,channel:process.env.LUMIN_TEST_BROWSER_CHANNEL||'chrome',downloadsPath});t.after(()=>browser.close());
   const page=await browser.newPage({viewport:{width:375,height:812},acceptDownloads:true,reducedMotion:'reduce'});page.setDefaultTimeout(8000);
+  const sourcePhoto=await page.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=canvas.height=160;const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,160,160);ctx.fillStyle='#60a5fa';ctx.fillRect(40,40,80,96);ctx.fillStyle='#dbeafe';ctx.fillRect(48,48,64,20);return canvas.toDataURL('image/jpeg',.8);});
+  await page.route('https://inventory.test/functions/v1/inventory-images/**',async route=>{assert.equal(route.request().headers().authorization,'Bearer fixture-token');return route.fulfill({contentType:'image/jpeg',headers:{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization'},body:Buffer.from(sourcePhoto.split(',')[1],'base64')});});
   const errors=[];page.on('pageerror',error=>errors.push(error.message));let creates=0,dropReply=true,lastSaved;
   await page.exposeFunction('fixtureRPC',async(name,args)=>{try{const data=await rpc(name,args);if(name==='create_inventory_supplier_list'){creates++;lastSaved=data;if(dropReply){dropReply=false;return{error:{message:'Lost response'}};}}return{data};}catch(error){return{error:{message:error.message}};}});
   await page.route('https://supplier.test/**',async route=>{
     const url=new URL(route.request().url());
-    if(url.pathname==='/')return route.fulfill({contentType:'text/html',body:`<!doctype html><meta charset=utf-8><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:12px;font-family:Arial}*{box-sizing:border-box}.hidden{display:none}</style><link rel="stylesheet" href="lumin-inventory.css"><section id="view-clinic-management"><section id="view-inventory"></section></section><script>var currentSession={user:{id:'${uuid(1)}'}},currentUserAccess={permissions:new Set(['inventory']),isAdmin:true},currentUiLanguage='en';function hasPageAccess(){return true}var db={rpc:(name,args)=>fixtureRPC(name,args)};</script>${['vendor/lucide.min.js','lumin-inventory-model.js','lumin-supplier-list-model.js','lumin-inventory-supplier.js','lumin-inventory.js'].map(file=>`<script src="${file}"></script>`).join('')}`});
+    if(url.pathname==='/')return route.fulfill({contentType:'text/html',body:`<!doctype html><meta charset=utf-8><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:12px;font-family:Arial}*{box-sizing:border-box}.hidden{display:none}</style><link rel="stylesheet" href="lumin-inventory.css"><section id="view-clinic-management"><section id="view-inventory"></section></section><script>var SUPABASE_URL='https://inventory.test';var currentSession={user:{id:'${uuid(1)}'}},currentUserAccess={permissions:new Set(['inventory']),isAdmin:true},currentUiLanguage='en';function hasPageAccess(){return true}var db={rpc:(name,args)=>fixtureRPC(name,args),auth:{getSession:async()=>({data:{session:{access_token:'fixture-token'}}})}};</script>${['vendor/lucide.min.js','lumin-inventory-model.js','lumin-inventory-images.js','lumin-supplier-list-model.js','lumin-inventory-supplier.js','lumin-inventory.js'].map(file=>`<script src="${file}"></script>`).join('')}`});
     const file=path.join(root,url.pathname.slice(1));if(!file.startsWith(root+path.sep)||!fs.existsSync(file))return route.fulfill({status:404,body:''});
     return route.fulfill({contentType:file.endsWith('.css')?'text/css':file.endsWith('.js')?'application/javascript':'text/html',body:fs.readFileSync(file)});
   });
@@ -63,6 +70,7 @@ test('supplier review and shared JPG/link page fit mobile, tablet, desktop, Engl
   const supplierAction=name=>page.locator(`[data-supplier-action="${name}"]`);
   await heading.locator('[data-inv-action=supplier-list]').click();assert.equal(creates,0);await page.locator('[name=supplier-scope][value=both]').check();await supplierAction('review').click();
   await page.waitForFunction(()=>document.querySelectorAll('[data-supplier-item]').length===47);assert.equal(creates,0,'Review does not publish anything');
+  await page.waitForFunction(()=>document.querySelector('[data-supplier-thumb] img')?.naturalWidth===160);
   assert.equal(await page.locator('.inv-supplier-group h4').count(),1);assert.equal(await page.locator('.inv-supplier-group h4').textContent(),'Consumables');
   const removed=await page.locator('[data-supplier-item] strong').first().textContent();await supplierAction('remove').first().click();assert.equal(await page.locator('[data-supplier-item]').count(),46);
   const wanted=page.locator('[name=supplier-quantity]').first();assert.equal(await wanted.inputValue(),'1');assert.equal(await supplierAction('wanted-minus').first().isDisabled(),true);await supplierAction('wanted-plus').first().click();await supplierAction('wanted-plus').first().click();assert.equal(await wanted.inputValue(),'3');await supplierAction('wanted-minus').first().click();assert.equal(await wanted.inputValue(),'2');
@@ -81,6 +89,7 @@ test('supplier review and shared JPG/link page fit mobile, tablet, desktop, Engl
   await supplierAction('create').click();await page.locator('.inv-supplier-link').waitFor();const link=await page.locator('.inv-supplier-link').inputValue();assert.equal(new URL(link).searchParams.get('s'),lastSaved.token);assert.equal(creates,2);
   assert.equal((await db.query('select count(*) count from private.inventory_supplier_lists')).rows[0].count,1);
   const snapshot=await rpc('inventory_supplier_source',{p_token:lastSaved.token},null,'service_role');assert.equal(snapshot.items.some(item=>item.name_en===removed),false);assert.equal(snapshot.items.find(item=>item.name_en==='Supply 01').requested_quantity,2);
+  assert.match(snapshot.items.find(item=>item.name_en==='Supply 01').image_data_url,/^data:image\/jpeg;base64,/);
   const publicPage=await browser.newPage({viewport:{width:375,height:812},acceptDownloads:true,reducedMotion:'reduce'});publicPage.on('pageerror',error=>errors.push(error.message));
   await publicPage.addInitScript(()=>{Object.defineProperty(navigator,'canShare',{value:()=>false,writable:true,configurable:true});Object.defineProperty(navigator,'share',{value:undefined,writable:true,configurable:true});});
   await publicPage.route('https://pqbayjkypzfxvnksgwwf.supabase.co/functions/v1/inventory-supplier-view',async route=>{
@@ -89,9 +98,12 @@ test('supplier review and shared JPG/link page fit mobile, tablet, desktop, Engl
   });
   await publicPage.route('https://supplier.test/**',async route=>{const file=path.join(root,new URL(route.request().url()).pathname.slice(1));return route.fulfill({contentType:file.endsWith('.css')?'text/css':file.endsWith('.js')?'application/javascript':'text/html',body:fs.readFileSync(file)});});
   await publicPage.goto(link);await publicPage.locator('.sl-document').waitFor();assert.equal(await publicPage.locator('.sl-row').count(),46);assert.equal(await publicPage.locator('.sl-group').count(),1);assert.equal(await publicPage.locator('.sl-quantity').first().textContent(),'2');assert.match(await publicPage.locator('.sl-unit').first().textContent(),/Box/);
+  await publicPage.waitForFunction(()=>document.querySelector('.sl-thumb img')?.naturalWidth===160);assert.equal(await publicPage.locator('.sl-thumb img').count(),1);assert.equal(await publicPage.locator('.sl-thumb').count(),46);
+  await publicPage.evaluate(()=>{window.supplierPhotosDrawn=0;const draw=CanvasRenderingContext2D.prototype.drawImage;CanvasRenderingContext2D.prototype.drawImage=function(...args){if(args[0] instanceof HTMLImageElement)window.supplierPhotosDrawn++;return draw.apply(this,args);};});
   for(const width of [320,375,508,820,1440]){await publicPage.setViewportSize({width,height:900});for(const lang of ['en','ar']){if(await publicPage.locator('html').getAttribute('lang')!==lang)await publicPage.locator('[data-sl-action=language]').click();assert.equal(await publicPage.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${width} ${lang} page fits`);}}
   await publicPage.setViewportSize({width:375,height:812});
   const downloadPromise=publicPage.waitForEvent('download');await publicPage.locator('[data-sl-action=jpg]').click();const download=await downloadPromise;assert.match(download.suggestedFilename(),/^SL-.*\.jpg$/);const jpg=fs.readFileSync(await download.path());assert.equal(jpg[0],255);assert.equal(jpg[1],216);assert.equal(jpg.at(-2),255);assert.equal(jpg.at(-1),217);
+  assert.ok(await publicPage.evaluate(()=>window.supplierPhotosDrawn>=1),'JPG draws the saved item thumbnail');
   const artifactDir=process.env.LUMIN_SUPPLIER_SCREENSHOTS;
   if(artifactDir){fs.mkdirSync(artifactDir,{recursive:true});fs.writeFileSync(path.join(artifactDir,'supplier-list-ar.jpg'),jpg);await publicPage.screenshot({path:path.join(artifactDir,'supplier-page-mobile-ar.png'),fullPage:true});}
   await publicPage.evaluate(()=>{window.shared=[];navigator.share=async value=>window.shared.push({url:value.url,count:value.files?.length,type:value.files?.[0]?.type});navigator.canShare=()=>true;});

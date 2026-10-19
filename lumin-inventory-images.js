@@ -1,7 +1,7 @@
 /* Private inventory photos. Only optimized bytes leave the browser. */
 (function(host){
   'use strict';
-  const limit=300*1024,records=new Map(),cache=new Map(),pending=new Map(),busy=new Set(),errors=new Map(),loading=new Map();
+  const limit=300*1024,records=new Map(),cache=new Map(),pending=new Map(),busy=new Set(),errors=new Map(),loading=new Map(),thumbnails=new Map();
   let config=null,generation=0,observer=null;
   const words={add:['Add image','إضافة صورة'],change:['Change image','تغيير الصورة'],remove:['Remove image','إزالة الصورة'],empty:['No image added','لم تتم إضافة صورة'],saving:['Optimizing and saving…','جار تحسين الصورة وحفظها…'],retry:['Retry photo','إعادة محاولة الصورة'],load:['Load image','تحميل الصورة'],failed:['Photo unavailable. Try again.','الصورة غير متاحة. حاول مجدداً.'],saved:['Photo saved','تم حفظ الصورة'],image_size:['Choose an image smaller than 15 MB.','اختر صورة أصغر من ١٥ ميجابايت.'],image_format:['Choose a JPEG, PNG or WebP image.','اختر صورة JPEG أو PNG أو WebP.'],image_changed:['This photo changed. Refresh inventory and try again.','تم تغيير الصورة. حدّث المخزون وحاول مجدداً.'],invalid_session:['Sign in again to access photos.','سجل الدخول مجدداً للوصول إلى الصور.'],access_denied:['You do not have permission to change this photo.','ليست لديك صلاحية تغيير هذه الصورة.'],drive_not_connected:['Connect Google Drive in settings first.','اربط Google Drive من الإعدادات أولاً.'],saveFailed:['Could not save the photo. Retry to confirm it safely.','تعذر حفظ الصورة. أعد المحاولة لتأكيد حفظها بأمان.']};
   Object.assign(words,{paste:['Paste image','لصق صورة'],paste_hint:['Paste an image here with Ctrl+V or ⌘V.','الصق صورة هنا باستخدام Ctrl+V أو ⌘V.'],clipboard_empty:['Copy an image first, then paste it here.','انسخ صورة أولاً، ثم الصقها هنا.'],clipboard_denied:['Allow clipboard access, or use Ctrl+V / ⌘V here.','اسمح بالوصول إلى الحافظة، أو استخدم Ctrl+V / ⌘V هنا.'],clipboard_unavailable:['Use Ctrl+V / ⌘V here, or choose an image file.','استخدم Ctrl+V / ⌘V هنا، أو اختر ملف صورة.']});
@@ -11,7 +11,21 @@
   const frames=id=>[...document.querySelectorAll('[data-inv-photo]')].filter(n=>n.dataset.invPhoto===id);
   const key=item=>item.id+':'+item.image_version;
   function remember(versionKey,blob){const previous=cache.get(versionKey);if(previous)URL.revokeObjectURL(previous);cache.set(versionKey,URL.createObjectURL(blob));while(cache.size>60){const oldest=cache.keys().next().value;URL.revokeObjectURL(cache.get(oldest));cache.delete(oldest);}}
-  function clear(){generation++;observer?.disconnect();observer=null;cache.forEach(value=>URL.revokeObjectURL(value));cache.clear();records.clear();pending.clear();busy.clear();errors.clear();loading.clear();}
+  function clear(){generation++;observer?.disconnect();observer=null;cache.forEach(value=>URL.revokeObjectURL(value));cache.clear();thumbnails.clear();records.clear();pending.clear();busy.clear();errors.clear();loading.clear();}
+  async function thumbnail(item){
+    if(!item.image_version)return '';
+    const versionKey=key(item),context=generation;if(thumbnails.has(versionKey))return thumbnails.get(versionKey);
+    const source=cache.get(versionKey),blob=source?await fetch(source).then(response=>response.blob()):await request(item);
+    if(context!==generation||!['image/webp','image/jpeg'].includes(blob.type)||blob.size>limit)throw Error('thumbnail');
+    const bitmap=await createImageBitmap(blob);
+    try{
+      if(bitmap.width*bitmap.height>40000000)throw Error('thumbnail');
+      const canvas=document.createElement('canvas');canvas.width=canvas.height=160;const ctx=canvas.getContext('2d',{alpha:false});ctx.fillStyle='#ffffff';ctx.fillRect(0,0,160,160);
+      const scale=Math.min(160/bitmap.width,160/bitmap.height);ctx.drawImage(bitmap,(160-bitmap.width*scale)/2,(160-bitmap.height*scale)/2,bitmap.width*scale,bitmap.height*scale);
+      for(const quality of [.8,.65,.5]){const value=canvas.toDataURL('image/jpeg',quality);if(value.length<=24000){if(context!==generation)throw Error('thumbnail');thumbnails.set(versionKey,value);while(thumbnails.size>200)thumbnails.delete(thumbnails.keys().next().value);return value;}}
+      throw Error('thumbnail');
+    }finally{bitmap.close();}
+  }
   async function request(item,method='GET',form){
     const token=await config.token();if(!token)throw Object.assign(Error(),{code:'invalid_session'});
     const url=config.endpoint()+'/'+encodeURIComponent(item.id)+'?v='+encodeURIComponent(item.image_version||'');
@@ -101,5 +115,5 @@
       const file=[...(event.clipboardData?.files||[])].find(value=>value.type.startsWith('image/'));if(!file)return;
       event.preventDefault();void ingest(frame.dataset.invPhoto,file);
     });document.addEventListener('click',async event=>{const button=event.target.closest('[data-inv-photo-action]'),frame=button?.closest('[data-inv-photo]');if(!frame||button.disabled)return;const id=frame.dataset.invPhoto,action=button.dataset.invPhotoAction;if(action==='choose')void choose(id);else if(action==='paste')void paste(id);else if(action==='remove')void remove(id);else if(action==='retry'&&!busy.has(id)){errors.delete(id);if(pending.has(id)){const context=generation;busy.add(id);paint(id);try{await save(id);}finally{if(context===generation){busy.delete(id);paint(id);}}}else{paint(id);void load(id);}}});}
-  host.LuminInventoryImages={init,sync,clear,optimize};
+  host.LuminInventoryImages={init,sync,clear,optimize,thumbnail};
 })(typeof window==='undefined'?globalThis:window);
