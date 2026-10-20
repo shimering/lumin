@@ -71,20 +71,22 @@
   <!-- Precompiled utilities avoid compiling Tailwind in every browser session. -->
   <link rel="stylesheet" href="lumin-app.css" />
   <script src="vendor/lucide.min.js"></script>
+  <script src="lumin-dates.js?v=1"></script>
+  <link rel="stylesheet" href="lumin-dates.css?v=1" />
   <link rel="stylesheet" href="lumin-loading.css?v=1" />
   <script src="vendor/supabase.js"></script>
   <script src="lumin-loyalty.js?v=5"></script>
-  <script src="lumin-finance-sync.js?v=2"></script>
+  <script src="lumin-finance-sync.js?v=3"></script>
   <script src="lumin-cash-flow.js?v=1"></script>
-  <script src="lumin-clinic-management.js?v=5"></script>
+  <script src="lumin-clinic-management.js?v=6"></script>
   <script src="lumin-inventory-model.js?v=7"></script>
   <script src="lumin-inventory-images.js?v=5"></script>
   <script src="lumin-supplier-list-model.js?v=2"></script>
-  <script src="lumin-inventory-supplier.js?v=2"></script>
+  <script src="lumin-inventory-supplier.js?v=3"></script>
   <script src="lumin-inventory.js?v=15"></script>
   <link rel="stylesheet" href="lumin-inventory.css?v=15" />
   <link rel="stylesheet" href="lumin-clinic-management.css?v=4" />
-  <script src="lumin-patient-scans.js?v=6"></script>
+  <script src="lumin-patient-scans.js?v=7"></script>
   <link rel="stylesheet" href="lumin-patient-scans.css?v=4" />
   <link rel="stylesheet" href="lumin-cash-flow.css?v=1" />
   <script src="lumin-storage-sync.js?v=16"></script>
@@ -92,9 +94,9 @@
   <link rel="stylesheet" href="lumin-google-drive.css?v=1" />
   <link rel="stylesheet" href="lumin-storage-sync.css?v=8" />
   <script src="lumin-patient-swipe.js?v=1"></script>
-  <script src="lumin-patients.js?v=4"></script>
+  <script src="lumin-patients.js?v=5"></script>
   <script src="lumin-chart-sync.js?v=2"></script>
-  <script src="lumin-chart-media.js?v=19"></script>
+  <script src="lumin-chart-media.js?v=20"></script>
   <script src="lumin-xray-rotation.js?v=1"></script>
   <script src="lumin-tooth-notes.js?v=3"></script>
   <script src="lumin-chart-appointments.js?v=4"></script>
@@ -107,13 +109,14 @@
   <script src="lumin-nav-motion.js?v=1"></script>
   <script src="lumin-mobile-nav.js?v=3"></script>
   <script src="lumin-appointment-status.js?v=2"></script>
-  <script src="lumin-appointment-operations.js?v=2"></script>
+  <script src="lumin-appointment-operations.js?v=3"></script>
+  <script src="lumin-appointment-details.js?v=1"></script>
   <script src="lumin-dashboard-motion.js?v=3"></script>
   <script src="lumin-whatsapp-actions.js?v=2"></script>
   <script src="lumin-quotation-model.js?v=1"></script>
   <script src="lumin-dental-i18n.js?v=1"></script>
   <script src="lumin-tooth-anatomy.js?v=2"></script>
-  <script src="lumin-quotation-view.js?v=4"></script>
+  <script src="lumin-quotation-view.js?v=5"></script>
   <script src="lumin-quotations.js?v=6"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <link rel="stylesheet" href="lumin-tooth-images.css?v=1" />
@@ -5384,6 +5387,7 @@
   <link rel="stylesheet" href="lumin-dashboard-motion.css?v=2" />
   <link rel="stylesheet" href="lumin-appointment-status.css?v=3" />
   <link rel="stylesheet" href="lumin-appointment-operations.css?v=2" />
+  <link rel="stylesheet" href="lumin-appointment-details.css?v=1" />
   <link rel="stylesheet" href="lumin-patients.css?v=3" />
   <link rel="stylesheet" href="lumin-finance-sync.css?v=2" />
   <link rel="stylesheet" href="lumin-mobile-nav.css?v=3" />
@@ -10376,10 +10380,10 @@
       '{{وقت_الموعد}}'
     ]);
     const WHATSAPP_TEMPLATE_FORMATTERS = {
-      englishDate: new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+      englishDate: LuminDates.formatter(),
       englishDay: new Intl.DateTimeFormat('en-US', { weekday: 'long' }),
       englishTime: new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }),
-      arabicDate: new Intl.DateTimeFormat('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' }),
+      arabicDate: LuminDates.formatter(),
       arabicDay: new Intl.DateTimeFormat('ar-EG', { weekday: 'long' }),
       arabicTime: new Intl.DateTimeFormat('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: false })
     };
@@ -14385,7 +14389,7 @@
       document.getElementById('settings-google-calendar-enabled').checked = Boolean(connection.enabled);
       const lastSync = connection.last_sync_at ? new Date(connection.last_sync_at) : null;
       document.getElementById('settings-google-calendar-last-sync').textContent = lastSync && !Number.isNaN(lastSync.getTime())
-        ? `Last synced ${lastSync.toLocaleString()}`
+        ? `Last synced ${LuminDates.formatDateTime(lastSync)}`
         : `Connected to ${connection.calendar_name || 'Google Calendar'}`;
 
       const calendarSelect = document.getElementById('settings-google-calendar-select');
@@ -16533,13 +16537,12 @@
     }
 
     function prescriptionDateLabel(value) {
-      const date = new Date(`${value || new Date().toISOString().slice(0, 10)}T12:00:00`);
-      return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(date);
+      return LuminDates.format(value || appointmentDateKey(new Date()));
     }
 
     function prescriptionPrintModel(prescription, patient, settings) {
       const isAr = currentUiLanguage === 'ar';
-      const referenceDate = new Date(`${prescription.prescribedAt || new Date().toISOString().slice(0, 10)}T12:00:00`);
+      const referenceDate = new Date(`${prescription.prescribedAt || appointmentDateKey(new Date())}T12:00:00`);
       const age = currentPatientAge(patient, referenceDate);
       const fields = [];
       if (settings.doctorVisible) fields.push([isAr ? 'الطبيب' : 'Doctor', prescription.prescriberName || (isAr ? 'طبيب العيادة' : 'Clinic doctor')]);
@@ -16572,7 +16575,7 @@
       const token = ++prescriptionPreviewToken;
       const settings = prescriptionPrintSettingsFromForm();
       const samplePatient = { name: 'Mariam Hassan', patientNumber: 1024, birthDate: '1992-04-18', age: 34 };
-      const samplePrescription = { prescriberName: 'Dr Mohamed Gazzar', prescribedAt: new Date().toISOString().slice(0, 10), notes: '', items: [
+      const samplePrescription = { prescriberName: 'Dr Mohamed Gazzar', prescribedAt: appointmentDateKey(new Date()), notes: '', items: [
         { medicationName: 'Amoxicillin', form: 'Capsule', dose: '500 mg', frequencyPerDay: 3, durationDays: 5, route: 'By mouth', instructions: 'After food' },
         { medicationName: 'Ibuprofen', form: 'Tablet', dose: '400 mg', frequencyPerDay: 2, durationDays: 3, route: 'By mouth', instructions: 'When needed' }
       ] };
@@ -17298,12 +17301,12 @@
       const replacements = {
         '{{patient_name}}': entry?.patient || '',
         '{{doctor_name}}': doctorName || (currentUiLanguage === 'ar' ? 'طبيب غير محدد' : 'Unassigned doctor'),
-        '{{appointment_date}}': hasAppointmentTime ? WHATSAPP_TEMPLATE_FORMATTERS.englishDate.format(start) : (entry?.date || ''),
+        '{{appointment_date}}': hasAppointmentTime ? WHATSAPP_TEMPLATE_FORMATTERS.englishDate.format(start) : LuminDates.format(entry?.date),
         '{{appointment_day}}': hasAppointmentTime ? WHATSAPP_TEMPLATE_FORMATTERS.englishDay.format(start) : '',
         '{{appointment_time}}': hasAppointmentTime ? WHATSAPP_TEMPLATE_FORMATTERS.englishTime.format(start) : (entry?.time || ''),
         '{{اسم_المريض}}': entry?.patient || '',
         '{{اسم_الطبيب}}': doctorName || 'طبيب غير محدد',
-        '{{تاريخ_الموعد}}': hasAppointmentTime ? WHATSAPP_TEMPLATE_FORMATTERS.arabicDate.format(start) : (entry?.date || ''),
+        '{{تاريخ_الموعد}}': hasAppointmentTime ? WHATSAPP_TEMPLATE_FORMATTERS.arabicDate.format(start) : LuminDates.format(entry?.date),
         '{{يوم_الموعد}}': hasAppointmentTime ? WHATSAPP_TEMPLATE_FORMATTERS.arabicDay.format(start) : '',
         '{{وقت_الموعد}}': hasAppointmentTime ? WHATSAPP_TEMPLATE_FORMATTERS.arabicTime.format(start) : (entry?.time || '')
       };
@@ -19573,12 +19576,14 @@
 
     function requestForegroundRecovery() {
       if (document.visibilityState !== 'visible') return;
+      refreshAppCurrentDate();
       void requestAuthSessionRecovery();
       requestRealtimeCatchUp();
     }
 
     window.addEventListener('online', requestForegroundRecovery);
     window.addEventListener('focus', requestForegroundRecovery);
+    window.addEventListener('pageshow', requestForegroundRecovery);
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') requestForegroundRecovery();
     });
@@ -19644,12 +19649,7 @@
     function formatPatientBirthDate(value) {
       const normalisedBirthDate = normalisePatientBirthDate(value);
       if (!normalisedBirthDate) return '';
-      const [year, month, day] = normalisedBirthDate.split('-').map(Number);
-      return new Intl.DateTimeFormat(currentUiLanguage === 'ar' ? 'ar-EG' : 'en-GB', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric'
-      }).format(new Date(year, month - 1, day));
+      return LuminDates.format(normalisedBirthDate);
     }
 
     function patientAgeProfileLabel(patient) {
@@ -20824,15 +20824,7 @@
     function formatHrDoctorCaseCompletion(value) {
       const date = new Date(value);
       if (Number.isNaN(date.getTime())) return '—';
-      return new Intl.DateTimeFormat(currentUiLanguage === 'ar' ? 'ar-EG' : 'en-GB', {
-        timeZone: clinicAttendanceSettings.timezone,
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: useTwelveHourTime
-      }).format(date);
+      return LuminDates.formatDateTime(date, { timeZone: clinicAttendanceSettings.timezone, locale: currentUiLanguage === 'ar' ? 'ar-EG' : 'en-GB', hour12: useTwelveHourTime });
     }
 
     function renderHrDoctorPayroll(user) {
@@ -20991,7 +20983,7 @@
     function hrDateLabel(dateValue, options = {}) {
       const date = new Date(`${dateValue}T12:00:00`);
       if (Number.isNaN(date.getTime())) return dateValue;
-      return new Intl.DateTimeFormat(currentUiLanguage === 'ar' ? 'ar-EG' : 'en-GB', { day: 'numeric', month: options.short ? 'short' : 'long', year: 'numeric' }).format(date);
+      return LuminDates.format(dateValue);
     }
 
     function hrClockLabel(value) {
@@ -23078,7 +23070,7 @@
         return `
           <tr data-refresh-key="${escapeHtml(String(record.id))}" class="${rowClass} transition border-b border-slate-100">
             <td class="px-4 py-3 whitespace-nowrap text-xs font-bold text-slate-700">
-              ${escapeHtml(displayProcDate)}
+              ${escapeHtml(LuminDates.format(displayProcDate) || '—')}
             </td>
             <td class="px-4 py-3 whitespace-nowrap">
               <div class="flex flex-col">
@@ -23108,7 +23100,7 @@
             </td>
             <td class="px-4 py-3 whitespace-nowrap">
               <div class="flex items-center gap-1.5">
-                <span class="text-xs font-bold text-slate-700">${escapeHtml(record.delivery_date || '—')}</span>
+                <span class="text-xs font-bold text-slate-700">${escapeHtml(LuminDates.format(record.delivery_date) || '—')}</span>
                 ${deliveryBadge}
               </div>
             </td>
@@ -23193,7 +23185,7 @@
           patients.map(p => `<option value="${p.id}">${escapeHtml(p.name)} (${escapeHtml(p.phone || 'No phone')})</option>`).join('');
       }
 
-      const today = new Date().toISOString().slice(0, 10);
+      const today = appointmentDateKey(new Date());
       document.getElementById('implant-form-procedure-date').value = today;
       document.getElementById('implant-form-delivery-date').value = addMonthsToDate(today, 4);
       document.getElementById('implant-form-tooth').value = '';
@@ -23439,7 +23431,7 @@
       const slot = resolveToothSlotNumber(record.tooth_number);
       const palmerText = slot ? `${palmerToothNotation(record.tooth_number, slot)} (${palmerQuadrantLabel(record.tooth_number, slot)})` : (record.tooth_number ? `#${record.tooth_number}` : '');
       const tooth = palmerText ? ` (${palmerText})` : '';
-      const delivDate = record.delivery_date || '';
+      const delivDate = LuminDates.format(record.delivery_date);
 
       const msg = isAr
         ? `مرحباً ${patientName}، نود تذكيركم بمتابعة زراعة الأسنان للسن${tooth}. موعد التركيب النهائي المتوقع هو ${delivDate}. نسعد بتواصلكم لتأكيد الموعد.`
@@ -23551,7 +23543,7 @@
 
       if (nextStatus === 'In' || nextStatus === 'C') {
         const rawBeginDate = finding.beginDate || (finding.status === 'In' || finding.status === 'C' ? (finding.createdAt || new Date().toISOString()) : null);
-        const procedureDate = rawBeginDate ? String(rawBeginDate).slice(0, 10) : (finding.createdAt ? String(finding.createdAt).slice(0, 10) : new Date().toISOString().slice(0, 10));
+        const procedureDate = rawBeginDate ? String(rawBeginDate).slice(0, 10) : (finding.createdAt ? String(finding.createdAt).slice(0, 10) : appointmentDateKey(new Date()));
         const deliveryDate = addMonthsToDate(procedureDate, 4);
         const implantType = op?.code === 'dz_implantation_i9'
           ? 'Economic (dual)'
@@ -24038,12 +24030,7 @@
     function formatInvoiceDate(value) {
       const date = new Date(String(value || '') + 'T12:00:00');
       if (!Number.isFinite(date.getTime())) return String(value || '');
-      return new Intl.DateTimeFormat(currentUiLanguage === 'ar' ? 'ar-EG' : 'en-GB', {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric'
-      }).format(date);
+      return LuminDates.format(value);
     }
 
     function invoiceNumber(invoiceId) {
@@ -24209,21 +24196,21 @@
         }, 250);
         return;
       }
-      refreshFinanceFilteredResults();
+      if (options.refresh !== false) refreshFinanceFilteredResults();
     }
 
-    function applyFinanceUniversalDuration(value) {
+    function applyFinanceUniversalDuration(value, options = {}) {
       const startInput = document.getElementById('finance-universal-start-date');
       const endInput = document.getElementById('finance-universal-end-date');
       if (!startInput || !endInput) return;
       if (value === 'all') {
         startInput.value = '';
         endInput.value = '';
-        financeUniversalFiltersChanged();
+        financeUniversalFiltersChanged(options);
         return;
       }
       if (value === 'custom') {
-        financeUniversalFiltersChanged();
+        financeUniversalFiltersChanged(options);
         return;
       }
       const today = new Date();
@@ -24239,7 +24226,7 @@
       if (value === 'this_month') start.setDate(1);
       startInput.value = financeInvoiceDateInputValue(start);
       endInput.value = financeInvoiceDateInputValue(end);
-      financeUniversalFiltersChanged();
+      financeUniversalFiltersChanged(options);
     }
 
     function setFinanceUniversalCustomRange() {
@@ -25350,7 +25337,7 @@
 
     function incomeStatementPeriodLabel(report) {
       const locale = currentUiLanguage === 'ar' ? 'ar-EG' : 'en-GB';
-      const formatter = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' });
+      const formatter = LuminDates.formatter();
       return `${formatter.format(new Date(`${report.startDate}T12:00:00`))} – ${formatter.format(new Date(`${report.endDate}T12:00:00`))}`;
     }
 
@@ -26727,6 +26714,7 @@
     }
 
     function resetTargetedLoading() {
+      if (typeof closeAppointmentDetailEditor === 'function') closeAppointmentDetailEditor({ force: true, restoreFocus: false });
       workspaceNavigationToken += 1;
       appointmentModalOpenSequence += 1;
       if (typeof resetAppointmentOperations === 'function') resetAppointmentOperations();
@@ -28465,7 +28453,7 @@
         const isDcm = file.filename.toLowerCase().endsWith('.dcm');
         const isAttachment = typeof patientMediaFileKind === 'function' && patientMediaFileKind(file) !== 'image';
         const sizeKb = (file.sizeBytes / 1024).toFixed(0);
-        const dateDisplay = file.modifiedAt ? file.modifiedAt.split('T')[0] : '';
+        const dateDisplay = LuminDates.format(file.modifiedAt);
         
         let previewHtml = '';
         if (isPdf) {
@@ -28990,7 +28978,7 @@
 
       if (badge) badge.textContent = category;
       if (nameLabel) nameLabel.textContent = filename;
-      if (dateLabel) dateLabel.textContent = dateStr;
+      if (dateLabel) dateLabel.textContent = LuminDates.format(dateStr) || dateStr;
       if (dlLink) {
         dlLink.href = fullUrl;
         const file = currentPatientMediaFiles.find(item => item.relativePath === relativePath);
@@ -31151,14 +31139,7 @@
     function formatChartOperationCreatedAt(value) {
       const timestamp = chartFindingCreatedAtTimestamp(value);
       if (!Number.isFinite(timestamp)) return '';
-      return new Intl.DateTimeFormat('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: useTwelveHourTime
-      }).format(new Date(timestamp));
+      return LuminDates.formatDateTime(new Date(timestamp), { hour12: useTwelveHourTime });
     }
 
     function chartOperationDateInputValue(value) {
@@ -32951,17 +32932,56 @@
       const dateLocale = currentUiLanguage === 'ar' ? 'ar-EG' : 'en-US';
       const timeLocale = currentUiLanguage === 'ar' ? 'ar-EG' : (useTwelveHourTime ? 'en-US' : 'en-GB');
       appointmentMonthFormatter = new Intl.DateTimeFormat(dateLocale, { month: 'long', year: 'numeric' });
-      appointmentDayFormatter = new Intl.DateTimeFormat(dateLocale, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-      appointmentCompactDayFormatter = new Intl.DateTimeFormat(dateLocale, { weekday: 'short', month: 'short', day: 'numeric' });
-      appointmentShortDateFormatter = new Intl.DateTimeFormat(dateLocale, { month: 'short', day: 'numeric' });
+      appointmentDayFormatter = LuminDates.formatter();
+      appointmentCompactDayFormatter = LuminDates.formatter();
+      appointmentShortDateFormatter = LuminDates.formatter();
       appointmentWeekdayFormatter = new Intl.DateTimeFormat(dateLocale, { weekday: 'short' });
-      appointmentWeekRangeFormatter = new Intl.DateTimeFormat(dateLocale, { month: 'short', day: 'numeric', year: 'numeric' });
+      appointmentWeekRangeFormatter = LuminDates.formatter();
       appointmentTimeFormatter = new Intl.DateTimeFormat(timeLocale, { hour: '2-digit', minute: '2-digit', hour12: useTwelveHourTime });
       WHATSAPP_TEMPLATE_FORMATTERS.englishTime = new Intl.DateTimeFormat(useTwelveHourTime ? 'en-US' : 'en-GB', { hour: '2-digit', minute: '2-digit', hour12: useTwelveHourTime });
       WHATSAPP_TEMPLATE_FORMATTERS.arabicTime = new Intl.DateTimeFormat('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: useTwelveHourTime });
     }
 
     configureAppointmentFormatters();
+
+    function refreshAppCurrentDate({ render = true } = {}) {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      if (sameAppointmentDate(now, appointmentToday)) return false;
+      const dashboardFollowedToday = sameAppointmentDate(dashboardSelectedDate, appointmentToday);
+      const calendarFollowedToday = sameAppointmentDate(appointmentSelectedDate, appointmentToday);
+      const monthFollowedToday = appointmentVisibleMonth.getFullYear() === appointmentToday.getFullYear()
+        && appointmentVisibleMonth.getMonth() === appointmentToday.getMonth();
+      appointmentToday.setTime(now.getTime());
+      if (dashboardFollowedToday) dashboardSelectedDate = new Date(now);
+      if (calendarFollowedToday) {
+        appointmentSelectedDate = new Date(now);
+        if (monthFollowedToday) appointmentVisibleMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      }
+      dashboardDayCache.clear();
+      dashboardInvoiceCache.clear();
+      invalidateChartAppointments();
+      if (!currentUserAccess) return true;
+      // Keep relative filter values current without refreshing hidden views.
+      const duration = document.getElementById('finance-universal-duration')?.value;
+      if (duration && !['custom', 'all'].includes(duration)) {
+        applyFinanceUniversalDuration(duration, { refresh: render && realtimeViewIsVisible('clinic-management') && activeClinicManagementTab === 'finances' });
+      }
+      if (!render) return true;
+      if (realtimeViewIsVisible('dashboard')) renderDashboard();
+      if (realtimeViewIsVisible('appointments')) renderAppointments();
+      if (realtimeViewIsVisible('chart')) void loadChartAppointments({ refresh: true });
+      window.LuminClinicManagement?.invalidate();
+      return true;
+    }
+
+    function setupAppDateMonitor() {
+      refreshAppCurrentDate();
+      // Also covers an open foreground tab crossing midnight or a changed system clock.
+      window.setInterval(() => {
+        if (document.visibilityState === 'visible') refreshAppCurrentDate();
+      }, 15000);
+    }
 
     function appointmentDateKey(date) {
       const year = date.getFullYear();
@@ -35006,7 +35026,9 @@
 
     function showDashboardToday() {
       window.LuminDashboardMotion?.prepareCards();
-      dashboardSelectedDate = new Date(appointmentToday);
+      refreshAppCurrentDate({ render: false });
+      dashboardSelectedDate = new Date();
+      dashboardSelectedDate.setHours(0, 0, 0, 0);
       renderDashboard();
     }
 
@@ -35183,9 +35205,9 @@
       noteToggle.classList.toggle('border-violet-200', !isNote);
       noteToggle.classList.toggle('bg-violet-50', !isNote);
       noteToggle.classList.toggle('text-violet-700', !isNote);
-      clinicalFields.classList.toggle('hidden', isNote);
+      clinicalFields.classList.toggle('hidden', isNote || Boolean(editingAppointmentId));
       if (typeof syncAppointmentOperationPatient === 'function') syncAppointmentOperationPatient(isNote ? '' : selectedInput.value);
-      visitType.required = !isNote;
+      visitType.required = !isNote && !editingAppointmentId;
       closeAppointmentPatientResults();
       const saveButton = document.getElementById('btn-save-appointment');
       const eyebrow = document.getElementById('appointment-modal-eyebrow');
@@ -36915,6 +36937,7 @@
     }
 
     function closeAppointmentCardPopover(clearSelection = true, restoreFocus = true) {
+      if (typeof closeAppointmentDetailEditor === 'function') closeAppointmentDetailEditor({ force: true, restoreFocus: false });
       if (whatsappTemplatePickerScope === '#appointment-card-popover') closeWhatsAppTemplatePicker();
       const layer = document.getElementById('appointment-card-popover-layer');
       const popover = document.getElementById('appointment-card-popover');
@@ -36996,6 +37019,9 @@
       };
       const patientAge = patientAgeLabel(patient);
       const statusOptions = APPOINTMENT_STATUSES.map(status => `<option value="${status}" ${status === entry.status ? 'selected' : ''}>${escapeAppointmentText(currentUiLanguage === 'ar' ? arabicUiPhrase(status) : status)}</option>`).join('');
+      const selectedVisitType = appointmentVisitTypeForEntry(entry);
+      const visitTypes = appointmentVisitTypes.filter(type => type.active || type.id === selectedVisitType?.id);
+      const visitTypeOptions = `<option value="" disabled ${selectedVisitType ? '' : 'selected'}>${appointmentPopoverText('Choose visit type', 'اختر نوع الزيارة')}</option>` + visitTypes.map(type => `<option value="${escapeAppointmentText(type.id)}" ${type.id === selectedVisitType?.id ? 'selected' : ''}>${escapeAppointmentText(type.name)}</option>`).join('');
       popover.style.setProperty('--appointment-popover-color', entry.appointmentColor || '#2563eb');
       const contentChanged = setStableHtml(popover, `
         <div class="flex items-start justify-between gap-3 border-b border-blue-100 bg-blue-50/80 px-4 py-3.5">
@@ -37004,22 +37030,21 @@
             <div class="min-w-0">
               <p class="text-[10px] font-black uppercase tracking-wider text-blue-600">${entry.isNote ? appointmentPopoverText('Calendar note', 'ملاحظة التقويم') : appointmentPopoverText('Appointment details', 'تفاصيل الموعد')}</p>
               <h3 id="appointment-card-popover-title" class="mt-0.5 truncate text-base font-black text-slate-900">${escapeAppointmentText(entry.patient)}</h3>
-              <span class="mt-1.5 flex">${appointmentVisitTypeBadgeMarkup(entry)}</span>
             </div>
           </div>
           <button type="button" data-close-appointment-popover class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-slate-400 shadow-xs ring-1 ring-blue-100 transition hover:text-slate-700" aria-label="${appointmentPopoverText('Close appointment details', 'إغلاق تفاصيل الموعد')}"><i data-lucide="x" class="h-4 w-4"></i></button>
         </div>
         <div class="space-y-2.5 bg-slate-50/60 px-4 py-3.5">
           <div class="grid grid-cols-2 gap-2">
-            <section data-appointment-detail-card="schedule" class="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2.5 text-sky-900">
-              <p class="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-sky-600"><i data-lucide="clock-3" class="h-3.5 w-3.5"></i>${appointmentPopoverText('Schedule', 'الموعد')}</p>
+            <button type="button" data-appointment-detail-card="schedule" data-edit-appointment-detail="schedule" ${editable ? '' : 'disabled'} aria-haspopup="dialog" aria-label="${appointmentPopoverText('Edit date and time', 'تعديل التاريخ والوقت')}" class="appointment-detail-box rounded-xl bg-sky-50 px-3 py-2.5 text-sky-900">
+              <p class="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-sky-600"><i data-lucide="clock-3" class="h-3.5 w-3.5"></i>${appointmentPopoverText('Schedule', 'الموعد')}${editable ? '<i data-lucide="pencil" class="appointment-detail-edit-hint" aria-hidden="true"></i>' : ''}</p>
               <p class="mt-1.5 text-xs font-black">${escapeAppointmentText(appointmentShortDateFormatter.format(appointmentDate))}</p>
               <p class="mt-0.5 text-xs font-bold text-sky-700">${escapeAppointmentText(appointmentTimeRange(entry))} · ${escapeAppointmentText(appointmentDurationLabel(entry.duration))}</p>
-            </section>
-            <section data-appointment-detail-card="doctor" class="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2.5 text-violet-900">
-              <p class="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-violet-600"><i data-lucide="stethoscope" class="h-3.5 w-3.5"></i>${appointmentPopoverText('Doctor', 'الطبيب')}</p>
+            </button>
+            <button type="button" data-appointment-detail-card="doctor" data-edit-appointment-detail="doctor" ${editable ? '' : 'disabled'} aria-haspopup="dialog" aria-label="${appointmentPopoverText('Change assigned doctor', 'تغيير الطبيب المسؤول')}" class="appointment-detail-box rounded-xl bg-violet-50 px-3 py-2.5 text-violet-900">
+              <p class="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-violet-600"><i data-lucide="stethoscope" class="h-3.5 w-3.5"></i>${appointmentPopoverText('Doctor', 'الطبيب')}${editable ? '<i data-lucide="pencil" class="appointment-detail-edit-hint" aria-hidden="true"></i>' : ''}</p>
               <p class="mt-1.5 line-clamp-2 text-xs font-black">${escapeAppointmentText(entry.doctor)}</p>
-            </section>
+            </button>
           </div>
           ${entry.isNote ? '' : `<div class="grid grid-cols-2 gap-2">
             <section data-appointment-detail-card="age" class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-rose-900">
@@ -37042,19 +37067,23 @@
               ${whatsAppSplitControlMarkup(entry, { fullWidth: true })}
             </div>
           </section>`}
-          ${typeof appointmentPopoverOperationsMarkup === 'function' ? appointmentPopoverOperationsMarkup(entry) : ''}
           ${entry.notes ? `<section data-appointment-detail-card="notes" class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-amber-950"><p class="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-amber-700"><i data-lucide="notebook-pen" class="h-3.5 w-3.5"></i>${appointmentPopoverText('Notes', 'ملاحظات')}</p><p class="mt-1.5 text-xs leading-5 text-amber-900/80">${escapeAppointmentText(entry.notes)}</p></section>` : ''}
-          ${entry.isNote ? '' : `<section data-appointment-detail-card="status" class="rounded-xl border border-indigo-200 bg-indigo-50 p-2.5">
+          ${entry.isNote ? '' : `<div class="appointment-detail-controls">
+          <section data-appointment-detail-card="status" class="rounded-xl bg-indigo-50 p-2.5">
             <label class="block">
               <span class="mb-1.5 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-indigo-700"><i data-lucide="activity" class="h-3.5 w-3.5"></i>${appointmentPopoverText('Appointment status', 'حالة الموعد')}</span>
-              <select data-appointment-popover-status ${editable ? '' : 'disabled'} class="w-full rounded-xl border border-indigo-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-60" aria-label="${appointmentPopoverText('Change appointment status', 'تغيير حالة الموعد')}">${statusOptions}</select>
+              <select data-appointment-popover-status ${editable ? '' : 'disabled'} class="appointment-detail-select" aria-label="${appointmentPopoverText('Change appointment status', 'تغيير حالة الموعد')}">${statusOptions}</select>
               ${checkedInWaitIndicatorMarkup(entry)}
             </label>
-          </section>`}
-          ${entry.isNote ? '' : `<button type="button" data-open-appointment-patient-profile ${hasPageAccess('patients') ? '' : 'disabled'} class="flex w-full items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-left text-blue-800 transition hover:border-blue-300 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-40">
-            <span class="flex min-w-0 items-center gap-2.5"><span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm"><i data-lucide="user-round" class="h-4 w-4"></i></span><span class="min-w-0"><span class="block text-xs font-black">${appointmentPopoverText('Open patient profile', 'فتح ملف المريض')}</span><span class="mt-0.5 block truncate text-[10px] font-bold text-blue-600">${appointmentPopoverText('Patient info, chart and invoices', 'بيانات المريض والمخطط والفواتير')}</span></span></span>
-            <i data-lucide="chevron-${currentUiLanguage === 'ar' ? 'left' : 'right'}" class="h-4 w-4 shrink-0"></i>
-          </button>`}
+          </section>
+          <section data-appointment-detail-card="visit-type" class="rounded-xl bg-blue-50 p-2.5"><label class="block"><span class="mb-1.5 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-blue-700"><i data-lucide="calendar-heart" class="h-3.5 w-3.5"></i>${appointmentPopoverText('Visit type', 'نوع الزيارة')}</span><select data-appointment-popover-visit-type ${editable && visitTypes.length ? '' : 'disabled'} class="appointment-detail-select" aria-label="${appointmentPopoverText('Change visit type', 'تغيير نوع الزيارة')}">${visitTypeOptions}</select></label></section>
+          </div><p data-appointment-detail-error class="appointment-detail-error" role="alert" hidden></p>
+          <button type="button" data-add-appointment-operations ${editable ? '' : 'disabled'} class="appointment-detail-action" aria-haspopup="dialog"><i data-lucide="clipboard-plus" aria-hidden="true"></i>${appointmentPopoverText('Add appointment operations', 'إضافة عمليات الموعد')}</button>
+          ${typeof appointmentPopoverOperationsMarkup === 'function' ? appointmentPopoverOperationsMarkup(entry) : ''}
+          <section data-appointment-detail-card="fast-links" class="appointment-fast-links"><h4><i data-lucide="link" aria-hidden="true"></i>${appointmentPopoverText('Fast links', 'روابط سريعة')}</h4><div class="appointment-detail-controls">
+            <button type="button" data-open-appointment-patient-profile ${hasPageAccess('patients') ? '' : 'disabled'} class="appointment-detail-action"><i data-lucide="user-round" aria-hidden="true"></i>${appointmentPopoverText('Patient profile', 'ملف المريض')}</button>
+            <button type="button" data-open-appointment-patient-chart ${hasPageAccess('chart') ? '' : 'disabled'} class="appointment-detail-action"><i data-lucide="clipboard-list" aria-hidden="true"></i>${appointmentPopoverText('Chart', 'مخطط الأسنان')}</button>
+          </div></section>`}
         </div>
         <div class="flex items-center justify-between gap-2 border-t border-slate-200 bg-white px-4 py-3">
           <button type="button" data-delete-appointment-popover ${editable ? '' : 'disabled'} class="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700 transition hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i>${appointmentPopoverText('Delete', 'حذف')}</button>
@@ -37068,9 +37097,16 @@
       const closeButton = popover.querySelector('[data-close-appointment-popover]');
       closeButton?.addEventListener('click', () => closeAppointmentCardPopover());
       popover.querySelector('[data-appointment-popover-status]')?.addEventListener('change', event => changeAppointmentCardStatus(appointmentId, event.currentTarget));
+      popover.querySelector('[data-appointment-popover-visit-type]')?.addEventListener('change', event => changeAppointmentCardVisitType(appointmentId, event.currentTarget));
+      popover.querySelectorAll('[data-edit-appointment-detail]').forEach(button => button.addEventListener('click', () => openAppointmentDetailEditor(appointmentId, button.dataset.editAppointmentDetail, button)));
+      popover.querySelector('[data-add-appointment-operations]')?.addEventListener('click', event => openAppointmentDetailOperations(appointmentId, event.currentTarget));
       popover.querySelector('[data-open-appointment-patient-profile]')?.addEventListener('click', () => {
         closeAppointmentCardPopover(true, false);
         openPatientWorkspace(entry.patientId, 'profile');
+      });
+      popover.querySelector('[data-open-appointment-patient-chart]')?.addEventListener('click', () => {
+        closeAppointmentCardPopover(true, false);
+        openPatientChart(entry.patientId, 'appointments');
       });
       popover.querySelector('[data-edit-appointment-popover]')?.addEventListener('click', () => {
         closeAppointmentCardPopover(false, false);
@@ -37123,7 +37159,7 @@
       document.addEventListener('pointerdown', event => {
         if (
           !appointmentCardPopoverId
-          || event.target.closest('#appointment-card-popover, #whatsapp-template-dropdown, [data-whatsapp-template-toggle]')
+          || event.target.closest('#appointment-card-popover, #appointment-detail-editor, #appointment-operation-picker, #whatsapp-template-dropdown, [data-whatsapp-template-toggle]')
           || event.target.closest('[data-timeline-appointment-id], [data-week-appointment-id]')
         ) return;
         closeAppointmentCardPopover(true, false);
@@ -37151,6 +37187,7 @@
     }
 
     function openAppointmentsView() {
+      refreshAppCurrentDate({ render: false });
       appointmentCalendarMode = 'day';
       appointmentSelectedDate = new Date(appointmentToday);
       appointmentVisibleMonth = new Date(appointmentToday.getFullYear(), appointmentToday.getMonth(), 1);
@@ -38049,8 +38086,10 @@
     }
 
     function showAppointmentToday() {
-      appointmentSelectedDate = new Date(appointmentToday);
-      appointmentVisibleMonth = new Date(appointmentToday.getFullYear(), appointmentToday.getMonth(), 1);
+      refreshAppCurrentDate({ render: false });
+      appointmentSelectedDate = new Date();
+      appointmentSelectedDate.setHours(0, 0, 0, 0);
+      appointmentVisibleMonth = new Date(appointmentSelectedDate.getFullYear(), appointmentSelectedDate.getMonth(), 1);
       appointmentWeekNavigationDirection = 0;
       selectedAppointmentId = null;
       renderAppointments();
@@ -38081,7 +38120,7 @@
       if (!input || !label) return;
       const date = appointmentDateFromInput(input.value);
       label.textContent = date
-        ? new Intl.DateTimeFormat(currentUiLanguage === 'ar' ? 'ar-EG' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(date)
+        ? LuminDates.format(date)
         : '';
     }
 
@@ -38108,6 +38147,7 @@
       appointmentModalEntryMode = 'patient';
       renderAppointmentPatientOptions();
       const entry = appointmentId ? appointments.find(appointment => appointment.id === appointmentId) : null;
+      if (appointmentId && !entry) { editingAppointmentId = null; return; }
       if (entry?.patientId) appointmentPatientSearchRecords.set(entry.patientId, {
         id: entry.patientId, name: entry.patient, phone: entry.patientPhone, recordComplete: false
       });
@@ -38239,7 +38279,7 @@
         return;
       }
       const selectedDate = appointmentDateFromInput(dateValue);
-      if (!assignedUser || (!isNote && !visitType) || !selectedDate || !time || !duration) return;
+      if (!assignedUser || (!isNote && !visitType && !appointmentId) || !selectedDate || !time || !duration) return;
 
       const [hours, minutes] = time.split(':').map(Number);
       const appointmentAt = new Date(
@@ -38253,13 +38293,18 @@
         patient_id: isNote ? null : patientId,
         assigned_user_id: assignedUserId,
         appointment_at: appointmentAt,
-        visit_type_id: isNote ? null : visitType.id,
-        appointment_type: isNote ? noteTitle.slice(0, 120) : visitType.name,
+        visit_type_id: isNote ? null : visitType?.id,
+        appointment_type: isNote ? noteTitle.slice(0, 120) : visitType?.name,
         status: isNote ? previousAppointment?.status || 'Scheduled' : status,
         notes,
         operations: isNote || typeof appointmentOperationsForSave !== 'function' ? [] : appointmentOperationsForSave(patientId),
         duration_minutes: duration
       };
+      if (appointmentId && !isNote) {
+        delete payload.visit_type_id;
+        delete payload.appointment_type;
+        delete payload.status;
+      }
       const saveButton = document.getElementById('btn-save-appointment');
       saveButton.dataset.saving = 'true';
       saveButton.disabled = true;
@@ -41078,7 +41123,7 @@
         } else if (diffDays < 7) {
           return date.toLocaleDateString([], { weekday: 'short' });
         } else {
-          return date.toLocaleDateString([], { month: 'numeric', day: 'numeric' });
+          return LuminDates.format(date);
         }
       } catch {
         return '';
@@ -41762,6 +41807,7 @@
 
     // Startup Initialization
     window.addEventListener('DOMContentLoaded', async () => {
+      setupAppDateMonitor();
       syncNavMountLocation();
       setupStorageConnectionMonitor();
       setupMobileNavigation();

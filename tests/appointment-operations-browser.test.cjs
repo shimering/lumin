@@ -32,16 +32,18 @@ test('optional appointment operations save, edit and open the chart across deskt
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.route('**/*', route => route.request().url().startsWith(base) ? route.continue() : route.abort());
   await page.goto(base);
+  await page.addScriptTag({path:path.join(root,'lumin-dates.js')});
   await page.addScriptTag({url: base + '/vendor/lucide.min.js'});
   await page.addScriptTag({content: html.slice(html.indexOf('    const luminLucideIcons ='),html.indexOf('    let patients = []'))});
   await page.addScriptTag({url: base + '/lumin-dental-i18n.js'});
   await page.addScriptTag({url: base + '/lumin-appointment-operations.js'});
+  await page.addScriptTag({url: base + '/lumin-appointment-details.js'});
   const helpers = ['appointmentModalUsesNote','setAppointmentModalEntryMode','selectAppointmentPatient','syncAppointmentSaveButton',
     'appointmentDateFromInput','setAppointmentDurationSelection','updateAppointmentModalDateLabel',
     'openAppointmentModal','closeAppointmentModal','saveAppointment','normaliseAppointmentRecord','renderDashboard',
     'isPrimaryToothId','palmerPositionForSlot','palmerQuadrantForSlot','palmerToothNotation','palmerQuadrantLabel','palmerNotationSVG','wholeMouthIconSVG',
     'normaliseSpecialtyIconName','specialtyIconMarkup','appointmentPopoverText','appointmentPopoverAnchor',
-    'positionAppointmentCardPopover','closeAppointmentCardPopover','openAppointmentCardPopover'];
+    'positionAppointmentCardPopover','closeAppointmentCardPopover','openAppointmentCardPopover','changeAppointmentCardStatus','setupAppointmentCardPopover','blockAppointmentCardPopoverTouchThrough'];
   await page.addScriptTag({content: `
     let currentUiLanguage='en', currentSession={user:{id:'staff'}}, targetedLoadingGeneration=0, allowed=true;
     let editingAppointmentId=null, appointmentModalEntryMode='patient',appointmentModalOpenSequence=0,patientModalReturnToAppointment=false;
@@ -51,9 +53,9 @@ test('optional appointment operations save, edit and open the chart across deskt
     const appointmentVisitTypes=[{id:'check',name:'Check-up',active:true}],APPOINTMENT_TIME_STEP=15,APPOINTMENT_SELECT_FIELDS='id,operations';
     let appointments=[], appointmentSelectedDate=new Date(2026,9,14),appointmentVisibleMonth=new Date(2026,9,1),selectedAppointmentId=null;
     const currentUserAccess={isDoctor:true},appointmentToday=appointmentSelectedDate,dashboardSelectedDate=appointmentSelectedDate;
-    const appointmentDayFormatter=new Intl.DateTimeFormat('en',{dateStyle:'long'}),appointmentTimeFormatter=new Intl.DateTimeFormat('en',{hour:'numeric',minute:'2-digit'});
+    const appointmentDayFormatter=LuminDates.formatter(),appointmentTimeFormatter=new Intl.DateTimeFormat('en',{hour:'numeric',minute:'2-digit'});
     let dashboardInvoiceRenderToken=0,expandedDashboardAppointmentId=null,appointmentsLoaded=true;
-    let appointmentCardPopoverId=null,appointmentCalendarMode='day',whatsappTemplatePickerScope=null;
+    let appointmentCardPopoverId=null,appointmentCalendarMode='day',whatsappTemplatePickerScope=null,appointmentCardPopoverTouchGuard=null;
     ${html.slice(html.indexOf('    const PRIMARY_TOOTH_BY_SLOT ='),html.indexOf('    const CONDITION_LABELS ='))}
     ${html.slice(html.indexOf('    const SPECIALTY_ICON_OPTIONS ='),html.indexOf('    const DEFAULT_SPECIALTY_ACCENT_COLOR ='))}
     ${html.match(/    const APPOINTMENT_STATUSES = [^\n]+/)[0]}
@@ -64,7 +66,7 @@ test('optional appointment operations save, edit and open the chart across deskt
       {finding_ids:['f2','f3'],code:'crown',name:'A long operation name that should wrap without pushing controls beyond the viewport',status:'In',tooth_ids:['12','13'],surfaces:[]},
       {finding_ids:['f4'],code:'completed',name:'Completed crown',status:'C',tooth_ids:['14'],surfaces:[]}
     ]};
-    function hasPageAccess(){return true} function canModifyAppointments(){return allowed}
+    function hasPageAccess(page){return !fixture.denied?.includes(page)} function canModifyAppointments(){return allowed}
     function escapeAppointmentText(value){return String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;').replaceAll("'",'&#39;')}
     function escapeHtml(value){return escapeAppointmentText(value)}
     function appointmentDateKey(date){return [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-')}
@@ -74,17 +76,18 @@ test('optional appointment operations save, edit and open the chart across deskt
     function appointmentPatientRecord(id){return patients.find(p=>p.id===id)||appointmentPatientSearchRecords.get(id)}
     function appointmentPatientDisplayValue(p){return p.name}
     function resetAppointmentPatientSearch(){} function closeAppointmentPatientResults(){} function renderAppointmentPatientOptions(){}
-    function ensureAppointmentsLoaded(){return Promise.resolve(true)} function ensureAppointmentVisitTypesLoaded(){return Promise.resolve(true)}
+    function ensureAppointmentStaffLoaded(){return Promise.resolve(true)} function ensureAppointmentsLoaded(){return Promise.resolve(true)} function ensureAppointmentVisitTypesLoaded(){return Promise.resolve(true)}
     function renderAppointmentDoctorOptions(id){document.getElementById('appointment-assigned-user-id').innerHTML='<option value="doctor">Dr. Lumin</option>';return true}
     function refreshAppointmentVisitTypeSelector(){document.getElementById('appointment-type').innerHTML='<option value="check">Check-up</option>'}
-    function appointmentVisitTypeForEntry(){return appointmentVisitTypes[0]}
-    function appointmentStaffMember(){return appointmentStaff[0]} function normaliseHexColor(c){return c}
+    function appointmentVisitTypeForEntry(entry){return appointmentVisitTypes.find(type=>type.id===entry.visitTypeId)||appointmentVisitTypes[0]}
+    function appointmentStaffMember(id){return appointmentStaff.find(staff=>staff.userId===id)||appointmentStaff[0]} function normaliseHexColor(c){return c}
     function canonicalAppointmentStatus(s){return s} function markLocalAppointmentChange(){}
     function appointmentTimeRange(entry){return entry.time} function arabicUiPhrase(value){return value}
-    function whatsAppSplitControlMarkup(){return ''} function changeAppointmentCardStatus(){}
+    function whatsAppSplitControlMarkup(){return ''}
     function queueGoogleCalendarAppointmentSync(){} function queueAppointmentPushNotification(){}
     function renderAppointments(){renderDashboard()} function realtimeViewIsVisible(){return false}
     function replaceAppointmentRecord(row){const entry=normaliseAppointmentRecord(row);appointments=appointments.filter(a=>a.id!==row.id);appointments.push(entry);return entry}
+    function openPatientWorkspace(patientId,tab){fixture.workspace={patientId,tab};return Promise.resolve()}
     function openPatientChart(patientId,view){fixture.chart={patientId,view};return Promise.resolve()}
     function refreshMyAttendanceState(){} function ensureDashboardAppointmentsLoaded(){}
     function canViewDashboardInvoices(){return false} function syncDashboardMobileTabs(){}
@@ -96,8 +99,8 @@ test('optional appointment operations save, edit and open the chart across deskt
     function dashboardMobileContactActionsMarkup(){return ''} function refreshWhatsAppTemplatePickerAnchor(){} function ensureAppointmentWaitIndicatorTimer(){}
     function setStableHtml(node,markup){node.innerHTML=markup;return true}
     window.alert=message=>fixture.alerts.push(message);
-    function savedRow(payload,id){return {...payload,id,operations:(payload.operations||[]).flatMap(link=>fixture.options.filter(o=>JSON.stringify(o.finding_ids)===JSON.stringify(link.finding_ids))),patients:patients.find(p=>p.id===payload.patient_id)}}
-    function updateAppointmentRecordWithRetry(id,payload){fixture.writes.push(payload);return Promise.resolve({data:savedRow(payload,id)})}
+    function savedRow(payload,id){const old=appointments.find(entry=>entry.id===id);const row={patient_id:old?.patientId,assigned_user_id:old?.assignedUserId,appointment_at:old?.startAt,appointment_type:old?.type,visit_type_id:old?.visitTypeId,status:old?.status,notes:old?.notes,duration_minutes:old?.duration,operations:old?.operations||[],...payload,id};row.operations=row.operations.flatMap(link=>fixture.options.filter(o=>JSON.stringify(o.finding_ids)===JSON.stringify(link.finding_ids)));row.patients=patients.find(p=>p.id===row.patient_id);return row;}
+    function updateAppointmentRecordWithRetry(id,payload){fixture.writes.push(payload);if(fixture.writePending)return new Promise(resolve=>{fixture.finishWrite=()=>resolve({data:savedRow(payload,id)})});return Promise.resolve(fixture.writeFail?{error:Error('Offline')}:{data:savedRow(payload,id)})}
     const db={rpc(name,args){
       if(name==='get_appointment_operation_catalog')return Promise.resolve({data:fixture.options.map(o=>({code:o.code,name:o.name,category_name:o.code==='crown'?'Crown':'Restoration',icon_name:o.code==='crown'?'dental-crown':'dental-restorative'}))});
       if(name!=='get_patient_appointment_operations')throw Error(name);
@@ -107,6 +110,7 @@ test('optional appointment operations save, edit and open the chart across deskt
     ${helpers.map(source).join('\n')}
     document.getElementById('auth-gate').classList.add('hidden');document.getElementById('app-shell').classList.remove('hidden');
     document.getElementById('view-dashboard').classList.remove('hidden');
+    setupAppointmentCardPopover();
   `});
   const choose = page.locator('#appointment-operations-choose');
   const picker = page.locator('#appointment-operation-picker');
@@ -166,6 +170,17 @@ test('optional appointment operations save, edit and open the chart across deskt
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
     await operations.scrollIntoViewIfNeeded();
     if(width===1440||width===390)await popup.screenshot({path:path.join(screenshots,`appointment-popup-${width}-${language}.png`)});
+    for(const field of ['schedule','doctor']) {
+      await popup.locator(`[data-edit-appointment-detail="${field}"]`).click();
+      const editor=page.locator('#appointment-detail-editor');
+      await editor.locator(field==='schedule'?'[data-lumin-date-text]':'#appointment-detail-doctor').waitFor();
+      assert.equal(await editor.evaluate(node=>node.scrollWidth>node.clientWidth),false,'detail editor fits its viewport');
+      const bounds=await editor.boundingBox();
+      assert.ok(bounds.x>=0&&bounds.x+bounds.width<=width+1&&bounds.y+bounds.height<=height+1,JSON.stringify({field,width,language,bounds}));
+      if(field==='schedule')assert.equal(await editor.locator('[data-lumin-date-text]').inputValue(),'14/10/2026');
+      if(width===390||width===1440)await editor.screenshot({path:path.join(screenshots,`appointment-${field}-${width}-${language}.png`)});
+      await editor.locator('[data-detail-cancel]').click();
+    }
     await operations.locator('.dashboard-operation-link').click();
     assert.deepEqual(await page.evaluate(()=>fixture.chart),{patientId:'p1',view:'appointments'});
     assert.equal(await popup.isVisible(),false,'chart navigation closes appointment details');
@@ -174,8 +189,10 @@ test('optional appointment operations save, edit and open the chart across deskt
   await page.locator('#appointment-card-popover [data-operation-appointment]').click();
   assert.equal(await page.locator('#appointment-card-popover').isVisible(),false,'editing closes the appointment popup');
   assert.equal(await picker.isVisible(),true);
+  assert.equal(await page.locator('#modal-appointment').isVisible(),false,'details operations open directly');
   await page.locator('[data-operation-cancel]').click();
-  await page.evaluate(()=>closeAppointmentModal());
+  assert.equal(await page.locator('#appointment-card-popover').isVisible(),true,'cancel returns to appointment details');
+  await page.evaluate(()=>{closeAppointmentCardPopover();closeAppointmentModal()});
 
   for (const [width,height] of [[1440,1000],[834,1112],[390,844],[320,568]]) {
     await page.setViewportSize({width,height});
@@ -221,6 +238,112 @@ test('optional appointment operations save, edit and open the chart across deskt
   await choose.click();
   assert.equal(await page.locator('.appointment-operation-option').count(),1,'unlinked completed treatments cannot be newly selected');
   await page.locator('[data-operation-cancel]').click();
+  await t.test('details edit schedule, doctor, visit type and operations independently with retry and fast links', async () => {
+    await page.setViewportSize({width:1440,height:1000});
+    await page.evaluate(()=>{
+      closeAppointmentModal();currentUiLanguage='en';document.documentElement.dir='ltr';
+      appointmentStaff.push({userId:'doctor-2',fullName:'Dr. Salma',canReceiveAppointments:true});
+      appointmentVisitTypes.push({id:'emergency',name:'Emergency',active:true});
+      openAppointmentCardPopover('a2');
+    });
+    const popup=page.locator('#appointment-card-popover'),dialog=page.locator('#appointment-detail-editor');
+    const status=popup.locator('[data-appointment-popover-status]'),visit=popup.locator('[data-appointment-popover-visit-type]');
+    const boxes=await popup.evaluate(node=>['status','visit-type'].map(name=>node.querySelector(`[data-appointment-detail-card="${name}"]`).getBoundingClientRect().toJSON()));
+    assert.ok(Math.abs(boxes[0].y-boxes[1].y)<2&&boxes[1].x>boxes[0].x,'visit type sits beside status: '+JSON.stringify(boxes));
+    assert.equal(await popup.locator('[data-appointment-detail-card="fast-links"] button').count(),2);
+    assert.equal(await popup.evaluate(node=>{
+      const status=node.querySelector('[data-appointment-detail-card="status"]');
+      const operations=node.querySelector('[data-add-appointment-operations]');
+      const links=node.querySelector('[data-appointment-detail-card="fast-links"]');
+      return Boolean(status.compareDocumentPosition(operations)&Node.DOCUMENT_POSITION_FOLLOWING)&&Boolean(operations.compareDocumentPosition(links)&Node.DOCUMENT_POSITION_FOLLOWING);
+    }),true);
+    await status.selectOption('Confirmed');
+    await page.waitForFunction(()=>appointments.find(a=>a.id==='a2').status==='Confirmed');
+    await visit.selectOption('emergency');
+    await page.waitForFunction(()=>appointments.find(a=>a.id==='a2').visitTypeId==='emergency');
+    assert.deepEqual(await page.evaluate(()=>fixture.writes.at(-1)),{visit_type_id:'emergency',appointment_type:'Emergency'});
+    await popup.locator('[data-edit-appointment-popover]').click();
+    assert.equal(await page.locator('#appointment-clinical-fields').isVisible(),false,'edit appointment has no status or visit controls');
+    await page.evaluate(()=>{document.getElementById('appointment-status').value='Cancelled';document.getElementById('appointment-notes').value='Updated note';});
+    await page.evaluate(()=>saveAppointment({preventDefault(){}}));
+    assert.equal(await page.evaluate(()=>appointments.find(a=>a.id==='a2').status),'Confirmed','general edits preserve the live status');
+    assert.equal(await page.evaluate(()=>appointments.find(a=>a.id==='a2').visitTypeId),'emergency');
+    assert.equal(await page.evaluate(()=>['status','visit_type_id','appointment_type'].some(key=>key in fixture.writes.at(-1))),false);
+    await page.evaluate(()=>openAppointmentCardPopover('a2'));
+    await popup.locator('[data-edit-appointment-detail="schedule"]').click();
+    assert.equal(await dialog.isVisible(),true);
+    const beforeInvalid=await page.evaluate(()=>fixture.writes.length);
+    await dialog.locator('[data-lumin-date-text]').fill('31/02/2026');
+    await dialog.locator('[data-detail-save]').click();
+    assert.equal(await page.evaluate(()=>fixture.writes.length),beforeInvalid,'invalid dates cannot save');
+    await dialog.locator('[data-lumin-date-text]').fill('25/12/2026');
+    await dialog.locator('#appointment-detail-time').fill('14:15');
+    await dialog.locator('#appointment-detail-duration').selectOption('45');
+    await dialog.locator('[data-detail-save]').click();
+    await dialog.waitFor({state:'hidden'});
+    assert.deepEqual(await page.evaluate(()=>Object.keys(fixture.writes.at(-1)).sort()),['appointment_at','duration_minutes']);
+    assert.deepEqual(await page.evaluate(()=>{const entry=appointments.find(a=>a.id==='a2'),date=new Date(entry.startAt);return [entry.date,date.getHours(),date.getMinutes(),entry.duration,entry.status,entry.visitTypeId]}),['2026-12-25',14,15,45,'Confirmed','emergency']);
+    await popup.locator('[data-edit-appointment-detail="schedule"]').click();
+    const beforeCancel=await page.evaluate(()=>fixture.writes.length);
+    await dialog.locator('#appointment-detail-time').fill('18:00');
+    await page.keyboard.press('Escape');
+    assert.equal(await dialog.isVisible(),false);
+    assert.equal(await popup.isVisible(),true,'Escape closes only the editor');
+    assert.equal(await page.evaluate(()=>fixture.writes.length),beforeCancel);
+    await popup.locator('[data-edit-appointment-detail="doctor"]').click();
+    await dialog.locator('#appointment-detail-doctor').selectOption('doctor-2');
+    await dialog.locator('[data-detail-save]').click();
+    await dialog.waitFor({state:'hidden'});
+    assert.deepEqual(await page.evaluate(()=>fixture.writes.at(-1)),{assigned_user_id:'doctor-2'});
+    assert.equal(await page.evaluate(()=>appointments.find(a=>a.id==='a2').doctor),'Dr. Salma');
+    await popup.locator('[data-edit-appointment-detail="doctor"]').click();
+    await dialog.locator('#appointment-detail-doctor').selectOption('doctor');
+    await page.evaluate(()=>{fixture.writeFail=true;});
+    await dialog.locator('[data-detail-save]').click();
+    await dialog.locator('[data-detail-error]').waitFor();
+    assert.match(await dialog.locator('[data-detail-error]').textContent(),/Offline/);
+    assert.equal(await page.evaluate(()=>appointments.find(a=>a.id==='a2').assignedUserId),'doctor-2');
+    await page.evaluate(()=>{fixture.writeFail=false;});
+    await dialog.locator('[data-detail-save]').click();
+    await dialog.waitFor({state:'hidden'});
+    assert.equal(await page.evaluate(()=>appointments.find(a=>a.id==='a2').assignedUserId),'doctor');
+    await popup.locator('[data-add-appointment-operations]').click();
+    assert.equal(await page.locator('#modal-appointment').isVisible(),false);
+    await picker.locator('input[type="checkbox"]').first().uncheck();
+    await apply.click();
+    await picker.waitFor({state:'hidden'});
+    assert.deepEqual(await page.evaluate(()=>fixture.writes.at(-1)),{operations:[]});
+    assert.equal(await popup.locator('[data-appointment-detail-card="operations"]').count(),0);
+    await popup.locator('[data-add-appointment-operations]').click();
+    await picker.locator('input[type="checkbox"]').first().check();
+    await page.evaluate(()=>{fixture.writeFail=true;});
+    await apply.click();
+    await picker.locator('[data-operation-save-error]').waitFor();
+    assert.equal(await page.evaluate(()=>appointments.find(a=>a.id==='a2').operations.length),0);
+    await page.evaluate(()=>{fixture.writeFail=false;});
+    await apply.click();
+    await picker.waitFor({state:'hidden'});
+    assert.equal(await page.evaluate(()=>appointments.find(a=>a.id==='a2').operations.length),1);
+    assert.deepEqual(await page.evaluate(()=>Object.keys(fixture.writes.at(-1))),['operations']);
+    await popup.locator('[data-open-appointment-patient-profile]').click();
+    assert.deepEqual(await page.evaluate(()=>fixture.workspace),{patientId:'p1',tab:'profile'});
+    await page.evaluate(()=>openAppointmentCardPopover('a2'));
+    await popup.locator('[data-open-appointment-patient-chart]').click();
+    assert.deepEqual(await page.evaluate(()=>fixture.chart),{patientId:'p1',view:'appointments'});
+    await page.evaluate(()=>{allowed=false;fixture.denied=['chart'];openAppointmentCardPopover('a2')});
+    for(const selector of ['[data-edit-appointment-detail="schedule"]','[data-edit-appointment-detail="doctor"]','[data-appointment-popover-status]','[data-appointment-popover-visit-type]','[data-add-appointment-operations]','[data-open-appointment-patient-chart]'])assert.equal(await popup.locator(selector).isDisabled(),true);
+    assert.equal(await popup.locator('[data-open-appointment-patient-profile]').isEnabled(),true);
+    await page.evaluate(()=>{allowed=true;fixture.denied=[];openAppointmentCardPopover('a2')});
+    await popup.locator('[data-edit-appointment-detail="doctor"]').click();
+    await dialog.locator('#appointment-detail-doctor').selectOption('doctor-2');
+    await page.evaluate(()=>{fixture.writePending=true;});
+    await dialog.locator('[data-detail-save]').click();
+    assert.equal(await dialog.locator('[data-detail-save]').isDisabled(),true);
+    await page.evaluate(()=>{currentSession={user:{id:'another-account'}};fixture.finishWrite();});
+    await dialog.waitFor({state:'hidden'});
+    assert.equal(await page.evaluate(()=>appointments.find(a=>a.id==='a2').assignedUserId),'doctor','a late save cannot populate another account');
+    await page.evaluate(()=>{currentSession={user:{id:'staff'}};fixture.writePending=false;closeAppointmentCardPopover()});
+  });
   await page.evaluate(()=>{allowed=false;});
   await page.evaluate(()=>renderAppointmentOperations());
   assert.equal(await choose.isDisabled(),true);

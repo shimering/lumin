@@ -1,0 +1,12 @@
+.lumin-date-field { display: inline-grid; position: relative; width: 100%; min-width: 0; grid-template-columns: minmax(0, 1fr) 44px; vertical-align: middle; }
+.lumin-date-field[hidden] { display: none !important; }
+.lumin-date-field > .lumin-date-native { position: absolute !important; inset-inline-end: 0 !important; top: 0; width: 44px !important; height: 100% !important; margin: 0 !important; opacity: 0 !important; pointer-events: none; }
+.lumin-date-field > .lumin-date-text { grid-column: 1 / -1; grid-row: 1; width: 100%; min-width: 0; min-height: 44px; padding-inline-end: 48px !important; text-align: start; font-variant-numeric: tabular-nums; }
+.lumin-date-field > .lumin-date-text:focus-visible { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px #dbeafe; }
+.lumin-date-field > .lumin-date-picker { grid-column: 2; grid-row: 1; z-index: 1; align-self: stretch; display: grid; place-items: center; width: 44px; min-height: 44px; margin: 0; padding: 0; border: 0; border-radius: 10px; background: transparent; color: #64748b; cursor: pointer; transition: background 150ms ease-out, transform 150ms ease-out; }
+.lumin-date-field > .lumin-date-picker:hover { background: #f1f5f9; color: #2563eb; }
+.lumin-date-field > .lumin-date-picker:active { transform: scale(.98); }
+.lumin-date-field > .lumin-date-picker:focus-visible { outline: 2px solid #2563eb; outline-offset: -3px; }
+.lumin-date-field > .lumin-date-picker:disabled, .lumin-date-field > .lumin-date-text:disabled { opacity: .5; pointer-events: none; }
+.lumin-date-picker svg { width: 18px; height: 18px; }
+.lumin-date-field:dir(rtl) > .lumin-date-text { padding-inline-end: 12px !important; padding-inline-start: 48px !important; }

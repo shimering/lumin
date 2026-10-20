@@ -64,6 +64,7 @@ test('mobile screens fill the available height at every app scale', { skip: !chr
     let currentUiLanguage = 'en';
     let activeDashboardMobileTab = 'schedule', expandedDashboardAppointmentId = null, dashboardInvoiceRenderToken = 0;
     const appointmentToday = new Date(2026, 8, 30);
+    function refreshAppCurrentDate(){appointmentToday.setTime(new Date().setHours(0,0,0,0));}
     let dashboardSelectedDate = new Date(appointmentToday);
     const appointmentDayFormatter = new Intl.DateTimeFormat('en-GB', { dateStyle: 'long' });
     let currentUserAccess = { isAdmin: false, isDoctor: false, permissions: new Set(['dashboard_invoices']) };

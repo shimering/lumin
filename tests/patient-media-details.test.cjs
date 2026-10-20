@@ -79,6 +79,7 @@ function createHarness() {
       }
     },
   };
+  context.LuminDates=require('../lumin-dates.js');
   vm.createContext(context);
   vm.runInContext(names.map(source).join('\n'), context);
   vm.runInContext(fs.readFileSync(path.join(root, 'lumin-media-teeth.js'), 'utf8'), context);

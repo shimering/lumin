@@ -20,15 +20,15 @@ const chart = html.slice(chartStart, html.indexOf('    </section>', chartStart) 
 const helpers = ['isPrimaryToothId', 'palmerPositionForSlot', 'palmerQuadrantForSlot', 'palmerQuadrantLabel', 'palmerToothNotation', 'chartToothLabel', 'renderToothHTML', 'renderEmptyToothHTML', 'toothDentitionLongPressTarget', 'beginToothDentitionLongPress', 'cancelToothDentitionLongPress', 'patientMediaToothLabel', 'patientMediaDisplayName', 'patientMediaDownloadName', 'patientMediaFileUrl', 'openPatientMediaLightboxByIndex', 'updateAppViewportDimensions'].map(source).join('\n');
 
 test('X-ray upload dates use upload timestamps, retain the saved upload date after edits, and handle older files', () => {
-  const context=vm.createContext({window:{matchMedia:()=>({matches:false})},document:{addEventListener(){}},currentUiLanguage:'en',escapeHtml:value=>String(value)});
+  const context=vm.createContext({LuminDates:require('../lumin-dates.js'),window:{matchMedia:()=>({matches:false})},document:{addEventListener(){}},currentUiLanguage:'en',escapeHtml:value=>String(value)});
   vm.runInContext(fs.readFileSync(path.join(root,'lumin-chart-media.js'),'utf8'),context);
   const markup=context.chartXrayUploadDateMarkup({uploadedAt:'2026-09-12T12:00:00Z',modifiedAt:'2026-10-02T12:00:00Z'});
   assert.match(markup,/Uploaded/);
-  assert.match(markup,/12 Sept 2026/);
+  assert.match(markup,/12\/09\/2026/);
   assert.match(markup,/datetime="2026-09-12T12:00:00.000Z"/);
   const savedEpoch=Date.parse('2026-09-12T12:00:00Z')/1000;
-  assert.match(context.chartXrayUploadDateMarkup({filename:`2026-09-12_${savedEpoch}_xray.png`,modifiedAt:'2026-10-02T12:00:00Z'}),/12 Sept 2026/);
-  assert.match(context.chartXrayUploadDateMarkup({modifiedAt:'2026-09-01T12:00:00Z'}),/1 Sept 2026/);
+  assert.match(context.chartXrayUploadDateMarkup({filename:`2026-09-12_${savedEpoch}_xray.png`,modifiedAt:'2026-10-02T12:00:00Z'}),/12\/09\/2026/);
+  assert.match(context.chartXrayUploadDateMarkup({modifiedAt:'2026-09-01T12:00:00Z'}),/01\/09\/2026/);
   for(const file of [{},{modifiedAt:'invalid'},{uploadedAt:'<script>alert(1)</script>'}]) {
     assert.match(context.chartXrayUploadDateMarkup(file),/Upload date unavailable/);
     assert.doesNotMatch(context.chartXrayUploadDateMarkup(file),/<script>|Invalid Date|1970/);
@@ -92,6 +92,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
     return route.fulfill({ contentType:'application/octet-stream', body:'sample' });
   });
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
+  await page.addScriptTag({path:path.join(root,'lumin-dates.js')});
   await page.addScriptTag({ url:`http://127.0.0.1:${server.address().port}/vendor/lucide.min.js` });
   await page.addScriptTag({ content: `
     let currentUiLanguage = 'en', activePatientId = 'patient-1', activeWorkspacePatientId = 'patient-1';
@@ -189,7 +190,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
       assert.equal(await page.locator('.chart-media-thumbnail').count(), 1, 'Viewer is filtered to the tapped tooth');
       assert.equal(await page.locator('.chart-media-caption h4').textContent(), 'UR6 before treatment');
       assert.equal(await page.locator('.chart-media-upload-date time').getAttribute('datetime'),'2026-09-12T12:00:00.000Z');
-      assert.match(await page.locator('.chart-media-upload-date').textContent(),language==='ar'?/تاريخ الرفع/:/Uploaded 12 Sept 2026/);
+      assert.match(await page.locator('.chart-media-upload-date').textContent(),language==='ar'?/تاريخ الرفع/:/Uploaded 12\/09\/2026/);
       assert.equal(await page.evaluate(() => [window.toothSelections, window.dentitionSwitches].join(',')), '0,0', 'Indicators do not select teeth or switch dentition');
       assert.ok(await page.locator('.chart-media-filter').isVisible());
       await page.locator('[data-chart-clear-filter]').click();
@@ -479,6 +480,7 @@ test('landscape chart viewer stays on the right while scrolling; attachment prev
   assert.ok(!(await page.locator('#patient-attachment-modal').isVisible()));
   assert.equal(await page.evaluate(() => chartPatientMedia.files.length),0);
   await page.goto(`http://127.0.0.1:${server.address().port}/shell`);
+  await page.addScriptTag({path:path.join(root,'lumin-dates.js')});
   await page.addScriptTag({ url:`http://127.0.0.1:${server.address().port}/vendor/lucide.min.js` });
   await page.addScriptTag({content:`
     let currentUiLanguage='en', activePatientId='patient-1';

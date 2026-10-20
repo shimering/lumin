@@ -5,7 +5,7 @@
   const t=(en,ar)=>language==='ar'?ar:en;
   const icon=name=>`<i data-lucide="${name}" aria-hidden="true"></i>`;
   const token=()=>new URL(location.href).searchParams.get('s')||'';
-  const date=value=>new Intl.DateTimeFormat(language,{dateStyle:'medium',timeZone:'Africa/Cairo'}).format(new Date(value));
+  const date=value=>LuminDates.format(value,{timeZone:'Africa/Cairo'});
   const count=value=>new Intl.NumberFormat(language).format(value);
   function icons(){if(window.lucide)lucide.createIcons();}
   function locale(){document.documentElement.lang=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';}
@@ -60,7 +60,7 @@
       ctx.fillStyle='#eff6ff';ctx.fillRect(0,0,width,240);
       text(snapshot.clinic_name,start,80,25,'#64748b',600,contentWidth);
       text(tr('Supplier list','قائمة المورد'),start,140,44,'#17263b',600);
-      const meta=`${snapshot.reference} · ${new Intl.NumberFormat(exportLanguage).format(snapshot.items.length)} ${tr('items','أصناف')} · ${new Intl.DateTimeFormat(exportLanguage,{dateStyle:'medium',timeZone:'Africa/Cairo'}).format(new Date(snapshot.created_at))}`;
+      const meta=`${snapshot.reference} · ${new Intl.NumberFormat(exportLanguage).format(snapshot.items.length)} ${tr('items','أصناف')} · ${LuminDates.format(snapshot.created_at,{timeZone:'Africa/Cairo'})}`;
       text(meta,start,190,22,'#64748b',400,contentWidth);let y=260;
       for(const row of pages[p]){
         if(row.type==='category'){ctx.fillStyle='#f8fafc';ctx.fillRect(edge,y+12,contentWidth,60);text(row.label,rtl?start-16:start+16,y+52,24,'#475569',600,contentWidth-32);text(tr('Item','الصنف'),rtl?start-138:start+138,y+106,20,'#94a3b8');text(tr('Quantity wanted','الكمية المطلوبة'),rtl?edge+150:width-edge-150,y+106,20,'#94a3b8',400,150);}

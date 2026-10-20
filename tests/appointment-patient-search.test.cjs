@@ -47,8 +47,10 @@ test('appointment patient search opens immediately and only fetches five summari
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/*', route => route.request().url().startsWith('http://127.0.0.1:') ? route.continue() : route.abort());
   await page.goto('http://127.0.0.1:' + server.address().port);
+  await page.addScriptTag({path:path.join(root,'lumin-dates.js')});
   await page.addScriptTag({ url: 'http://127.0.0.1:' + server.address().port + '/vendor/lucide.min.js' });
-  await page.clock.install();
+  await page.clock.install({time:new Date('2026-10-14T09:00:00Z')});
+  await page.clock.pauseAt(new Date('2026-10-14T09:00:01Z'));
   const state = html.slice(html.indexOf('    let appointmentPatientMatches ='), html.indexOf('    const recentLocalAppointmentChanges ='));
   await page.addScriptTag({ content: `
     let currentSession={user:{id:'staff'}},currentUiLanguage='en',targetedLoadingGeneration=0,allowed=true;

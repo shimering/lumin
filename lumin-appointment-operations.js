@@ -1,7 +1,7 @@
 // Optional links to existing clinical operations. Removing a link never edits the chart.
 const appointmentOperationState = {
   patientId: '', selected: [], choices: [], draft: new Set(), open: false,
-  status: 'idle', sequence: 0, trigger: null, bodyOverflow: ''
+  status: 'idle', sequence: 0, trigger: null, bodyOverflow: '', appointmentId: null, userId: null, saving: false
 };
 const appointmentOperationCatalog = { entries: new Map(), userId: null, expiresAt: 0, pending: null, generation: 0 };
 
@@ -110,9 +110,9 @@ function appointmentOperationStatusMarkup(operation) {
 }
 
 function resetAppointmentOperations(patientId = '', selected = []) {
-  closeAppointmentOperationPicker(false);
+  closeAppointmentOperationPicker(false, true);
   Object.assign(appointmentOperationState, { patientId, selected: normaliseAppointmentOperations(selected),
-    choices: [], draft: new Set(), status: 'idle', sequence: appointmentOperationState.sequence + 1 });
+    choices: [], draft: new Set(), status: 'idle', sequence: appointmentOperationState.sequence + 1, appointmentId: null, userId: null, saving: false });
   renderAppointmentOperations();
 }
 
@@ -154,7 +154,7 @@ function ensureAppointmentOperationPicker() {
   layer.id = 'appointment-operation-picker';
   layer.className = 'appointment-operation-picker';
   layer.hidden = true;
-  layer.innerHTML = `<div class="appointment-operation-dialog" role="dialog" aria-modal="true" aria-labelledby="appointment-operation-picker-title"><header><span class="appointment-operation-icon"><i data-lucide="tooth" class="dental-chart-icon" aria-hidden="true"></i></span><div><h3 id="appointment-operation-picker-title"></h3><p id="appointment-operation-picker-description"></p></div><button type="button" class="appointment-operation-button" data-operation-close><i data-lucide="x" aria-hidden="true"></i></button></header><div class="appointment-operation-search"><i data-lucide="search" aria-hidden="true"></i><input id="appointment-operation-search" type="search" autocomplete="off" /></div><div id="appointment-operation-options" class="appointment-operation-options" aria-live="polite"></div><footer><span id="appointment-operation-count" role="status"></span><div><button type="button" class="appointment-operation-button" data-operation-cancel></button><button type="button" class="appointment-operation-button appointment-operation-primary" data-operation-apply></button></div></footer></div>`;
+  layer.innerHTML = `<div class="appointment-operation-dialog" role="dialog" aria-modal="true" aria-labelledby="appointment-operation-picker-title"><header><span class="appointment-operation-icon"><i data-lucide="tooth" class="dental-chart-icon" aria-hidden="true"></i></span><div><h3 id="appointment-operation-picker-title"></h3><p id="appointment-operation-picker-description"></p></div><button type="button" class="appointment-operation-button" data-operation-close><i data-lucide="x" aria-hidden="true"></i></button></header><div class="appointment-operation-search"><i data-lucide="search" aria-hidden="true"></i><input id="appointment-operation-search" type="search" autocomplete="off" /></div><div id="appointment-operation-options" class="appointment-operation-options" aria-live="polite"></div><p data-operation-save-error class="appointment-detail-error" role="alert" hidden></p><footer><span id="appointment-operation-count" role="status"></span><div><button type="button" class="appointment-operation-button" data-operation-cancel></button><button type="button" class="appointment-operation-button appointment-operation-primary" data-operation-apply></button></div></footer></div>`;
   layer.addEventListener('click', event => { if (event.target === layer) closeAppointmentOperationPicker(); });
   layer.querySelector('[data-operation-close]').addEventListener('click', () => closeAppointmentOperationPicker());
   layer.querySelector('[data-operation-cancel]').addEventListener('click', () => closeAppointmentOperationPicker());
@@ -188,10 +188,13 @@ async function openAppointmentOperationPicker(trigger = null) {
   const layer = ensureAppointmentOperationPicker();
   state.trigger = trigger || document.getElementById('appointment-operations-choose');
   state.open = true;
+  state.userId = currentSession.user.id;
   state.draft = new Set(state.selected.map(operation => operation.key));
   state.status = 'loading';
   state.choices = [];
   layer.hidden = false;
+  layer.querySelectorAll('button, input').forEach(control => { control.disabled = false; });
+  layer.querySelector('[data-operation-save-error]').hidden = true;
   state.bodyOverflow = document.body.style.overflow;
   document.body.style.overflow = 'hidden';
   layer.dir = currentUiLanguage === 'ar' ? 'rtl' : 'ltr';
@@ -200,7 +203,7 @@ async function openAppointmentOperationPicker(trigger = null) {
   document.getElementById('appointment-operation-picker-description').textContent = appointmentOperationText('Planned and in-progress operations from this patient’s chart.', 'العمليات المخططة وقيد التنفيذ من مخطط هذا المريض.');
   layer.querySelector('[data-operation-close]').ariaLabel = appointmentOperationText('Close operation picker', 'إغلاق اختيار العمليات');
   layer.querySelector('[data-operation-cancel]').textContent = appointmentOperationText('Cancel', 'إلغاء');
-  layer.querySelector('[data-operation-apply]').textContent = appointmentOperationText('Apply selection', 'تطبيق الاختيار');
+  layer.querySelector('[data-operation-apply]').textContent = state.appointmentId ? appointmentOperationText('Save operations', 'حفظ العمليات') : appointmentOperationText('Apply selection', 'تطبيق الاختيار');
   const search = layer.querySelector('input');
   search.value = '';
   search.placeholder = appointmentOperationText('Search operations or tooth number', 'ابحث عن عملية أو رقم السن');
@@ -257,24 +260,57 @@ function renderAppointmentOperationOptions() {
   if (window.lucide) lucide.createIcons();
 }
 
-function applyAppointmentOperationPicker() {
+async function applyAppointmentOperationPicker() {
   const state = appointmentOperationState;
-  if (!canModifyAppointments() || state.status !== 'ready') return;
-  state.selected = state.choices.filter(operation => state.draft.has(operation.key));
+  if (!state.open || state.saving || !canModifyAppointments() || currentSession?.user?.id !== state.userId || state.status !== 'ready') return;
+  const selected = state.choices.filter(operation => state.draft.has(operation.key));
+  if (state.appointmentId) {
+    const sequence = state.sequence, appointmentId = state.appointmentId;
+    const layer = document.getElementById('appointment-operation-picker'), error = layer.querySelector('[data-operation-save-error]');
+    state.saving = true;
+    error.hidden = true;
+    layer.querySelectorAll('button, input').forEach(control => { control.disabled = true; });
+    layer.querySelector('[data-operation-apply]').textContent = appointmentOperationText('Saving…', 'جارٍ الحفظ…');
+    try {
+      const saved = await saveAppointmentDetailPatch(appointmentId, { operations: selected.map(operation => ({ finding_ids: operation.finding_ids })) });
+      if (!state.open || state.sequence !== sequence) return;
+      if (currentSession?.user?.id !== state.userId || !canModifyAppointments()) { resetAppointmentOperations(); return; }
+      if (!saved) throw new Error(appointmentOperationText('Your access changed. Reopen the appointment and try again.', 'تغيرت صلاحياتك. أعد فتح الموعد وحاول مرة أخرى.'));
+      state.selected = selected;
+      state.saving = false;
+      closeAppointmentOperationPicker();
+    } catch (failure) {
+      if (state.open && state.sequence === sequence) { error.textContent = appointmentOperationText('Could not save operations. ', 'تعذر حفظ العمليات. ') + failure.message; error.hidden = false; }
+    } finally {
+      if (state.open && state.sequence === sequence) {
+        state.saving = false;
+        layer.querySelectorAll('button, input').forEach(control => { control.disabled = !canModifyAppointments(); });
+        layer.querySelector('[data-operation-apply]').textContent = appointmentOperationText('Save operations', 'حفظ العمليات');
+      }
+    }
+    return;
+  }
+  state.selected = selected;
   closeAppointmentOperationPicker(false);
   renderAppointmentOperations();
   document.getElementById('appointment-operations-choose')?.focus({ preventScroll: true });
 }
 
-function closeAppointmentOperationPicker(restoreFocus = true) {
+function closeAppointmentOperationPicker(restoreFocus = true, force = false) {
   const state = appointmentOperationState;
-  if (!state.open) return;
+  if (!state.open || state.saving && !force) return;
+  const appointmentId = state.appointmentId, userId = state.userId;
   state.open = false;
   state.sequence++;
   const layer = document.getElementById('appointment-operation-picker');
   if (layer) layer.hidden = true;
   document.body.style.overflow = state.bodyOverflow;
   document.getElementById('modal-appointment')?.removeAttribute('inert');
+  state.appointmentId = null;
+  if (appointmentId && restoreFocus && currentSession?.user?.id === userId && hasPageAccess('appointments')) {
+    openAppointmentCardPopover(appointmentId);
+    requestAnimationFrame(() => document.querySelector('#appointment-card-popover [data-add-appointment-operations]')?.focus({ preventScroll: true }));
+  }
   if (restoreFocus && state.trigger?.isConnected) state.trigger.focus({ preventScroll: true });
   state.trigger = null;
 }
@@ -288,6 +324,7 @@ async function openAppointmentOperationChart() {
 
 async function editAppointmentOperations(appointmentId) {
   if (!canModifyAppointments()) return;
+  if (typeof appointmentCardPopoverId !== 'undefined' && appointmentCardPopoverId === appointmentId) return openAppointmentDetailOperations(appointmentId);
   if (typeof closeAppointmentCardPopover === 'function') closeAppointmentCardPopover(false, false);
   await openAppointmentModal(appointmentId);
   if (editingAppointmentId === appointmentId && !document.getElementById('modal-appointment').classList.contains('hidden')) {

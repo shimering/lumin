@@ -89,6 +89,7 @@ test('tooth notes open and edit in the sidebar, stay live, and fit expanded, col
   await page.route('**/api/thumbnail/**',route=>route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#334155"/></svg>'}));
   const base=`http://127.0.0.1:${server.address().port}`;
   await page.goto(base);
+  await page.addScriptTag({path:path.join(root,'lumin-dates.js')});
   await page.addScriptTag({path:path.join(root,'vendor/lucide.min.js')});
   const helpers=['isPrimaryToothId','palmerPositionForSlot','palmerQuadrantForSlot','palmerQuadrantLabel','palmerToothNotation','chartToothLabel',
     'renderToothHTML','renderEmptyToothHTML','toothDentitionLongPressTarget','chartFindingIdsFromControl','chartFindingToothIdsFromControl',

@@ -16,6 +16,7 @@ test('newest visit preview, three-visit drawer and note/date popup work across d
   const browser=await chromium.launch({headless:true,channel:process.env.LUMIN_TEST_BROWSER_CHANNEL||undefined});t.after(()=>browser.close());
   const page=await browser.newPage({timezoneId:'Africa/Cairo'}),errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
+  await page.addScriptTag({path:path.join(root,'lumin-dates.js')});
   await page.addScriptTag({path:path.join(root,'vendor/lucide.min.js')});
   await page.addScriptTag({path:path.join(root,'lumin-ortho-visits.js')});
   await page.addScriptTag({content:`

@@ -222,7 +222,7 @@ test('patient Quotations tab supports editing, deletion, pagination and patient 
   await page.route(base+'/staff',route=>route.fulfill({contentType:'text/html',body:`${head}<body class="lumin-raised"><div id="app-shell"><main id="app-main" class="w-full p-4 sm:p-6">${workspaceHeader}<div id="chart-selection-fixture">${group}</div><button id="history" onclick="openPatientQuotations()">History</button>${quotationSection}<div id="admin-quotation-settings"></div><form id="admin-prescription-print-form" class="hidden"><section><input id="prescription-print-logo-file" type="file"/></section></form></main></div></body>`}));
   await page.goto(base+'/staff');
   await page.addScriptTag({path:path.join(root,'vendor/lucide.min.js')});
-  for(const filename of ['lumin-quotation-model.js','lumin-dental-i18n.js','lumin-tooth-anatomy.js','lumin-quotation-view.js'])await page.addScriptTag({path:path.join(root,filename)});
+  for(const filename of ['lumin-dates.js','lumin-quotation-model.js','lumin-dental-i18n.js','lumin-tooth-anatomy.js','lumin-quotation-view.js'])await page.addScriptTag({path:path.join(root,filename)});
   await page.addScriptTag({content:`
     let currentUiLanguage='en',currentSession={user:{id:'staff'}},currentUserAccess={isAdmin:true},activePatientId='${id(90)}',activeWorkspacePatientId=activePatientId,patientWorkspaceReturnView='patients';
     let selectedFindingIds=new Set(['${id(1)}','${id(2)}']),invoicedFindingIds=new Set(),chartInvoiceStateLoading=false;

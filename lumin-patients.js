@@ -148,7 +148,7 @@ function patientProcedureDate(record, invoiceDate = '') {
 }
 
 function formatPatientProcedureDay(value) {
-  return value ? new Intl.DateTimeFormat(currentUiLanguage === 'ar' ? 'ar-EG' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${value}T12:00:00`)) : '—';
+  return value ? LuminDates.format(value) : '—';
 }
 
 function readPatientProcedureFilters() {

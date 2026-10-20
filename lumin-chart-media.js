@@ -118,7 +118,7 @@ function chartXrayUploadDateMarkup(file) {
   const timestamp = rawDate ? Date.parse(rawDate) : NaN;
   if (!Number.isFinite(timestamp)) return `<p class="chart-media-upload-date"><i data-lucide="calendar-days" aria-hidden="true"></i><span>${chartMediaText('Upload date unavailable', 'تاريخ الرفع غير متوفر')}</span></p>`;
   const date = new Date(timestamp);
-  const label = new Intl.DateTimeFormat(currentUiLanguage === 'ar' ? 'ar-EG' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+  const label = LuminDates.format(date);
   return `<p class="chart-media-upload-date"><i data-lucide="calendar-days" aria-hidden="true"></i><span>${chartMediaText('Uploaded', 'تاريخ الرفع')}</span> <time datetime="${date.toISOString()}">${escapeHtml(label)}</time></p>`;
 }
 

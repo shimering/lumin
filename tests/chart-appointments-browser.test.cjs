@@ -35,6 +35,7 @@ test('account-specific chart appointments open only in landscape and preserve re
   await page.route('**/api/thumbnail/**', route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="240"><rect width="400" height="240" fill="#151b23"/><path d="M120 60 Q155 30 190 60 L180 180 L165 180 L155 110 L140 180 L125 180 Z M210 60 Q245 30 280 60 L270 180 L255 180 L245 110 L230 180 L215 180 Z" fill="#b4bac4" stroke="#697386" stroke-width="6"/></svg>' }));
   const base = `http://127.0.0.1:${server.address().port}`;
   await page.goto(base);
+  await page.addScriptTag({path:path.join(root,'lumin-dates.js')});
   await page.addScriptTag({ url: base + '/vendor/lucide.min.js' });
   await page.addScriptTag({ content: `
     let currentSession={user:{id:'staff'}}, currentUserAccess={active:true}, currentUiLanguage='en', canReadAppointments=true;

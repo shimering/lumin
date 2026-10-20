@@ -47,6 +47,7 @@ test('chart X-ray filters prefill uploads, allow multiple teeth, and save withou
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/api/thumbnail/**', route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="240"><rect width="300" height="240" fill="#334155"/></svg>' }));
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
+  await page.addScriptTag({path:path.join(root,'lumin-dates.js')});
   await page.addScriptTag({ url: `http://127.0.0.1:${server.address().port}/vendor/lucide.min.js` });
   await page.addScriptTag({ content: `
     let currentUiLanguage='en', activePatientId='patient-1', activeWorkspacePatientId='patient-1', activePatientMediaPatientId='patient-1';

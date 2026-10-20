@@ -14,6 +14,7 @@ test('clinic overview, dropdown, payroll payment, permissions and bilingual layo
   const page=await browser.newPage({viewport:{width:1440,height:1100}}),errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.route('**/*',route=>route.request().url().startsWith('http://127.0.0.1:')?route.continue():route.abort());
   await page.goto('http://127.0.0.1:'+server.address().port+'/');
+  await page.addScriptTag({path:path.join(root,'lumin-dates.js')});
   await page.addScriptTag({path:path.join(root,'vendor/lucide.min.js')});
   await page.addScriptTag({content:
     "let currentUiLanguage='en',currentSession={user:{id:'actor'}},currentUserAccess={active:true,isAdmin:true,permissions:new Set(['finances','analytics','hr','finance_depts','patients'])},activeClinicManagementTab='overview',activeFinanceTab='invoices',activeHrDoctorDetailsId=null,hrDirectoryLoaded=true;"+
@@ -52,10 +53,10 @@ test('clinic overview, dropdown, payroll payment, permissions and bilingual layo
   await page.locator('#cm-start-date').fill('2026-10-14');
   assert.equal(await page.locator('#cm-range-preset').inputValue(),'custom');
   const beforeInvalid=await page.evaluate(()=>calls.filter(call=>call.name==='get_clinic_management_overview').length);
-  await page.locator('#cm-range-toolbar button').click();
+  await page.locator('#cm-range-toolbar button.cm-button').click();
   assert.match(await page.locator('#cm-overview-error').textContent(),/valid date range/);
   assert.equal(await page.evaluate(()=>calls.filter(call=>call.name==='get_clinic_management_overview').length),beforeInvalid);
-  await page.locator('#cm-start-date').fill('2026-10-01');await page.locator('#cm-range-toolbar button').click();
+  await page.locator('#cm-start-date').fill('2026-10-01');await page.locator('#cm-range-toolbar button.cm-button').click();
   await page.waitForFunction(()=>calls.filter(call=>call.name==='get_clinic_management_overview').at(-1)?.args.p_start_date==='2026-10-01');
   await page.locator('#cm-range-preset').selectOption('today');
   assert.deepEqual(errors,[]);assert.equal(await page.locator('.cm-invoice-row').count(),20);assert.equal(await page.locator('#cm-alert-count').textContent(),'5');

@@ -1,7 +1,7 @@
 /* Clinic overview and day settlement. Uses existing HR payment confirmation and server guards. */
 (function (host) {
   'use strict';
-  const state = { actor:'', token:0, payrollToken:0, report:null, payroll:null, team:null, alerts:[], alertView:'alerts', start:'', end:'', preset:'today', day:'', doctor:'', page:1, onlyUnpaid:false, loading:false, payrollLoading:false,paying:false,loadedAt:0,error:'',payrollError:'' };
+  const state = { actor:'', token:0, payrollToken:0, report:null, payroll:null, team:null, alerts:[], alertView:'alerts', start:'', end:'', preset:'today', day:'', calendarDay:'', doctor:'', page:1, onlyUnpaid:false, loading:false, payrollLoading:false,paying:false,loadedAt:0,error:'',payrollError:'' };
   const el = id => document.getElementById(id);
   const text = (en,ar) => typeof currentUiLanguage !== 'undefined' && currentUiLanguage === 'ar' ? ar : en;
   const esc = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -36,7 +36,7 @@
   const empty = (title,description,name='circle-check',action='') => `<div class="cm-empty"><span class="cm-icon">${icon(name)}</span><h4>${title}</h4><p>${description}</p>${action}</div>`;
   function reset() {
     state.token++;state.payrollToken++;closeAlerts(false);
-    Object.assign(state,{actor:'',report:null,payroll:null,team:null,alerts:[],alertView:'alerts',loadedAt:0,error:'',payrollError:'',loading:false,payrollLoading:false,paying:false,doctor:'',day:'',start:'',end:'',preset:'today',page:1,onlyUnpaid:false});
+    Object.assign(state,{actor:'',report:null,payroll:null,team:null,alerts:[],alertView:'alerts',loadedAt:0,error:'',payrollError:'',loading:false,payrollLoading:false,paying:false,doctor:'',day:'',calendarDay:'',start:'',end:'',preset:'today',page:1,onlyUnpaid:false});
     for(const id of ['cm-stats','cm-payroll-rows','cm-team-content','cm-expense-breakdown','cm-cash-chart','cm-alert-body'])if(el(id))el(id).replaceChildren();
     if(el('cm-alert-bell')){el('cm-alert-bell').classList.remove('has-alerts');el('cm-alert-count').hidden=true;}
   }
@@ -141,7 +141,7 @@
     const compact=new Intl.NumberFormat(currentUiLanguage==='ar'?'ar-EG':'en-US',{notation:'compact',maximumFractionDigits:1});
     let marks='';for(let i=0;i<=4;i++){const value=ceiling*i/4;marks+=`<line class="cm-grid-line" x1="${left}" x2="${width-right}" y1="${y(value)}" y2="${y(value)}"/><text x="${left-10}" y="${y(value)+4}" text-anchor="end">${esc(compact.format(value))}</text>`;}
     const tickCount=width<420?3:5;const indices=[...new Set(Array.from({length:tickCount},(_,i)=>Math.round(i/(tickCount-1)*(series.length-1))))];
-    for(const index of indices){const d=series[index].day;const label=new Intl.DateTimeFormat(currentUiLanguage==='ar'?'ar-EG':'en-GB',{day:'numeric',month:'short'}).format(new Date(d+'T12:00:00'));marks+=`<text x="${x(index)}" y="${height-8}" text-anchor="${index===0?'start':index===series.length-1?'end':'middle'}">${esc(label)}</text>`;}
+    for(const index of indices){const d=series[index].day;const label=LuminDates.format(d);marks+=`<text x="${x(index)}" y="${height-8}" text-anchor="${index===0?'start':index===series.length-1?'end':'middle'}">${esc(label)}</text>`;}
     const last=series.at(-1);const lastX=x(series.length-1);
     root.innerHTML=`<div class="cm-toolbar"><span class="cm-muted">${text('Collected','المحصل')}: <strong>${esc(money(finance.income_total))}</strong></span><span class="cm-muted">${text('Paid','المدفوع')}: <strong>${esc(money(finance.expense_total))}</strong></span></div><svg class="cm-chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(text('Cumulative cash receipts and paid expenses','المقبوضات والمصروفات المدفوعة التراكمية'))}"><title>${esc(text('Collected income and paid expenses','الدخل المحصل والمصروفات المدفوعة'))}</title><desc>${esc(money(finance.income_total))} / ${esc(money(finance.expense_total))}</desc><text x="${left}" y="14">${text('EGP','ج.م')}</text>${marks}<path d="${path('income')} L${lastX} ${y(0)} L${x(0)} ${y(0)}Z" fill="#2563eb" opacity=".06"/><path d="${path('income')}" fill="none" stroke="#2563eb" stroke-width="2.5"/><path d="${path('expense')}" fill="none" stroke="#94a3b8" stroke-width="2.5"/><circle cx="${lastX}" cy="${y(last.income)}" r="4" fill="#2563eb"/><circle cx="${lastX}" cy="${y(last.expense)}" r="4" fill="#94a3b8"/></svg><div class="cm-legend"><span><i></i>${text('Collected','المحصل')}</span><span><i class="cm-expense-dot"></i>${text('Paid expenses','المصروفات المدفوعة')}</span></div>${number(finance.legacy_expense_total)>0?`<p class="cm-muted">${text('Older payments without installment history use the recorded expense date.','تستخدم الدفعات القديمة بدون سجل أقساط تاريخ المصروف المسجل.')}</p>`:''}`;
   }
@@ -179,6 +179,10 @@
     if(!el('cm-alert-menu'))init();
     const context=signature();if(state.actor&&state.actor!==context){reset();init();}state.actor=context;
     if(!state.start){state.day=today();state.start=state.day;state.end=state.day;}
+    const currentDay=today(),range=presetRange(state.preset,currentDay);
+    if(state.calendarDay&&state.calendarDay!==currentDay&&state.day===state.calendarDay&&!state.paying){state.day=currentDay;state.payroll=null;state.page=1;}
+    state.calendarDay=currentDay;
+    if(range&&(range.start!==state.start||range.end!==state.end)){state.start=range.start;state.end=range.end;state.report=null;state.loadedAt=0;}
     renderStatic();
     if(!options.force&&state.report&&Date.now()-state.loadedAt<30000){render();if(allowed('hr')&&!state.payroll)await loadPayroll();return;}
     const token=++state.token;state.loading=true;render();el('cm-refresh').disabled=true;
@@ -226,7 +230,7 @@
     const amount=Math.round(number(state.payroll?.ready_amount)*100)/100;if(amount<=0)return;
     const name=state.payroll.doctors.find(d=>d.id===doctor)?.name||'';state.paying=true;renderPayroll();icons();
     try{
-      const paid=await openHrSalaryPaymentDialog({amount,recipients:[name],summary:`${text('Single day','يوم واحد')} · ${day} · ${number(state.payroll.ready_count)} ${text('completed procedures','إجراءات مكتملة')}`,
+      const paid=await openHrSalaryPaymentDialog({amount,recipients:[name],summary:`${text('Single day','يوم واحد')} · ${LuminDates.format(day)} · ${number(state.payroll.ready_count)} ${text('completed procedures','إجراءات مكتملة')}`,
         pay:async methodId=>{if(context!==signature()||!canModifyHr())throw new Error(text('HR access changed. Reopen the payment.','تغيرت صلاحية الموارد البشرية. افتح الدفع مجددًا.'));const {error}=await db.rpc('hr_pay_doctor_procedures_with_method',{p_user_id:doctor,p_scope:'day',p_start_date:day,p_end_date:day,p_finding_ids:null,p_payment_method_id:methodId,p_expected_amount:amount});if(error)throw error;}});
       if(paid&&context===signature()){showAppointmentNotificationToast(text('Doctor salary paid','تم دفع راتب الطبيب'),text('The selected day was settled and a linked Salary expense was added.','تمت تسوية اليوم المحدد وإضافة مصروف راتب مرتبط.'));state.loadedAt=0;}
     }finally{state.paying=false;if(context===signature())await refresh({force:true});}
@@ -282,7 +286,7 @@
       const entry=document.createElement('article');entry.className='cm-payment-preview-row';
       const detail=document.createElement('div'),name=document.createElement('strong'),procedure=document.createElement('p'),date=document.createElement('p');
       name.textContent=(row.patient_name||'')+' · '+(row.doctor_name||'');
-      procedure.textContent=(row.operation_name||'')+' · '+money(row.doctor_amount);date.textContent=(row.day||'')+' · #'+row.invoice_id;
+      procedure.textContent=(row.operation_name||'')+' · '+money(row.doctor_amount);date.textContent=LuminDates.format(row.day)+' · #'+row.invoice_id;
       detail.append(name,procedure,date);
       const actions=document.createElement('div');actions.className='cm-payment-preview-actions';
       const redirect=document.createElement('button');redirect.type='button';redirect.className='cm-button cm-button-icon';

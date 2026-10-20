@@ -3,7 +3,7 @@
   const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   const text = (language,en,ar) => language === 'ar' ? ar : en;
   const money = (amount,language) => new Intl.NumberFormat(language === 'ar' ? 'ar-EG' : 'en-GB',{style:'currency',currency:'EGP',minimumFractionDigits:0,maximumFractionDigits:0}).format(amount);
-  const date = (value,language) => new Intl.DateTimeFormat(language === 'ar' ? 'ar-EG' : 'en-GB',{dateStyle:'medium',timeZone:'Africa/Cairo'}).format(new Date(value));
+  const date = (value,language) => LuminDates.format(value,{timeZone:'Africa/Cairo'});
   const icon = name => `<i data-lucide="${name}" aria-hidden="true"></i>`;
   const procedureName = (item,language) => root.LuminDentalI18n.translate(item.name,language);
   function procedureTeeth(item,language) {

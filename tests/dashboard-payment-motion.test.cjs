@@ -253,6 +253,7 @@ async function realDashboard(page, width) {
   await page.addScriptTag({content:`
     let currentUserAccess={isDoctor:false},expandedDashboardAppointmentId=null,appointmentsLoaded=true;
     const appointmentToday=new Date(2026,9,4),dashboardDayCache=new Map();
+    function refreshAppCurrentDate(){appointmentToday.setTime(new Date().setHours(0,0,0,0));}
     window.fixtureAppointments=[1,2,3].map(id=>({id:'appointment-'+id,patientId:'patient',patient:'Test patient '+id,
       patientAge:40,time:'09:00',duration:30,doctor:'Dr Sara',appointmentColor:'#2563eb',status:id===3?'Cancelled':'Scheduled'}));
     function appointmentDateKey(date=new Date()){return [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-')}
@@ -305,7 +306,7 @@ test('both dashboard boxes fade cards top to bottom on entry and day changes wit
     assert.equal(await page.evaluate(()=>dashboardSelectedDate.getDate()),5);
     await page.evaluate(()=>{animationRecords.length=0;showDashboardToday()});
     await ready();
-    assert.equal(await page.evaluate(()=>dashboardSelectedDate.getDate()),4);
+    assert.equal(await page.evaluate(()=>dashboardSelectedDate.getDate()===new Date().getDate()),true);
     await page.evaluate(()=>{LuminDashboardMotion.prepareCards();animationRecords.length=0;renderDashboard()});
     await ready();
     assert.deepEqual(errors,[]);

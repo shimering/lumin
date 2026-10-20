@@ -106,8 +106,8 @@
       const body = this.host.querySelector('.scan-library');
       body.innerHTML = this.files.length ? `<div class="scan-card-grid">${this.files.map((file, index) => {
         const details = file.details, name = details.display_name || details.scan_config?.original_filename || file.filename;
-        const date = details.scan_date ? `${esc(details.scan_date)} · ` : '';
-        return `<article class="scan-card"><div class="scan-card-heading"><span class="scan-symbol">${this.icon('box')}</span><div><h4>${esc(name)}</h4><p>${date}${this.t('uploaded')} ${esc(String(file.modifiedAt || '').slice(0, 10))} · ${(file.sizeBytes / 1048576).toFixed(1)} MB</p></div></div>
+        const date = details.scan_date ? `${esc(LuminDates.format(details.scan_date))} · ` : '';
+        return `<article class="scan-card"><div class="scan-card-heading"><span class="scan-symbol">${this.icon('box')}</span><div><h4>${esc(name)}</h4><p>${date}${this.t('uploaded')} ${esc(LuminDates.format(file.modifiedAt))} · ${(file.sizeBytes / 1048576).toFixed(1)} MB</p></div></div>
           ${details.note ? `<p class="scan-note">${esc(details.note)}</p>` : ''}<label class="scan-check"><input type="checkbox" data-scan-select="${index}" ${this.selected.has(index) ? 'checked' : ''}>${this.t('selected')}</label>
           <div class="scan-actions">${this.button('open', 'open', 'box', `data-index="${index}"`)}${this.button('download', 'download', 'download', `data-index="${index}"`)}${this.button('delete', 'delete', 'trash-2', `data-index="${index}" class="scan-danger"`)}</div></article>`;
       }).join('')}</div>` : `<div class="scan-empty"><span class="scan-symbol">${this.icon('box')}</span><h4>${this.t('empty')}</h4><p>${this.t('emptyHint')}</p>${this.button('import', 'import', 'upload', !this.canImport() ? 'disabled' : '')}<p class="scan-drop-hint">${this.t('choose')}</p></div>`;

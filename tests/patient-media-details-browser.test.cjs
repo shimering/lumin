@@ -45,6 +45,7 @@ test('media gallery and edit sheet fit phone, tablet, and desktop in English and
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/api/thumbnail/**', route => route.fulfill({ contentType:'image/svg+xml', body:'<svg xmlns="http://www.w3.org/2000/svg" width="480" height="320"><rect width="480" height="320" fill="#e2e8f0"/><text x="140" y="170" font-size="32" fill="#64748b">Test X-ray</text></svg>' }));
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
+  await page.addScriptTag({path:path.join(root,'lumin-dates.js')});
   await page.addScriptTag({ url:`http://127.0.0.1:${server.address().port}/vendor/lucide.min.js` });
   await page.addScriptTag({ content: `
     let currentUiLanguage = 'en', patientMediaDetailsError = false, activePatientMediaFilter = 'ALL';

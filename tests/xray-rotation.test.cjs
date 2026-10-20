@@ -74,7 +74,8 @@ test('chart and enlarged viewer save, reopen, fit rotated images, recover errors
   const radiograph='<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400"><rect width="1200" height="400" fill="#101827"/><path d="M100 70 Q200 20 300 70 L280 330 L230 330 L200 180 L150 330 L110 330 Z M420 70 Q520 20 620 70 L600 330 L550 330 L520 180 L470 330 L430 330 Z" fill="#b3bbc5"/><text x="820" y="90" font-size="40" fill="#eef2ff">UR6</text></svg>';
   await page.route('**/api/thumbnail/**',route=>route.fulfill({contentType:'image/svg+xml',body:radiograph}));
   await page.route('**/files/**',route=>route.fulfill({contentType:'image/svg+xml',body:radiograph}));
-  await page.goto(`http://127.0.0.1:${server.address().port}/`);await page.addScriptTag({path:path.join(root,'vendor/lucide.min.js')});
+  await page.goto(`http://127.0.0.1:${server.address().port}/`);
+  await page.addScriptTag({path:path.join(root,'lumin-dates.js')});await page.addScriptTag({path:path.join(root,'vendor/lucide.min.js')});
   const helpers=['escapeHtml','patientMediaDisplayName','patientMediaDownloadName','patientMediaFileUrl','persistPatientMediaDetails','renderPatientMediaGrid',
     'setupLightboxInteractions','openMediaLightbox','closeMediaLightbox','lightboxZoom','lightboxResetZoom','lightboxRotate','lightboxToggleInvert','updateLightboxTransform'].map(source).join('\n');
   await page.addScriptTag({content:`
