@@ -88,6 +88,7 @@ test('invoice column stays beside the tick and below the badge without overlappi
   page.on('pageerror',error => errors.push(error.message));
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
   await page.addScriptTag({path:path.join(root,'vendor/lucide.min.js')});
+  await page.addScriptTag({path:path.join(root,'lumin-ortho-visits.js')});
   await page.addScriptTag({content:`
     let currentUiLanguage='en', documentedFindingsTab='treatment', documentedFindingsStatusFilter='all', chartInvoiceStateLoading=false;
     let openChartFindingNoteTrigger=null, chartDoctorsLoaded=true;
@@ -96,7 +97,7 @@ test('invoice column stays beside the tick and below the badge without overlappi
       ['paid',{transfer_status:'eligible',invoiceItemId:10}],
       ['b1',{transfer_status:'eligible',invoiceItemId:21}],
       ['steps',{transfer_status:'transferred',invoiceItemId:11}],
-    ]), expandedFindingProcedureSteps=new Set(['steps']),collapsedOrthoFindings=new Set();
+    ]), expandedFindingProcedureSteps=new Set(['steps']),expandedOrthoFindings=new Set();
     const chartDoctors=[], SLOT_BY_PRIMARY_TOOTH={}, FINDING_SURFACE_TOGGLE_ORDER=[];
     const OPERATION_STATUSES={P:{key:'P',label:'Planned',color:'#dc2626'},C:{key:'C',label:'Completed',color:'#16a34a'},In:{key:'In',label:'In progress',color:'#2563eb'}};
     const base={kind:'whole',toothId:'3',toothIds:['3'],surfaces:[],price:400,notes:[],createdAt:'2026-09-23T09:00:00',beginDate:'2026-09-29T08:00:00',steps:[]};
@@ -169,7 +170,7 @@ test('invoice column stays beside the tick and below the badge without overlappi
       assert.equal(await page.locator('.ortho-visit-invoice .finding-invoice-amount').textContent(),'EGP 0 / 471.43');
       const geometry = await page.evaluate(() => {
         const rect = element => {const r=element.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom};};
-        const rows=[...document.querySelectorAll('.finding-row')].map(row => ({summary:rect(row.querySelector('.finding-row-summary')),notes:rect(row.querySelector('.finding-note-button')),invoice:rect(row.querySelector('.finding-row-actions > .finding-invoice-control')),dates:rect(row.querySelector('.finding-dates-group')),price:rect(row.querySelector('.finding-price-control')),status:rect(row.querySelector('.finding-status-control')),doctor:rect(row.querySelector('.finding-doctor-control')),salary:row.querySelector('.finding-salary-transfer-button')?rect(row.querySelector('.finding-salary-transfer-button')):null,separate:row.querySelector('.finding-separate-button')?rect(row.querySelector('.finding-separate-button')):null}));
+        const rows=[...document.querySelectorAll('.finding-row')].map(row => ({ortho:row.classList.contains('has-ortho-visits'),summary:rect(row.querySelector('.finding-row-summary')),notes:rect(row.querySelector('.finding-note-button')),invoice:rect(row.querySelector('.finding-row-actions > .finding-invoice-control')),dates:rect(row.querySelector('.finding-dates-group')),price:rect(row.querySelector('.finding-price-control')),status:rect(row.querySelector('.finding-status-control')),doctor:rect(row.querySelector('.finding-doctor-control')),salary:row.querySelector('.finding-salary-transfer-button')?rect(row.querySelector('.finding-salary-transfer-button')):null,separate:row.querySelector('.finding-separate-button')?rect(row.querySelector('.finding-separate-button')):null}));
         const paid=document.querySelector('[data-refresh-key="paid"]');
         const prices=[...document.querySelectorAll('.finding-price-control input')].map(input=>{
           const styles=getComputedStyle(input), canvas=document.createElement('canvas'), context=canvas.getContext('2d');
@@ -186,15 +187,15 @@ test('invoice column stays beside the tick and below the badge without overlappi
       });
       const overlaps=(a,b)=>a.x<b.right-1&&b.x<a.right-1&&a.y<b.bottom-1&&b.y<a.bottom-1;
       assert.equal(geometry.overflow,false,`${viewport.width} ${language} page overflow`);
-      for(const row of geometry.rows){assert.equal(overlaps(row.summary,row.invoice),false);assert.equal(overlaps(row.invoice,row.dates),false);assert.ok(Math.abs(row.invoice.x-geometry.rows[0].invoice.x)<2,'Invoice column aligns across row types');}
+      for(const row of geometry.rows){assert.equal(overlaps(row.summary,row.invoice),false);assert.equal(overlaps(row.invoice,row.dates),false);if(!row.ortho)assert.ok(Math.abs(row.invoice.x-geometry.rows[0].invoice.x)<2,'Invoice column aligns across standard row types');}
       for(const row of geometry.rows){
         assert.ok(row.notes.width>=44&&row.notes.height>=44,'Notes remain easy to tap');
         assert.equal(overlaps(row.notes,row.dates),false);
         assert.equal(overlaps(row.price,row.status),false,'Compact controls do not overlap');
         assert.ok(language==='ar'?row.notes.x>=row.dates.right:row.notes.right<=row.dates.x,'Notes occupy the former invoice position');
-        assert.ok(language==='ar'?row.invoice.right<=row.status.x:row.invoice.x>=row.status.right,'Invoice and tick occupy the former notes position');
+        if(!row.ortho)assert.ok(language==='ar'?row.invoice.right<=row.status.x:row.invoice.x>=row.status.right,'Invoice and tick occupy the former notes position');
         const statusInvoiceGap=language==='ar'?row.status.x-row.invoice.right:row.invoice.x-row.status.right;
-        assert.ok(statusInvoiceGap<=32,'No empty batch-action column remains between status and invoice');
+        if(!row.ortho)assert.ok(statusInvoiceGap<=32,'No empty batch-action column remains between status and invoice');
         if(row.salary){
           assert.ok(row.salary.y>=row.doctor.bottom+4,'Salary transfer sits beneath the doctor dropdown');
           assert.ok(Math.abs(row.salary.x-row.doctor.x)<2&&Math.abs(row.salary.width-row.doctor.width)<2,'Salary transfer aligns with the doctor dropdown');

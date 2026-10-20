@@ -229,7 +229,7 @@ test('real finding cards retain controls during rapid chart edits on mobile, tab
       await page.addScriptTag({content:bootstrap+`
         var windowLucide=window.lucide, documentedFindingsTab='treatment',documentedFindingsStatusFilter='all';
         var selectedFindingIds=new Set(),invoicedFindingIds=new Set(),chartInvoiceItemsByFindingId=new Map(),chartSalaryTransfersByFindingId=new Map();
-        var expandedFindingProcedureSteps=new Set(['c']),collapsedOrthoFindings=new Set(),chartInvoiceStateLoading=false,chartDoctorsLoaded=true;
+        var expandedFindingProcedureSteps=new Set(['c']),expandedOrthoFindings=new Set(),chartInvoiceStateLoading=false,chartDoctorsLoaded=true;
         var openChartFindingNoteTrigger=null, SLOT_BY_PRIMARY_TOOTH={}, FINDING_SURFACE_TOGGLE_ORDER=[];
         function renderDocumentedFindingsTabs(){}
         function chartFindingInvoiceAmounts(findings){return new Map(findings.map(f=>[f.id,f.price]))}

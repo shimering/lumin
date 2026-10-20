@@ -99,6 +99,7 @@
   <script src="lumin-tooth-notes.js?v=3"></script>
   <script src="lumin-chart-appointments.js?v=4"></script>
   <script src="lumin-chart-dates.js?v=1"></script>
+  <script src="lumin-ortho-visits.js?v=1"></script>
   <script src="lumin-specialty-picker.js?v=3"></script>
   <script src="lumin-clinical-actions.js?v=6"></script>
   <link rel="stylesheet" href="lumin-chart-dates.css?v=2" />
@@ -5435,6 +5436,7 @@
     }
     @media (prefers-reduced-motion: reduce) { .finance-expense-action, .finance-expense-pay { transition: none; } }
   </style>
+  <link rel="stylesheet" href="lumin-ortho-visits.css?v=1" />
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 font-sans antialiased selection:bg-blue-100">
 
@@ -10410,7 +10412,7 @@
     let documentedFindingsTab = 'treatment';
     let documentedFindingsStatusFilter = 'all';
     let expandedFindingProcedureSteps = new Set();
-    let collapsedOrthoFindings = new Set();
+    let expandedOrthoFindings = new Set();
     let showRootsAnatomy = true;
 
     // Appointment calendar state
@@ -13247,7 +13249,7 @@
         invoicedFindingIds = new Set();
         chartInvoiceItemsByFindingId = new Map();
         expandedFindingProcedureSteps = new Set();
-        collapsedOrthoFindings = new Set();
+        expandedOrthoFindings = new Set();
         chartInvoiceStatePatientId = null;
         chartInvoiceStateLoading = false;
         editingWhatsAppTemplateId = null;
@@ -30283,6 +30285,7 @@
 
     function loadActivePatientChart(options = {}) {
       syncChartFindingDateDialogContext();
+      if (typeof syncOrthoVisitDialogContext === 'function') syncOrthoVisitDialogContext();
       const patient = patients.find(p => p.id === activePatientId);
       if (!patient) return;
 
@@ -31225,7 +31228,7 @@
         return;
       }
       deletedIds.forEach(id => {
-        collapsedOrthoFindings.delete(id);
+        expandedOrthoFindings.delete(id);
         expandedFindingProcedureSteps.delete(id);
       });
       procedureIds.forEach(id => { void deleteImplantProgressByFindingId(id); });
@@ -31708,7 +31711,8 @@
         ...finding,
         doctorId: doctor?.userId || null,
         doctorName: doctor?.fullName || '',
-        doctorAssignmentMode: doctor ? 'whole' : (normaliseChartFindingSteps(finding.steps).length ? 'steps' : 'whole')
+        doctorAssignmentMode: doctor ? 'whole' : (normaliseChartFindingSteps(finding.steps).length ? 'steps' : 'whole'),
+        ...(finding.isOrthoPackage && doctor ? { orthoVisits: normaliseOrthoVisits(finding.orthoVisits).map(visit => ({ ...visit, doctorId: doctor.userId, doctorName: doctor.fullName })) } : {})
       }));
       if (!updated) return;
       renderFindingsList();
@@ -31719,7 +31723,7 @@
           afterSave: async () => {
             const { error } = await db.rpc('sync_chart_finding_doctor', {
               p_patient_id: patient.id,
-              p_finding_ids: findingIds
+              p_finding_ids: [...new Set([...findingIds, ...collectDocumentedFindings(patient).filter(finding => findingIds.includes(finding.id)).flatMap(finding => (finding.orthoVisits || []).map(visit => visit.id))])]
             });
             if (error) throw error;
           }
@@ -32468,145 +32472,29 @@
 
     function toggleOrthoVisitsCollapse(findingId) {
       if (!findingId) return;
-      if (collapsedOrthoFindings.has(findingId)) {
-        collapsedOrthoFindings.delete(findingId);
+      if (expandedOrthoFindings.has(findingId)) {
+        expandedOrthoFindings.delete(findingId);
       } else {
-        collapsedOrthoFindings.add(findingId);
+        expandedOrthoFindings.add(findingId);
       }
       renderFindingsList();
     }
 
-    async function addOrthoVisit(button) {
-      const card = button.closest('[data-finding-id]');
-      const findingId = card?.dataset.findingId;
-      const patient = getActivePatient();
-      if (!patient || !findingId) return;
-      let newVisitNumber = 1;
-      let added = false;
-      updateChartFindingById(patient, findingId, finding => {
-        const visits = Array.isArray(finding.orthoVisits) ? [...finding.orthoVisits] : [];
-        newVisitNumber = visits.length + 1;
-        const newVisit = normaliseOrthoVisit({
-          id: createChartFindingId(),
-          visitNumber: newVisitNumber,
-          date: new Date().toISOString(),
-          notes: '',
-          price: 0,
-          status: 'P',
-          doctorId: finding.doctorId || null,
-          doctorName: finding.doctorName || '',
-          createdAt: new Date().toISOString()
-        }, visits.length);
-        visits.push(newVisit);
-        added = true;
-        return {
-          ...finding,
-          isOrthoPackage: true,
-          orthoVisits: visits
-        };
-      });
-      if (!added) return;
-      collapsedOrthoFindings.delete(findingId);
-      renderFindingsList();
-      await saveActivePatientChart();
-      showAppointmentNotificationToast(
-        currentUiLanguage === 'ar' ? 'تمت إضافة الزيارة' : 'Visit added',
-        currentUiLanguage === 'ar' ? `تمت إضافة الزيارة رقم ${newVisitNumber}` : `Visit #${newVisitNumber} added.`
-      );
+    function addOrthoVisit(button) {
+      openOrthoVisitDialog(button, true);
     }
 
-    async function updateOrthoVisitDate(input) {
-      const card = input.closest('[data-finding-id]');
-      const visitRow = input.closest('[data-ortho-visit-id]');
-      const findingId = card?.dataset.findingId;
-      const visitId = visitRow?.dataset.orthoVisitId;
-      const patient = getActivePatient();
-      if (!patient || !findingId || !visitId) return;
-      const dateValue = input.value ? new Date(input.value).toISOString() : new Date().toISOString();
-      if (!updateChartFindingById(patient, findingId, finding => {
-        const visits = (finding.orthoVisits || []).map(v => v.id === visitId ? {
-          ...v,
-          date: dateValue
-        } : v);
-        return { ...finding, orthoVisits: visits };
-      })) return;
-      renderFindingsList();
-      await saveActivePatientChart();
-    }
+
 
     async function updateOrthoVisitPrice(input) {
-      const card = input.closest('[data-finding-id]');
-      const visitRow = input.closest('[data-ortho-visit-id]');
-      const findingId = card?.dataset.findingId;
-      const visitId = visitRow?.dataset.orthoVisitId;
-      const patient = getActivePatient();
-      if (!patient || !findingId || !visitId) return;
-      if (invoicedFindingIds.has(visitId)) {
-        alert(currentUiLanguage === 'ar' ? 'هذه الزيارة مفوترة بالفعل ولا يمكن تغيير سعرها.' : 'This visit is already invoiced and its price cannot be changed.');
-        renderFindingsList();
-        return;
-      }
-      const price = Number(input.value);
-      if (!Number.isFinite(price) || price < 0) {
-        alert('Enter a valid price of zero or more.');
-        renderFindingsList();
-        return;
-      }
-      const roundedPrice = Math.round(price * 100) / 100;
-      if (!updateChartFindingById(patient, findingId, finding => {
-        const visits = (finding.orthoVisits || []).map(v => v.id === visitId ? {
-          ...v,
-          price: roundedPrice
-        } : v);
-        return { ...finding, orthoVisits: visits };
-      })) return;
-      renderFindingsList();
-      await saveActivePatientChart();
+      await saveOrthoVisitControl(input, 'price');
     }
 
     async function updateOrthoVisitDoctor(select) {
-      const card = select.closest('[data-finding-id]');
-      const visitRow = select.closest('[data-ortho-visit-id]');
-      const findingId = card?.dataset.findingId;
-      const visitId = visitRow?.dataset.orthoVisitId;
-      const patient = getActivePatient();
-      if (!patient || !findingId || !visitId) return;
-      const doctorId = String(select.value || '');
-      const doctor = doctorId ? chartDoctors.find(item => item.userId === doctorId) : null;
-      if (doctorId && !doctor) {
-        alert('Choose an active doctor from the list.');
-        renderFindingsList();
-        return;
-      }
-      if (!updateChartFindingById(patient, findingId, finding => {
-        const visits = (finding.orthoVisits || []).map(v => v.id === visitId ? {
-          ...v,
-          doctorId: doctor?.userId || null,
-          doctorName: doctor?.fullName || ''
-        } : v);
-        return { ...finding, orthoVisits: visits };
-      })) return;
-      renderFindingsList();
-      await saveActivePatientChart();
+      await saveOrthoVisitControl(select, 'doctor');
     }
 
-    async function updateOrthoVisitNotes(textarea) {
-      const card = textarea.closest('[data-finding-id]');
-      const visitRow = textarea.closest('[data-ortho-visit-id]');
-      const findingId = card?.dataset.findingId;
-      const visitId = visitRow?.dataset.orthoVisitId;
-      const patient = getActivePatient();
-      if (!patient || !findingId || !visitId) return;
-      const notes = String(textarea.value || '').trim();
-      updateChartFindingById(patient, findingId, finding => {
-        const visits = (finding.orthoVisits || []).map(v => v.id === visitId ? {
-          ...v,
-          notes
-        } : v);
-        return { ...finding, orthoVisits: visits };
-      });
-      await saveActivePatientChart();
-    }
+
 
     function toggleOrthoVisitSelection(checkbox) {
       const visitId = checkbox.dataset.orthoVisitId;
@@ -32797,6 +32685,7 @@
     function renderFindingsList() {
       if (typeof renderChartToothNoteIndicators === 'function') renderChartToothNoteIndicators();
       syncChartFindingDateDialogContext();
+      if (typeof syncOrthoVisitDialogContext === 'function') syncOrthoVisitDialogContext();
       const container = document.getElementById('findings-container');
       const patient = getActivePatient();
       const findings = collectDocumentedFindings(patient);
@@ -32854,7 +32743,7 @@
         const totalPrice = isBatch ? chartFindingBatchTotal(finding, memberFindings.length) : findingPrice;
         const isOrthoPackage = Boolean(finding.isOrthoPackage);
         const orthoVisits = isOrthoPackage ? normaliseOrthoVisits(finding.orthoVisits) : [];
-        const isOrthoCollapsed = Boolean(finding.id && collapsedOrthoFindings.has(finding.id));
+      const isOrthoCollapsed = !Boolean(finding.id && expandedOrthoFindings.has(finding.id));
         const totalAllocatedPrice = orthoVisits.reduce((sum, v) => sum + Math.max(0, Number(v.price) || 0), 0);
         const remainingBalance = findingPrice - totalAllocatedPrice;
         const invoicedVisitsCount = orthoVisits.filter(v => invoicedFindingIds.has(v.id)).length;
@@ -32881,106 +32770,7 @@
           <p class="mt-2 text-[9px] font-semibold leading-4 text-slate-500">${currentUiLanguage === 'ar' ? 'يصبح تحويل الراتب متاحاً بعد اكتمال جميع الخطوات وفوترة الإجراء. يُقسّم السعر والأجر الثابت بحسب نسب الخطوات عند تعيين أطبائها.' : 'Salary transfer becomes available after every step is completed and the procedure is invoiced. Step percentages split both the invoice value and fixed compensation.'}</p>
         </div>` : '';
 
-        let orthoVisitsMarkup = '';
-        if (isOrthoPackage) {
-          const visitsListHtml = orthoVisits.length ? orthoVisits.map((visit) => {
-            const isVisitInvoiced = invoicedFindingIds.has(visit.id);
-            const isVisitSelected = selectedFindingIds.has(visit.id);
-            const visitPrice = Math.max(0, Number(visit.price) || 0);
-            const canSelectVisit = !isVisitInvoiced && !chartInvoiceStateLoading;
-            return `
-              <div data-ortho-visit-id="${escapeHtml(visit.id)}" class="ortho-visit-card flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-2xs transition hover:border-indigo-200">
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                  <div class="flex items-center gap-2 min-w-0">
-                    <label class="finding-selection-target">
-                    <input type="checkbox"
-                      data-ortho-visit-id="${escapeHtml(visit.id)}"
-                      class="h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                      ${isVisitInvoiced ? 'checked disabled' : (canSelectVisit ? (isVisitSelected ? 'checked' : '') : 'disabled')}
-                      onchange="toggleOrthoVisitSelection(this)"
-                      aria-label="${currentUiLanguage === 'ar' ? (isVisitInvoiced ? 'زيارة مفوترة' : 'تحديد الزيارة') : (isVisitInvoiced ? 'Invoiced visit' : 'Select visit')} #${visit.visitNumber}"
-                      title="${currentUiLanguage === 'ar' ? (isVisitInvoiced ? 'هذه الزيارة مفوترة بالفعل' : 'تحديد الزيارة للفوترة أو الحذف') : (isVisitInvoiced ? 'This visit is already invoiced' : 'Select visit for invoicing or deletion')}">
-                    </label>
-                    <span class="inline-flex items-center justify-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-black text-indigo-700">
-                      ${currentUiLanguage === 'ar' ? 'زيارة' : 'Visit'} #${visit.visitNumber}
-                    </span>
-                  </div>
-
-                  <div class="flex flex-wrap items-center gap-2 ms-auto">
-                    <div class="ortho-visit-invoice finding-invoice-control">${isVisitInvoiced ? chartFindingInvoiceColumn([visit.id]) : ''}</div>
-                    <!-- Date/Time Picker -->
-                    <label class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50/70 px-2 py-1 text-[10px] font-bold text-slate-600 shadow-2xs" title="${currentUiLanguage === 'ar' ? 'تاريخ ووقت الزيارة' : 'Visit date & time'}">
-                      <i data-lucide="calendar" class="h-3 w-3 text-indigo-500 shrink-0"></i>
-                      <input type="datetime-local"
-                        value="${chartOperationDateInputValue(visit.date || visit.createdAt)}"
-                        onchange="updateOrthoVisitDate(this)"
-                        class="bg-transparent text-[10px] font-semibold text-slate-700 outline-none"
-                        aria-label="Visit date">
-                    </label>
-
-                    <!-- Doctor Select -->
-                    <label class="inline-flex items-center overflow-hidden rounded-lg border border-cyan-200 bg-white shadow-2xs" title="${currentUiLanguage === 'ar' ? 'طبيب الزيارة' : 'Doctor for this visit'}">
-                      <span class="border-r border-cyan-100 bg-cyan-50 px-2 py-1 text-[9px] font-black text-cyan-700">${currentUiLanguage === 'ar' ? 'الطبيب' : 'Dr'}</span>
-                      <select onchange="updateOrthoVisitDoctor(this)" class="bg-transparent px-1.5 py-1 text-[10px] font-bold text-slate-700 outline-none" aria-label="Visit doctor">
-                        ${chartDoctorSelectOptions(visit)}
-                      </select>
-                    </label>
-
-                    <!-- Visit Cost / Price -->
-                    <label class="inline-flex items-center overflow-hidden rounded-lg border ${isVisitInvoiced ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-70' : 'border-indigo-200 bg-white focus-within:ring-2 focus-within:ring-indigo-500/20 shadow-2xs'}" title="${isVisitInvoiced ? 'This visit is invoiced' : 'Visit fee to invoice'}">
-                      <span class="border-r px-1.5 py-1 text-[9px] font-black ${isVisitInvoiced ? 'border-slate-200 bg-slate-200 text-slate-500' : 'border-indigo-100 bg-indigo-50 text-indigo-600'}">EGP</span>
-                      <input type="number" min="0" step="0.01"
-                        value="${visitPrice}"
-                        onchange="updateOrthoVisitPrice(this)"
-                        ${isVisitInvoiced ? 'disabled' : ''}
-                        class="w-16 bg-transparent px-1.5 py-1 text-right text-[10px] font-black outline-none ${isVisitInvoiced ? 'cursor-not-allowed text-slate-400' : 'text-slate-700'}"
-                        aria-label="Visit price">
-                    </label>
-
-                  </div>
-                </div>
-
-                <!-- Notes Textarea -->
-                <div>
-                  <textarea rows="1"
-                    placeholder="${currentUiLanguage === 'ar' ? 'ملاحظات الزيارة، التعديلات، تقدم العلاج…' : 'Visit notes, adjustments, archwires, progress…'}"
-                    onchange="updateOrthoVisitNotes(this)"
-                    class="w-full rounded-lg border border-slate-200 bg-slate-50/50 p-1.5 text-[11px] text-slate-700 placeholder-slate-400 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-500/15"
-                    aria-label="Visit notes">${escapeHtml(visit.notes || '')}</textarea>
-                </div>
-              </div>
-            `;
-          }).join('') : `
-            <div class="rounded-xl border border-dashed border-indigo-200 bg-indigo-50/30 px-4 py-3 text-center">
-              <p class="text-[11px] font-bold text-indigo-700">${currentUiLanguage === 'ar' ? 'لا توجد زيارات مسجلة لهذه الباقة بعد.' : 'No visits recorded for this package yet.'}</p>
-              <button type="button" onclick="addOrthoVisit(this)" class="mt-1.5 inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-indigo-700 transition shadow-2xs">
-                <i data-lucide="plus" class="h-3 w-3"></i>
-                <span>${currentUiLanguage === 'ar' ? 'إضافة الزيارة الأولى' : 'Add First Visit'}</span>
-              </button>
-            </div>
-          `;
-
-          orthoVisitsMarkup = `
-            <div data-ortho-visits-panel class="${isOrthoCollapsed ? 'hidden ' : ''}w-full border-t border-indigo-100 bg-indigo-50/20 px-3.5 py-2.5">
-              <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <div class="flex items-center gap-1.5">
-                  <i data-lucide="layers" class="h-3.5 w-3.5 text-indigo-600"></i>
-                  <span class="text-[10px] font-black uppercase tracking-wider text-indigo-900">${currentUiLanguage === 'ar' ? 'زيارات الباقة' : 'Package Visits'}</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <span class="text-[10px] font-bold text-slate-500">${invoicedVisitsCount} / ${orthoVisits.length} ${currentUiLanguage === 'ar' ? 'مفوترة' : 'invoiced'}</span>
-                  <button type="button" onclick="addOrthoVisit(this)" class="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-600 px-2 py-0.5 text-[10px] font-black text-white hover:bg-indigo-700 shadow-2xs transition">
-                    <i data-lucide="plus" class="h-3 w-3"></i>
-                    <span>${currentUiLanguage === 'ar' ? 'إضافة زيارة' : 'Add Visit'}</span>
-                  </button>
-                </div>
-              </div>
-              <div class="space-y-2">
-                ${visitsListHtml}
-              </div>
-            </div>
-          `;
-        }
+        const orthoVisitsMarkup = isOrthoPackage ? renderOrthoVisitDrawer(finding, orthoVisits, isOrthoCollapsed) : '';
 
         const invoicedMemberIds = isOrthoPackage
           ? orthoVisits.filter(v => invoicedFindingIds.has(v.id)).map(v => v.id)
@@ -33067,16 +32857,7 @@
                 <div class="finding-operation-heading flex flex-nowrap items-center gap-2">
                   ${procedureSteps.length ? `<button type="button" onclick="toggleFindingProcedureSteps(this)" aria-expanded="${procedureStepsExpanded}" class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-cyan-200 bg-cyan-50 text-cyan-700 transition hover:bg-cyan-100" title="${procedureStepsExpanded ? 'Collapse' : 'Open'} procedure steps" aria-label="${procedureStepsExpanded ? 'Collapse' : 'Open'} ${escapeHtml(dentalOperationLabel(finding.code))} steps"><i data-lucide="${procedureStepsExpanded ? 'minus' : 'plus'}" class="h-3 w-3"></i></button>` : ''}
                   <h4 class="finding-operation-title text-xs sm:text-sm font-bold text-slate-900 whitespace-nowrap" title="${escapeHtml(dentalOperationLabel(finding.code))}">${escapeHtml(dentalOperationLabel(finding.code))}</h4>
-                  ${isOrthoPackage ? `
-                    <button type="button" onclick="toggleOrthoVisitsCollapse('${escapeHtml(finding.id)}')" aria-expanded="${!isOrthoCollapsed}" class="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 transition hover:bg-indigo-100 whitespace-nowrap" title="${isOrthoCollapsed ? (currentUiLanguage === 'ar' ? 'إظهار الزيارات' : 'Expand visits') : (currentUiLanguage === 'ar' ? 'إخفاء الزيارات' : 'Collapse visits')}">
-                      <i data-lucide="${isOrthoCollapsed ? 'chevron-right' : 'chevron-down'}" class="h-3.5 w-3.5"></i>
-                      <span>${orthoVisits.length} ${currentUiLanguage === 'ar' ? (orthoVisits.length === 1 ? 'زيارة' : 'زيارات') : (orthoVisits.length === 1 ? 'visit' : 'visits')}</span>
-                    </button>
-                    <button type="button" onclick="addOrthoVisit(this)" class="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-600 px-2 py-0.5 text-[11px] font-bold text-white transition hover:bg-indigo-700 active:scale-[0.98] shadow-2xs whitespace-nowrap">
-                      <i data-lucide="plus" class="h-3 w-3"></i>
-                      <span>${currentUiLanguage === 'ar' ? 'إضافة زيارة' : 'Add Visit'}</span>
-                    </button>
-                  ` : ''}
+
                 </div>
                 ${!isOrthoPackage && isMouth
                   ? '<p class="mt-0.5 truncate text-[11px] font-normal text-slate-500">Applied once to the complete mouth · tooth selection ignored</p>'
@@ -33104,20 +32885,18 @@
               ${isOrthoPackage ? `
                 <div class="finding-pricing-group flex flex-col items-end justify-center shrink-0">
                   <div class="flex flex-col items-start gap-1">
-                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-tight hidden sm:inline">${currentUiLanguage === 'ar' ? 'سعر الباقة:' : 'Package:'}</span>
+                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-tight">${currentUiLanguage === 'ar' ? 'الإجمالي:' : 'Total:'}</span>
                     <label class="finding-price-control inline-flex items-center overflow-hidden rounded-lg border border-indigo-200 bg-white/85 focus-within:ring-2 focus-within:ring-indigo-500/20 shadow-2xs" title="${currentUiLanguage === 'ar' ? 'إجمالي سعر الباقة التعاقدي' : 'Total package contract fee'}">
                       <span class="border-r border-indigo-100 bg-indigo-50 px-2 py-1.5 text-[9px] font-black text-indigo-600">EGP</span>
                       <input type="number" min="0" step="0.01" value="${findingPrice}" onchange="updateFindingPriceFromControl(this)" class="w-20 bg-transparent px-2 py-1.5 text-right text-[11px] font-black outline-none text-slate-700" aria-label="${currentUiLanguage === 'ar' ? 'إجمالي سعر الباقة' : 'Total package fee'} for ${escapeHtml(dentalOperationLabel(finding.code))}">
                     </label>
                   </div>
-                  <div class="mt-1 flex flex-wrap items-center justify-end gap-1 text-[10px]">
-                    <span class="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-600" title="${currentUiLanguage === 'ar' ? 'المبلغ الموزع على الزيارات' : 'Allocated across visits'}">
-                      ${currentUiLanguage === 'ar' ? 'الموزع:' : 'Allocated:'} ${escapeHtml(formatInvoiceMoney(totalAllocatedPrice))}
-                    </span>
+                  <div class="ortho-package-remaining">
+
                     <span class="inline-flex items-center rounded-md px-1.5 py-0.5 text-[9px] font-black ${remainingBalance < 0 ? 'bg-rose-50 text-rose-700' : remainingBalance === 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}" title="${currentUiLanguage === 'ar' ? 'الرصيد المتبقي للتوزيع' : 'Remaining balance to allocate'}">
                       ${remainingBalance < 0
                         ? (currentUiLanguage === 'ar' ? 'تجاوز بـ:' : 'Over:') + ' ' + escapeHtml(formatInvoiceMoney(Math.abs(remainingBalance)))
-                        : (currentUiLanguage === 'ar' ? 'المتبقي:' : 'Rem:') + ' ' + escapeHtml(formatInvoiceMoney(remainingBalance))}
+                        : (currentUiLanguage === 'ar' ? 'المتبقي:' : 'Remaining:') + ' ' + escapeHtml(formatInvoiceMoney(remainingBalance))}
                     </span>
                   </div>
                   ${separateBatchMarkup}

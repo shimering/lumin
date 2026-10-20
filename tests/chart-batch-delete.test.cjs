@@ -34,7 +34,7 @@ function setup(ids = []) {
     var patientWorkspaceLoadingId=null,chartInvoiceStateLoading=false,hrDirectoryLoaded=true;
     var patients=[{id:'patient',chartState:${JSON.stringify(chart)}},{id:'other',chartState:{}}];
     var selectedFindingIds=new Set(${JSON.stringify(ids)}),invoicedFindingIds=new Set();
-    var collapsedOrthoFindings=new Set(['ortho']),expandedFindingProcedureSteps=new Set(['a','mouth']);
+    var expandedOrthoFindings=new Set(['ortho']),expandedFindingProcedureSteps=new Set(['a','mouth']);
     var CHART_META_KEY='_meta',SLOT_BY_PRIMARY_TOOTH={};
     var confirmations=[],alerts=[],writes=[],cleanup=[],renderedTeeth=[],renderCount=0;
     var acceptConfirmation=true,failWrite=false,deferWrite=false;
@@ -122,7 +122,7 @@ test('selecting a package and its visits deletes the package once, with an Arabi
   const ctx=setup(['ortho','v1','v2']);ctx.currentUiLanguage='ar';
   await ctx.deleteSelectedFindings();
   assert.match(ctx.confirmations[0],/حذف 1.*جميع زيارات/);
-  assert.equal(ctx.writes.length,1);assert.equal(ctx.collapsedOrthoFindings.has('ortho'),false);
+  assert.equal(ctx.writes.length,1);assert.equal(ctx.expandedOrthoFindings.has('ortho'),false);
   assert.deepEqual([...ctx.cleanup],['ortho']);assert.deepEqual([...ctx.selectedFindingIds],[]);
 });
 
