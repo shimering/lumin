@@ -3,7 +3,7 @@ const {chromium}=require('playwright');
 const root=path.resolve(__dirname,'..'),html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 function source(name){const start=html.search(new RegExp('    (?:async )?function '+name+'\\('));assert.ok(start>=0,name);return html.slice(start,html.indexOf('\n    }',start)+6);}
 
-test('prominent visit notes, separate editors and keyboard-aware popups work across devices and languages',async t=>{
+test('direct blank visits, separate editors and keyboard-aware popups work across devices and languages',async t=>{
   const head=html.slice(0,html.indexOf('</head>')+7).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'');
   const server=http.createServer((req,res)=>{
     const url=new URL(req.url,'http://localhost');
@@ -24,15 +24,15 @@ test('prominent visit notes, separate editors and keyboard-aware popups work acr
     const selectedFindingIds=new Set(),invoicedFindingIds=new Set(),expandedOrthoFindings=new Set();
     const chartDoctors=[{userId:'00000000-0000-4000-8000-000000000001',fullName:'Dr A'},{userId:'00000000-0000-4000-8000-000000000002',fullName:'Dr B'}];
     const OPERATION_STATUSES={P:{key:'P',label:'Planned'},C:{key:'C',label:'Completed'},In:{key:'In',label:'In progress'},E:{key:'E',label:'Existing'}};
-    let patient={id:'patient',chartState:{finding:{id:'package',code:'Orthodontic treatment',isOrthoPackage:true,price:5000,doctorId:null,orthoVisits:[]}}},saves=0,failSave=false,hrDirectoryLoaded=true,financeInvoicesLoaded=true;
-    const dashboardInvoiceCache=new Map(),rpcCalls=[];
+    let patient={id:'patient',chartState:{finding:{id:'package',code:'Orthodontic treatment',isOrthoPackage:true,price:5000,doctorId:null,orthoVisits:[]}}},saves=0,failSave=false,saveBlock=null,releaseSave=null,hrDirectoryLoaded=true,financeInvoicesLoaded=true;
+    const dashboardInvoiceCache=new Map(),rpcCalls=[],notifications=[];
     const db={rpc:async(name,args)=>{rpcCalls.push({name,args});return {error:null};}};
     function getActivePatient(){return patient;}
     function collectDocumentedFindings(patient){return [patient.chartState.finding];}
     function clonePatientChart(chart){return JSON.parse(JSON.stringify(chart));}
     function updateChartFindingById(patient,id,update){if(patient.chartState.finding.id!==id)return false;patient.chartState.finding=update(patient.chartState.finding);return true;}
     function updateChartFindingsByIds(patient,ids,update){return ids.includes(patient.chartState.finding.id)&&updateChartFindingById(patient,patient.chartState.finding.id,update);}
-    async function saveActivePatientChart(patient,{previousChartState,afterSave}={}){saves++;if(failSave){if(failSave!=='committed')patient.chartState=previousChartState;return false;}if(afterSave)await afterSave();return true;}
+    async function saveActivePatientChart(patient,{previousChartState,afterSave}={}){saves++;if(saveBlock)await saveBlock;if(failSave){if(failSave!=='committed')patient.chartState=previousChartState;return false;}if(afterSave)await afterSave();return true;}
     async function refreshChartFindingInvoiceState(){}
     function dentalOperationLabel(code){return code;}
     function chartFindingInvoiceColumn(){return '';}
@@ -43,7 +43,7 @@ test('prominent visit notes, separate editors and keyboard-aware popups work acr
     function normaliseChartFindingSteps(value){return value||[];}
     function chartFindingIdsFromControl(control){return [control.closest('[data-finding-id]').dataset.findingId];}
     function chartFindingGroupFromControl(){return patient.chartState.finding;}
-    function showAppointmentNotificationToast(){}
+    function showAppointmentNotificationToast(...text){notifications.push(text);}
     function alert(message){throw Error(message);}
     function renderFindingsList(){
       syncOrthoVisitDialogContext();
@@ -129,13 +129,16 @@ test('prominent visit notes, separate editors and keyboard-aware popups work acr
       const expectedDate=await page.evaluate(()=>new Date('2026-10-01T00:00:00').toISOString());
       assert.deepEqual(await page.evaluate(()=>JSON.parse(JSON.stringify(patient.chartState.finding.orthoVisits.at(-1)))),{...notesVisit,date:expectedDate},'Date editor changes only the calendar date');
       assert.equal(await card.locator('time').textContent(),'01/10/2026');
-      await page.locator('[data-ortho-add-visit]').click();await dialog.locator('textarea').fill('Newly recorded visit');await dialog.locator('#ortho-visit-price').fill('275');
-      assert.equal(await dialog.locator('#ortho-visit-status').inputValue(),'C');
-      const bounds=await dialog.boundingBox();assert.ok(bounds.x>=0&&bounds.y>=0&&bounds.x+bounds.width<=viewport.width+1&&bounds.y+bounds.height<=viewport.height+1);
-      if(viewport.width<768)assert.ok(Math.abs(bounds.y+bounds.height-viewport.height)<2,'Mobile popup is a bottom sheet');
+      await page.locator('[data-ortho-add-visit]').click();
+      await page.waitForFunction(()=>!document.querySelector('[data-ortho-add-visit]').disabled);
+      assert.equal(await page.locator('dialog[open]').count(),0,'Adding a visit opens no popup');
+      assert.equal(await page.evaluate(()=>document.activeElement.matches('input,textarea,select')),false,'Adding does not focus a field or summon the keyboard');
+      const blankVisit=await page.evaluate(()=>patient.chartState.finding.orthoVisits.at(-1));
+      assert.equal(blankVisit.notes,'');assert.equal(blankVisit.price,0);assert.equal(blankVisit.status,'C');assert.equal(blankVisit.doctorId,null);
+      assert.equal(blankVisit.date,await page.evaluate(()=>{const now=new Date();return new Date(now.getFullYear(),now.getMonth(),now.getDate()).toISOString();}),'New visits use today in the local timezone');
+      assert.equal(await card.locator('.ortho-visit-price input').inputValue(),'0');
       if(viewport.width===390&&language==='ar')await page.screenshot({path:path.join(screenshots,'ortho-visit-mobile-ar.png')});
-      await dialog.locator('[data-visit-save]').click();await dialog.waitFor({state:'hidden'});
-      assert.equal(await card.count(),1);assert.match(await card.locator('.ortho-visit-number').textContent(),/#6/);assert.equal(await card.locator('.ortho-visit-notes').textContent(),'Newly recorded visit');
+      assert.equal(await card.count(),1);assert.match(await card.locator('.ortho-visit-number').textContent(),/#6/);assert.ok(await card.locator('.ortho-visit-notes').evaluate(button=>button.classList.contains('is-empty')));
       assert.equal(await page.evaluate(()=>invoicedFindingIds.size),0,'Saving keeps the select-and-invoice workflow');
       await card.locator('select').selectOption('00000000-0000-4000-8000-000000000002');
       assert.equal(await page.evaluate(()=>patient.chartState.finding.orthoVisits.at(-1).doctorId),'00000000-0000-4000-8000-000000000002');
@@ -146,6 +149,10 @@ test('prominent visit notes, separate editors and keyboard-aware popups work acr
       });
       assert.equal(await card.locator('select').count(),0,'Inherited doctor is hidden');
       assert.equal(await page.evaluate(()=>patient.chartState.finding.orthoVisits.every(visit=>visit.doctorId===chartDoctors[0].userId)),true);
+      await page.locator('[data-ortho-add-visit]').click();await page.waitForFunction(()=>!document.querySelector('[data-ortho-add-visit]').disabled);
+      assert.equal(await page.evaluate(()=>patient.chartState.finding.orthoVisits.at(-1).doctorId),'00000000-0000-4000-8000-000000000001','Directly added visits inherit the main doctor');
+      assert.equal(await page.evaluate(()=>patient.chartState.finding.orthoVisits.at(-1).doctorName),'Dr A');
+      assert.equal(await card.locator('select').count(),0);assert.equal(await page.locator('dialog[open]').count(),0);
       await card.locator('.ortho-visit-notes').click();assert.ok(!(await dialog.locator('[data-visit-doctor-field]').isVisible()));await page.keyboard.press('Escape');
       await page.evaluate(()=>{patient.chartState.finding.doctorId=null;renderFindingsList();});assert.equal(await card.locator('select').count(),1);
       await page.evaluate(()=>{invoicedFindingIds.add(patient.chartState.finding.orthoVisits.at(-1).id);renderFindingsList();});
@@ -155,15 +162,20 @@ test('prominent visit notes, separate editors and keyboard-aware popups work acr
       if(viewport.width===1440&&language==='en'){await toggle.click();await page.screenshot({path:path.join(screenshots,'ortho-visits-desktop.png')});}
     }
   }
-  await page.evaluate(()=>{reset();failSave=true;});await page.locator('[data-ortho-add-visit]').click();await dialog.locator('textarea').fill('Retry this');await dialog.locator('[data-visit-save]').click();
-  assert.ok(await dialog.locator('[data-visit-error]').isVisible());assert.equal(await page.evaluate(()=>patient.chartState.finding.orthoVisits.length),5,'Failed save rolls back');
-  await page.evaluate(()=>{failSave=false;});await dialog.locator('[data-visit-save]').click();await dialog.waitFor({state:'hidden'});assert.equal(await page.evaluate(()=>patient.chartState.finding.orthoVisits.length),6,'Retry creates exactly one visit');
-  await page.evaluate(()=>{reset();failSave='committed';});await page.locator('[data-ortho-add-visit]').click();await dialog.locator('[data-visit-save]').click();
-  assert.equal(await page.evaluate(()=>patient.chartState.finding.orthoVisits.length),6);
-  await page.evaluate(()=>{failSave=false;});await dialog.locator('[data-visit-save]').click();await dialog.waitFor({state:'hidden'});
-  assert.equal(await page.evaluate(()=>patient.chartState.finding.orthoVisits.length),6,'A committed save followed by a refresh error cannot duplicate the visit on retry');
+  await page.evaluate(()=>{reset();failSave=true;notifications.length=0;});await page.locator('[data-ortho-add-visit]').click();
+  await page.waitForFunction(()=>!document.querySelector('[data-ortho-add-visit]').disabled);
+  assert.equal(await page.evaluate(()=>patient.chartState.finding.orthoVisits.length),5,'Failed save rolls back');
+  assert.equal(await page.evaluate(()=>notifications.length),1,'Failed saves show a nonblocking notice');assert.equal(await page.locator('dialog[open]').count(),0);
+  await page.evaluate(()=>{failSave=false;});await page.locator('[data-ortho-add-visit]').click();await page.waitForFunction(()=>!document.querySelector('[data-ortho-add-visit]').disabled);
+  assert.equal(await page.evaluate(()=>patient.chartState.finding.orthoVisits.length),6,'Retry creates exactly one visit');
+  await page.evaluate(()=>{reset();saveBlock=new Promise(resolve=>{releaseSave=resolve;});const button=document.querySelector('[data-ortho-add-visit]');window.firstAdd=addOrthoVisit(button);window.repeatedAdd=addOrthoVisit(button);});
+  assert.ok(await page.locator('[data-ortho-add-visit]').isDisabled());
+  assert.equal(await page.evaluate(()=>patient.chartState.finding.orthoVisits.length),6,'Rapid taps cannot add duplicate rows while a save is pending');
+  assert.equal(await page.locator('dialog[open]').count(),0);
+  await page.evaluate(async()=>{releaseSave();saveBlock=null;await Promise.all([window.firstAdd,window.repeatedAdd]);});
+  assert.equal(await page.evaluate(()=>patient.chartState.finding.orthoVisits.length),6);assert.ok(await page.locator('[data-ortho-add-visit]').isEnabled());
   await page.locator('.ortho-visits-footer [aria-expanded]').click();await page.locator('.ortho-visits-scroll').evaluate(list=>{list.scrollTop=list.scrollHeight;});
-  await page.locator('[data-ortho-add-visit]').click();await dialog.locator('[data-visit-save]').click();await dialog.waitFor({state:'hidden'});
+  await page.locator('[data-ortho-add-visit]').click();await page.waitForFunction(()=>!document.querySelector('[data-ortho-add-visit]').disabled);
   assert.equal(await page.locator('.ortho-visits-scroll').evaluate(list=>list.scrollTop),0,'New visit is immediately visible in an expanded drawer');
   await card.first().locator('.ortho-visit-notes').click();await page.evaluate(()=>{patient={id:'another',chartState:patient.chartState};syncOrthoVisitDialogContext();});assert.ok(!(await dialog.isVisible()),'Changing patient closes the editor');
   assert.deepEqual(errors,[]);

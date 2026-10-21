@@ -2,8 +2,13 @@
 let orthoVisitDialogState = null;
 let orthoVisitViewportFrame = null;
 let orthoVisitViewportTimers = [];
+const orthoVisitAddsInProgress = new Set();
 
 function orthoVisitText(en, ar) { return currentUiLanguage === 'ar' ? ar : en; }
+
+function orthoVisitAddKey(patient, findingId) {
+  return JSON.stringify([typeof currentSession === 'undefined' ? null : currentSession?.user?.id, patient?.id, findingId]);
+}
 
 function orthoVisitDateValue(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? value : chartOperationDateInputValue(value).slice(0, 10);
@@ -43,13 +48,68 @@ function renderOrthoVisitDrawer(finding, visits, collapsed) {
     <div id="ortho-visits-${escapeHtml(finding.id)}" class="ortho-visits-scroll" tabindex="0" role="region" aria-label="${orthoVisitText('Visit history', 'سجل الزيارات')}">${cards || `<div class="ortho-empty"><i data-lucide="calendar-plus"></i><strong>${orthoVisitText('No visits yet', 'لا توجد زيارات بعد')}</strong><p>${orthoVisitText('Add the first visit to record its details and fee.', 'أضف الزيارة الأولى لتسجيل التفاصيل والسعر.')}</p></div>`}</div>
     <div class="ortho-visits-footer">
       <button type="button" class="ortho-button" onclick="toggleOrthoVisitsCollapse('${escapeHtml(finding.id)}')" aria-expanded="${!collapsed}" aria-controls="ortho-visits-${escapeHtml(finding.id)}"><i data-lucide="${collapsed ? 'chevron-down' : 'chevron-up'}"></i><span>${visits.length} ${orthoVisitText(visits.length === 1 ? 'visit' : 'visits', 'زيارات')}</span></button>
-      <button type="button" data-ortho-add-visit class="ortho-button ortho-primary" onclick="addOrthoVisit(this)"><i data-lucide="plus"></i><span>${orthoVisitText('Add new visit', 'إضافة زيارة جديدة')}</span></button>
+      <button type="button" data-ortho-add-visit class="ortho-button ortho-primary" onclick="addOrthoVisit(this)" ${orthoVisitAddsInProgress.has(orthoVisitAddKey(getActivePatient(), finding.id)) ? 'disabled' : ''}><i data-lucide="plus"></i><span>${orthoVisitText('Add new visit', 'إضافة زيارة جديدة')}</span></button>
     </div>
   </section>`;
 }
 
 function orthoVisitFinding(patient, id) {
   return collectDocumentedFindings(patient).flatMap(group => group.memberFindings || [group]).find(finding => finding.id === id);
+}
+
+async function addBlankOrthoVisit(button) {
+  const patient = getActivePatient();
+  const findingId = button.closest('[data-finding-id]')?.dataset.findingId;
+  const finding = patient && orthoVisitFinding(patient, findingId);
+  if (!finding) return;
+  const key = orthoVisitAddKey(patient, findingId);
+  if (orthoVisitAddsInProgress.has(key)) return;
+  const context = { patientId: String(patient.id), userId: typeof currentSession === 'undefined' ? undefined : currentSession?.user?.id };
+  const now = new Date();
+  const visit = normaliseOrthoVisit({
+    id: createChartFindingId(),
+    visitNumber: Math.max(0, ...(finding.orthoVisits || []).map(item => Number(item.visitNumber) || 0)) + 1,
+    createdAt: now.toISOString(),
+    date: new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString(),
+    notes: '', price: 0, status: 'C',
+    doctorId: finding.doctorId || null, doctorName: finding.doctorId ? finding.doctorName || '' : ''
+  });
+  const previousChartState = clonePatientChart(patient.chartState);
+  orthoVisitAddsInProgress.add(key);
+  let saved = false;
+  try {
+    if (!updateChartFindingById(patient, findingId, current => ({ ...current, isOrthoPackage: true,
+      orthoVisits: [...(current.orthoVisits || []), visit] }))) return;
+    renderFindingsList();
+    const history = document.getElementById(`ortho-visits-${findingId}`);
+    if (history) history.scrollTop = 0;
+    saved = await saveActivePatientChart(patient, { previousChartState, afterSave: async () => {
+      const { error } = await db.rpc('sync_chart_finding_doctor', { p_patient_id: patient.id, p_finding_ids: [visit.id] });
+      if (error) throw error;
+    } });
+    if (saved) {
+      hrDirectoryLoaded = false; financeInvoicesLoaded = false; dashboardInvoiceCache.clear();
+      if (orthoVisitContextMatches(context)) {
+        try { await refreshChartFindingInvoiceState(patient.id); }
+        catch (error) { console.error('Could not refresh visit invoice status:', error); }
+      }
+    }
+  } catch (error) {
+    console.error('Could not add orthodontic visit:', error);
+    updateChartFindingById(patient, findingId, current => ({ ...current,
+      orthoVisits: (current.orthoVisits || []).filter(item => item.id !== visit.id) }));
+  } finally {
+    orthoVisitAddsInProgress.delete(key);
+    if (orthoVisitContextMatches(context)) {
+      renderFindingsList();
+      const history = document.getElementById(`ortho-visits-${findingId}`);
+      if (saved && history) history.scrollTop = 0;
+    }
+  }
+  if (!saved && orthoVisitContextMatches(context)) showAppointmentNotificationToast(
+    orthoVisitText('Could not add visit', 'تعذّر إضافة الزيارة'),
+    orthoVisitText('Please try again.', 'يرجى المحاولة مرة أخرى.')
+  );
 }
 
 async function saveOrthoVisitControl(control, field) {
