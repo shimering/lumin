@@ -110,7 +110,7 @@
   <script src="lumin-mobile-nav.js?v=3"></script>
   <script src="lumin-appointment-status.js?v=2"></script>
   <script src="lumin-appointment-operations.js?v=3"></script>
-  <script src="lumin-appointment-details.js?v=1"></script>
+  <script src="lumin-appointment-details.js?v=2"></script>
   <script src="lumin-dashboard-motion.js?v=3"></script>
   <script src="lumin-whatsapp-actions.js?v=2"></script>
   <script src="lumin-quotation-model.js?v=1"></script>
@@ -5387,7 +5387,7 @@
   <link rel="stylesheet" href="lumin-dashboard-motion.css?v=2" />
   <link rel="stylesheet" href="lumin-appointment-status.css?v=3" />
   <link rel="stylesheet" href="lumin-appointment-operations.css?v=2" />
-  <link rel="stylesheet" href="lumin-appointment-details.css?v=1" />
+  <link rel="stylesheet" href="lumin-appointment-details.css?v=2" />
   <link rel="stylesheet" href="lumin-patients.css?v=3" />
   <link rel="stylesheet" href="lumin-finance-sync.css?v=2" />
   <link rel="stylesheet" href="lumin-mobile-nav.css?v=3" />
@@ -9577,7 +9577,7 @@
   </div>
 
   <div id="appointment-card-popover-layer" class="appointment-card-popover-layer fixed inset-0 z-[87] hidden items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
-    <div id="appointment-card-popover" role="dialog" aria-modal="true" aria-labelledby="appointment-card-popover-title" class="appointment-card-popover hidden rounded-3xl border border-blue-200 bg-white"></div>
+    <div id="appointment-card-popover" role="dialog" aria-modal="true" aria-labelledby="appointment-card-popover-title" tabindex="-1" class="appointment-card-popover hidden rounded-3xl border border-slate-200 bg-white"></div>
   </div>
 
   <!-- ================= MODAL: NEW APPOINTMENT ================= -->
@@ -36934,10 +36934,12 @@
       layer.classList.remove('hidden');
       layer.classList.add('flex');
       popover.classList.remove('hidden');
+      setAppointmentDetailSheetOpen(true);
     }
 
     function closeAppointmentCardPopover(clearSelection = true, restoreFocus = true) {
       if (typeof closeAppointmentDetailEditor === 'function') closeAppointmentDetailEditor({ force: true, restoreFocus: false });
+      setAppointmentDetailSheetOpen(false);
       if (whatsappTemplatePickerScope === '#appointment-card-popover') closeWhatsAppTemplatePicker();
       const layer = document.getElementById('appointment-card-popover-layer');
       const popover = document.getElementById('appointment-card-popover');
@@ -37024,7 +37026,9 @@
       const visitTypeOptions = `<option value="" disabled ${selectedVisitType ? '' : 'selected'}>${appointmentPopoverText('Choose visit type', 'اختر نوع الزيارة')}</option>` + visitTypes.map(type => `<option value="${escapeAppointmentText(type.id)}" ${type.id === selectedVisitType?.id ? 'selected' : ''}>${escapeAppointmentText(type.name)}</option>`).join('');
       popover.style.setProperty('--appointment-popover-color', entry.appointmentColor || '#2563eb');
       const contentChanged = setStableHtml(popover, `
-        <div class="flex items-start justify-between gap-3 border-b border-blue-100 bg-blue-50/80 px-4 py-3.5">
+        <div class="appointment-popover-heading">
+        <div class="appointment-sheet-handle" aria-hidden="true"><span></span></div>
+        <header class="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3.5">
           <div class="flex min-w-0 items-start gap-3">
             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-blue-600 shadow-sm ring-1 ring-blue-100"><i data-lucide="${entry.isNote ? 'notebook-pen' : 'calendar-clock'}" class="h-5 w-5"></i></span>
             <div class="min-w-0">
@@ -37032,9 +37036,13 @@
               <h3 id="appointment-card-popover-title" class="mt-0.5 truncate text-base font-black text-slate-900">${escapeAppointmentText(entry.patient)}</h3>
             </div>
           </div>
-          <button type="button" data-close-appointment-popover class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-slate-400 shadow-xs ring-1 ring-blue-100 transition hover:text-slate-700" aria-label="${appointmentPopoverText('Close appointment details', 'إغلاق تفاصيل الموعد')}"><i data-lucide="x" class="h-4 w-4"></i></button>
+          <div class="appointment-popover-header-actions">
+            <button type="button" data-delete-appointment-popover ${editable ? '' : 'disabled'} class="appointment-detail-button is-danger" aria-label="${appointmentPopoverText('Delete appointment', 'حذف الموعد')}" title="${appointmentPopoverText('Delete appointment', 'حذف الموعد')}"><i data-lucide="trash-2" aria-hidden="true"></i></button>
+            <button type="button" data-close-appointment-popover class="appointment-detail-button" aria-label="${appointmentPopoverText('Close appointment details', 'إغلاق تفاصيل الموعد')}"><i data-lucide="x" aria-hidden="true"></i></button>
+          </div>
+        </header>
         </div>
-        <div class="space-y-2.5 bg-slate-50/60 px-4 py-3.5">
+        <div class="appointment-popover-body space-y-2.5 bg-slate-50/60 px-4 py-3.5">
           <div class="grid grid-cols-2 gap-2">
             <button type="button" data-appointment-detail-card="schedule" data-edit-appointment-detail="schedule" ${editable ? '' : 'disabled'} aria-haspopup="dialog" aria-label="${appointmentPopoverText('Edit date and time', 'تعديل التاريخ والوقت')}" class="appointment-detail-box rounded-xl bg-sky-50 px-3 py-2.5 text-sky-900">
               <p class="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-sky-600"><i data-lucide="clock-3" class="h-3.5 w-3.5"></i>${appointmentPopoverText('Schedule', 'الموعد')}${editable ? '<i data-lucide="pencil" class="appointment-detail-edit-hint" aria-hidden="true"></i>' : ''}</p>
@@ -37084,10 +37092,6 @@
             <button type="button" data-open-appointment-patient-profile ${hasPageAccess('patients') ? '' : 'disabled'} class="appointment-detail-action"><i data-lucide="user-round" aria-hidden="true"></i>${appointmentPopoverText('Patient profile', 'ملف المريض')}</button>
             <button type="button" data-open-appointment-patient-chart ${hasPageAccess('chart') ? '' : 'disabled'} class="appointment-detail-action"><i data-lucide="clipboard-list" aria-hidden="true"></i>${appointmentPopoverText('Chart', 'مخطط الأسنان')}</button>
           </div></section>`}
-        </div>
-        <div class="flex items-center justify-between gap-2 border-t border-slate-200 bg-white px-4 py-3">
-          <button type="button" data-delete-appointment-popover ${editable ? '' : 'disabled'} class="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700 transition hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i>${appointmentPopoverText('Delete', 'حذف')}</button>
-          <button type="button" data-edit-appointment-popover ${editable ? '' : 'disabled'} class="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"><i data-lucide="pencil" class="h-3.5 w-3.5"></i>${appointmentPopoverText('Edit appointment', 'تعديل الموعد')}</button>
         </div>`);
 
       positionAppointmentCardPopover();
@@ -37108,13 +37112,11 @@
         closeAppointmentCardPopover(true, false);
         openPatientChart(entry.patientId, 'appointments');
       });
-      popover.querySelector('[data-edit-appointment-popover]')?.addEventListener('click', () => {
-        closeAppointmentCardPopover(false, false);
-        openAppointmentModal(appointmentId);
-      });
       popover.querySelector('[data-delete-appointment-popover]')?.addEventListener('click', () => deleteAppointment(appointmentId));
       positionAppointmentCardPopover();
-      if (!refreshOpenPopover) requestAnimationFrame(() => closeButton?.focus({ preventScroll: true }));
+      if (!refreshOpenPopover) requestAnimationFrame(() => {
+        if (appointmentCardPopoverId === appointmentId) (window.matchMedia('(max-width: 767px)').matches ? popover : closeButton)?.focus({ preventScroll: true });
+      });
       lucide.createIcons();
       ensureAppointmentWaitIndicatorTimer();
       if (entry.operations?.length && typeof appointmentOperationCatalogNeedsLoad === 'function' && appointmentOperationCatalogNeedsLoad()) {
@@ -37155,15 +37157,8 @@
     }
 
     function setupAppointmentCardPopover() {
+      setupAppointmentDetailSheet();
       document.addEventListener('click', blockAppointmentCardPopoverTouchThrough, true);
-      document.addEventListener('pointerdown', event => {
-        if (
-          !appointmentCardPopoverId
-          || event.target.closest('#appointment-card-popover, #appointment-detail-editor, #appointment-operation-picker, #whatsapp-template-dropdown, [data-whatsapp-template-toggle]')
-          || event.target.closest('[data-timeline-appointment-id], [data-week-appointment-id]')
-        ) return;
-        closeAppointmentCardPopover(true, false);
-      });
       document.addEventListener('keydown', event => {
         if (event.key === 'Escape' && appointmentCardPopoverId) closeAppointmentCardPopover();
       });

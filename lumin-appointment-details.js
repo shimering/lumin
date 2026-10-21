@@ -1,6 +1,108 @@
 /* Focused appointment edits write only the fields the user changed. */
 let appointmentDetailEditorState = null;
 const appointmentDetailWrites = new Set();
+let appointmentDetailSheetGesture = null;
+let appointmentDetailSheetBodyOverflow = null;
+
+function clearAppointmentDetailSheetGesture() {
+  appointmentDetailSheetGesture = null;
+  const panel = document.getElementById('appointment-card-popover');
+  panel?.style.removeProperty('translate');
+  panel?.classList.remove('is-sheet-dragging');
+}
+
+function setAppointmentDetailSheetOpen(open) {
+  if (open) {
+    if (appointmentDetailSheetBodyOverflow === null) appointmentDetailSheetBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+  } else {
+    clearAppointmentDetailSheetGesture();
+    if (appointmentDetailSheetBodyOverflow !== null) document.body.style.overflow = appointmentDetailSheetBodyOverflow;
+    appointmentDetailSheetBodyOverflow = null;
+  }
+}
+
+function setupAppointmentDetailSheet() {
+  const panel = document.getElementById('appointment-card-popover');
+  const layer = document.getElementById('appointment-card-popover-layer');
+  if (!panel || !layer || panel.dataset.sheetReady) return;
+  panel.dataset.sheetReady = 'true';
+  let backdropTap = null;
+  layer.addEventListener('pointerdown', event => {
+    if (event.target !== layer) return;
+    backdropTap = { x: event.clientX, y: event.clientY, moved: false };
+    event.stopPropagation();
+  });
+  layer.addEventListener('pointermove', event => {
+    if (backdropTap && Math.hypot(event.clientX - backdropTap.x, event.clientY - backdropTap.y) > 8) backdropTap.moved = true;
+  });
+  layer.addEventListener('touchmove', event => {
+    if (event.target === layer && event.cancelable) event.preventDefault();
+  }, { passive: false });
+  // Keep the backdrop in place until the full click is consumed. Closing on
+  // pointerdown can send the subsequent click to a button behind the sheet.
+  layer.addEventListener('click', event => {
+    if (event.target !== layer) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (!backdropTap?.moved) closeAppointmentCardPopover();
+    backdropTap = null;
+  });
+  panel.addEventListener('touchstart', event => {
+    clearAppointmentDetailSheetGesture();
+    if (event.touches.length !== 1 || !window.matchMedia('(max-width: 767px)').matches || !appointmentCardPopoverId
+      || event.target.closest('button, a, input, textarea, select, label, [contenteditable]')) return;
+    if (!event.target.closest('.appointment-popover-heading')) {
+      // A body swipe dismisses only when every scroll container is at the top.
+      for (let node = event.target; node && panel.contains(node); node = node.parentElement) {
+        if (node.scrollTop > 0 && /auto|scroll/.test(getComputedStyle(node).overflowY)) return;
+      }
+    }
+    const touch = event.touches[0];
+    appointmentDetailSheetGesture = { id: touch.identifier, x: touch.clientX, y: touch.clientY, distance: 0, dragging: false };
+  }, { passive: true });
+  panel.addEventListener('touchmove', event => {
+    const gesture = appointmentDetailSheetGesture;
+    if (!gesture) return;
+    if (event.touches.length !== 1 || !window.matchMedia('(max-width: 767px)').matches) { clearAppointmentDetailSheetGesture(); return; }
+    const touch = [...event.touches].find(touch => touch.identifier === gesture.id);
+    if (!touch) return;
+    const dx = touch.clientX - gesture.x, dy = touch.clientY - gesture.y;
+    if (!gesture.dragging) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 8) return;
+      if (dy <= 0 || Math.abs(dx) > dy * .8) { clearAppointmentDetailSheetGesture(); return; }
+      gesture.dragging = true;
+      panel.classList.add('is-sheet-dragging');
+    }
+    if (event.cancelable) event.preventDefault();
+    event.stopPropagation();
+    gesture.distance = Math.max(0, dy);
+    const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+    panel.style.translate = `0 ${gesture.distance / zoom}px`;
+  }, { passive: false });
+  const finish = event => {
+    const gesture = appointmentDetailSheetGesture;
+    if (!gesture) return;
+    if (gesture.dragging) {
+      if (event.cancelable) event.preventDefault();
+      event.stopPropagation();
+      if (event.type !== 'touchcancel' && gesture.distance >= Math.min(100, panel.getBoundingClientRect().height * .2)) closeAppointmentCardPopover();
+    }
+    clearAppointmentDetailSheetGesture();
+  };
+  panel.addEventListener('touchend', finish, { passive: false });
+  panel.addEventListener('touchcancel', finish, { passive: false });
+  panel.addEventListener('keydown', event => {
+    if (event.key !== 'Tab') return;
+    const controls = [...panel.querySelectorAll('button, a[href], input, select, textarea, [tabindex="0"]')]
+      .filter(control => !control.disabled && control.getClientRects().length);
+    const next = event.shiftKey ? controls.at(-1) : controls[0];
+    if (document.activeElement === panel || document.activeElement === (event.shiftKey ? controls[0] : controls.at(-1))) {
+      event.preventDefault();
+      (next || panel).focus({ preventScroll: true });
+    }
+  });
+}
 
 function appointmentDetailError(message) {
   const error = document.querySelector('#appointment-card-popover [data-appointment-detail-error]');

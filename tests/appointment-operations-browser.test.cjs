@@ -89,6 +89,7 @@ test('optional appointment operations save, edit and open the chart across deskt
     function replaceAppointmentRecord(row){const entry=normaliseAppointmentRecord(row);appointments=appointments.filter(a=>a.id!==row.id);appointments.push(entry);return entry}
     function openPatientWorkspace(patientId,tab){fixture.workspace={patientId,tab};return Promise.resolve()}
     function openPatientChart(patientId,view){fixture.chart={patientId,view};return Promise.resolve()}
+    function deleteAppointment(id){fixture.deleted=id}
     function refreshMyAttendanceState(){} function ensureDashboardAppointmentsLoaded(){}
     function canViewDashboardInvoices(){return false} function syncDashboardMobileTabs(){}
     function renderDashboardDoctorFilter(){return {label:'Dr. Lumin'}} function dashboardAppointmentsForDate(){return appointments}
@@ -158,6 +159,14 @@ test('optional appointment operations save, edit and open the chart across deskt
     await page.setViewportSize({width,height});
     await page.evaluate(language=>{currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';openAppointmentCardPopover('a2');},language);
     const popup=page.locator('#appointment-card-popover'),operations=popup.locator('[data-appointment-detail-card="operations"]');
+    assert.equal(await popup.locator('[data-edit-appointment-popover]').count(),0);
+    assert.equal(await popup.locator('header [data-delete-appointment-popover]').count(),1);
+    assert.equal(await popup.locator('[data-delete-appointment-popover]').count(),1);
+    assert.equal(await popup.locator('[data-close-appointment-popover]').isVisible(),width>=768);
+    assert.equal(await popup.locator('.appointment-sheet-handle').isVisible(),width<768);
+    await popup.evaluate(node=>Promise.all(node.getAnimations().map(animation=>animation.finished)));
+    const deleteSize=await popup.locator('[data-delete-appointment-popover]').boundingBox();
+    assert.ok(deleteSize.width>=44&&deleteSize.height>=44);
     assert.equal(await operations.isVisible(),true,'appointment page popup includes linked treatments');
     assert.equal(await operations.locator('.palmer-symbol').count(),8);
     assert.deepEqual(await operations.locator('.palmer-value').allTextContents(),['1','1','1','1','A','A','A','A']);
@@ -262,7 +271,8 @@ test('optional appointment operations save, edit and open the chart across deskt
     await visit.selectOption('emergency');
     await page.waitForFunction(()=>appointments.find(a=>a.id==='a2').visitTypeId==='emergency');
     assert.deepEqual(await page.evaluate(()=>fixture.writes.at(-1)),{visit_type_id:'emergency',appointment_type:'Emergency'});
-    await popup.locator('[data-edit-appointment-popover]').click();
+    assert.equal(await popup.locator('[data-edit-appointment-popover]').count(),0,'general edit action is removed from details');
+    await page.evaluate(()=>openAppointmentModal('a2'));
     assert.equal(await page.locator('#appointment-clinical-fields').isVisible(),false,'edit appointment has no status or visit controls');
     await page.evaluate(()=>{document.getElementById('appointment-status').value='Cancelled';document.getElementById('appointment-notes').value='Updated note';});
     await page.evaluate(()=>saveAppointment({preventDefault(){}}));
@@ -331,7 +341,7 @@ test('optional appointment operations save, edit and open the chart across deskt
     await popup.locator('[data-open-appointment-patient-chart]').click();
     assert.deepEqual(await page.evaluate(()=>fixture.chart),{patientId:'p1',view:'appointments'});
     await page.evaluate(()=>{allowed=false;fixture.denied=['chart'];openAppointmentCardPopover('a2')});
-    for(const selector of ['[data-edit-appointment-detail="schedule"]','[data-edit-appointment-detail="doctor"]','[data-appointment-popover-status]','[data-appointment-popover-visit-type]','[data-add-appointment-operations]','[data-open-appointment-patient-chart]'])assert.equal(await popup.locator(selector).isDisabled(),true);
+    for(const selector of ['[data-edit-appointment-detail="schedule"]','[data-edit-appointment-detail="doctor"]','[data-appointment-popover-status]','[data-appointment-popover-visit-type]','[data-add-appointment-operations]','[data-open-appointment-patient-chart]','[data-delete-appointment-popover]'])assert.equal(await popup.locator(selector).isDisabled(),true);
     assert.equal(await popup.locator('[data-open-appointment-patient-profile]').isEnabled(),true);
     await page.evaluate(()=>{allowed=true;fixture.denied=[];openAppointmentCardPopover('a2')});
     await popup.locator('[data-edit-appointment-detail="doctor"]').click();
@@ -343,6 +353,71 @@ test('optional appointment operations save, edit and open the chart across deskt
     await dialog.waitFor({state:'hidden'});
     assert.equal(await page.evaluate(()=>appointments.find(a=>a.id==='a2').assignedUserId),'doctor','a late save cannot populate another account');
     await page.evaluate(()=>{currentSession={user:{id:'staff'}};fixture.writePending=false;closeAppointmentCardPopover()});
+  });
+  await t.test('mobile swipe and outside dismissal consume the gesture without activating background buttons', async () => {
+    const popup=page.locator('#appointment-card-popover');
+    const touch=await page.context().newCDPSession(page);
+    await page.evaluate(()=>{
+      fixture.backgroundClicks=0;fixture.backgroundPresses=0;
+      const button=document.createElement('button');button.id='fixture-background-action';
+      button.textContent='Background action';button.style.cssText='position:fixed;top:0;left:0;width:120px;height:44px;z-index:1';
+      button.addEventListener('click',()=>fixture.backgroundClicks++);
+      button.addEventListener('pointerdown',()=>fixture.backgroundPresses++);
+      document.body.append(button);
+    });
+    const drag=async(x,y,dx,dy)=>{
+      await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+      for(let step=1;step<=5;step++) {
+        await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+dx*step/5,y:y+dy*step/5}]});
+        await page.waitForTimeout(20);
+      }
+    };
+    const end=()=>touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    for(const [width,language] of [[390,'en'],[390,'ar'],[320,'ar']]) {
+      await page.setViewportSize({width,height:844});
+      await page.evaluate(language=>{
+        currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';
+        document.body.style.overflow='auto';openAppointmentCardPopover('a2');
+      },language);
+      await popup.locator('[data-delete-appointment-popover]').click();
+      assert.equal(await page.evaluate(()=>fixture.deleted),'a2','header delete keeps the existing delete action');
+      await page.mouse.move(20,20);await page.mouse.down();
+      assert.equal(await popup.isVisible(),true,'pointerdown keeps the backdrop in place');
+      await page.mouse.up();await popup.waitFor({state:'hidden'});
+      assert.equal(await page.evaluate(()=>document.body.style.overflow),'auto','closing restores the previous scroll setting');
+      await page.evaluate(()=>openAppointmentCardPopover('a2'));
+      await page.touchscreen.tap(20,20);await popup.waitFor({state:'hidden'});
+      await page.evaluate(()=>openAppointmentCardPopover('a2'));
+      await popup.evaluate(node=>Promise.all(node.getAnimations().map(animation=>animation.finished)));
+      const handle=await popup.locator('.appointment-sheet-handle').boundingBox();
+      const x=width/2,y=handle.y+12;
+      await drag(x,y,0,30);await end();
+      assert.equal(await popup.isVisible(),true,'a short pull returns the sheet to its position');
+      assert.equal(await popup.evaluate(node=>node.style.translate),'');
+      await drag(x,y,80,5);await end();
+      assert.equal(await popup.isVisible(),true,'horizontal movement does not close the sheet');
+      await drag(x,y,0,140);
+      await touch.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});
+      assert.equal(await popup.isVisible(),true,'a cancelled gesture does not dismiss');
+      assert.equal(await popup.evaluate(node=>node.style.translate),'');
+      await popup.evaluate(node=>{node.scrollTop=120});
+      const header=await popup.locator('header').boundingBox();
+      await drag(12,header.y+header.height+50,0,60);await end();
+      assert.equal(await popup.isVisible(),true,'scrolling down within the body preserves the panel');
+      await popup.evaluate(node=>{node.scrollTop=0});
+      await page.waitForTimeout(200);
+      await drag(x,y,0,140);
+      assert.equal(await popup.evaluate(node=>node.classList.contains('is-sheet-dragging')),true,'the sheet follows the finger');
+      await end();await popup.waitFor({state:'hidden'});
+      assert.deepEqual(await page.evaluate(()=>[fixture.backgroundClicks,fixture.backgroundPresses]),[0,0],'dismissing never presses the action behind the backdrop');
+      await page.evaluate(()=>openAppointmentCardPopover('a2'));
+      await popup.evaluate(node=>Promise.all(node.getAnimations().map(animation=>animation.finished)));
+      await popup.focus();await page.keyboard.press('Shift+Tab');
+      assert.equal(await popup.locator('[data-open-appointment-patient-chart]').evaluate(node=>node===document.activeElement),true,'keyboard focus stays inside the panel: '+await page.evaluate(()=>document.activeElement.outerHTML));
+      await page.keyboard.press('Escape');await popup.waitFor({state:'hidden'});
+    }
+    await touch.detach();
+    await page.evaluate(()=>{document.getElementById('fixture-background-action').remove();document.body.style.overflow='';});
   });
   await page.evaluate(()=>{allowed=false;});
   await page.evaluate(()=>renderAppointmentOperations());
