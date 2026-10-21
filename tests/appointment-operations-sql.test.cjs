@@ -34,6 +34,12 @@ test('appointment operation links are optional, patient-specific and follow clin
   await db.exec(fs.readFileSync(path.join(__dirname, 'fixtures/appointment-chart-parser.sql'), 'utf8'));
   await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/20261014120830_appointment_operations.sql'), 'utf8'));
   await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/20261014124000_appointment_operation_catalog.sql'), 'utf8'));
+  // Apply the real chart parser update, including its restricted helper ACL.
+  // The older parser fixture alone cannot detect nested invoker permission errors.
+  const orthoMigration = fs.readFileSync(path.join(root, 'supabase/migrations/20261020133050_ortho_visit_billing_and_payroll.sql'), 'utf8');
+  const parserEnd = orthoMigration.indexOf('create or replace function private.chart_finding_by_id(');
+  assert.ok(parserEnd > 0);
+  await db.exec(orthoMigration.slice(0, parserEnd));
   const finding = (id, code = 'filling', status = 'P', extra = {}) => ({ id: uuid(id), code, status, ...extra });
   const chart = {
     '11': { wholeOperations: [finding(11, 'crown', 'In')], surfaces: { B: [finding(12)], O: [finding(12)] } },
@@ -48,6 +54,27 @@ test('appointment operation links are optional, patient-specific and follow clin
   const insert = async (id, ops, patient = 1) => db.query('insert into public.appointments(id,patient_id,operations) values($1,$2,$3) returning operations', [uuid(id), uuid(patient), JSON.stringify(ops)]);
   const link = (...ids) => ({ finding_ids: ids.map(uuid) });
   const stored = async id => (await db.query('select operations from public.appointments where id=$1', [uuid(id)])).rows[0].operations;
+
+  await t.test('nested parser permission regression blocks both loading and saving until repaired', async () => {
+    await assert.rejects(choices(1), /permission denied for function ortho_visit_finding_rows/);
+    await assert.rejects(insert(100, [link(11)]), /permission denied for function ortho_visit_finding_rows/);
+    await db.exec('reset role');
+    await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/20261021043711_restore_appointment_operation_parser_access.sql'), 'utf8'));
+    const permissions = (await db.query(`select
+      has_function_privilege('authenticated','private.ortho_visit_finding_rows(jsonb)','execute') as staff,
+      has_function_privilege('anon','private.ortho_visit_finding_rows(jsonb)','execute') as anonymous,
+      (select prosecdef from pg_proc where oid='private.ortho_visit_finding_rows(jsonb)'::regprocedure) as security_definer`)).rows[0];
+    assert.deepEqual(permissions, { staff: true, anonymous: false, security_definer: false });
+    await db.exec('set role authenticated');
+    assert.equal((await choices(1)).length, 6);
+    await insert(99, [link(11)]);
+    assert.deepEqual((await stored(99))[0].finding_ids, [uuid(11)]);
+    await db.query('update public.appointments set operations=$1 where id=$2', [JSON.stringify([link(12)]), uuid(99)]);
+    assert.deepEqual((await stored(99))[0].finding_ids, [uuid(12)]);
+    await db.exec('reset role');
+    await db.query('delete from public.appointments where id=$1', [uuid(99)]);
+    await db.exec('set role authenticated');
+  });
 
   await t.test('picker groups multi-surface fillings, batch teeth and mouth operations without steps', async () => {
     const options = await choices(1);
