@@ -160,6 +160,17 @@ html.chart-actions-mobile body.lumin-mobile-keyboard-open #chart-clinical-worksp
   max-height: var(--lumin-app-viewport-height, 100dvh);
   padding-top: env(safe-area-inset-top);
 }
+/* Tablet keyboard search prioritizes the result list over the frozen chrome. */
+html.chart-actions-tablet-search #app-header,
+html.chart-actions-tablet-search #patient-workspace-header { transform: translateY(-150%); visibility: hidden; pointer-events: none; }
+html.chart-actions-tablet-search #chart-clinical-workspace.has-clinical-actions-panel .chart-side-panels { position: static; }
+html.chart-actions-tablet-search #chart-clinical-workspace.has-clinical-actions-panel .chart-actions-panel {
+  position: fixed; z-index: 90; top: var(--chart-search-top); left: var(--chart-search-left); right: auto;
+  width: var(--chart-search-width); height: auto; max-height: none; flex: none; transition: none;
+}
+html.chart-actions-tablet-search #chart-actions-body { flex: none; }
+html.chart-actions-tablet-search .chart-actions-content { height: var(--chart-search-height); flex: none; min-height: 0; }
+html.chart-actions-tablet-search #chart-actions-operations { min-height: 0; }
 @media (prefers-reduced-motion: reduce) {
   .chart-actions-panel, .chart-actions-panel *, .chart-specialty-option, #chart-clinical-workspace.has-clinical-actions-panel { transition: none !important; animation: none !important; }
 }

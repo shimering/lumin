@@ -489,6 +489,70 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
       await page.locator('#standard-icons-fixture').screenshot({path:path.join(screenshots,`standard-icons-${viewport.width}-${language}.png`)});
     }
   });
+  await t.test('tablet search keeps a scrollable result list above iPad and Android keyboards', async st => {
+    const touch=await page.context().newCDPSession(page);st.after(()=>touch.detach());
+    const originalAgent=await page.evaluate(()=>navigator.userAgent);
+    await page.evaluate(()=>{
+      window.tabletOriginalViewport=window.visualViewport;
+      activePatientId='patient-1';
+      dentalSpecialties=[{id:'endo',name:'Endo',iconName:'dental-endodontics',active:true}];
+      dentalOperations=[{id:'root-canal',name:'Root canal',specialtyId:'endo',active:true,actionScope:'tooth',code:'root-canal',price:1200,steps:[]},
+        ...Array.from({length:40},(_,index)=>({id:'extra-'+index,name:'Additional procedure '+index,specialtyId:'endo',active:true,actionScope:'tooth',code:'extra-'+index,price:100,steps:[]}))];
+      const viewport=Object.assign(new EventTarget(),{width:834,height:1112,offsetTop:0,offsetLeft:0});
+      Object.defineProperty(window,'visualViewport',{configurable:true,value:viewport});
+      viewport.addEventListener('resize',updateAppViewportDimensions);viewport.addEventListener('scroll',updateAppViewportDimensions);
+    });
+    const cases=[{width:834,height:1112,keyboardHeight:600,ipad:true},{width:1194,height:834,keyboardHeight:400,ipad:true},{width:1280,height:800,keyboardHeight:360,ipad:false}];
+    try {
+      for(const viewport of cases) {
+        await touch.send('Network.setUserAgentOverride',{userAgent:viewport.ipad?'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Safari/604.1':'Mozilla/5.0 (Linux; Android 14; SM-X610) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36'});
+        for(const language of ['en','ar'])for(const scale of [.85,1,1.25])for(const shrinkLayout of [false,true]) {
+          await page.setViewportSize({width:viewport.width,height:viewport.height});
+          await page.evaluate(({viewport,language,scale})=>{
+            document.activeElement.blur();Object.assign(window.visualViewport,{width:viewport.width,height:viewport.height,offsetTop:0});
+            currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';
+            document.documentElement.style.zoom=String(scale);document.documentElement.style.setProperty('--lumin-app-scale',String(scale));
+            activeSelection=emptyChartSelection();resetClinicalActionsFilters();updateSelectionUI();toggleSelectedChartTooth('1',1);chooseClinicalActionsOperation('root-canal');
+            updateAppViewportDimensions();window.scrollTo(0,0);
+          },{viewport,language,scale});
+          const panel=page.locator('#action-palette-card'),search=page.locator('#chart-actions-search'),results=page.locator('#chart-actions-operations');
+          await search.focus();assert.equal(await page.evaluate(()=>clinicalActionsSearchViewport.active),false,'A hardware keyboard or focus alone keeps the normal rail');
+          await search.fill('Additional');
+          assert.ok(await results.locator('[data-clinical-operation]').count()>=30);
+          const saves=await page.evaluate(()=>window.savedCharts.length);
+          if(shrinkLayout)await page.setViewportSize({width:viewport.width,height:viewport.keyboardHeight});
+          for(const offset of [0,24]) {
+            await page.evaluate(({height,offset})=>{Object.assign(window.visualViewport,{height,offsetTop:offset});window.visualViewport.dispatchEvent(new Event('resize'));window.visualViewport.dispatchEvent(new Event('scroll'));},{height:viewport.keyboardHeight,offset});
+            await page.waitForFunction(()=>clinicalActionsSearchViewport.active);
+            await page.waitForFunction(offset=>document.getElementById('action-palette-card').getBoundingClientRect().top+document.querySelector('.chart-actions-header').getBoundingClientRect().height>=offset,offset);
+            const searchBox=await search.boundingBox(),listBox=await results.boundingBox();
+            assert.ok(searchBox.y>=offset&&searchBox.y+searchBox.height<offset+viewport.keyboardHeight,'Search stays above the keyboard: '+JSON.stringify({viewport,scale,shrinkLayout,searchBox}));
+            assert.ok(listBox.y>=searchBox.y+searchBox.height&&listBox.height>=128,'At least two complete result rows remain visible: '+JSON.stringify({viewport,scale,listBox}));
+            assert.ok(listBox.y+listBox.height<=offset+viewport.keyboardHeight+1,'Results end above the keyboard');
+            assert.ok(await results.evaluate(node=>node.scrollHeight>node.clientHeight),'All matching procedures remain scrollable');
+            await results.evaluate(node=>{node.scrollTop=node.scrollHeight;});assert.ok(await results.evaluate(node=>node.scrollTop)>0);await results.evaluate(node=>{node.scrollTop=0;});
+            assert.equal(await search.evaluate(node=>node===document.activeElement),true,'Viewport changes retain typing focus');
+            assert.equal(await page.locator('#app-header').evaluate(node=>getComputedStyle(node).visibility),'hidden','Upper frozen chrome moves out of the search area');
+            const footer=await panel.locator('footer').boundingBox();assert.ok(footer.y>=offset+viewport.keyboardHeight-12,'Lower controls move below the search viewport');
+            assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+          }
+          if(scale===1&&!shrinkLayout)await page.screenshot({path:path.join(screenshots,`tablet-keyboard-search-${viewport.width}-${language}.png`)});
+          await results.locator('[data-clinical-operation]').first().click();
+          assert.equal(await page.locator('#chart-operation-select').inputValue(),'extra-0','A result is selected with one press while the keyboard is open');
+          await page.waitForFunction(()=>!clinicalActionsSearchViewport.active);
+          await page.setViewportSize({width:viewport.width,height:viewport.height});
+          await page.evaluate(viewport=>{Object.assign(window.visualViewport,{height:viewport.height,offsetTop:0});window.visualViewport.dispatchEvent(new Event('resize'));},viewport);
+          assert.equal(await page.locator('#app-header').evaluate(node=>getComputedStyle(node).visibility),'visible');
+          assert.equal(await search.inputValue(),'Additional');assert.deepEqual(await page.evaluate(()=>chartSelectionTargets().map(target=>target.tooth)),['1']);
+          assert.equal(await page.evaluate(()=>window.savedCharts.length),saves,'Keyboard search never applies a procedure automatically');
+        }
+      }
+    } finally {
+      await touch.send('Network.setUserAgentOverride',{userAgent:originalAgent});
+      await page.setViewportSize({width:834,height:1112});
+      await page.evaluate(()=>{document.activeElement.blur();Object.defineProperty(window,'visualViewport',{configurable:true,value:window.tabletOriginalViewport});document.documentElement.style.removeProperty('zoom');document.documentElement.style.removeProperty('--lumin-app-scale');updateAppViewportDimensions();updateClinicalActionsSearchViewport();});
+    }
+  });
   await t.test('mobile search fills the keyboard viewport, retains procedure selection and dismisses only on explicit actions', async st => {
     const touch=await page.context().newCDPSession(page);
     st.after(()=>touch.detach());

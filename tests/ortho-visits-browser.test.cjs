@@ -3,7 +3,7 @@ const {chromium}=require('playwright');
 const root=path.resolve(__dirname,'..'),html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 function source(name){const start=html.search(new RegExp('    (?:async )?function '+name+'\\('));assert.ok(start>=0,name);return html.slice(start,html.indexOf('\n    }',start)+6);}
 
-test('newest visit preview, three-visit drawer and note/date popup work across devices and languages',async t=>{
+test('prominent visit notes, separate editors and keyboard-aware popups work across devices and languages',async t=>{
   const head=html.slice(0,html.indexOf('</head>')+7).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'');
   const server=http.createServer((req,res)=>{
     const url=new URL(req.url,'http://localhost');
@@ -53,7 +53,7 @@ test('newest visit preview, three-visit drawer and note/date popup work across d
     }
     function reset(){expandedOrthoFindings.clear();invoicedFindingIds.clear();patient.chartState.finding.doctorId=null;
       patient.chartState.finding.orthoVisits=Array.from({length:5},(_,index)=>({id:'00000000-0000-4000-8000-'+String(index+10).padStart(12,'0'),visitNumber:index+1,status:'C',price:200,notes:'Visit notes '+(index+1),doctorId:null,date:'2026-10-19T12:00:00Z',createdAt:'2026-10-'+String(index+10).padStart(2,'0')+'T12:00:00Z'}));renderFindingsList();}
-    ${['chartFindingCreatedAtTimestamp','chartOperationDateInputValue','normaliseOperationStatus','normaliseOrthoVisit','normaliseOrthoVisits','operationStatusDefinition','operationStatusSelectOptions','chartDoctorSelectOptions','toggleOrthoVisitsCollapse','addOrthoVisit','toggleOrthoVisitSelection','updateFindingDoctorFromControl','updateOrthoVisitDoctor','updateOrthoVisitPrice'].map(source).join('\n')}
+    ${['getAppViewportBounds','chartFindingCreatedAtTimestamp','chartOperationDateInputValue','normaliseOperationStatus','normaliseOrthoVisit','normaliseOrthoVisits','operationStatusDefinition','operationStatusSelectOptions','chartDoctorSelectOptions','toggleOrthoVisitsCollapse','addOrthoVisit','toggleOrthoVisitSelection','updateFindingDoctorFromControl','updateOrthoVisitDoctor','updateOrthoVisitPrice'].map(source).join('\n')}
   `});
   const screenshots=process.env.LUMIN_MEDIA_SCREENSHOT_DIR||path.join(require('node:os').tmpdir(),'lumin-ortho-visits');fs.mkdirSync(screenshots,{recursive:true});
   const card=page.locator('.ortho-visit-card'),dialog=page.locator('#ortho-visit-dialog');
@@ -69,14 +69,56 @@ test('newest visit preview, three-visit drawer and note/date popup work across d
       await page.locator('.ortho-visits-scroll').evaluate(list=>{list.scrollTop=list.scrollHeight;});assert.ok(await card.last().isVisible());
       await toggle.click();assert.equal(await card.count(),1);
       const before=await page.evaluate(()=>saves);
-      await card.locator('.ortho-note-button').click();assert.ok(await dialog.isVisible());
-      await dialog.locator('textarea').fill('New visit text');await dialog.locator('#ortho-visit-date').fill('2026-10-01T10:30');
+      assert.equal(await card.locator('.ortho-note-button, .ortho-visit-controls .rounded-full').count(),0,'Yellow note button and status badge are removed');
+      assert.match(await card.locator('time').textContent(),/^\d{2}\/\d{2}\/\d{4}$/,'Visit date has no time');
+      const noteStyle=await card.locator('.ortho-visit-notes').evaluate(note=>({size:parseFloat(getComputedStyle(note).fontSize),weight:Number(getComputedStyle(note).fontWeight),border:getComputedStyle(note).borderTopColor}));
+      assert.ok(noteStyle.size>=15&&noteStyle.weight>=700);assert.equal(noteStyle.border,'rgb(226, 232, 240)');
+      await card.locator('.ortho-visit-notes').click();assert.ok(await dialog.isVisible());
+      assert.equal(await dialog.getAttribute('data-mode'),'notes');
+      assert.equal(await dialog.locator('[data-visit-field]:visible').count(),1);assert.ok(await dialog.locator('textarea').isVisible());
+      assert.ok(!(await dialog.locator('#ortho-visit-date').isVisible()));assert.ok(await dialog.locator('#ortho-visit-date').isDisabled());
+      for(let index=0;index<6;index++) { await page.keyboard.press('Tab');assert.ok(await dialog.evaluate(node=>node.contains(document.activeElement)),'Focus remains inside the notes popup'); }
+      await dialog.locator('textarea').fill('New visit text');
+      if(viewport.width===390){
+        await page.evaluate(()=>{
+          window.originalOrthoViewport=window.visualViewport;
+          Object.defineProperty(window,'visualViewport',{configurable:true,value:{width:390,height:360,offsetTop:84,offsetLeft:0}});
+          window.dispatchEvent(new Event('resize'));
+        });
+        await page.waitForFunction(()=>document.getElementById('ortho-visit-dialog').style.getPropertyValue('--ortho-viewport-height')==='360px');
+        const keyboardBounds=await dialog.boundingBox(),footer=await dialog.locator('footer').boundingBox();
+        assert.ok(keyboardBounds.y>=84&&keyboardBounds.y+keyboardBounds.height<=444,'Editor stays inside the visible area above the keyboard');
+        assert.ok(footer.y>=84&&footer.y+footer.height<=444,'Save actions stay above the keyboard');
+        assert.equal(await dialog.locator('textarea').evaluate(input=>input===document.activeElement),true,'Typing focus is retained');
+        const fieldBounds=await dialog.locator('textarea').boundingBox(),bodyBounds=await dialog.locator('.ortho-dialog-body').boundingBox();
+        assert.ok(fieldBounds.y>=bodyBounds.y-1&&fieldBounds.y+fieldBounds.height<=bodyBounds.y+bodyBounds.height+1,'The text field remains visible');
+        if(language==='ar')await page.screenshot({path:path.join(screenshots,'ortho-notes-keyboard-mobile-ar.png')});
+        await page.evaluate(()=>{Object.defineProperty(window,'visualViewport',{configurable:true,value:window.originalOrthoViewport});window.dispatchEvent(new Event('resize'));});
+        await page.waitForFunction(()=>document.getElementById('ortho-visit-dialog').style.getPropertyValue('--ortho-viewport-height')==='844px');
+      }
       await dialog.locator('[data-visit-cancel]').click();assert.equal(await page.evaluate(()=>saves),before);
-      await card.locator('.ortho-visit-date').click();await dialog.locator('textarea').fill('Updated notes <script>');await dialog.locator('#ortho-visit-date').fill('2026-10-01T10:30');
+      const originalVisit=await page.evaluate(()=>JSON.parse(JSON.stringify(patient.chartState.finding.orthoVisits.at(-1))));
+      await card.locator('.ortho-visit-notes').focus();await page.keyboard.press('Enter');await dialog.locator('textarea').fill('Updated notes <script>');
+      await page.evaluate(()=>{document.getElementById('ortho-visit-date').value='2030-12-25';document.getElementById('ortho-visit-price').value='9999';document.getElementById('ortho-visit-status').value='P';});
+      await dialog.locator('[data-visit-save]').click();await dialog.waitFor({state:'hidden'});
+      const notesVisit=await page.evaluate(()=>JSON.parse(JSON.stringify(patient.chartState.finding.orthoVisits.at(-1))));
+      assert.deepEqual(notesVisit,{...originalVisit,notes:'Updated notes <script>'},'Notes editor changes only text');
+      assert.equal(await card.locator('.ortho-visit-notes').evaluate(button=>button===document.activeElement),true,'Focus returns to the note frame');
+      await card.locator('.ortho-visit-date').click();assert.equal(await dialog.getAttribute('data-mode'),'date');
+      assert.equal(await dialog.locator('[data-visit-field]:visible').count(),1);assert.ok(!(await dialog.locator('textarea').isVisible()));
+      assert.equal(await dialog.locator('#ortho-visit-date').getAttribute('type'),'date');
+      assert.ok(!(await dialog.locator('#ortho-visit-price').isVisible()));
+      const dateSaves=await page.evaluate(()=>saves);
+      await dialog.locator('#ortho-visit-date').fill('');await dialog.locator('[data-visit-save]').click();
+      assert.ok(await dialog.isVisible());assert.equal(await page.evaluate(()=>saves),dateSaves,'An empty date cannot be saved');
+      await dialog.locator('#ortho-visit-date').fill('2026-10-01');
+      await page.evaluate(()=>{document.getElementById('ortho-visit-notes').value='Do not overwrite notes';});
       await dialog.locator('[data-visit-save]').click();await dialog.waitFor({state:'hidden'});
       assert.match(await card.locator('.ortho-visit-number').textContent(),/#5/,'Editing the clinical date does not reorder creation history');
       assert.equal(await card.locator('.ortho-visit-notes').textContent(),'Updated notes <script>');
-      assert.equal(await page.evaluate(()=>patient.chartState.finding.orthoVisits.at(-1).date),'2026-10-01T07:30:00.000Z');
+      const expectedDate=await page.evaluate(()=>new Date('2026-10-01T00:00:00').toISOString());
+      assert.deepEqual(await page.evaluate(()=>JSON.parse(JSON.stringify(patient.chartState.finding.orthoVisits.at(-1)))),{...notesVisit,date:expectedDate},'Date editor changes only the calendar date');
+      assert.equal(await card.locator('time').textContent(),'01/10/2026');
       await page.locator('[data-ortho-add-visit]').click();await dialog.locator('textarea').fill('Newly recorded visit');await dialog.locator('#ortho-visit-price').fill('275');
       assert.equal(await dialog.locator('#ortho-visit-status').inputValue(),'C');
       const bounds=await dialog.boundingBox();assert.ok(bounds.x>=0&&bounds.y>=0&&bounds.x+bounds.width<=viewport.width+1&&bounds.y+bounds.height<=viewport.height+1);
@@ -94,10 +136,10 @@ test('newest visit preview, three-visit drawer and note/date popup work across d
       });
       assert.equal(await card.locator('select').count(),0,'Inherited doctor is hidden');
       assert.equal(await page.evaluate(()=>patient.chartState.finding.orthoVisits.every(visit=>visit.doctorId===chartDoctors[0].userId)),true);
-      await card.locator('.ortho-note-button').click();assert.ok(!(await dialog.locator('[data-visit-doctor-field]').isVisible()));await page.keyboard.press('Escape');
+      await card.locator('.ortho-visit-notes').click();assert.ok(!(await dialog.locator('[data-visit-doctor-field]').isVisible()));await page.keyboard.press('Escape');
       await page.evaluate(()=>{patient.chartState.finding.doctorId=null;renderFindingsList();});assert.equal(await card.locator('select').count(),1);
       await page.evaluate(()=>{invoicedFindingIds.add(patient.chartState.finding.orthoVisits.at(-1).id);renderFindingsList();});
-      assert.ok(await card.locator('.ortho-visit-price input').isDisabled());await card.locator('.ortho-note-button').click();assert.ok(await dialog.locator('#ortho-visit-price').isDisabled());await page.keyboard.press('Escape');
+      assert.ok(await card.locator('.ortho-visit-price input').isDisabled());await card.locator('.ortho-visit-notes').click();assert.ok(await dialog.locator('#ortho-visit-price').isDisabled());await page.keyboard.press('Escape');
       for(const button of await page.locator('.ortho-visits-section button').all()){const b=await button.boundingBox();assert.ok(b.width>=44&&b.height>=44);}
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'No page overflow');
       if(viewport.width===1440&&language==='en'){await toggle.click();await page.screenshot({path:path.join(screenshots,'ortho-visits-desktop.png')});}
@@ -113,6 +155,6 @@ test('newest visit preview, three-visit drawer and note/date popup work across d
   await page.locator('.ortho-visits-footer [aria-expanded]').click();await page.locator('.ortho-visits-scroll').evaluate(list=>{list.scrollTop=list.scrollHeight;});
   await page.locator('[data-ortho-add-visit]').click();await dialog.locator('[data-visit-save]').click();await dialog.waitFor({state:'hidden'});
   assert.equal(await page.locator('.ortho-visits-scroll').evaluate(list=>list.scrollTop),0,'New visit is immediately visible in an expanded drawer');
-  await card.first().locator('.ortho-note-button').click();await page.evaluate(()=>{patient={id:'another',chartState:patient.chartState};syncOrthoVisitDialogContext();});assert.ok(!(await dialog.isVisible()),'Changing patient closes the editor');
+  await card.first().locator('.ortho-visit-notes').click();await page.evaluate(()=>{patient={id:'another',chartState:patient.chartState};syncOrthoVisitDialogContext();});assert.ok(!(await dialog.isVisible()),'Changing patient closes the editor');
   assert.deepEqual(errors,[]);
 });

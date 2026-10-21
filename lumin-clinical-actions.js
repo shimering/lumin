@@ -2,6 +2,73 @@
 const clinicalActionsPanel = { open: false, selectionKey: '', patientId: null, query: '', specialty: '' };
 let clinicalActionsSheetGesture = null;
 let clinicalActionsSheetExit = null;
+const clinicalActionsSearchViewport = { baselineHeight: window.innerHeight, active: false, frame: null, timers: [], viewport: null };
+
+function updateClinicalActionsSearchViewport() {
+  const root = document.documentElement;
+  const panel = document.getElementById('action-palette-card');
+  const search = document.getElementById('chart-actions-search');
+  const focused = document.activeElement === search;
+  const viewport = window.visualViewport;
+  const bounds = typeof getAppViewportBounds === 'function' ? getAppViewportBounds() : {
+    height: viewport?.height || window.innerHeight, width: viewport?.width || window.innerWidth,
+    offsetTop: viewport?.offsetTop || 0, offsetLeft: viewport?.offsetLeft || 0
+  };
+  const keyboard = Math.max(window.innerHeight, clinicalActionsSearchViewport.baselineHeight) - bounds.height > 120;
+  const active = Boolean(panel && focused && clinicalActionsPanel.open && !clinicalActionsIsMobile() && keyboard
+    && !document.getElementById('view-chart')?.classList.contains('hidden'));
+  clinicalActionsSearchViewport.active = active;
+  root.classList.toggle('chart-actions-tablet-search', active);
+  if (!active) {
+    if (!focused) clinicalActionsSearchViewport.baselineHeight = window.innerHeight;
+    return;
+  }
+  // Reserve the visible area for search and its results. The rail heading moves
+  // above it; the procedure summary and neighboring panels remain below it.
+  const rail = panel.closest('.chart-side-panels').getBoundingClientRect();
+  const zoom = Number.parseFloat(getComputedStyle(root).zoom) || 1;
+  const width = Math.min(rail.width, bounds.width - 16);
+  const left = Math.max(bounds.offsetLeft + 8, Math.min(rail.left, bounds.offsetLeft + bounds.width - width - 8));
+  const heading = panel.querySelector('.chart-actions-header').offsetHeight;
+  panel.style.setProperty('--chart-search-left', `${left / zoom}px`);
+  panel.style.setProperty('--chart-search-top', `${(bounds.offsetTop + 8) / zoom - heading}px`);
+  panel.style.setProperty('--chart-search-width', `${width / zoom}px`);
+  panel.style.setProperty('--chart-search-height', `${Math.max(0, bounds.height - 16) / zoom}px`);
+}
+
+function scheduleClinicalActionsSearchViewport() {
+  if (clinicalActionsSearchViewport.frame !== null) return;
+  clinicalActionsSearchViewport.frame = requestAnimationFrame(() => {
+    clinicalActionsSearchViewport.frame = null;
+    updateClinicalActionsSearchViewport();
+  });
+}
+
+function setupClinicalActionsSearchViewport() {
+  const search = document.getElementById('chart-actions-search');
+  if (!search || search.dataset.viewportReady) return;
+  search.dataset.viewportReady = 'true';
+  const bindViewport = () => {
+    const viewport = window.visualViewport;
+    if (clinicalActionsSearchViewport.viewport === viewport) return;
+    clinicalActionsSearchViewport.viewport?.removeEventListener('resize', scheduleClinicalActionsSearchViewport);
+    clinicalActionsSearchViewport.viewport?.removeEventListener('scroll', scheduleClinicalActionsSearchViewport);
+    clinicalActionsSearchViewport.viewport = viewport;
+    viewport?.addEventListener('resize', scheduleClinicalActionsSearchViewport, { passive: true });
+    viewport?.addEventListener('scroll', scheduleClinicalActionsSearchViewport, { passive: true });
+  };
+  search.addEventListener('focus', () => {
+    clinicalActionsSearchViewport.baselineHeight = Math.max(window.innerHeight, window.visualViewport?.height || 0);
+    bindViewport();
+    updateClinicalActionsSearchViewport();
+  });
+  search.addEventListener('blur', () => {
+    clinicalActionsSearchViewport.timers.forEach(clearTimeout);
+    scheduleClinicalActionsSearchViewport();
+    clinicalActionsSearchViewport.timers = [120, 400].map(delay => setTimeout(scheduleClinicalActionsSearchViewport, delay));
+  });
+  bindViewport();
+}
 
 function cancelClinicalActionsSheetExit() {
   const exit = clinicalActionsSheetExit;
@@ -88,6 +155,7 @@ function updateClinicalActionsRailLayout() {
     toggle.innerHTML = `<i data-lucide="${iconName}" aria-hidden="true"></i>`;
     if (window.lucide) lucide.createIcons();
   }
+  updateClinicalActionsSearchViewport();
 }
 
 function setClinicalActionsPanelOpen(open) {
@@ -341,7 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const panel = document.getElementById('action-palette-card');
   if (!panel) return;
   panel.addEventListener('pointerdown', event => {
-    if (!clinicalActionsIsMobile() || !clinicalActionsPanel.open || event.button !== 0 || !event.isPrimary
+    if ((!clinicalActionsIsMobile() && !clinicalActionsSearchViewport.active) || !clinicalActionsPanel.open || event.button !== 0 || !event.isPrimary
       || document.activeElement !== document.getElementById('chart-actions-search') || !event.target.closest('button')) return;
     // Keep the keyboard from moving the tapped button before its click completes.
     // Procedure selection moves focus after the click, allowing the keyboard to close safely.
@@ -354,6 +422,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (operation) chooseClinicalActionsOperation(operation.dataset.clinicalOperation);
   });
   setupClinicalActionsSheetSwipe();
+  setupClinicalActionsSearchViewport();
   syncClinicalActionsPanel();
 });
 

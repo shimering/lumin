@@ -1,7 +1,18 @@
 /* Orthodontic visits keep their own clinical details, invoice IDs and payroll. */
 let orthoVisitDialogState = null;
+let orthoVisitViewportFrame = null;
+let orthoVisitViewportTimers = [];
 
 function orthoVisitText(en, ar) { return currentUiLanguage === 'ar' ? ar : en; }
+
+function orthoVisitDateValue(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? value : chartOperationDateInputValue(value).slice(0, 10);
+}
+
+function orthoVisitDateLabel(value) {
+  const day = orthoVisitDateValue(value);
+  return window.LuminDates ? LuminDates.format(day) : day.split('-').reverse().join('/');
+}
 
 function renderOrthoVisitDrawer(finding, visits, collapsed) {
   // The clinical date is editable, so it must never determine creation order.
@@ -17,16 +28,14 @@ function renderOrthoVisitDrawer(finding, visits, collapsed) {
         <div class="ortho-visit-name">
           <label class="finding-selection-target"><input type="checkbox" data-ortho-visit-id="${escapeHtml(visit.id)}" class="h-4 w-4 rounded border-slate-300" ${invoiced ? 'checked disabled' : (selectable ? (selected ? 'checked' : '') : 'disabled')} onchange="toggleOrthoVisitSelection(this)" aria-label="${orthoVisitText(invoiced ? 'Invoiced visit' : 'Select visit', invoiced ? 'زيارة مفوترة' : 'تحديد الزيارة')} #${visit.visitNumber}"></label>
           <span class="ortho-visit-number">${orthoVisitText('Visit', 'زيارة')} #${visit.visitNumber}</span>
-          <span class="ortho-visit-notes" title="${escapeHtml(visit.notes || '')}">${escapeHtml(visit.notes || orthoVisitText('Add visit notes', 'أضف ملاحظات الزيارة'))}</span>
-          <button type="button" class="ortho-button ortho-note-button" onclick="openOrthoVisitDialog(this)" aria-haspopup="dialog" aria-label="${orthoVisitText('Edit visit notes', 'تعديل ملاحظات الزيارة')}"><i data-lucide="sticky-note"></i></button>
+          <button type="button" class="ortho-visit-notes${visit.notes ? '' : ' is-empty'}" onclick="openOrthoVisitDialog(this, 'notes')" aria-haspopup="dialog" aria-label="${orthoVisitText('Edit visit notes', 'تعديل ملاحظات الزيارة')} #${visit.visitNumber}" title="${escapeHtml(visit.notes || '')}"><span>${escapeHtml(visit.notes || orthoVisitText('Add visit notes', 'أضف ملاحظات الزيارة'))}</span></button>
         </div>
-        <div class="ortho-visit-invoice finding-invoice-control">${invoiced ? chartFindingInvoiceColumn([visit.id]) : ''}</div>
       </div>
       <div class="ortho-visit-controls">
-        <button type="button" class="ortho-button ortho-visit-date" onclick="openOrthoVisitDialog(this)" aria-haspopup="dialog" aria-label="${orthoVisitText('Edit visit date', 'تعديل تاريخ الزيارة')}"><i data-lucide="calendar"></i><time datetime="${escapeHtml(visit.date || visit.createdAt || '')}">${escapeHtml(formatChartOperationCreatedAt(visit.date || visit.createdAt))}</time></button>
+        <button type="button" class="ortho-button ortho-visit-date" onclick="openOrthoVisitDialog(this, 'date')" aria-haspopup="dialog" aria-label="${orthoVisitText('Edit visit date', 'تعديل تاريخ الزيارة')}"><i data-lucide="calendar"></i><time datetime="${escapeHtml(orthoVisitDateValue(visit.date || visit.createdAt))}">${escapeHtml(orthoVisitDateLabel(visit.date || visit.createdAt))}</time></button>
         ${finding.doctorId ? '' : `<select onchange="updateOrthoVisitDoctor(this)" aria-label="${orthoVisitText('Visit doctor', 'طبيب الزيارة')}">${chartDoctorSelectOptions(visit)}</select>`}
-        <span class="rounded-full px-2 py-1 text-xs ${visit.status === 'C' ? 'bg-emerald-50 text-emerald-700' : visit.status === 'In' ? 'bg-blue-50 text-blue-700' : visit.status === 'P' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}">${escapeHtml(operationStatusDefinition(visit.status).label)}</span>
         <label class="ortho-visit-price"><span>EGP</span><input type="number" min="0" step="0.01" value="${Math.max(0, Number(visit.price) || 0)}" onchange="updateOrthoVisitPrice(this)" ${invoiced ? 'disabled' : ''} aria-label="${orthoVisitText('Visit price', 'سعر الزيارة')}"></label>
+        <div class="ortho-visit-invoice finding-invoice-control">${invoiced ? chartFindingInvoiceColumn([visit.id]) : ''}</div>
       </div>
     </div>`;
   }).join('');
@@ -88,9 +97,9 @@ function ensureOrthoVisitDialog() {
   dialog.innerHTML = `<form class="ortho-dialog-form">
     <header class="ortho-dialog-header"><div><h2 id="ortho-visit-dialog-title"></h2><p data-visit-procedure></p></div><button type="button" class="ortho-button ortho-close" data-visit-close><i data-lucide="x"></i></button></header>
     <div class="ortho-dialog-body">
-      <label for="ortho-visit-notes" data-label="notes"></label><textarea id="ortho-visit-notes" rows="4" maxlength="10000" autofocus></textarea>
-      <label for="ortho-visit-date" data-label="date"></label><input id="ortho-visit-date" type="datetime-local" step="60" required dir="ltr">
-      <div class="ortho-dialog-grid"><div><label for="ortho-visit-price" data-label="price"></label><input id="ortho-visit-price" type="number" min="0" step="0.01" required inputmode="decimal"></div><div><label for="ortho-visit-status" data-label="status"></label><select id="ortho-visit-status"></select></div></div>
+      <div data-visit-field="notes"><label for="ortho-visit-notes" data-label="notes"></label><textarea id="ortho-visit-notes" rows="4" maxlength="10000"></textarea></div>
+      <div data-visit-field="date"><label for="ortho-visit-date" data-label="date"></label><input id="ortho-visit-date" type="date" required dir="ltr"></div>
+      <div class="ortho-dialog-grid" data-visit-field="billing"><div><label for="ortho-visit-price" data-label="price"></label><input id="ortho-visit-price" type="number" min="0" step="0.01" required inputmode="decimal"></div><div><label for="ortho-visit-status" data-label="status"></label><select id="ortho-visit-status"></select></div></div>
       <div data-visit-doctor-field><label for="ortho-visit-doctor" data-label="doctor"></label><select id="ortho-visit-doctor"></select></div>
       <p data-visit-error role="alert" hidden></p>
     </div>
@@ -100,8 +109,73 @@ function ensureOrthoVisitDialog() {
   dialog.querySelector('[data-visit-close]').onclick = () => closeOrthoVisitDialog();
   dialog.querySelector('[data-visit-cancel]').onclick = () => closeOrthoVisitDialog();
   dialog.addEventListener('cancel', event => { event.preventDefault(); closeOrthoVisitDialog(); });
+  dialog.addEventListener('keydown', event => {
+    if (event.key !== 'Tab') return;
+    const controls = [...dialog.querySelectorAll('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled)')]
+      .filter(control => control.tabIndex >= 0 && control.getClientRects().length && !control.closest('[hidden]'));
+    if (!controls.length) { event.preventDefault(); return; }
+    if (event.shiftKey && document.activeElement === controls[0]) { event.preventDefault(); controls.at(-1).focus({ preventScroll: true }); }
+    else if (!event.shiftKey && document.activeElement === controls.at(-1)) { event.preventDefault(); controls[0].focus({ preventScroll: true }); }
+  });
+  dialog.addEventListener('focusin', settleOrthoVisitDialogViewport);
+  dialog.addEventListener('focusout', settleOrthoVisitDialogViewport);
+  window.addEventListener('resize', scheduleOrthoVisitDialogViewport, { passive: true });
+  window.visualViewport?.addEventListener('resize', scheduleOrthoVisitDialogViewport, { passive: true });
+  window.visualViewport?.addEventListener('scroll', scheduleOrthoVisitDialogViewport, { passive: true });
   document.body.appendChild(dialog);
   return dialog;
+}
+
+function updateOrthoVisitDialogViewport() {
+  const dialog = document.getElementById('ortho-visit-dialog');
+  if (!dialog?.open) return;
+  const viewport = window.visualViewport;
+  const bounds = typeof getAppViewportBounds === 'function' ? getAppViewportBounds() : {
+    height: Math.min(window.innerHeight, viewport?.height || window.innerHeight),
+    width: viewport?.width || window.innerWidth,
+    offsetTop: viewport?.offsetTop || 0, offsetLeft: viewport?.offsetLeft || 0
+  };
+  dialog.style.setProperty('--ortho-viewport-height', `${bounds.height}px`);
+  dialog.style.setProperty('--ortho-viewport-width', `${bounds.width}px`);
+  dialog.style.setProperty('--ortho-viewport-top', `${bounds.offsetTop}px`);
+  dialog.style.setProperty('--ortho-viewport-left', `${bounds.offsetLeft}px`);
+  dialog.style.setProperty('--ortho-viewport-right', `${Math.max(0, window.innerWidth - bounds.offsetLeft - bounds.width)}px`);
+  dialog.style.setProperty('--ortho-viewport-bottom', `${Math.max(0, window.innerHeight - bounds.offsetTop - bounds.height)}px`);
+  // Scroll only the dialog body; keep its actions above the keyboard.
+  const body = dialog.querySelector('.ortho-dialog-body');
+  const focused = document.activeElement;
+  if (body.contains(focused)) {
+    const field = focused.getBoundingClientRect(), visible = body.getBoundingClientRect();
+    if (field.top < visible.top + 8) body.scrollTop -= visible.top + 8 - field.top;
+    else if (field.bottom > visible.bottom - 8) body.scrollTop += field.bottom - visible.bottom + 8;
+  }
+}
+
+function scheduleOrthoVisitDialogViewport() {
+  if (!orthoVisitDialogState || orthoVisitViewportFrame !== null) return;
+  orthoVisitViewportFrame = window.requestAnimationFrame(() => {
+    orthoVisitViewportFrame = null;
+    updateOrthoVisitDialogViewport();
+  });
+}
+
+function settleOrthoVisitDialogViewport() {
+  if (!orthoVisitDialogState) return;
+  orthoVisitViewportTimers.forEach(timer => window.clearTimeout(timer));
+  scheduleOrthoVisitDialogViewport();
+  // Mobile viewport metrics can settle after the keyboard focus event.
+  orthoVisitViewportTimers = [120, 400].map(delay => window.setTimeout(scheduleOrthoVisitDialogViewport, delay));
+}
+
+function configureOrthoVisitDialogControls(dialog, state, parent) {
+  dialog.querySelectorAll('[data-visit-field], [data-visit-doctor-field]').forEach(field => {
+    const name = field.dataset.visitField || 'doctor';
+    const visible = state.mode === 'create' ? (name !== 'doctor' || !parent.doctorId) : name === state.mode;
+    field.hidden = !visible;
+    field.querySelectorAll('input, textarea, select, button').forEach(control => { control.disabled = state.saving || !visible; });
+  });
+  dialog.querySelectorAll('.ortho-dialog-header button, .ortho-dialog-footer button').forEach(button => { button.disabled = state.saving; });
+  dialog.querySelector('#ortho-visit-price').disabled = state.saving || state.mode !== 'create' || invoicedFindingIds.has(state.visitId);
 }
 
 function orthoVisitContextMatches(state) {
@@ -113,7 +187,10 @@ function syncOrthoVisitDialogContext() {
   if (orthoVisitDialogState && !orthoVisitContextMatches(orthoVisitDialogState)) closeOrthoVisitDialog({ force: true, restoreFocus: false });
 }
 
-function openOrthoVisitDialog(button, create = false) {
+function openOrthoVisitDialog(button, mode = 'notes') {
+  mode = mode === true ? 'create' : mode;
+  if (!['create', 'notes', 'date'].includes(mode)) return;
+  const create = mode === 'create';
   const patient = getActivePatient();
   const findingId = button.closest('[data-finding-id]')?.dataset.findingId;
   if (!patient || !findingId || orthoVisitDialogState?.saving) return;
@@ -125,34 +202,47 @@ function openOrthoVisitDialog(button, create = false) {
   if (!visit) return;
   const dialog = ensureOrthoVisitDialog();
   orthoVisitDialogState = { patientId: String(patient.id), userId: typeof currentSession === 'undefined' ? undefined : currentSession?.user?.id,
-    findingId, visitId, create, trigger: button, saving: false };
+    findingId, visitId, create, mode, trigger: button, saving: false };
   dialog.dir = currentUiLanguage === 'ar' ? 'rtl' : 'ltr';
-  dialog.querySelector('h2').textContent = create ? orthoVisitText('Add new visit', 'إضافة زيارة جديدة') : orthoVisitText(`Edit visit #${visit.visitNumber}`, `تعديل الزيارة رقم ${visit.visitNumber}`);
-  dialog.querySelector('[data-visit-procedure]').textContent = dentalOperationLabel(finding.code);
-  const labels = { notes: ['Visit notes', 'ملاحظات الزيارة'], date: ['Visit date and time', 'تاريخ ووقت الزيارة'], price: ['Visit fee (EGP)', 'سعر الزيارة (ج.م)'], status: ['Visit status', 'حالة الزيارة'], doctor: ['Visit doctor', 'طبيب الزيارة'] };
+  dialog.dataset.mode = mode;
+  dialog.querySelector('h2').textContent = create ? orthoVisitText('Add new visit', 'إضافة زيارة جديدة')
+    : mode === 'notes' ? orthoVisitText('Edit visit notes', 'تعديل ملاحظات الزيارة') : orthoVisitText('Edit visit date', 'تعديل تاريخ الزيارة');
+  dialog.querySelector('[data-visit-procedure]').textContent = dentalOperationLabel(finding.code) + (create ? '' : orthoVisitText(` · Visit #${visit.visitNumber}`, ` · الزيارة رقم ${visit.visitNumber}`));
+  const labels = { notes: ['Visit notes', 'ملاحظات الزيارة'], date: ['Visit date', 'تاريخ الزيارة'], price: ['Visit fee (EGP)', 'سعر الزيارة (ج.م)'], status: ['Visit status', 'حالة الزيارة'], doctor: ['Visit doctor', 'طبيب الزيارة'] };
   Object.entries(labels).forEach(([key, text]) => { dialog.querySelector(`[data-label="${key}"]`).textContent = orthoVisitText(...text); });
-  dialog.querySelectorAll('button, input, textarea, select').forEach(element => { element.disabled = false; });
   dialog.querySelector('#ortho-visit-notes').value = visit.notes || '';
   dialog.querySelector('#ortho-visit-notes').placeholder = orthoVisitText('Adjustments, archwires, treatment progress…', 'التعديلات والأسلاك وتقدم العلاج…');
-  dialog.querySelector('#ortho-visit-date').value = chartOperationDateInputValue(visit.date || visit.createdAt);
+  dialog.querySelector('#ortho-visit-date').value = orthoVisitDateValue(visit.date || visit.createdAt);
   dialog.querySelector('#ortho-visit-price').value = visit.price || 0;
-  dialog.querySelector('#ortho-visit-price').disabled = invoicedFindingIds.has(visitId);
   dialog.querySelector('#ortho-visit-status').innerHTML = operationStatusSelectOptions(visit.status);
-  dialog.querySelector('[data-visit-doctor-field]').hidden = Boolean(finding.doctorId);
   dialog.querySelector('#ortho-visit-doctor').innerHTML = chartDoctorSelectOptions(visit);
   dialog.querySelector('[data-visit-error]').hidden = true;
   dialog.querySelector('[data-visit-close]').setAttribute('aria-label', orthoVisitText('Close', 'إغلاق'));
   dialog.querySelector('[data-visit-cancel]').textContent = orthoVisitText('Cancel', 'إلغاء');
-  dialog.querySelector('[data-visit-save] span').textContent = orthoVisitText('Save visit', 'حفظ الزيارة');
+  dialog.querySelector('[data-visit-save] span').textContent = orthoVisitSaveLabel(mode);
+  window.LuminDates?.enhanceInputs(dialog);
+  configureOrthoVisitDialogControls(dialog, orthoVisitDialogState, finding);
   if (window.lucide) lucide.createIcons();
   if (!dialog.open) dialog.showModal();
-  dialog.querySelector('#ortho-visit-notes').focus();
+  updateOrthoVisitDialogViewport();
+  const focus = mode === 'date' ? (dialog.querySelector('[data-visit-field="date"] .lumin-date-text') || dialog.querySelector('#ortho-visit-date')) : dialog.querySelector('#ortho-visit-notes');
+  focus.focus({ preventScroll: true });
+  settleOrthoVisitDialogViewport();
+}
+
+function orthoVisitSaveLabel(mode) {
+  return mode === 'notes' ? orthoVisitText('Save notes', 'حفظ الملاحظات')
+    : mode === 'date' ? orthoVisitText('Save date', 'حفظ التاريخ') : orthoVisitText('Save visit', 'حفظ الزيارة');
 }
 
 function closeOrthoVisitDialog({ force = false, restoreFocus = true } = {}) {
   const state = orthoVisitDialogState;
   if (state?.saving && !force) return;
   orthoVisitDialogState = null;
+  orthoVisitViewportTimers.forEach(timer => window.clearTimeout(timer));
+  orthoVisitViewportTimers = [];
+  if (orthoVisitViewportFrame !== null) window.cancelAnimationFrame(orthoVisitViewportFrame);
+  orthoVisitViewportFrame = null;
   document.getElementById('ortho-visit-dialog')?.close();
   if (restoreFocus && state?.trigger?.isConnected) state.trigger.focus({ preventScroll: true });
 }
@@ -167,40 +257,49 @@ async function saveOrthoVisitDialog() {
   const parent = orthoVisitFinding(patient, state.findingId);
   const existing = (parent?.orthoVisits || []).find(visit => visit.id === state.visitId);
   if (!parent || (!state.create && !existing)) { closeOrthoVisitDialog(); return; }
-  const date = new Date(dialog.querySelector('#ortho-visit-date').value);
-  const price = Number(dialog.querySelector('#ortho-visit-price').value);
-  if (!Number.isFinite(date.getTime()) || !Number.isFinite(price) || price < 0) return;
-  const doctorId = parent.doctorId || dialog.querySelector('#ortho-visit-doctor').value;
-  const doctor = doctorId ? chartDoctors.find(item => item.userId === doctorId) : null;
   const error = dialog.querySelector('[data-visit-error]');
-  if (doctorId && !doctor && doctorId !== parent.doctorId) {
-    error.textContent = orthoVisitText('Choose an active doctor.', 'اختر طبيباً نشطاً.'); error.hidden = false; return;
+  let change = {};
+  if (state.mode !== 'date') change.notes = dialog.querySelector('#ortho-visit-notes').value.trim();
+  if (state.mode !== 'notes') {
+    const day = dialog.querySelector('#ortho-visit-date').value;
+    const date = new Date(`${day}T00:00:00`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !Number.isFinite(date.getTime())) return;
+    change.date = date.toISOString();
+  }
+  if (state.create) {
+    const price = Number(dialog.querySelector('#ortho-visit-price').value);
+    if (!Number.isFinite(price) || price < 0) return;
+    const doctorId = parent.doctorId || dialog.querySelector('#ortho-visit-doctor').value;
+    const doctor = doctorId ? chartDoctors.find(item => item.userId === doctorId) : null;
+    if (doctorId && !doctor && doctorId !== parent.doctorId) {
+      error.textContent = orthoVisitText('Choose an active doctor.', 'اختر طبيباً نشطاً.'); error.hidden = false; return;
+    }
+    change = normaliseOrthoVisit({ ...existing, ...change, id: state.visitId,
+      visitNumber: existing?.visitNumber || Math.max(0, ...(parent.orthoVisits || []).map(item => Number(item.visitNumber) || 0)) + 1,
+      createdAt: existing?.createdAt || new Date().toISOString(),
+      status: dialog.querySelector('#ortho-visit-status').value,
+      price: invoicedFindingIds.has(state.visitId) ? existing?.price : Math.round(price * 100) / 100,
+      doctorId: doctorId || null, doctorName: parent.doctorId ? parent.doctorName : doctor?.fullName || '' });
   }
   const previousChartState = clonePatientChart(patient.chartState);
-  const status = dialog.querySelector('#ortho-visit-status').value;
-  const visit = normaliseOrthoVisit({ ...existing, id: state.visitId,
-    visitNumber: existing?.visitNumber || Math.max(0, ...(parent.orthoVisits || []).map(item => Number(item.visitNumber) || 0)) + 1,
-    createdAt: existing?.createdAt || new Date().toISOString(), date: date.toISOString(),
-    notes: dialog.querySelector('#ortho-visit-notes').value.trim(), status,
-    price: invoicedFindingIds.has(state.visitId) ? existing?.price : Math.round(price * 100) / 100,
-    doctorId: doctorId || null, doctorName: parent.doctorId ? parent.doctorName : doctor?.fullName || '' });
   if (!updateChartFindingById(patient, state.findingId, finding => ({ ...finding, isOrthoPackage: true,
-    orthoVisits: state.create && !existing ? [...(finding.orthoVisits || []), visit] : (finding.orthoVisits || []).map(item => item.id === state.visitId ? visit : item) }))) return;
+    orthoVisits: state.create && !existing ? [...(finding.orthoVisits || []), change] : (finding.orthoVisits || []).map(item => item.id === state.visitId ? { ...item, ...change } : item) }))) return;
   state.saving = true;
   error.hidden = true;
-  dialog.querySelectorAll('button, input, textarea, select').forEach(element => { element.disabled = true; });
+  configureOrthoVisitDialogControls(dialog, state, parent);
   dialog.querySelector('[data-visit-save] span').textContent = orthoVisitText('Saving…', 'جارٍ الحفظ…');
   let saved = false;
   try {
-    saved = await saveActivePatientChart(patient, { previousChartState, afterSave: async () => {
+    saved = await saveActivePatientChart(patient, { previousChartState, ...(state.create ? { afterSave: async () => {
       const { error: syncError } = await db.rpc('sync_chart_finding_doctor', { p_patient_id: patient.id, p_finding_ids: [state.visitId] });
       if (syncError) throw syncError;
-    } });
+    } } : {}) });
   } catch (saveError) {
     console.error('Could not save orthodontic visit:', saveError);
     updateChartFindingById(patient, state.findingId, finding => ({ ...finding,
-      orthoVisits: state.create ? (finding.orthoVisits || []).filter(item => item.id !== state.visitId)
-        : (finding.orthoVisits || []).map(item => item.id === state.visitId ? existing : item) }));
+      orthoVisits: state.create && !existing ? (finding.orthoVisits || []).filter(item => item.id !== state.visitId)
+        : (finding.orthoVisits || []).map(item => item.id === state.visitId
+          ? { ...item, ...Object.fromEntries(Object.keys(change).map(key => [key, existing?.[key]])) } : item) }));
   }
   if (saved) {
     hrDirectoryLoaded = false; financeInvoicesLoaded = false; dashboardInvoiceCache.clear();
@@ -217,12 +316,14 @@ async function saveOrthoVisitDialog() {
   if (orthoVisitDialogState !== state) return;
   state.saving = false;
   if (saved) {
-    state.trigger = [...document.querySelectorAll('[data-finding-id]')].find(row => row.dataset.findingId === state.findingId)?.querySelector('[data-ortho-add-visit]') || state.trigger;
+    const row = [...document.querySelectorAll('[data-finding-id]')].find(row => row.dataset.findingId === state.findingId);
+    const visitRow = [...(row?.querySelectorAll('.ortho-visit-card') || [])].find(visit => visit.dataset.orthoVisitId === state.visitId);
+    state.trigger = (state.create ? row?.querySelector('[data-ortho-add-visit]')
+      : visitRow?.querySelector(state.mode === 'notes' ? '.ortho-visit-notes' : '.ortho-visit-date')) || state.trigger;
     closeOrthoVisitDialog();
   } else {
-    dialog.querySelectorAll('button, input, textarea, select').forEach(element => { element.disabled = false; });
-    dialog.querySelector('#ortho-visit-price').disabled = invoicedFindingIds.has(state.visitId);
-    dialog.querySelector('[data-visit-save] span').textContent = orthoVisitText('Save visit', 'حفظ الزيارة');
+    configureOrthoVisitDialogControls(dialog, state, parent);
+    dialog.querySelector('[data-visit-save] span').textContent = orthoVisitSaveLabel(state.mode);
     error.textContent = orthoVisitText('The visit could not be saved. Please try again.', 'تعذّر حفظ الزيارة. يرجى المحاولة مرة أخرى.');
     error.hidden = false;
   }
