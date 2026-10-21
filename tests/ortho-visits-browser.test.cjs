@@ -7,7 +7,7 @@ test('prominent visit notes, separate editors and keyboard-aware popups work acr
   const head=html.slice(0,html.indexOf('</head>')+7).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'');
   const server=http.createServer((req,res)=>{
     const url=new URL(req.url,'http://localhost');
-    if(url.pathname==='/'){res.setHeader('Content-Type','text/html');res.end(head+'<body class="lumin-raised"><main style="max-width:1000px;margin:auto;padding:16px"><div id="findings-container"></div></main></body></html>');return;}
+    if(url.pathname==='/'){res.setHeader('Content-Type','text/html');res.end(head+'<body class="lumin-raised"><main style="max-width:1400px;margin:auto;padding:16px"><div id="findings-container" class="clinical-findings-list"></div></main></body></html>');return;}
     const file=path.resolve(root,'.'+decodeURIComponent(url.pathname));
     if(!file.startsWith(root+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile()){res.statusCode=404;res.end();return;}
     res.setHeader('Content-Type',file.endsWith('.css')?'text/css':'application/javascript');res.end(fs.readFileSync(file));
@@ -62,6 +62,16 @@ test('prominent visit notes, separate editors and keyboard-aware popups work acr
     for(const language of ['en','ar']){
       await page.evaluate(language=>{currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';reset();},language);
       assert.equal(await card.count(),1);assert.match(await card.locator('.ortho-visit-number').textContent(),/#5/);
+      if(viewport.width<900){
+        const horizontal=await page.locator('#findings-container').evaluate(list=>{
+          const row=list.querySelector('.ortho-visit-card'),controls=row.querySelector('.ortho-visit-controls');
+          return {scroll:list.scrollWidth,width:list.clientWidth,rowHeight:row.getBoundingClientRect().height,wrap:getComputedStyle(controls).flexWrap};
+        });
+        assert.ok(horizontal.scroll>horizontal.width,'Landscape visit layout scrolls horizontally inside findings');
+        assert.equal(horizontal.rowHeight,144,'Mobile visits retain landscape height');assert.equal(horizontal.wrap,'nowrap');
+        assert.ok(await page.locator('#findings-container').evaluate(list=>{list.scrollLeft=(document.documentElement.dir==='rtl'?-1:1)*list.scrollWidth;return Math.abs(list.scrollLeft)>0;}),'The whole row is reachable by horizontal scrolling in both directions');
+        await page.locator('#findings-container').evaluate(list=>{list.scrollLeft=0;});
+      }
       const toggle=page.locator('.ortho-visits-footer [aria-expanded]');assert.equal(await toggle.getAttribute('aria-expanded'),'false');assert.match(await toggle.textContent(),/5/);
       await toggle.click();assert.equal(await card.count(),5);assert.match(await card.first().locator('.ortho-visit-number').textContent(),/#5/);
       const size=await page.locator('.ortho-visits-scroll').evaluate(list=>({height:list.clientHeight,scroll:list.scrollHeight,row:list.firstElementChild.getBoundingClientRect().height,padding:4}));

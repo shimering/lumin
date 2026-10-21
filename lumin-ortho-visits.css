@@ -31,11 +31,7 @@
 .ortho-empty > i, .ortho-empty > svg { padding: 12px; width: 48px; height: 48px; border-radius: 50%; background: #eff6ff; color: #2563eb; }
 .ortho-empty strong { color: #334155; }
 .ortho-package-remaining { align-self: stretch; text-align: end; margin-top: 4px; font-size: 11px; }
-#findings-container .finding-row.has-ortho-visits { min-width: 0 !important; width: 100% !important; max-width: 100% !important; overflow: hidden !important; }
-#findings-container .finding-row.has-ortho-visits .finding-row-main { min-width: 0 !important; flex-wrap: wrap !important; }
-#findings-container .finding-row.has-ortho-visits .finding-row-summary { min-width: 0 !important; flex: 1 1 200px !important; max-width: 100% !important; }
-#findings-container .finding-row.has-ortho-visits .finding-operation-details { flex: 1 1 auto !important; }
-#findings-container .finding-row.has-ortho-visits .finding-operation-title { overflow: hidden !important; text-overflow: ellipsis !important; }
+/* Keep the shared landscape finding grid; the findings list owns horizontal scrolling. */
 #findings-container .finding-row.has-ortho-visits .finding-pricing-group { align-items: stretch !important; }
 #ortho-visit-dialog { position: fixed; inset: var(--ortho-viewport-top, 0px) var(--ortho-viewport-right, 0px) var(--ortho-viewport-bottom, 0px) var(--ortho-viewport-left, 0px); margin: auto; width: min(520px, calc(var(--ortho-viewport-width, 100vw) - 32px)); max-width: none; max-height: calc(var(--ortho-viewport-height, 100dvh) - 32px); padding: 0; border: 1px solid #e2e8f0; border-radius: 20px; color: #334155; background: var(--lumin-face, #fff); box-shadow: 0 24px 72px #0f172a33; overflow: hidden; }
 #ortho-visit-dialog:not([open]) { display: none; }
@@ -59,15 +55,7 @@
 .ortho-dialog-footer { display: flex; flex-shrink: 0; justify-content: flex-end; gap: 12px; padding: 16px 24px; padding-bottom: max(16px, env(safe-area-inset-bottom)); background: #f8fafc; border-top: 1px solid #f1f5f9; }
 [data-visit-error] { margin-top: 16px; color: #be123c; font-size: 13px; }
 @media (max-width: 767px) {
-  .ortho-visits-section { --ortho-row-height: 200px; }
-  .ortho-visit-topline { align-items: flex-start; }
-  .ortho-visit-controls { flex-wrap: wrap; justify-content: flex-start; }
   #ortho-visit-dialog { inset: auto var(--ortho-viewport-right, 0px) var(--ortho-viewport-bottom, 0px) var(--ortho-viewport-left, 0px); margin: 0; width: var(--ortho-viewport-width, 100%); max-height: calc(var(--ortho-viewport-height, 100dvh) - max(8px, env(safe-area-inset-top))); border-radius: 20px 20px 0 0; }
   .ortho-dialog-header { padding: 16px 20px; }
   .ortho-dialog-body { padding-inline: 20px; }
-}
-@media (max-width: 899px) {
-  #findings-container .finding-row.has-ortho-visits .finding-row-main { display: flex !important; flex-direction: column !important; align-items: stretch !important; }
-  #findings-container .finding-row.has-ortho-visits .finding-row-summary { width: 100% !important; flex: 0 0 auto !important; }
-  #findings-container .finding-row.has-ortho-visits .finding-row-actions { display: flex !important; flex-wrap: wrap !important; width: 100% !important; min-width: 0 !important; max-width: 100% !important; margin-inline-start: 0 !important; gap: 8px !important; }
 }

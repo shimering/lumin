@@ -311,5 +311,23 @@ test('invoice column stays beside the tick and below the badge without overlappi
       if(viewport.width===834&&language==='ar')await page.screenshot({path:path.join(screenshots,'finding-invoice-column-tablet-ar.png')});
     }
   }
+  for(const viewport of [{width:390,height:844},{width:844,height:390}])for(const language of ['en','ar']) {
+    await page.setViewportSize(viewport);
+    await page.evaluate(language=>{currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';renderFindingsList();document.getElementById('findings-container').scrollLeft=0;},language);
+    const ortho=page.locator('[data-refresh-key="ortho"]');
+    const layout=await ortho.evaluate(row=>{
+      const main=row.querySelector('.finding-row-main'),summary=row.querySelector('.finding-row-summary'),actions=row.querySelector('.finding-row-actions'),list=row.closest('#findings-container');
+      const a=summary.getBoundingClientRect(),b=actions.getBoundingClientRect();
+      return {main:getComputedStyle(main).display,actions:getComputedStyle(actions).display,height:main.getBoundingClientRect().height,aligned:Math.abs(a.y+a.height/2-b.y-b.height/2)<2,scroll:list.scrollWidth>list.clientWidth};
+    });
+    assert.equal(layout.main,'grid');assert.equal(layout.actions,'grid');assert.ok(layout.aligned,'Procedure summary and actions stay beside one another');
+    assert.ok(layout.height<144&&layout.scroll,'Portrait keeps the compact landscape procedure row inside horizontal scrolling');
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    if(viewport.width===390&&language==='en') {
+      await ortho.evaluate(row=>row.scrollIntoView({block:'center',inline:'start'}));
+      await page.locator('#findings-container').evaluate(list=>{list.scrollLeft=0;});
+      await page.screenshot({path:path.join(screenshots,'ortho-mobile-landscape-row.png')});
+    }
+  }
   assert.deepEqual(errors,[]);
 });
