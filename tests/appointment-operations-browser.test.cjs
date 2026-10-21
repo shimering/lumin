@@ -408,7 +408,25 @@ test('optional appointment operations save, edit and open the chart across deskt
       await page.waitForTimeout(200);
       await drag(x,y,0,140);
       assert.equal(await popup.evaluate(node=>node.classList.contains('is-sheet-dragging')),true,'the sheet follows the finger');
-      await end();await popup.waitFor({state:'hidden'});
+      const releasedY=(await popup.boundingBox()).y;
+      await end();
+      const frames=await page.evaluate(()=>{
+        const exit=appointmentDetailSheetExit,panel=exit?.panel;
+        if(!exit)return null;
+        exit.animation.pause();exit.animation.currentTime=0;
+        const start=panel.getBoundingClientRect().top;
+        exit.animation.currentTime=130;
+        const middle=panel.getBoundingClientRect().top;
+        const blocked=document.body.style.overflow==='hidden'&&!document.getElementById('appointment-card-popover-layer').classList.contains('hidden');
+        exit.animation.currentTime=260;
+        const frames={start,middle,end:panel.getBoundingClientRect().top,blocked};
+        exit.animation.finish();return frames;
+      });
+      assert.ok(frames,'release starts an exit animation');
+      assert.ok(Math.abs(frames.start-releasedY)<2,'exit continues from the released position: '+JSON.stringify({releasedY,frames}));
+      assert.ok(frames.middle>frames.start&&frames.end>=844,'the panel moves down and fully leaves the viewport: '+JSON.stringify(frames));
+      assert.equal(frames.blocked,true,'the backdrop and scroll lock remain through the exit');
+      await popup.waitFor({state:'hidden'});
       assert.deepEqual(await page.evaluate(()=>[fixture.backgroundClicks,fixture.backgroundPresses]),[0,0],'dismissing never presses the action behind the backdrop');
       await page.evaluate(()=>openAppointmentCardPopover('a2'));
       await popup.evaluate(node=>Promise.all(node.getAnimations().map(animation=>animation.finished)));
@@ -416,6 +434,25 @@ test('optional appointment operations save, edit and open the chart across deskt
       assert.equal(await popup.locator('[data-open-appointment-patient-chart]').evaluate(node=>node===document.activeElement),true,'keyboard focus stays inside the panel: '+await page.evaluate(()=>document.activeElement.outerHTML));
       await page.keyboard.press('Escape');await popup.waitFor({state:'hidden'});
     }
+    await page.emulateMedia({reducedMotion:'reduce'});
+    await page.evaluate(()=>openAppointmentCardPopover('a2'));
+    const handle=await popup.locator('.appointment-sheet-handle').boundingBox();
+    await drag(handle.x+handle.width/2,handle.y+12,0,140);await end();
+    assert.equal(await popup.isVisible(),false,'reduced motion closes without an exit animation');
+    assert.equal(await page.evaluate(()=>appointmentDetailSheetExit),null);
+    await page.emulateMedia({reducedMotion:'no-preference'});
+    await page.evaluate(()=>openAppointmentCardPopover('a2'));
+    await popup.evaluate(node=>Promise.all(node.getAnimations().map(animation=>animation.finished)));
+    const reopenedHandle=await popup.locator('.appointment-sheet-handle').boundingBox();
+    await drag(reopenedHandle.x+reopenedHandle.width/2,reopenedHandle.y+12,0,140);await end();
+    assert.equal(await page.evaluate(()=>{
+      const animation=appointmentDetailSheetExit.animation;
+      closeAppointmentCardPopover();openAppointmentCardPopover('a2');
+      return animation.playState;
+    }),'idle','explicit closure cancels a pending exit before reopening');
+    await popup.evaluate(node=>Promise.all(node.getAnimations().map(animation=>animation.finished)));
+    assert.equal(await popup.isVisible(),true,'an old animation cannot close the reopened panel');
+    await page.evaluate(()=>closeAppointmentCardPopover());
     await touch.detach();
     await page.evaluate(()=>{document.getElementById('fixture-background-action').remove();document.body.style.overflow='';});
   });

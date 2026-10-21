@@ -3,6 +3,37 @@ let appointmentDetailEditorState = null;
 const appointmentDetailWrites = new Set();
 let appointmentDetailSheetGesture = null;
 let appointmentDetailSheetBodyOverflow = null;
+let appointmentDetailSheetExit = null;
+
+function cancelAppointmentDetailSheetExit() {
+  const exit = appointmentDetailSheetExit;
+  if (!exit) return;
+  appointmentDetailSheetExit = null;
+  exit.animation.cancel();
+  exit.panel.inert = exit.inert;
+}
+
+function dismissAppointmentDetailSheet() {
+  const panel = document.getElementById('appointment-card-popover');
+  if (appointmentDetailSheetExit) return;
+  if (!panel?.animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { closeAppointmentCardPopover(); return; }
+  // Retain the released position and the backdrop until the sheet is off-screen.
+  const animation = panel.animate([
+    { translate: getComputedStyle(panel).translate },
+    { translate: `0 ${panel.offsetHeight + 24}px` }
+  ], { duration: 260, easing: 'cubic-bezier(.22, 1, .36, 1)', fill: 'forwards' });
+  const exit = { animation, panel, inert: panel.inert };
+  appointmentDetailSheetExit = exit;
+  appointmentDetailSheetGesture = null;
+  panel.inert = true;
+  animation.finished.then(() => {
+    if (appointmentDetailSheetExit !== exit) return;
+    appointmentDetailSheetExit = null;
+    panel.inert = exit.inert;
+    closeAppointmentCardPopover();
+    animation.cancel();
+  }).catch(() => {});
+}
 
 function clearAppointmentDetailSheetGesture() {
   appointmentDetailSheetGesture = null;
@@ -16,6 +47,7 @@ function setAppointmentDetailSheetOpen(open) {
     if (appointmentDetailSheetBodyOverflow === null) appointmentDetailSheetBodyOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
   } else {
+    cancelAppointmentDetailSheetExit();
     clearAppointmentDetailSheetGesture();
     if (appointmentDetailSheetBodyOverflow !== null) document.body.style.overflow = appointmentDetailSheetBodyOverflow;
     appointmentDetailSheetBodyOverflow = null;
@@ -45,10 +77,11 @@ function setupAppointmentDetailSheet() {
     if (event.target !== layer) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    if (!backdropTap?.moved) closeAppointmentCardPopover();
+    if (!backdropTap?.moved && !appointmentDetailSheetExit) closeAppointmentCardPopover();
     backdropTap = null;
   });
   panel.addEventListener('touchstart', event => {
+    if (appointmentDetailSheetExit) return;
     clearAppointmentDetailSheetGesture();
     if (event.touches.length !== 1 || !window.matchMedia('(max-width: 767px)').matches || !appointmentCardPopoverId
       || event.target.closest('button, a, input, textarea, select, label, [contenteditable]')) return;
@@ -86,12 +119,19 @@ function setupAppointmentDetailSheet() {
     if (gesture.dragging) {
       if (event.cancelable) event.preventDefault();
       event.stopPropagation();
-      if (event.type !== 'touchcancel' && gesture.distance >= Math.min(100, panel.getBoundingClientRect().height * .2)) closeAppointmentCardPopover();
+      if (event.type !== 'touchcancel' && gesture.distance >= Math.min(100, panel.getBoundingClientRect().height * .2)) {
+        dismissAppointmentDetailSheet();
+        return;
+      }
     }
     clearAppointmentDetailSheetGesture();
   };
   panel.addEventListener('touchend', finish, { passive: false });
   panel.addEventListener('touchcancel', finish, { passive: false });
+  window.addEventListener('resize', () => {
+    cancelAppointmentDetailSheetExit();
+    clearAppointmentDetailSheetGesture();
+  }, { passive: true });
   panel.addEventListener('keydown', event => {
     if (event.key !== 'Tab') return;
     const controls = [...panel.querySelectorAll('button, a[href], input, select, textarea, [tabindex="0"]')]

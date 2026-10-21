@@ -1,6 +1,43 @@
 // A selection-aware action rail. Catalog and chart writes use the existing chart workflow.
 const clinicalActionsPanel = { open: false, selectionKey: '', patientId: null, query: '', specialty: '' };
 let clinicalActionsSheetGesture = null;
+let clinicalActionsSheetExit = null;
+
+function cancelClinicalActionsSheetExit() {
+  const exit = clinicalActionsSheetExit;
+  if (!exit) return;
+  clinicalActionsSheetExit = null;
+  exit.animation.cancel();
+  exit.panel.inert = exit.inert;
+  clearClinicalActionsSheetGesture();
+}
+
+function dismissClinicalActionsSheet() {
+  const panel = document.getElementById('action-palette-card');
+  if (clinicalActionsSheetExit) return;
+  if (!panel?.animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    clearClinicalActionsSheetGesture();
+    setClinicalActionsPanelOpen(false);
+    focusClinicalActionsTrigger();
+    return;
+  }
+  const animation = panel.animate([
+    { transform: getComputedStyle(panel).transform },
+    { transform: `translateY(${panel.offsetHeight + 24}px)` }
+  ], { duration: 260, easing: 'cubic-bezier(.22, 1, .36, 1)', fill: 'forwards' });
+  const exit = { animation, panel, inert: panel.inert };
+  clinicalActionsSheetExit = exit;
+  clinicalActionsSheetGesture = null;
+  panel.inert = true;
+  animation.finished.then(() => {
+    if (clinicalActionsSheetExit !== exit) return;
+    clinicalActionsSheetExit = null;
+    panel.inert = exit.inert;
+    setClinicalActionsPanelOpen(false);
+    focusClinicalActionsTrigger();
+    animation.cancel();
+  }).catch(() => {});
+}
 
 function clinicalActionsIsMobile() {
   return window.matchMedia('(max-width: 767px)').matches || Boolean(window.LuminMobileNav?.isPhone());
@@ -34,7 +71,8 @@ function updateClinicalActionsRailLayout() {
   workspace.classList.toggle('is-chart-rail-collapsed', !clinicalActionsPanel.open && !mediaOpen && !appointmentsOpen);
   panel.classList.toggle('is-collapsed', !clinicalActionsPanel.open);
   if (!clinicalActionsPanel.open && typeof closeClinicalSpecialtyPicker === 'function') closeClinicalSpecialtyPicker();
-  panel.inert = mobile && !clinicalActionsPanel.open;
+  if (!mobile || !clinicalActionsPanel.open) cancelClinicalActionsSheetExit();
+  panel.inert = Boolean(clinicalActionsSheetExit) || (mobile && !clinicalActionsPanel.open);
   if (mobile && clinicalActionsPanel.open) panel.setAttribute('role', 'dialog');
   else panel.removeAttribute('role');
   if (!mobile || !clinicalActionsPanel.open) clearClinicalActionsSheetGesture();
@@ -53,6 +91,7 @@ function updateClinicalActionsRailLayout() {
 }
 
 function setClinicalActionsPanelOpen(open) {
+  cancelClinicalActionsSheetExit();
   clinicalActionsPanel.open = Boolean(open);
   if (open) {
     if (typeof chartPatientMedia !== 'undefined' && !chartPatientMedia.collapsed) {
@@ -94,6 +133,7 @@ function setupClinicalActionsSheetSwipe() {
   if (!panel || panel.dataset.swipeReady) return;
   panel.dataset.swipeReady = 'true';
   panel.addEventListener('touchstart', event => {
+    if (clinicalActionsSheetExit) return;
     clearClinicalActionsSheetGesture();
     if (event.touches.length !== 1 || !clinicalActionsIsMobile() || !clinicalActionsPanel.open
       || event.target.closest('button, a, input, textarea, select, [contenteditable]')) return;
@@ -129,8 +169,8 @@ function setupClinicalActionsSheetSwipe() {
       && (gesture.distance >= Math.min(120, panel.getBoundingClientRect().height * .22)
         || (gesture.distance >= 40 && gesture.distance / Math.max(1, event.timeStamp - gesture.time) > .55));
     if (gesture.dragging && event.cancelable) event.preventDefault();
-    clearClinicalActionsSheetGesture();
-    if (close) { setClinicalActionsPanelOpen(false); focusClinicalActionsTrigger(); }
+    if (close) dismissClinicalActionsSheet();
+    else clearClinicalActionsSheetGesture();
   };
   panel.addEventListener('touchend', finish, { passive: false });
   panel.addEventListener('touchcancel', finish, { passive: false });
@@ -318,6 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 window.addEventListener('resize', () => {
+  cancelClinicalActionsSheetExit();
   clearClinicalActionsSheetGesture();
   updateClinicalActionsRailLayout();
 }, { passive: true });

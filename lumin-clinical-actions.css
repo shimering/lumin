@@ -144,7 +144,7 @@ html.chart-actions-mobile .chart-actions-preview .chart-actions-scope { display:
 html.chart-actions-mobile .chart-actions-procedure-badge { padding-inline: 6px; gap: 6px; }
 html.chart-actions-mobile .chart-actions-procedure-badge strong { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 11px; }
 html.chart-actions-mobile #chart-actions-operations { overflow: visible; flex: none; min-height: 0; }
-html.chart-actions-mobile .chart-actions-panel.is-sheet-dragging { transition: none; will-change: transform; user-select: none; }
+html.chart-actions-mobile #chart-clinical-workspace.has-clinical-actions-panel .chart-actions-panel.is-sheet-dragging { transition: none; will-change: transform; user-select: none; }
 @media (max-height: 500px) {
   html.chart-actions-mobile .chart-actions-footer-row label > span { display: none; }
   html.chart-actions-mobile #chart-clinical-workspace.has-clinical-actions-panel .chart-actions-panel { height: min(calc(var(--lumin-app-viewport-height, 100dvh) * .9), 280px); max-height: min(calc(var(--lumin-app-viewport-height, 100dvh) * .9), 280px); }

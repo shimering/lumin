@@ -46,7 +46,7 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
     'renderChartProcedureMenu', 'renderClinicalActionSelectors', 'setClinicalOperationStatus', 'renderClinicalOperationStatusSelector',
     'renderChartOperationOptions', 'updateClinicalOperationPreview', 'normaliseSpecialtyIconName', 'normaliseSpecialtyAccentColor',
     'specialtyIconMarkup', 'isPrimaryToothId', 'palmerPositionForSlot', 'palmerQuadrantForSlot', 'palmerToothNotation', 'palmerQuadrantLabel', 'palmerNotationSVG', 'applySelectedDentalOperation', 'applySurfaceCondition',
-    'applyToothStatus', 'applyMouthOperation', 'bindGlobalClickEvents', 'updateAppViewportDimensions'].map(source).join('\n');
+    'applyToothStatus', 'applyMouthOperation', 'bindGlobalClickEvents', 'getAppViewportBounds', 'updateAppViewportDimensions'].map(source).join('\n');
   await page.addScriptTag({ content: `
     ${iconRegistry}
     let currentUiLanguage='en', activePatientId='patient-1', activeClinicalOperationStatus='P';
@@ -392,6 +392,56 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
     assert.ok(Math.abs((await page.locator('#action-palette-card').boundingBox()).height-422)<2,'The sheet stays at half the visible viewport with app scaling');
     await page.keyboard.press('Escape');
     assert.equal(await page.locator('#action-palette-card').isVisible(),false);
+    await page.evaluate(()=>{document.documentElement.style.removeProperty('zoom');updateAppViewportDimensions();});
+  });
+  await t.test('swipe release continues downward until the clinical sheet leaves the viewport', async st => {
+    const touch=await page.context().newCDPSession(page);
+    st.after(()=>touch.detach());
+    await page.emulateMedia({reducedMotion:'no-preference'});
+    st.after(()=>page.emulateMedia({reducedMotion:'reduce'}));
+    const panel=page.locator('#action-palette-card');
+    const dismiss=async()=>{
+      const handle=await page.locator('.chart-actions-sheet-handle').boundingBox();
+      const x=handle.x+handle.width/2,y=handle.y+10;
+      await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+      for(let step=1;step<=5;step++)await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:y+140*step/5}]});
+      const releasedY=(await panel.boundingBox()).y;
+      await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+      return releasedY;
+    };
+    for(const [width,language,scale] of [[390,'en',1],[320,'ar',.85]]) {
+      await page.setViewportSize({width,height:844});
+      await page.evaluate(({language,scale})=>{
+        currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';
+        document.documentElement.style.zoom=String(scale);updateAppViewportDimensions();setClinicalActionsPanelOpen(true);
+      },{language,scale});
+      const releasedY=await dismiss();
+      const frames=await page.evaluate(()=>{
+        const exit=clinicalActionsSheetExit;
+        if(!exit)return null;
+        exit.animation.pause();exit.animation.currentTime=0;
+        const start=exit.panel.getBoundingClientRect().top;
+        exit.animation.currentTime=130;
+        const middle=exit.panel.getBoundingClientRect().top;
+        const retained=clinicalActionsPanel.open&&exit.panel.inert;
+        exit.animation.currentTime=260;
+        const end=exit.panel.getBoundingClientRect().top;
+        exit.animation.finish();return {start,middle,end,retained};
+      });
+      assert.ok(frames,'release starts a downward exit');
+      assert.ok(Math.abs(frames.start-releasedY)<2,'the sheet does not jump back on release: '+JSON.stringify({releasedY,frames}));
+      assert.ok(frames.middle>frames.start&&frames.end>=844,'the sheet moves below the viewport: '+JSON.stringify(frames));
+      assert.equal(frames.retained,true,'the sheet stays rendered and its actions are blocked until exit completes');
+      await panel.waitFor({state:'hidden'});
+      await page.evaluate(()=>setClinicalActionsPanelOpen(true));
+      await dismiss();
+      assert.equal(await page.evaluate(()=>{
+        const animation=clinicalActionsSheetExit.animation;
+        setClinicalActionsPanelOpen(true);return animation.playState;
+      }),'idle','reopening cancels the old animation');
+      assert.equal(await panel.isVisible(),true);
+      await page.evaluate(()=>setClinicalActionsPanelOpen(false));
+    }
     await page.evaluate(()=>{document.documentElement.style.removeProperty('zoom');updateAppViewportDimensions();});
   });
   await t.test('catalog, pricing and previews share the standard assets, including saved legacy choices', async () => {
