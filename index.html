@@ -71,7 +71,7 @@
   <!-- Precompiled utilities avoid compiling Tailwind in every browser session. -->
   <link rel="stylesheet" href="lumin-app.css" />
   <script src="vendor/lucide.min.js"></script>
-  <script src="lumin-dates.js?v=1"></script>
+  <script src="lumin-dates.js?v=2"></script>
   <link rel="stylesheet" href="lumin-dates.css?v=1" />
   <link rel="stylesheet" href="lumin-loading.css?v=1" />
   <script src="vendor/supabase.js"></script>
@@ -1946,39 +1946,32 @@
     }
     #dashboard-attendance-action {
       position: relative;
-      width: 4.5rem;
-      height: 4.5rem;
-      min-width: 4.5rem;
-      min-height: 4.5rem;
-      touch-action: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      min-height: calc(48px / var(--lumin-app-scale, 1));
+      padding: 12px 16px;
+      border: 0;
+      border-radius: 16px;
+      background: #ecfdf5;
+      color: #047857;
+      font-size: 14px;
+      font-weight: 600;
+      transition: background-color 150ms ease-out, transform 150ms ease-out;
+      touch-action: manipulation;
       user-select: none;
       -webkit-user-select: none;
       -webkit-touch-callout: none;
     }
-    #dashboard-attendance-action::after {
-      position: absolute;
-      inset: 0.28rem;
-      content: '';
-      pointer-events: none;
-      border: 2px solid rgba(255, 255, 255, 0.72);
-      border-radius: 999px;
-      opacity: 0;
-      transform: scale(0.76);
-    }
-    #dashboard-attendance-action.is-holding {
-      transform: scale(0.95);
-      box-shadow: 0 0 0 7px rgba(244, 63, 94, 0.13), 0 10px 24px rgba(190, 24, 93, 0.25);
-    }
-    #dashboard-attendance-action.is-holding::after {
-      animation: attendance-hold-ring 700ms linear forwards;
-    }
-    #dashboard-attendance-action[data-attendance-mode="check-out"].is-holding {
-      box-shadow: 0 0 0 7px rgba(15, 23, 42, 0.12), 0 10px 24px rgba(15, 23, 42, 0.24);
-    }
-    @keyframes attendance-hold-ring {
-      0% { opacity: 0.35; transform: scale(0.76); }
-      100% { opacity: 1; transform: scale(1); }
-    }
+    #dashboard-attendance-action svg { width: 20px; height: 20px; flex: none; }
+    #dashboard-attendance-action:hover { background: #d1fae5; }
+    #dashboard-attendance-action[data-attendance-mode="check-out"] { background: #fffbeb; color: #b45309; }
+    #dashboard-attendance-action[data-attendance-mode="check-out"]:hover { background: #fef3c7; }
+    #dashboard-attendance-action:active { transform: scale(.98); }
+    #dashboard-attendance-action:focus-visible { outline: 2px solid #2563eb; outline-offset: -3px; }
+    #dashboard-attendance-action:disabled { opacity: .5; pointer-events: none; }
     #modal-appointment {
       overflow-y: auto;
       overscroll-behavior: contain;
@@ -3683,8 +3676,7 @@
       #appointments-calendar-toolbar > div:last-child { width: auto; justify-content: flex-end; gap: 0.25rem; }
       #appointments-calendar-toolbar > div:last-child > div:first-child { flex: none; }
       #appointments-calendar-toolbar > div:last-child > div:first-child button,
-      #appointments-calendar-toolbar > div:last-child > div:last-child button,
-      #appointment-today-button { width: 2.125rem; min-height: 2.25rem; padding-inline: 0; }
+      #appointments-calendar-toolbar > div:last-child > div:last-child button { padding-inline: 0; }
       #appointments-calendar-toolbar button { min-height: 2.25rem; }
       #appointments-month-heading { font-size: 1rem; }
       #appointments-month-view { padding: 0.5rem !important; overflow-x: hidden; }
@@ -5381,7 +5373,7 @@
       .wa-settings-primary-button { flex: 1 1 0; }
     }
   </style>
-  <link rel="stylesheet" href="lumin-theme.css?v=22" />
+  <link rel="stylesheet" href="lumin-theme.css?v=23" />
   <link rel="stylesheet" href="lumin-backgrounds.css?v=1" />
   <link rel="stylesheet" href="lumin-whatsapp-actions.css?v=2" />
   <link rel="stylesheet" href="lumin-dashboard-motion.css?v=2" />
@@ -5739,14 +5731,8 @@
         <select id="dashboard-doctor-filter" onchange="setDashboardDoctorFilter(this.value)" aria-label="Filter by doctor" class="min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20"></select>
       </div>
 
-      <div id="dashboard-attendance-card" hidden class="hidden overflow-hidden rounded-2xl border border-rose-200 bg-gradient-to-br from-white via-rose-50/70 to-amber-50/60 shadow-xs">
-        <div class="flex items-start justify-between gap-3 p-4">
-          <div class="flex min-w-0 items-start gap-3">
-            <span id="dashboard-attendance-icon" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-rose-700"><i data-lucide="map-pin-check" class="h-5 w-5"></i></span>
-            <div class="min-w-0"><span class="text-[10px] font-black uppercase tracking-[0.16em] text-rose-600">Clinic attendance</span><h3 id="dashboard-attendance-heading" class="mt-1 text-sm font-black text-slate-900">Ready to check in</h3><p id="dashboard-attendance-summary" class="mt-1 text-[11px] font-semibold leading-4 text-slate-500">Your location is checked only when you tap the button.</p></div>
-          </div>
-          <button id="dashboard-attendance-action" type="button" data-attendance-mode="check-in" onpointerdown="startAttendanceLongPress(event)" onpointermove="moveAttendanceLongPress(event)" onpointerup="finishAttendanceLongPress(event)" onpointercancel="cancelAttendanceLongPress()" onlostpointercapture="cancelAttendanceLongPress()" onkeydown="startAttendanceLongPress(event)" onkeyup="finishAttendanceLongPress(event)" onblur="cancelAttendanceLongPress()" onclick="event.preventDefault()" class="inline-flex shrink-0 items-center justify-center rounded-full bg-rose-600 text-white shadow-md transition hover:bg-rose-700 disabled:cursor-wait disabled:opacity-60" aria-label="Press and hold to check in" title="Press and hold to check in"><i data-lucide="fingerprint" class="h-8 w-8"></i><span class="sr-only">Press and hold to check in</span></button>
-        </div>
+      <div id="dashboard-attendance-card" hidden class="hidden overflow-hidden rounded-2xl">
+        <button id="dashboard-attendance-action" type="button" data-attendance-mode="check-in" onclick="recordMobileAttendance()" aria-label="Check in" title="Check in"><i data-lucide="fingerprint" aria-hidden="true"></i><span>Check in</span></button>
         <p id="dashboard-attendance-message" class="hidden border-t border-rose-100 px-4 py-3 text-xs font-bold" role="status"></p>
       </div>
 
@@ -5758,21 +5744,19 @@
       <div id="dashboard-scroll-panels" class="grid gap-5 xl:grid-cols-2">
         <div id="dashboard-schedule-card" class="dashboard-scroll-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
           <div id="dashboard-schedule-date-slot" class="border-b border-slate-100 p-4 sm:p-5">
-          <div id="dashboard-date-toolbar" class="flex items-center justify-between gap-3" dir="ltr">
-            <button type="button" onclick="changeDashboardDay(-1)" class="dashboard-day-button flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-xs transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700" aria-label="Previous day" title="Previous day">
-              <i data-lucide="arrow-left" class="h-4 w-4"></i>
-            </button>
-            <div class="min-w-0 text-center" dir="auto">
-              <div class="flex items-center justify-center gap-2">
-                <span id="dashboard-day-eyebrow" class="text-[11px] font-bold uppercase tracking-wider text-blue-600">Today</span>
-                <button id="dashboard-today-button" type="button" onclick="showDashboardToday()" aria-label="Back to today" title="Back to today" class="hidden shrink-0 rounded-lg bg-blue-50 px-2 py-1.5 text-xs font-black text-blue-700 transition hover:bg-blue-100"><i data-lucide="calendar-arrow-up" class="h-4 w-4" aria-hidden="true"></i></button>
+          <div id="dashboard-date-toolbar">
+            <div class="dashboard-date-summary">
+              <span class="dashboard-date-icon" aria-hidden="true"><i data-lucide="calendar-days"></i></span>
+              <div class="min-w-0" aria-live="polite" aria-atomic="true">
+                <h3 id="dashboard-date-heading"></h3>
+                <p id="dashboard-doctor-heading"></p>
               </div>
-              <h3 id="dashboard-date-heading" class="mt-1 truncate text-lg font-black text-slate-900"></h3>
-              <p id="dashboard-doctor-heading" class="mt-1 truncate text-xs font-bold text-slate-400"></p>
             </div>
-            <button type="button" onclick="changeDashboardDay(1)" class="dashboard-day-button flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-xs transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700" aria-label="Next day" title="Next day">
-              <i data-lucide="arrow-right" class="h-4 w-4"></i>
-            </button>
+            <div class="dashboard-date-navigation">
+              <button type="button" onclick="changeDashboardDay(-1)" class="dashboard-day-button" aria-label="Previous day" title="Previous day"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
+              <button id="dashboard-today-button" type="button" onclick="showDashboardToday()" aria-label="Back to today" title="Back to today" class="schedule-today-button"><i data-lucide="rotate-ccw" aria-hidden="true"></i><span>Today</span></button>
+              <button type="button" onclick="changeDashboardDay(1)" class="dashboard-day-button" aria-label="Next day" title="Next day"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
+            </div>
           </div>
           </div>
           <div id="dashboard-appointments-list" class="divide-y divide-slate-100"></div>
@@ -6914,7 +6898,7 @@
                 <button id="appointment-view-week" type="button" onclick="setAppointmentCalendarMode('week')" class="inline-flex items-center justify-center border-l border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-500 hover:text-slate-800" aria-label="Week view" title="Week view"><i data-lucide="columns-3" class="h-4 w-4 sm:hidden"></i><span class="hidden sm:inline">Week</span></button>
                 <button id="appointment-view-day" type="button" onclick="setAppointmentCalendarMode('day')" class="inline-flex items-center justify-center border-l border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-500 hover:text-slate-800" aria-label="Day view" title="Day view"><i data-lucide="calendar-days" class="h-4 w-4 sm:hidden"></i><span class="hidden sm:inline">Day</span></button>
               </div>
-              <button id="appointment-today-button" onclick="showAppointmentToday()" class="inline-flex items-center justify-center rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-600 transition hover:bg-slate-50" aria-label="Today" title="Today"><i data-lucide="locate-fixed" class="h-4 w-4 sm:hidden"></i><span class="hidden sm:inline">Today</span></button>
+              <button id="appointment-today-button" type="button" onclick="showAppointmentToday()" class="schedule-today-button" aria-label="Back to today" title="Back to today"><i data-lucide="rotate-ccw" aria-hidden="true"></i><span>Today</span></button>
               <div class="flex overflow-hidden rounded-lg border border-slate-200">
                 <button onclick="changeAppointmentPeriod(-1)" class="p-1 text-slate-600 transition hover:bg-slate-50" aria-label="Previous period">
                   <i data-lucide="chevron-left" class="w-4 h-4"></i>
@@ -10312,10 +10296,7 @@
     let myOpenAttendanceSession = null;
     let attendanceStateLoadPromise = null;
     let attendanceStateLoadedAt = 0;
-    let attendanceLongPressGesture = null;
     const ATTENDANCE_STATE_CACHE_TTL = 30000;
-    const ATTENDANCE_LONG_PRESS_DELAY = 700;
-    const ATTENDANCE_LONG_PRESS_MOVE_TOLERANCE = 14;
     let editingExpenseId = null;
     let activeExpensePaymentId = null;
     let activeExpensePayment = null;
@@ -13176,7 +13157,6 @@
         prescriptionComposerMode = 'patient';
         editingPrescriptionTemplateId = null;
         prescriptionComposerSaving = false;
-        cancelAttendanceLongPress();
         dashboardInvoiceCache.clear();
         financeInvoices = [];
         financeInvoicesLoaded = false;
@@ -13350,7 +13330,6 @@
         appointmentVisitTypesLoaded = false;
         appointmentVisitTypesLoadPromise = null;
         editingAppointmentVisitTypeId = null;
-        cancelAttendanceLongPress();
         dashboardInvoiceCache.clear();
         financeInvoices = [];
         financeInvoicesLoaded = false;
@@ -22411,24 +22390,14 @@
       card.classList.toggle('hidden', !enabled);
       if (!enabled) return true;
       const button = document.getElementById('dashboard-attendance-action');
-      const heading = document.getElementById('dashboard-attendance-heading');
-      const summary = document.getElementById('dashboard-attendance-summary');
-      const actionLabel = myOpenAttendanceSession ? 'Press and hold to check out' : 'Press and hold to check in';
-      if (myOpenAttendanceSession) {
-        heading.textContent = 'Checked in';
-        summary.textContent = `Started ${new Intl.DateTimeFormat(currentUiLanguage === 'ar' ? 'ar-EG' : 'en-GB', { timeZone: clinicAttendanceSettings.timezone, hour: '2-digit', minute: '2-digit', hour12: useTwelveHourTime }).format(new Date(myOpenAttendanceSession.check_in_at))} · Press and hold the fingerprint when your shift ends.`;
-        button.dataset.attendanceMode = 'check-out';
-        button.className = 'inline-flex shrink-0 items-center justify-center rounded-full bg-slate-900 text-white shadow-md transition hover:bg-slate-700 disabled:cursor-wait disabled:opacity-60';
-      } else {
-        heading.textContent = 'Ready to check in';
-        summary.textContent = 'Press and hold the fingerprint. Your location is checked only after the hold completes.';
-        button.dataset.attendanceMode = 'check-in';
-        button.className = 'inline-flex shrink-0 items-center justify-center rounded-full bg-rose-600 text-white shadow-md transition hover:bg-rose-700 disabled:cursor-wait disabled:opacity-60';
-      }
-      button.innerHTML = `<i data-lucide="fingerprint" class="h-8 w-8"></i><span class="sr-only">${actionLabel}</span>`;
-      button.setAttribute('aria-label', actionLabel);
-      button.title = actionLabel;
-      lucide.createIcons();
+      const ar = currentUiLanguage === 'ar';
+      const checkedIn = Boolean(myOpenAttendanceSession);
+      const label = checkedIn ? (ar ? 'تسجيل الانصراف' : 'Check out') : (ar ? 'تسجيل الحضور' : 'Check in');
+      button.dataset.attendanceMode = checkedIn ? 'check-out' : 'check-in';
+      button.innerHTML = `<i data-lucide="fingerprint" aria-hidden="true"></i><span>${label}</span>`;
+      button.setAttribute('aria-label', label);
+      button.title = label;
+      if (window.lucide) lucide.createIcons();
       return true;
     }
 
@@ -22470,70 +22439,6 @@
       return attendanceStateLoadPromise;
     }
 
-    function cancelAttendanceLongPress() {
-      const gesture = attendanceLongPressGesture;
-      if (!gesture) return;
-      window.clearTimeout(gesture.timer);
-      gesture.button?.classList.remove('is-holding');
-      if (gesture.pointerId != null && gesture.button?.hasPointerCapture?.(gesture.pointerId)) {
-        try { gesture.button.releasePointerCapture(gesture.pointerId); } catch (_) {}
-      }
-      attendanceLongPressGesture = null;
-    }
-
-    function startAttendanceLongPress(event) {
-      const button = event.currentTarget || document.getElementById('dashboard-attendance-action');
-      if (currentUserAccess?.isDoctor || !button || button.disabled || attendanceLongPressGesture) return;
-      const keyboard = event.type === 'keydown';
-      if (keyboard && (!['Enter', ' '].includes(event.key) || event.repeat)) return;
-      if (!keyboard && (event.button !== 0 || event.isPrimary === false)) return;
-      event.preventDefault();
-      const gesture = {
-        button,
-        pointerId: keyboard ? null : event.pointerId,
-        startX: keyboard ? 0 : event.clientX,
-        startY: keyboard ? 0 : event.clientY,
-        keyboard,
-        timer: null
-      };
-      attendanceLongPressGesture = gesture;
-      button.classList.add('is-holding');
-      if (gesture.pointerId != null) {
-        try { button.setPointerCapture?.(gesture.pointerId); } catch (_) {}
-      }
-      gesture.timer = window.setTimeout(() => {
-        if (attendanceLongPressGesture !== gesture) return;
-        button.classList.remove('is-holding');
-        attendanceLongPressGesture = null;
-        if (gesture.pointerId != null && button.hasPointerCapture?.(gesture.pointerId)) {
-          try { button.releasePointerCapture(gesture.pointerId); } catch (_) {}
-        }
-        try { navigator.vibrate?.(35); } catch (_) {}
-        void recordMobileAttendance();
-      }, ATTENDANCE_LONG_PRESS_DELAY);
-    }
-
-    function moveAttendanceLongPress(event) {
-      const gesture = attendanceLongPressGesture;
-      if (!gesture || gesture.keyboard || event.pointerId !== gesture.pointerId) return;
-      if (Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY) > ATTENDANCE_LONG_PRESS_MOVE_TOLERANCE) {
-        cancelAttendanceLongPress();
-      }
-    }
-
-    function finishAttendanceLongPress(event) {
-      const gesture = attendanceLongPressGesture;
-      if (!gesture) return;
-      if (gesture.keyboard && event.type === 'keyup' && !['Enter', ' '].includes(event.key)) return;
-      if (!gesture.keyboard && event.pointerId !== gesture.pointerId) return;
-      event.preventDefault();
-      cancelAttendanceLongPress();
-      const message = document.getElementById('dashboard-attendance-message');
-      if (!message) return;
-      message.className = 'border-t border-rose-100 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-700';
-      message.textContent = `Keep holding the fingerprint to ${myOpenAttendanceSession ? 'check out' : 'check in'}.`;
-    }
-
     async function queueHrAttendancePushNotification(attendanceSessionId, action) {
       if (!currentSession || !attendanceSessionId) return false;
       try {
@@ -22557,8 +22462,10 @@
       if (currentUserAccess?.isDoctor) return false;
       const button = document.getElementById('dashboard-attendance-action');
       const message = document.getElementById('dashboard-attendance-message');
+      if (!button || button.disabled) return false;
       const action = myOpenAttendanceSession ? 'check_out' : 'check_in';
       button.disabled = true;
+      button.ariaBusy = 'true';
       message.classList.remove('hidden', 'bg-red-50', 'text-red-700', 'bg-emerald-50', 'text-emerald-700');
       message.classList.add('bg-rose-50', 'text-rose-700');
       message.textContent = 'Checking your current location...';
@@ -22575,7 +22482,10 @@
       } catch (error) {
         message.className = 'border-t border-red-100 bg-red-50 px-4 py-3 text-xs font-bold text-red-700';
         message.textContent = error.message || 'Attendance could not be recorded.';
-      } finally { button.disabled = false; }
+      } finally {
+        button.disabled = false;
+        button.ariaBusy = 'false';
+      }
     }
 
     async function handleSavePatient(e) {
@@ -32932,8 +32842,8 @@
       const dateLocale = currentUiLanguage === 'ar' ? 'ar-EG' : 'en-US';
       const timeLocale = currentUiLanguage === 'ar' ? 'ar-EG' : (useTwelveHourTime ? 'en-US' : 'en-GB');
       appointmentMonthFormatter = new Intl.DateTimeFormat(dateLocale, { month: 'long', year: 'numeric' });
-      appointmentDayFormatter = LuminDates.formatter();
-      appointmentCompactDayFormatter = LuminDates.formatter();
+      appointmentDayFormatter = LuminDates.formatter({ weekday: 'long', locale: dateLocale });
+      appointmentCompactDayFormatter = LuminDates.formatter({ weekday: 'short', locale: dateLocale });
       appointmentShortDateFormatter = LuminDates.formatter();
       appointmentWeekdayFormatter = new Intl.DateTimeFormat(dateLocale, { weekday: 'short' });
       appointmentWeekRangeFormatter = LuminDates.formatter();
@@ -34758,12 +34668,11 @@
       void ensureDashboardAppointmentsLoaded();
       const heading = document.getElementById('dashboard-date-heading');
       const doctorHeading = document.getElementById('dashboard-doctor-heading');
-      const eyebrow = document.getElementById('dashboard-day-eyebrow');
       const todayButton = document.getElementById('dashboard-today-button');
       const list = document.getElementById('dashboard-appointments-list');
       const scrollPanels = document.getElementById('dashboard-scroll-panels');
       const invoicesCard = document.getElementById('dashboard-invoices-card');
-      if (!heading || !doctorHeading || !eyebrow || !todayButton || !list || !currentUserAccess) return;
+      if (!heading || !doctorHeading || !todayButton || !list || !currentUserAccess) return;
 
       const showDashboardInvoices = canViewDashboardInvoices();
       invoicesCard?.classList.toggle('hidden', !showDashboardInvoices);
@@ -34776,13 +34685,13 @@
       const selectedDoctor = renderDashboardDoctorFilter();
       const entries = dashboardAppointmentsForDate(dashboardSelectedDate);
       const dayState = dashboardDayCache.get(dashboardDayContext());
-      const isToday = sameAppointmentDate(dashboardSelectedDate, appointmentToday);
       heading.textContent = appointmentDayFormatter.format(dashboardSelectedDate);
       doctorHeading.textContent = selectedDoctor
         ? (currentUiLanguage === 'ar' ? `مواعيد ${selectedDoctor.label}` : `Appointments for ${selectedDoctor.label}`)
         : (currentUiLanguage === 'ar' ? 'مواعيد كل الأطباء' : "All doctors' appointments");
-      eyebrow.textContent = isToday ? 'Today' : 'Selected date';
-      todayButton.classList.toggle('hidden', isToday);
+      todayButton.querySelector('span').textContent = currentUiLanguage === 'ar' ? 'اليوم' : 'Today';
+      todayButton.title = currentUiLanguage === 'ar' ? 'العودة إلى اليوم' : 'Back to today';
+      todayButton.setAttribute('aria-label', todayButton.title);
       if (showDashboardInvoices && (dayState?.data || appointmentsLoaded)) void renderDashboardInvoices(entries);
 
       if (!dayState?.data && !appointmentsLoaded && !entries.length) {

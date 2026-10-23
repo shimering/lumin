@@ -178,3 +178,28 @@ test('failed attendance does not notify HR and push failure does not invalidate 
   assert.equal(pushFailure.message.textContent, 'Checked out successfully using server time.');
   assert.equal(pushFailure.button.disabled, false);
 });
+
+test('attendance ignores duplicate calls until location, saving and state refresh finish', async () => {
+  const harness = createClientHarness();
+  let resolveLocation, resolveRefresh, refreshStarted;
+  const refreshing = new Promise(resolve => { refreshStarted = resolve; });
+  harness.context.getDevicePosition = () => new Promise(resolve => { resolveLocation = resolve; });
+  harness.context.refreshMyAttendanceState = () => {
+    refreshStarted();
+    return new Promise(resolve => { resolveRefresh = resolve; });
+  };
+  const pending = harness.context.recordMobileAttendance();
+  assert.equal(harness.button.disabled, true);
+  assert.equal(harness.button.ariaBusy, 'true');
+  assert.equal(await harness.context.recordMobileAttendance(), false);
+  assert.equal(harness.calls.length, 0);
+  resolveLocation({ coords: { latitude: 30, longitude: 31, accuracy: 10 } });
+  await refreshing;
+  assert.equal(harness.button.disabled, true);
+  assert.equal(await harness.context.recordMobileAttendance(), false);
+  assert.deepEqual(harness.calls.map(call => call.type), ['rpc', 'push']);
+  resolveRefresh();
+  await pending;
+  assert.equal(harness.button.disabled, false);
+  assert.equal(harness.button.ariaBusy, 'false');
+});

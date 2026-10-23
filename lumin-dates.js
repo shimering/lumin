@@ -9,9 +9,9 @@
     date.setFullYear(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
     return date.getFullYear() === Number(match[1]) && date.getMonth() === Number(match[2]) - 1 && date.getDate() === Number(match[3]);
   }
-  function format(value, options = {}) {
+  function formatNumeric(value, options = {}) {
     if (value == null || value === '') return '';
-    if (typeof value === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(value)) return format(parseInput(value), options);
+    if (typeof value === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(value)) return formatNumeric(parseInput(value), options);
     // A date without a time describes a calendar day, regardless of time zone.
     if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
       return validDay(value) ? value.split('-').reverse().join('/') : '';
@@ -25,6 +25,18 @@
     }).formatToParts(date);
     const part = type => parts.find(item => item.type === type).value;
     return `${part('day')}/${part('month')}/${part('year').padStart(4, '0')}`;
+  }
+  function format(value, options = {}) {
+    const label = formatNumeric(value, options);
+    if (!label || !options.weekday) return label;
+    // Derive the weekday from the displayed day, including date-only and zoned values.
+    const [day, month, year] = label.split('/').map(Number);
+    const date = new Date(0);
+    date.setUTCFullYear(year, month - 1, day);
+    const weekday = new Intl.DateTimeFormat(options.locale || 'en-GB', {
+      weekday: options.weekday, timeZone: 'UTC'
+    }).format(date);
+    return `${weekday} · ${label}`;
   }
   function formatDateTime(value, options = {}) {
     const label = format(value, options);

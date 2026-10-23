@@ -33,6 +33,17 @@ test('date entry rejects impossible or ambiguous dates and accepts Arabic digits
   for (const value of ['01/01/2026 24:00', '01/01/2026 23:60', '01/01/2026']) assert.equal(dates.parseInput(value, true), '');
 });
 
+test('schedule labels pair the localized weekday with the displayed Gregorian date', () => {
+  for (const timeZone of ['Africa/Cairo', 'America/Los_Angeles', 'Pacific/Kiritimati']) {
+    assert.equal(dates.format('2026-10-24', { weekday: 'long', locale: 'en-US', timeZone }), 'Saturday · 24/10/2026');
+    assert.equal(dates.format('24/10/2026', { weekday: 'long', locale: 'ar-EG', timeZone }), 'السبت · 24/10/2026');
+  }
+  assert.equal(dates.formatter({ weekday: 'short', locale: 'en-US' }).format('2026-10-24'), 'Sat · 24/10/2026');
+  assert.equal(dates.format('2026-10-19T22:30:00Z', { weekday: 'long', timeZone: 'Africa/Cairo' }), 'Tuesday · 20/10/2026');
+  assert.equal(dates.format('2026-10-19T22:30:00Z', { weekday: 'long', timeZone: 'America/Los_Angeles' }), 'Monday · 19/10/2026');
+  assert.equal(dates.format('2026-02-29', { weekday: 'long' }), '');
+});
+
 function clockFixture() {
   let now = new Date(2026, 9, 19, 23, 59, 55).getTime();
   class ClockDate extends Date {

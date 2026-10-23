@@ -291,8 +291,7 @@ body.lumin-raised :is(#btn-current-user, #btn-logout) {
       stroke: #ffffff !important;
       stroke-width: 2.75px !important;
     }
-    body.lumin-raised #view-dashboard .dashboard-scroll-card,
-body.lumin-raised #view-dashboard #dashboard-attendance-card {
+    body.lumin-raised #view-dashboard .dashboard-scroll-card {
       border: 1px solid #ffffff;
       border-top-width: 2px;
       border-radius: 1.75rem;
@@ -416,31 +415,66 @@ body.lumin-raised #view-dashboard #dashboard-attendance-card {
     body.lumin-raised #view-dashboard :is(.text-slate-400, .text-slate-500, .text-slate-600) { color: var(--lumin-muted); }
     body.lumin-raised #view-dashboard :is(.text-xs, .text-\[9px\], .text-\[10px\], .text-\[11px\]) { font-size: calc(0.8125rem - var(--dashboard-card-font-reduction, 0pt)); line-height: 1.45; }
     body.lumin-raised #view-dashboard :is(.text-blue-600, .text-violet-600) { color: hsl(var(--lumin-hue) calc(55.0% * var(--lumin-chroma)) 42.7%); }
-    body.lumin-raised #view-dashboard #dashboard-day-eyebrow { color: hsl(var(--lumin-hue) calc(55.0% * var(--lumin-chroma)) 42.7%); font-size: 0.75rem; letter-spacing: 0.12em; }
-    body.lumin-raised #view-dashboard #dashboard-day-eyebrow {
-      display: inline-block;
-      margin-bottom: 0.375rem;
-      padding: 0.375rem 1rem;
-      border: 1px solid #ffffff;
-      border-radius: 999px;
-      background: linear-gradient(145deg, #ffffff, hsl(var(--lumin-hue) calc(100.0% * var(--lumin-chroma)) 93.9%));
-      color: hsl(var(--lumin-hue) calc(74.3% * var(--lumin-chroma)) 44.3%);
-      box-shadow: var(--lumin-small-raised);
+    /* Shared schedule controls stay readable and touch-safe in both themes. */
+    #dashboard-date-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
+    .dashboard-date-summary { display: flex; flex: 1 1 240px; align-items: center; gap: 12px; min-width: 0; }
+    .dashboard-date-icon { display: flex; flex: none; align-items: center; justify-content: center; width: 44px; height: 44px; border: 0; border-radius: 14px; background: #eff6ff; color: #2563eb; }
+    .dashboard-date-icon svg { width: 22px; height: 22px; }
+    #dashboard-date-heading { margin: 0; color: #0f172a; font-size: 18px; font-weight: 600; line-height: 1.4; letter-spacing: -.025em; font-variant-numeric: tabular-nums; text-wrap: balance; }
+    #dashboard-doctor-heading { margin: 4px 0 0; color: #64748b; font-size: 12px; font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; }
+    .dashboard-date-navigation { display: flex; flex: none; align-items: center; gap: 6px; }
+    #dashboard-date-toolbar .dashboard-day-button,
+    #app-shell .schedule-today-button {
+      display: inline-flex;
+      flex: none;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: auto;
+      min-width: calc(44px / var(--lumin-app-scale, 1));
+      min-height: calc(44px / var(--lumin-app-scale, 1));
+      padding: 8px;
+      border: 0;
+      border-radius: 12px;
+      background: #f1f5f9;
+      color: #475569;
+      box-shadow: none;
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      touch-action: manipulation;
+      transition: background-color 150ms ease-out, color 150ms ease-out, transform 150ms ease-out;
     }
-    body.lumin-raised #view-dashboard #dashboard-date-heading { font-size: 1.375rem; white-space: normal; }
-    body.lumin-raised #view-dashboard #dashboard-doctor-heading { white-space: normal; }
-    body.lumin-raised #view-dashboard .dashboard-day-button,
-body.lumin-raised #view-dashboard #dashboard-today-button {
-      min-width: 2.75rem;
-      min-height: 2.75rem;
-      border: 1px solid #ffffff;
-      border-top-width: 2px;
-      border-radius: 999px;
-      background: var(--lumin-face);
-      color: hsl(var(--lumin-hue) calc(55.0% * var(--lumin-chroma)) 42.7%);
-      box-shadow: var(--lumin-small-raised);
+    #app-shell .schedule-today-button { padding-inline: 14px; background: #eff6ff; color: #1d4ed8; }
+    #appointments-calendar-toolbar button { min-width: calc(44px / var(--lumin-app-scale, 1)); min-height: calc(44px / var(--lumin-app-scale, 1)); }
+    #dashboard-date-toolbar button svg,
+    #app-shell .schedule-today-button svg { width: 16px; height: 16px; flex: none; }
+    #dashboard-date-toolbar .dashboard-day-button:hover { background: #e2e8f0; color: #0f172a; }
+    #app-shell .schedule-today-button:hover { background: #dbeafe; }
+    #dashboard-date-toolbar button:active,
+    #app-shell .schedule-today-button:active { transform: scale(.98); }
+    #dashboard-date-toolbar button:focus-visible,
+    #app-shell .schedule-today-button:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; }
+    #dashboard-date-toolbar button:disabled,
+    #app-shell .schedule-today-button:disabled { opacity: .5; pointer-events: none; }
+    [dir="rtl"] .dashboard-day-button svg { transform: scaleX(-1); }
+    body.lumin-raised #dashboard-date-toolbar .dashboard-day-button { background: var(--lumin-face); color: var(--lumin-muted); box-shadow: var(--lumin-small-raised); }
+    body.lumin-raised #dashboard-date-toolbar .dashboard-day-button:hover { background: #eff6ff; }
+    body.lumin-raised .dashboard-date-icon,
+    body.lumin-raised #app-shell .schedule-today-button { background: hsl(var(--lumin-hue) calc(80% * var(--lumin-chroma)) 94%); color: hsl(var(--lumin-hue) calc(65% * var(--lumin-chroma)) 38%); }
+    body.lumin-raised #view-dashboard #dashboard-doctor-heading { color: var(--lumin-muted); }
+    @media (max-width: 639px) {
+      .dashboard-date-navigation { width: 100%; justify-content: space-between; }
+      #appointments-calendar-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+      #appointments-calendar-toolbar > div:last-child { display: contents; }
+      #appointments-calendar-toolbar > div:last-child > div:first-child { grid-column: 1; grid-row: 2; justify-self: start; }
+      #appointments-calendar-toolbar #appointment-today-button { grid-column: 2; grid-row: 1; }
+      #appointments-calendar-toolbar > div:last-child > div:last-child { grid-column: 2; grid-row: 2; justify-self: end; }
+      #appointments-mobile-heading { white-space: normal; overflow-wrap: anywhere; }
     }
-    body.lumin-raised #view-dashboard .dashboard-day-button { width: 3.25rem; height: 3.25rem; }
+    @media (prefers-reduced-motion: reduce) {
+      #dashboard-date-toolbar button, #app-shell .schedule-today-button { transition: none; }
+    }
     body.lumin-raised #view-dashboard #dashboard-invoice-count {
       padding: 0.5rem 0.875rem;
       border: 1px solid #ffffff;
@@ -580,7 +614,7 @@ body.lumin-raised #view-dashboard [data-dashboard-appointment-card] > div:first-
     body.lumin-raised #view-dashboard .dashboard-invoice-actions button.bg-emerald-600 { background: linear-gradient(145deg, #effffb, #bce9e5); color: #08635f; border-color: #abdfda; }
     body.lumin-raised #view-dashboard .dashboard-invoice-actions button.bg-rose-50 { background: linear-gradient(145deg, #fffbfd, #f5dce8); color: #ac265e; border-color: #f3cbde; }
     body.lumin-raised #view-dashboard .dashboard-invoice-actions button.bg-violet-50 { background: linear-gradient(145deg, #fcfaff, hsl(var(--lumin-hue) calc(100.0% * var(--lumin-chroma)) 93.3%)); color: #6334c3; border-color: hsl(var(--lumin-hue) calc(100.0% * var(--lumin-chroma)) 90.2%); }
-    body.lumin-raised #view-dashboard #dashboard-attendance-icon { background: var(--lumin-face); box-shadow: var(--lumin-small-raised); }
+    body.lumin-raised #view-dashboard #dashboard-attendance-card { border: 0; border-radius: 16px; background: transparent; box-shadow: none; }
     body.lumin-raised #view-dashboard #dashboard-attendance-action { box-shadow: var(--lumin-small-raised); }
     body.lumin-raised #view-dashboard :is(#dashboard-appointments-list, #dashboard-invoices-list) > div > span.mx-auto {
       width: 3.5rem;
