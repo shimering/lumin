@@ -50,6 +50,7 @@ test('patient Media and Finances groups preserve routes, permissions, keyboard a
     function canOpenPatientsPage(){return access.patients;}
     function firstAuthorizedView(){return 'dashboard';}
     function patientWorkspaceId(){return activeWorkspacePatientId;}
+    window.LuminConsents={beforeNavigate(){return true;},render(){document.getElementById('view-patient-consents').textContent='Consent history';updatePatientWorkspaceNavigation(patient,'consents');}};
     function getKnownPatient(){return patient;}
     async function ensureKnownPatient(){return patient;}
     function currentPatientAge(){return null;}
@@ -106,6 +107,14 @@ test('patient Media and Finances groups preserve routes, permissions, keyboard a
           assert.equal(await button.evaluate(node => getComputedStyle(node).borderTopWidth), '0px');
         }
       }
+      await page.evaluate(() => switchView('patient-consents'));
+      assert.equal(await page.evaluate(() => location.hash), '#patient-consents');
+      assert.equal(await tab('consents').getAttribute('aria-selected'), 'true');
+      assert.equal(await page.locator('#view-patient-consents').isVisible(), true);
+      assert.equal(await page.locator('#patient-workspace-header').isVisible(), true);
+      assert.equal(await group('finances').isVisible(), false);
+      assert.equal(await group('media').isVisible(), false);
+      assert.equal(await tab('consents').getAttribute('aria-label'), language === 'ar' ? 'الموافقات' : 'Consents');
       await tab('media').click();
       assert.equal(await page.evaluate(() => location.hash), '#patient-media');
       assert.equal((await tab('media').getAttribute('aria-label')), language === 'ar' ? 'الوسائط' : 'Media');

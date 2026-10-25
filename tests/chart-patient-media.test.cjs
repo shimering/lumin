@@ -17,7 +17,7 @@ function source(name) {
 const head = html.slice(0, html.indexOf('</head>') + 7).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
 const chartStart = html.indexOf('    <section id="view-chart"');
 const chart = html.slice(chartStart, html.indexOf('    </section>', chartStart) + 14).replace('class="hidden space-y-6"', 'class="space-y-6"');
-const helpers = ['isPrimaryToothId', 'palmerPositionForSlot', 'palmerQuadrantForSlot', 'palmerQuadrantLabel', 'palmerToothNotation', 'chartToothLabel', 'renderToothHTML', 'renderEmptyToothHTML', 'toothDentitionLongPressTarget', 'beginToothDentitionLongPress', 'cancelToothDentitionLongPress', 'patientMediaToothLabel', 'patientMediaDisplayName', 'patientMediaDownloadName', 'patientMediaFileUrl', 'openPatientMediaLightboxByIndex', 'updateAppViewportDimensions'].map(source).join('\n');
+const helpers = ['isPrimaryToothId', 'palmerPositionForSlot', 'palmerQuadrantForSlot', 'palmerQuadrantLabel', 'palmerToothNotation', 'chartToothLabel', 'renderToothHTML', 'renderEmptyToothHTML', 'toothDentitionLongPressTarget', 'beginToothDentitionLongPress', 'cancelToothDentitionLongPress', 'patientMediaToothLabel', 'patientMediaDisplayName', 'patientMediaDownloadName', 'patientMediaFileUrl', 'openPatientMediaLightboxByIndex', 'getAppViewportBounds','updateAppViewportDimensions'].map(source).join('\n');
 
 test('X-ray upload dates use upload timestamps, retain the saved upload date after edits, and handle older files', () => {
   const context=vm.createContext({LuminDates:require('../lumin-dates.js'),window:{matchMedia:()=>({matches:false})},document:{addEventListener(){}},currentUiLanguage:'en',escapeHtml:value=>String(value)});

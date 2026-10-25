@@ -1,0 +1,21 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const model=require('../lumin-consent-model.js');
+test('consent drafting fills known tokens safely and keeps an independent patient copy',()=>{
+  const template={...model.templates[0],id:'implant',revision:3,active:true,procedure_codes:['implant']};
+  const patient={id:'patient',name:'مريم <script>',patientNumber:42,birthDate:'1990-01-01',phone:'0101'};
+  const consent=model.draft(template,patient,{user_id:'doctor',full_name:'Dr. A'},{language:'ar',procedure_name:'Implant 36',date:'25/10/2026',finding_ids:['finding']});
+  assert.match(consent.body,/مريم <script>/);
+  assert.match(consent.body,/Dr\. A/);
+  assert.match(consent.body,/Implant 36/);
+  assert.equal(consent.patient_data.number,'42');
+  assert.deepEqual(consent.finding_ids,['finding']);
+  const original=consent.body;template.body_ar='Changed clinic wording';patient.name='Changed patient name';
+  assert.equal(consent.body,original);assert.equal(consent.patient_data.name,'مريم <script>');
+  assert.equal(consent.template_revision,3);
+  assert.deepEqual(model.matching([template,{...template,id:'archived',active:false}], 'implant'),[template]);
+  assert.equal(model.fill('{{patient_name}} {{unknown}}',{patient_name:'{{unknown}}'}),'{{unknown}} {{unknown}}');
+  assert.equal(model.escape('<img onerror="x">'),'&lt;img onerror=&quot;x&quot;&gt;');
+  assert.equal(model.templates.length,7);
+  assert.ok(model.templates.every(template=>template.body_en.length>500&&template.body_ar.length>500));
+});

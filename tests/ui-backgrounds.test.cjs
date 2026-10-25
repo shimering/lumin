@@ -25,7 +25,7 @@ test('background preferences, app-wide surfaces and dashboard shadow gutters',{s
   await page.addScriptTag({content:['userUiTheme','normaliseUiTint','normaliseUiScale','userUiScale','normaliseUiBackground','userUiBackground',
     'syncUiBackgroundControl','handleUiBackgroundChange','syncUiThemeToggle','syncUiScaleControl','applyUiTheme','resetUiTheme',
     'syncUiThemeFromSession','refreshUiThemePreference','handleThemeToggle','handleThemeTintChange','handleUiScaleChange',
-    'saveUiAppearance','updateAppViewportDimensions','updateDashboardViewportHeight','scheduleDashboardViewportUpdate'].map(source).join('\n')});
+    'saveUiAppearance','getAppViewportBounds','updateAppViewportDimensions','updateDashboardViewportHeight','scheduleDashboardViewportUpdate'].map(source).join('\n')});
   await page.evaluate(()=>{
     document.getElementById('auth-gate').classList.add('hidden');document.getElementById('app-shell').classList.remove('hidden');
     showFixtureView('settings');syncUiThemeFromSession(currentSession);lucide.createIcons();
