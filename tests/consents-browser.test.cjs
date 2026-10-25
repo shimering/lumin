@@ -195,6 +195,8 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   await page.emulateMedia({media:'print'});
   assert.equal(await page.locator('#consent-print-root').isVisible(),true);
   assert.equal(await page.locator('#app-shell').isVisible(),false);
+  assert.equal(await page.locator('#consent-print-root > h1, #consent-print-root > .consent-identity, #consent-print-root > .consent-print-note').count(),0,'Print does not prepend a header outside the draft wording');
+  assert.equal(await page.locator('#consent-print-root > :first-child').getAttribute('class'),'consent-copy consent-rich-content');
   assert.match(await page.locator('#consent-print-root').innerText(),/Patient-specific clause/);
   assert.ok(await page.locator('#consent-print-root strong').count()>0);
   assert.ok(await page.locator('#consent-print-root [style*="font-family:Amiri"]').count()>0);
