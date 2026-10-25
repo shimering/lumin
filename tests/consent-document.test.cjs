@@ -18,4 +18,6 @@ test('rich consent documents preserve formatting, safely render data and fill at
   assert.equal(document.text(fields),'Fee: 25,000 / 25,000 · د. نور');
   const bound=fields.ops.filter(op=>op.attributes?.consentField==='implant_total');assert.equal(bound.length,2);assert.notEqual(bound[0].attributes.consentFieldId,bound[1].attributes.consentFieldId);
   assert.throws(()=>document.normalize({ops:[{insert:'Fee',attributes:{consentField:'unexpected'}}]}));
+  assert.equal(document.dimensionValid('cellHeight','16px'),true);assert.equal(document.dimensionValid('cellHeight','auto'),true);assert.equal(document.dimensionValid('cellHeight','15px'),false);assert.equal(document.dimensionValid('cellWidth','auto'),false);
+  assert.match(document.html({ops:[{insert:'Short'},{insert:'\n',attributes:{table:'row-fit',cellHeight:'auto',cellWidth:'160px'}}]}),/<tr style="height:auto">/);
 });

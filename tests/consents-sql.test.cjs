@@ -139,4 +139,13 @@ test('consents enforce clinic permissions, preserve snapshots and finalized text
   assert.equal((await db.query('select doctor_name_ar from patient_consents where id=$1',[created.id])).rows[0].doctor_name_ar,'د. نور');
   assert.equal((await db.query('select private.consent_document_valid($1) as valid',[JSON.stringify({ops:[{insert:{consentVariable:'restoration_months'}}]})])).rows[0].valid,true);
   await assert.rejects(db.query('update patient_consents set content=$1 where id=$2',[JSON.stringify({ops:[{insert:'2500\nد. نور\n',attributes:{consentField:'unknown_key'}}]}),created.id]),/check constraint/);
+  await db.exec('reset role');
+  const compactMigration=fs.readdirSync('supabase/migrations').find(name=>name.endsWith('_consent_compact_table_rows.sql'));
+  await db.exec(fs.readFileSync('supabase/migrations/'+compactMigration,'utf8'));await db.exec('set role authenticated');
+  for(const height of ['16px','auto']){
+    const document={ops:[{insert:'Compact cell'},{insert:'\n',attributes:{table:'row-compact',cellWidth:'160px',cellHeight:height}}]};
+    await db.query('update patient_consents set body=$1,content=$2 where id=$3',['Compact cell',JSON.stringify(document),created.id]);
+    assert.equal((await db.query('select content from patient_consents where id=$1',[created.id])).rows[0].content.ops[1].attributes.cellHeight,height);
+  }
+  assert.equal((await db.query('select private.consent_document_valid($1) as valid',[JSON.stringify({ops:[{insert:'Cell\n',attributes:{table:'row-one',cellHeight:'15px'}}]})])).rows[0].valid,false);
 });

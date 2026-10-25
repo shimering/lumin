@@ -23,11 +23,28 @@ test('consent tables add edge rows and columns, drag dimensions, persist and pri
     const saved=await page.evaluate(()=>editor.getDocument());assert.ok(saved.ops.some(op=>op.attributes?.table&&op.attributes.cellWidth==='208px'&&op.attributes.cellHeight==='76px'));
     await page.evaluate(saved=>{editor.setDocument(saved);document.getElementById('print').innerHTML=LuminConsentDocument.html(saved);},saved);
     assert.equal(await page.locator('#editor table td').count(),9);assert.equal(await page.locator('#print table td').count(),9);assert.match(await page.locator('#print').innerText(),/Cell A/);assert.equal(await page.locator('#editor td').first().evaluate(cell=>cell.style.width),'208px');
+    await page.locator('#editor td').first().click();await page.locator('.consent-table-menu [data-table-action="fit-row"]').click();
+    assert.equal(await page.locator('#editor td').first().evaluate(cell=>cell.style.height),'auto');
+    assert.ok(await page.locator('#editor tr').first().evaluate(row=>row.getBoundingClientRect().height<76),'A row can shrink to fit its text');
+    await page.evaluate(()=>{const cell=document.querySelector('#editor td'),blot=Quill.find(cell);editor.quill.formatText(blot.offset(editor.quill.scroll),blot.length()-1,'size','24px','user');});
+    const largeHeight=await page.locator('#editor tr').first().evaluate(row=>row.getBoundingClientRect().height);
+    await page.evaluate(()=>{const cell=document.querySelector('#editor td'),blot=Quill.find(cell);editor.quill.formatText(blot.offset(editor.quill.scroll),blot.length()-1,'size','10px','user');});
+    assert.ok(await page.locator('#editor tr').first().evaluate(row=>row.getBoundingClientRect().height)<largeHeight,'Auto height follows the word size');
+    await page.evaluate(()=>{const saved=editor.getDocument();editor.setDocument(saved);document.getElementById('print').innerHTML=LuminConsentDocument.html(saved);});
+    assert.equal(await page.locator('#print tr').first().evaluate(row=>row.style.height),'auto');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${width}/${language} page overflow`);
     const beforeClass=await page.locator('#editor').getAttribute('class');await page.locator('[data-editor-command="expand"]').click();assert.ok(await page.locator('.consent-editor.is-expanded').count(),JSON.stringify({width,language,beforeClass,afterClass:await page.locator('#editor').getAttribute('class')}));
     await page.locator('#editor td').first().click();await page.waitForFunction(()=>document.querySelector('.consent-table-overlay')?.hidden===false);
     await page.keyboard.press('Escape');assert.equal(await page.locator('.consent-editor.is-expanded').count(),0);
     if(width===390)await page.screenshot({path:path.join(os.tmpdir(),`lumin-consent-table-${language}.png`),fullPage:true});
+  }
+  for(const language of ['en','ar']){
+    await page.evaluate(language=>{editor.dispose();currentUiLanguage=language;window.editor=LuminConsentEditor.mount(document.getElementById('editor'),{name:'body',label:'Consent',language,document:{ops:[{insert:'Small ',attributes:{size:'12px'}},{insert:'Large',attributes:{size:'28px'}},{insert:' Plain\n'}]}});editor.quill.setSelection(6,5);},language);
+    assert.equal(await page.locator('[data-editor-format="size"]').inputValue(),'28px','The selected word reports its own size');
+    await page.locator('[data-editor-format="size"]').selectOption('20px');
+    assert.equal(await page.evaluate(()=>editor.quill.getFormat(6,5).size),'20px');assert.equal(await page.evaluate(()=>editor.quill.getFormat(0,5).size),'12px','Changing size is limited to the selection');
+    await page.evaluate(()=>editor.quill.setSelection(12,5));assert.equal(await page.locator('[data-editor-format="size"]').inputValue(),'14px','Inherited word size is shown as a number');
+    await page.locator('[data-editor-format="size"]').selectOption('10px');assert.equal(await page.evaluate(()=>editor.quill.getFormat(12,5).size),'10px');
   }
   await page.evaluate(()=>{editor.dispose();window.variables={implant_total:'10,000',doctor_name_ar:'د. نور'};window.editor=LuminConsentEditor.mount(document.getElementById('editor'),{name:'body',label:'Consent',language:'en',text:'Total: {{implant_total}} / {{implant_total}}\nDoctor: {{doctor_name_ar}}',values:()=>variables});variables.implant_total='20,000';editor.updateVariables(variables);});
   assert.match(await page.locator('#editor .ql-editor').innerText(),/20,000 \/ 20,000/,'Repeated variables update independently');

@@ -46,9 +46,19 @@
     function selection(){const range=quill.getSelection()||lastRange;return {index:Math.min(range.index,quill.getLength()-1),length:Math.min(range.length,Math.max(0,quill.getLength()-1-range.index))};}
     function restore(){const range=selection();quill.focus({preventScroll:true});quill.setSelection(range,'silent');return range;}
     function updateToolbar(){
-      const formats=quill.getFormat(selection());
+      const range=selection(),formats=quill.getFormat(range);
       container.querySelectorAll('[data-editor-command][aria-pressed]').forEach(button=>{const key=button.dataset.editorCommand,value=button.dataset.value;button.setAttribute('aria-pressed',String(value?formats[key]===value:formats[key]===true));});
-      container.querySelectorAll('select[data-editor-format]').forEach(select=>{const value=formats[select.dataset.editorFormat];select.value=Array.isArray(value)?'':value||'';});
+      container.querySelectorAll('select[data-editor-format]').forEach(select=>{
+        const key=select.dataset.editorFormat,value=formats[key];
+        if(key!=='size'){select.value=Array.isArray(value)?'':value||'';return;}
+        select.querySelector('[data-current-size]')?.remove();
+        select.options[0].textContent=Array.isArray(value)?t('Mixed sizes','أحجام مختلفة'):t('Size','الحجم');
+        if(Array.isArray(value)){select.value='';return;}
+        const leaf=quill.getLeaf(Math.min(quill.getLength()-1,range.index+(range.length?1:0)))[0],node=leaf?.domNode;
+        const current=value||getComputedStyle(node?.nodeType===3?node.parentElement:node||quill.root).fontSize;
+        if(![...select.options].some(option=>option.value===current)){const option=document.createElement('option');option.value=current;option.textContent=parseFloat(current);option.disabled=true;option.dataset.currentSize='true';select.appendChild(option);}
+        select.value=current;
+      });
     }
     function run(name,value){
       const range=restore(),formats=quill.getFormat(range);
@@ -77,7 +87,7 @@
         if(!event.shiftKey&&document.activeElement===last){event.preventDefault();event.stopPropagation();first?.focus();}
       }
     },{signal:events.signal});
-    container.querySelectorAll('[data-editor-format]').forEach(control=>control.addEventListener('change',()=>{restore();const key=control.dataset.editorFormat;quill.format(key,key==='header'?(Number(control.value)||false):(control.value||false),'user');updateToolbar();},{signal:events.signal}));
+    container.querySelectorAll('[data-editor-format]').forEach(control=>control.addEventListener('change',()=>{const key=control.dataset.editorFormat,value=key==='header'?(Number(control.value)||false):(control.value||false),range=restore();if(key==='size'&&range.length){quill.formatText(range.index,range.length,'size',value,'user');quill.setSelection(range,'silent');}else quill.format(key,value,'user');updateToolbar();},{signal:events.signal}));
     // Quill accepts only registered formats. DOMPurify also strips active pasted HTML.
     quill.root.addEventListener('paste',event=>{
       const html=event.clipboardData?.getData('text/html');if(!html)return;

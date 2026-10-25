@@ -273,17 +273,23 @@
     }catch(error){if(modalCurrent(request,id,user))feedback(error);}
     finally{if(request===ui.request)busy(false);}
   }
-  function printRecord(record){
+  let printCleanup=null,printJob=0;
+  async function printRecord(record){
     if(!record?.id||record.patient_id!==patientId()||!canUse())return;
     if(ui.readLanguage&&ui.readLanguage!==record.language){if(!record.alternate_body)return;record={...record,language:ui.readLanguage,title:record.alternate_title||record.title,body:record.alternate_body,content:record.alternate_content};}
-    document.getElementById('consent-print-root')?.remove();
+    const job=++printJob;printCleanup?.();document.getElementById('consent-print-root')?.remove();
     const paper=document.createElement('section');paper.id='consent-print-root';paper.dir=record.language==='ar'?'rtl':'ltr';paper.style.display='none';
     const ar=record.language==='ar',tr=(en,arabic)=>ar?arabic:en;
     paper.innerHTML=`<h1>${e(record.title)}</h1>${identity(record,tr)}<p class="consent-print-note">${tr('Document','المستند')}: ${e(record.id)} · ${tr('Template version','إصدار النموذج')}: ${record.template_revision} · ${record.status==='draft'?tr('DRAFT — not finalized','مسودة — غير معتمدة'):tr('Finalized','معتمدة')}: ${e(date(record.finalized_at||record.created_at))}</p><div class="consent-copy consent-rich-content">${rich().html(rich().read(record.content,record.body))}</div><div class="consent-print-signatures"><p>${tr('Patient / guardian name and signature','اسم وتوقيع المريض / ولي الأمر')}<br>${tr('Relationship (if guardian)','صلة القرابة (لولي الأمر)')}<br>${tr('Date','التاريخ')}: __________________</p><p>${tr('Treating doctor signature','توقيع الطبيب المعالج')}<br>${e(ar&&record.doctor_name_ar?record.doctor_name_ar:record.doctor_name)}<br>${tr('Date','التاريخ')}: __________________</p><p>${tr('Witness / interpreter (if needed)','الشاهد / المترجم (عند الحاجة)')}<br>${tr('Name and signature','الاسم والتوقيع')}: __________________</p></div>`;
-    document.body.appendChild(paper);document.body.classList.add('consent-printing');
-    const cleanup=()=>{document.body.classList.remove('consent-printing');paper.remove();};
-    root.addEventListener('afterprint',cleanup,{once:true});
-    try{root.print();}catch(error){cleanup();throw error;}
+    document.body.appendChild(paper);
+    const cleanup=()=>{root.removeEventListener('afterprint',cleanup);if(printCleanup===cleanup){document.documentElement.classList.remove('consent-printing');document.body.classList.remove('consent-printing');printCleanup=null;}paper.remove();};printCleanup=cleanup;
+    try{
+      const families=[...new Set((rich().read(record.content,record.body).ops||[]).map(op=>op.attributes?.font).filter(Boolean))];
+      if(document.fonts){await Promise.allSettled(families.map(font=>document.fonts.load(`14px "${font}"`,ar?'نص الموافقة':'Consent')));await document.fonts.ready;}
+      if(job!==printJob||record.patient_id!==patientId()||!canUse()){cleanup();return;}
+      document.documentElement.classList.add('consent-printing');document.body.classList.add('consent-printing');
+      root.addEventListener('afterprint',cleanup,{once:true});root.print();
+    }catch(error){cleanup();throw error;}
   }
   async function reopenConsent(){
     const record=ui.record;if(ui.busy||!record?.id||record.status!=='finalized'||!canUse())return;
