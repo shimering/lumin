@@ -1,0 +1,91 @@
+(function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;root.LuminConsentDocument=api;})(typeof globalThis!=='undefined'?globalThis:this,function(){
+  'use strict';
+  const fonts=['Arial','Tahoma','Amiri','Segoe UI','Times New Roman','Georgia','Courier New'];
+  const sizes=['10px','12px','14px','16px','18px','20px','24px','28px','32px','36px','48px'];
+  const variables=[['patient_name','Patient name','اسم المريض'],['patient_number','File number','رقم الملف'],['birth_date','Date of birth','تاريخ الميلاد'],['phone','Phone','الهاتف'],['address','Address','العنوان'],['age','Age','العمر'],['gender','Gender','النوع'],['doctor_name','Treating doctor','الطبيب المعالج'],['date','Date','التاريخ'],['procedure','Procedure / teeth','الإجراء / الأسنان'],['details','Treatment details','تفاصيل العلاج']];
+  const keys=variables.map(row=>row[0]);
+  const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const object=value=>value&&typeof value==='object'&&!Array.isArray(value);
+  function normalize(value){
+    if(!object(value)||Object.keys(value).some(key=>key!=='ops')||!Array.isArray(value.ops)||value.ops.length>2500)throw new Error('document');
+    let length=0;
+    const ops=value.ops.map(op=>{
+      if(!object(op)||Object.keys(op).some(key=>!['insert','attributes'].includes(key)))throw new Error('document');
+      let insert;
+      if(typeof op.insert==='string'){insert=op.insert;length+=insert.length;}
+      else if(object(op.insert)&&Object.keys(op.insert).length===1&&keys.includes(op.insert.consentVariable)){insert={consentVariable:op.insert.consentVariable};length+=op.insert.consentVariable.length+4;}
+      else throw new Error('document');
+      const attributes={};
+      if(op.attributes!==undefined){
+        if(!object(op.attributes))throw new Error('document');
+        for(const [key,value]of Object.entries(op.attributes)){
+          let valid=false;
+          if(['bold','italic','underline','strike','blockquote'].includes(key))valid=value===true;
+          if(key==='font')valid=fonts.includes(value);
+          if(key==='size')valid=sizes.includes(value);
+          if(['color','background'].includes(key))valid=typeof value==='string'&&/^#[0-9a-f]{6}$/i.test(value);
+          if(key==='header')valid=[1,2,3].includes(value);
+          if(key==='indent')valid=Number.isInteger(value)&&value>=1&&value<=8;
+          if(key==='align')valid=['left','right','center','justify'].includes(value);
+          if(key==='direction')valid=['rtl','ltr'].includes(value);
+          if(key==='list')valid=['bullet','ordered'].includes(value);
+          if(key==='script')valid=['sub','super'].includes(value);
+          if(!valid)throw new Error('document');attributes[key]=value;
+        }
+      }
+      return {insert,...(Object.keys(attributes).length?{attributes}:{})};
+    }).filter(op=>op.insert!=='');
+    if(length>40001||JSON.stringify({ops}).length>200000)throw new Error('document-size');
+    if(!ops.length||typeof ops.at(-1).insert!=='string'||!ops.at(-1).insert.endsWith('\n')){ops.push({insert:'\n'});length++;}
+    if(ops.length>2500||length>40001)throw new Error('document-size');
+    return {ops};
+  }
+  function fromText(text=''){return normalize({ops:[{insert:String(text).replace(/\r\n?/g,'\n').replace(/\n$/,'')+'\n'}]});}
+  function read(value,fallback=''){try{return value?normalize(value):fromText(fallback);}catch{return fromText(fallback);}}
+  function tokenize(value){
+    const ops=[];
+    for(const op of normalize(value).ops){
+      if(typeof op.insert!=='string'){ops.push(op);continue;}
+      let previous=0;
+      for(const match of op.insert.matchAll(/\{\{([a-z_]+)\}\}/g)){
+        if(!keys.includes(match[1]))continue;
+        if(match.index>previous)ops.push({...op,insert:op.insert.slice(previous,match.index)});
+        ops.push({...op,insert:{consentVariable:match[1]}});previous=match.index+match[0].length;
+      }
+      if(previous<op.insert.length)ops.push({...op,insert:op.insert.slice(previous)});
+    }
+    return normalize({ops});
+  }
+  function text(value){return normalize(value).ops.map(op=>typeof op.insert==='string'?op.insert:'{{'+op.insert.consentVariable+'}}').join('').trim();}
+  function resolve(value,values){return normalize({ops:tokenize(value).ops.map(op=>({...op,insert:typeof op.insert==='string'?op.insert:String(values[op.insert.consentVariable]??'')}))});}
+  function inline(op){
+    const attrs=op.attributes||{};let result=typeof op.insert==='string'?escape(op.insert):`<span class="consent-variable-label">${escape('{{'+op.insert.consentVariable+'}}')}</span>`;
+    if(attrs.bold)result=`<strong>${result}</strong>`;if(attrs.italic)result=`<em>${result}</em>`;if(attrs.underline)result=`<u>${result}</u>`;if(attrs.strike)result=`<s>${result}</s>`;
+    if(attrs.script)result=`<${attrs.script==='sub'?'sub':'sup'}>${result}</${attrs.script==='sub'?'sub':'sup'}>`;
+    const styles=[];
+    if(attrs.font)styles.push('font-family:'+attrs.font);
+    if(attrs.size)styles.push('font-size:'+attrs.size);
+    if(attrs.color)styles.push('color:'+attrs.color);
+    if(attrs.background)styles.push('background-color:'+attrs.background);
+    return styles.length?`<span style="${escape(styles.join(';'))}">${result}</span>`:result;
+  }
+  function html(value){
+    const lines=[];let chunks=[];
+    for(const op of normalize(value).ops){
+      if(typeof op.insert!=='string'){chunks.push(inline(op));continue;}
+      const parts=op.insert.split('\n');
+      parts.forEach((part,index)=>{if(part)chunks.push(inline({...op,insert:part}));if(index<parts.length-1){lines.push({body:chunks.join('')||'<br>',attrs:op.attributes||{}});chunks=[];}});
+    }
+    if(chunks.length)lines.push({body:chunks.join(''),attrs:{}});
+    let result='',list='';
+    for(const line of lines){
+      const a=line.attrs,wanted=a.list==='ordered'?'ol':a.list==='bullet'?'ul':'';
+      if(list!==wanted){if(list)result+=`</${list}>`;if(wanted)result+=`<${wanted}>`;list=wanted;}
+      const tag=wanted?'li':a.header?'h'+a.header:a.blockquote?'blockquote':'p';
+      const styles=[];if(a.align)styles.push('text-align:'+a.align);if(a.direction)styles.push('direction:'+a.direction);if(a.indent)styles.push('margin-inline-start:'+(a.indent*1.5)+'em');
+      result+=`<${tag}${styles.length?' style="'+styles.join(';')+'"':''}>${line.body}</${tag}>`;
+    }
+    if(list)result+=`</${list}>`;return result;
+  }
+  return {fonts,sizes,variables,escape,normalize,fromText,read,tokenize,text,resolve,html};
+});

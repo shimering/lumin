@@ -27,6 +27,8 @@ test('consents enforce clinic permissions, preserve snapshots and finalized text
     create policy own_profile on public.user_profiles for select to authenticated using(user_id=auth.uid());
   `);
   await db.exec(migration);
+  const richMigration=fs.readdirSync('supabase/migrations').find(name=>name.endsWith('_consent_rich_documents.sql'));
+  await db.exec(fs.readFileSync('supabase/migrations/'+richMigration,'utf8'));
   assert.equal((await db.query('select * from consent_templates')).rows.length,7);
   const template=(await db.query("select * from consent_templates where title_en='Dental implants'")).rows[0];
   await db.exec("set role anon");
@@ -49,6 +51,11 @@ test('consents enforce clinic permissions, preserve snapshots and finalized text
   await assert.rejects(db.query(insert,[...payload.slice(0,7),id(5),'Inactive doctor']),/active treating doctor/);
   const revised=(await db.query("update patient_consents set body='Individual change',doctor_id=null,doctor_name='Visiting specialist' where id=$1 and revision=1 returning *",[record.id])).rows[0];
   assert.equal(revised.revision,2);
+  const rich={ops:[{insert:'Individual change',attributes:{bold:true,font:'Amiri',size:'18px'}},{insert:'\n'}]};
+  await db.query('update patient_consents set content=$1,alternate_title=$2,alternate_body=$3,alternate_content=$4 where id=$5',[JSON.stringify(rich),'موافقة','نص عربي',JSON.stringify({ops:[{insert:'نص عربي\n',attributes:{direction:'rtl'}}]}),record.id]);
+  assert.equal((await db.query('select content from patient_consents where id=$1',[record.id])).rows[0].content.ops[0].attributes.bold,true);
+  await assert.rejects(db.query("update patient_consents set body='different hidden text' where id=$1",[record.id]),/check constraint/);
+  await assert.rejects(db.query('update patient_consents set content=$1 where id=$2',[JSON.stringify({ops:[{insert:'Individual change',attributes:{link:'javascript:alert(1)'}}]}),record.id]),/check constraint/);
   assert.equal((await db.query("update patient_consents set body='stale' where id=$1 and revision=1 returning *",[record.id])).rows.length,0);
   await assert.rejects(db.query('update patient_consents set patient_id=$1 where id=$2',[id(2),record.id]),/snapshot cannot change/);
   await assert.rejects(db.query("update patient_consents set patient_data='{}' where id=$1",[record.id]),/snapshot cannot change/);
@@ -62,6 +69,7 @@ test('consents enforce clinic permissions, preserve snapshots and finalized text
   assert.ok(finalized.finalized_at);
   await assert.rejects(db.query("update patient_consents set body='rewrite' where id=$1",[record.id]),/immutable/);
   await assert.rejects(db.query("update patient_consents set status='draft' where id=$1",[record.id]),/immutable/);
+  await assert.rejects(db.query("update patient_consents set alternate_body='rewrite translation' where id=$1",[record.id]),/immutable/);
   await assert.rejects(db.query('delete from patient_consents where id=$1',[record.id]),/permission denied/);
   await db.query('update consent_templates set active=false where id=$1',[template.id]);
   assert.equal((await db.query('select body from patient_consents where id=$1',[record.id])).rows[0].body,'Individual change');

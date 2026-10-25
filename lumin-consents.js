@@ -10,7 +10,8 @@
   const userId=()=>typeof currentSession!=='undefined'?currentSession?.user?.id:null;
   const state={request:0,records:[],templates:[],patient:null,hasMore:false};
   const admin={request:0,templates:[],operations:[]};
-  const ui={request:0,overlay:null,record:null,template:null,templates:[],doctors:[],patient:null,context:{},busy:false,dirty:false};
+  const ui={request:0,overlay:null,record:null,template:null,templates:[],doctors:[],patient:null,context:{},busy:false,dirty:false,editors:[],languageEditors:{}};
+  const rich=()=>root.LuminConsentDocument;
   const icon=name=>`<i data-lucide="${name}" aria-hidden="true"></i>`;
   const icons=()=>{if(root.lucide)lucide.createIcons();};
   const button=(action,label,name='plus',kind='')=>`<button type="button" class="consent-btn ${kind}" data-consent-action="${action}">${icon(name)}<span>${label}</span></button>`;
@@ -20,6 +21,8 @@
   const current=(request,id,user)=>request===state.request&&id===patientId()&&user===userId()&&canUse();
   const skeleton=()=>`<div role="status" aria-label="${t('Loading consents','جارٍ تحميل الموافقات')}"><div class="consent-skeleton"></div><div class="consent-skeleton"></div></div>`;
   function errorText(error){
+    const messages={document:t('Review the consent text and formatting before saving.','راجع نص الموافقة وتنسيقه قبل الحفظ.')};
+    if(messages[error?.message])return messages[error.message];
     if(error?.message==='unsaved')return t('Save your changes before printing.','احفظ تغييراتك قبل الطباعة.');
     if(String(error?.message||'').includes('changed'))return t('This form changed on another device. Close and reopen it before saving.','تغير النموذج على جهاز آخر. أغلقه وأعد فتحه قبل الحفظ.');
     if(error?.code==='42P01'||error?.code==='PGRST205')return t('Consent storage is not available yet. Apply the patient consents database migration.','تخزين الموافقات غير متاح بعد. يجب تطبيق تحديث قاعدة بيانات الموافقات.');
@@ -62,8 +65,9 @@
   function close(force=false){
     if(!force&&(ui.busy||(ui.dirty&&!root.confirm(t('Discard unsaved consent changes?','تجاهل التغييرات غير المحفوظة؟')))))return false;
     ui.request++;
+    disposeEditors();
     if(ui.overlay){ui.overlay.remove();document.body.style.overflow=ui.overflow;ui.returnFocus?.isConnected&&ui.returnFocus.focus({preventScroll:true});}
-    Object.assign(ui,{overlay:null,record:null,template:null,patient:null,templates:[],doctors:[],context:{},busy:false,dirty:false});
+    Object.assign(ui,{overlay:null,record:null,template:null,patient:null,templates:[],doctors:[],context:{},busy:false,dirty:false,readLanguage:null});
     return true;
   }
   function modal(title){
@@ -88,9 +92,45 @@
   function modalCurrent(request,id,user,adminMode=false){return request===ui.request&&ui.overlay&&user===userId()&&(adminMode?isAdmin():id===patientId()&&canUse());}
   function loadFailure(error){ui.overlay.querySelector('[data-consent-body]').innerHTML=`<p>${t('Close this form and try again.','أغلق النموذج وحاول مجدداً.')}</p>`;feedback(error);}
   function field(label,name,value,options={}){
+    if(options.textarea)return `<div data-consent-editor-slot="${name}" data-editor-label="${e(label)}"></div>`;
     return `<label class="consent-field">${label}${options.textarea?`<textarea name="${name}" rows="${options.rows||16}" maxlength="40000" dir="${options.dir||'auto'}" ${options.required?'required':''}>${e(value)}</textarea>`:`<input name="${name}" value="${e(value)}" maxlength="${options.max||200}" dir="auto" ${options.required?'required':''}/>`}</label>`;
   }
   const form=()=>ui.overlay?.querySelector('form');
+  function disposeEditors(){ui.editors.forEach(editor=>editor.dispose());ui.editors=[];ui.languageEditors={};}
+  function tabsMarkup(selected){return `<div class="consent-language-tabs" role="tablist" aria-label="${t('Consent language versions','نسخ الموافقة باللغتين')}"><button type="button" role="tab" data-consent-language="en" aria-selected="${selected==='en'}" tabindex="${selected==='en'?0:-1}">English</button><button type="button" role="tab" data-consent-language="ar" aria-selected="${selected==='ar'}" tabindex="${selected==='ar'?0:-1}">العربية</button></div>`;}
+  function bindLanguageTabs(group,selected,onSelect){
+    function select(language){group.querySelectorAll('[data-consent-language]').forEach(button=>{const active=button.dataset.consentLanguage===language;button.setAttribute('aria-selected',String(active));button.tabIndex=active?0:-1;});group.querySelectorAll('[data-consent-language-panel]').forEach(panel=>panel.hidden=panel.dataset.consentLanguagePanel!==language);onSelect?.(language);}
+    group.querySelectorAll('[data-consent-language]').forEach(button=>{
+      button.addEventListener('click',()=>select(button.dataset.consentLanguage));
+      button.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const next=event.key==='Home'?'en':event.key==='End'?'ar':button.dataset.consentLanguage==='en'?'ar':'en';select(next);group.querySelector(`[data-consent-language="${next}"]`).focus();});
+    });select(selected);return select;
+  }
+  function mountBilingual(slots,selected,patientMode=false){
+    const group=document.createElement('div');group.className='consent-bilingual';group.innerHTML=tabsMarkup(selected);
+    slots[selected].element.replaceWith(group);
+    for(const language of ['en','ar']){
+      const item=slots[language],panel=document.createElement('div');panel.className='consent-language-panel';panel.dataset.consentLanguagePanel=language;
+      if(item.titleField)panel.innerHTML=item.titleField;
+      panel.appendChild(item.element);group.appendChild(panel);
+      const editor=root.LuminConsentEditor.mount(item.element,{name:item.name,label:item.label,language,text:item.text,document:item.document,required:item.required,values:patientMode?()=>patientVariableValues():null});
+      ui.editors.push(editor);ui.languageEditors[language]=editor;
+    }
+    ui.selectLanguage=bindLanguageTabs(group,selected,patientMode?language=>{ui.readLanguage=language;}:null);return group;
+  }
+  function patientVariableValues(){
+    const record=ui.record,p=record.patient_data;
+    return model().variableValues({...p,patient_number:p.number},{full_name:form()?.elements.doctor_name?.value||record.doctor_name},{language:record.language,procedure_name:form()?.elements.procedure_name?.value||record.procedure_name});
+  }
+  function mountPatientEditors(record){
+    const primary=ui.overlay.querySelector('[data-consent-editor-slot="body"]'),alternate=document.createElement('div'),other=record.language==='ar'?'en':'ar';
+    const label=language=>language==='ar'?t('Arabic consent text','نص الموافقة بالعربية'):t('English consent text','نص الموافقة بالإنجليزية');
+    mountBilingual({[record.language]:{element:primary,name:'body',label:label(record.language),text:record.body,document:record.content,required:true},[other]:{element:alternate,name:'alternate_body',label:label(other),text:record.alternate_body||'',document:record.alternate_content,titleField:field(other==='ar'?t('Arabic title','العنوان العربي'):t('English title','العنوان الإنجليزي'),'alternate_title',record.alternate_title||'')}},record.language,true);
+  }
+  function renderLockedVersions(record){
+    const body=ui.overlay.querySelector('[data-consent-body]'),copy=body.querySelector('.consent-copy'),group=document.createElement('div');group.className='consent-bilingual';group.innerHTML=tabsMarkup(record.language);
+    for(const language of ['en','ar']){const alternate=language!==record.language,text=alternate?record.alternate_body:record.body,document=alternate?record.alternate_content:record.content;group.insertAdjacentHTML('beforeend',`<div class="consent-language-panel" data-consent-language-panel="${language}"><h3 dir="auto">${e(alternate?record.alternate_title||record.title:record.title)}</h3><div class="consent-copy consent-rich-content" dir="${language==='ar'?'rtl':'ltr'}">${text?rich().html(rich().read(document,text)):e(t('No version saved in this language.','لا توجد نسخة محفوظة بهذه اللغة.'))}</div></div>`);}
+    copy.previousElementSibling?.remove();copy.replaceWith(group);ui.selectLanguage=bindLanguageTabs(group,record.language,language=>{ui.readLanguage=language;const print=ui.overlay.querySelector('[data-consent-action="print"]');if(print)print.disabled=language!==record.language&&!record.alternate_body;});
+  }
   function identity(record,tr=t){
     const p=record.patient_data||{};
     return `<div class="consent-identity"><strong dir="auto">${e(p.name)}</strong><span>${tr('File','الملف')}: ${e(p.number||'—')} · ${tr('Date of birth','الميلاد')}: ${e(p.birth_date||'—')} · ${tr('Phone','الهاتف')}: <bdi>${e(p.phone||'—')}</bdi></span><br><span>${tr('Treating doctor','الطبيب المعالج')}: ${e(record.doctor_name||'—')}</span>${record.procedure_name?`<br><span>${tr('Procedure','الإجراء')}: ${e(record.procedure_name)}</span>`:''}</div>`;
@@ -131,22 +171,23 @@
     return `<label class="consent-field">${t('Choose treating doctor','اختيار الطبيب المعالج')}<select name="doctor_id"><option value="">${t('Enter a doctor name below','أدخل اسم الطبيب أدناه')}</option>${ui.doctors.map(doctor=>`<option value="${e(doctor.user_id)}" ${record.doctor_id===doctor.user_id?'selected':''}>${e(doctor.full_name)}</option>`).join('')}</select></label>`;
   }
   function renderEditor(){
+    disposeEditors();
     const record=ui.record,locked=record.status==='finalized';
     const body=ui.overlay.querySelector('[data-consent-body]');
     body.innerHTML=identity(record)+(locked?`<p class="consent-hint">${t('Finalized on','اعتمدت في')} ${e(date(record.finalized_at))}. ${t('The saved text is locked. Printing includes spaces for handwritten signatures.','النص المحفوظ مقفل. تتضمن الطباعة أماكن للتوقيعات اليدوية.')}</p><h3 dir="auto">${e(record.title)}</h3><div class="consent-copy" dir="${record.language==='ar'?'rtl':'ltr'}">${e(record.body)}</div>`:
       `<form onsubmit="return false"><div class="consent-form-grid">${field(t('Consent title','عنوان الموافقة'),'title',record.title,{required:true})}${!record.id?`<label class="consent-field">${t('Form language','لغة النموذج')}<select name="language"><option value="en" ${record.language==='en'?'selected':''}>English</option><option value="ar" ${record.language==='ar'?'selected':''}>العربية</option></select></label>`:''}${doctorControl(record)}${field(t('Treating doctor name','اسم الطبيب المعالج'),'doctor_name',record.doctor_name,{required:true})}${field(t('Procedure / teeth','الإجراء / الأسنان'),'procedure_name',record.procedure_name,{max:1000})}</div>${field(t('Patient-specific consent text','نص الموافقة الخاص بالمريض'),'body',record.body,{textarea:true,required:true,rows:18,dir:record.language==='ar'?'rtl':'ltr'})}<p class="consent-hint">${t('Changes here apply to this consent only. Finalizing locks the saved text; signatures are collected on the printed form.','تسري التغييرات على هذه الموافقة فقط. اعتمادها يقفل النص المحفوظ؛ تُجمع التوقيعات على النسخة المطبوعة.')}</p></form>`);
     ui.overlay.querySelector('[data-consent-footer]').innerHTML=button('close',t('Close','إغلاق'),'x')+(record.id?button('print',t('Print','طباعة'),'printer'):'')+(locked?'':button('save-draft',t('Save draft','حفظ المسودة'),'save')+button('finalize',t('Finalize consent','اعتماد الموافقة'),'file-check-2','consent-primary'));
+    if(locked)renderLockedVersions(record);else mountPatientEditors(record);
     const doctor=body.querySelector('[name="doctor_id"]');
     if(doctor)doctor.addEventListener('change',()=>{
       const selected=ui.doctors.find(item=>item.user_id===doctor.value);
-      if(selected){const input=form().elements.doctor_name,copy=form().elements.body;copy.value=replaceDoctor(copy.value,input.value,selected.full_name);input.value=selected.full_name;}
+      if(selected){const input=form().elements.doctor_name;ui.editors.forEach(editor=>{editor.replaceText('Treating doctor: '+input.value,'Treating doctor: '+selected.full_name);editor.replaceText('الطبيب المعالج: '+input.value,'الطبيب المعالج: '+selected.full_name);});input.value=selected.full_name;}
     });
     const language=body.querySelector('[name="language"]');
     if(language)language.addEventListener('change',()=>{
       const selectedLanguage=language.value;
-      if(!root.confirm(t('Replace the current text with the template in this language?','استبدال النص الحالي بنص النموذج بهذه اللغة؟'))){language.value=record.language;return;}
-      const values=new FormData(form());
-      ui.record=model().draft(ui.template,ui.patient,{user_id:values.get('doctor_id')||null,full_name:values.get('doctor_name')},{...ui.context,procedure_name:values.get('procedure_name'),language:selectedLanguage});renderEditor();ui.dirty=true;
+      const payload=patientPayload('draft');
+      ui.record={...record,...payload,language:selectedLanguage,title:payload.alternate_title,body:payload.alternate_body,content:payload.alternate_content,alternate_title:payload.title,alternate_body:payload.body,alternate_content:payload.content};renderEditor();ui.dirty=true;
     });
     icons();
   }
@@ -160,13 +201,17 @@
       Object.assign(ui,{record,doctors});renderEditor();if(print)printRecord(record);
     }catch(error){if(modalCurrent(request,pid,user))loadFailure(error);}
   }
-  function busy(value){ui.busy=value;ui.overlay?.querySelectorAll('button,input,select,textarea').forEach(node=>node.disabled=value);}
+  function busy(value){ui.busy=value;ui.overlay?.querySelectorAll('button,input,select,textarea').forEach(node=>node.disabled=value);ui.editors.forEach(editor=>editor.setDisabled(value));}
+  function patientPayload(status){
+    const values=new FormData(form()),record=ui.record,doctorName=String(values.get('doctor_name')||'').trim(),procedureName=String(values.get('procedure_name')||'').trim();
+    ui.editors.forEach(editor=>{editor.replaceText('Treating doctor: '+record.doctor_name,'Treating doctor: '+doctorName);editor.replaceText('الطبيب المعالج: '+record.doctor_name,'الطبيب المعالج: '+doctorName);editor.replaceText('Procedure / teeth: '+record.procedure_name,'Procedure / teeth: '+procedureName);editor.replaceText('الإجراء / الأسنان: '+record.procedure_name,'الإجراء / الأسنان: '+procedureName);});
+    const primary=ui.languageEditors[record.language],other=ui.languageEditors[record.language==='ar'?'en':'ar'];
+    return {title:String(values.get('title')||'').trim(),body:primary.getText(),content:primary.getDocument(),alternate_title:String(values.get('alternate_title')||'').trim(),alternate_body:other.getText(),alternate_content:other.getText()?other.getDocument():null,doctor_id:values.get('doctor_id')||null,doctor_name:doctorName,procedure_name:procedureName,status};
+  }
   async function save(status){
-    if(ui.busy||!canUse()||!form()?.reportValidity()||ui.record.patient_id!==patientId())return;
-    const request=ui.request,id=patientId(),user=userId(),values=new FormData(form());
-    const doctorName=String(values.get('doctor_name')||'').trim(),procedureName=String(values.get('procedure_name')||'').trim();
-    const copy=replaceDoctor(String(values.get('body')||'').trim(),ui.record.doctor_name,doctorName).replace('Procedure / teeth: '+ui.record.procedure_name,'Procedure / teeth: '+procedureName).replace('الإجراء / الأسنان: '+ui.record.procedure_name,'الإجراء / الأسنان: '+procedureName);
-    const payload={title:String(values.get('title')||'').trim(),body:copy,doctor_id:values.get('doctor_id')||null,doctor_name:doctorName,procedure_name:procedureName,status};
+    if(ui.busy||!canUse()||!form()?.reportValidity()||ui.record.patient_id!==patientId()||!ui.editors.every(editor=>editor.validate()))return;
+    const request=ui.request,id=patientId(),user=userId();let payload;
+    try{payload=patientPayload(status);}catch{return feedback(new Error('document'));}
     busy(true);
     try{
       const record=ui.record;
@@ -179,10 +224,11 @@
   }
   function printRecord(record){
     if(!record?.id||record.patient_id!==patientId()||!canUse())return;
+    if(ui.readLanguage&&ui.readLanguage!==record.language){if(!record.alternate_body)return;record={...record,language:ui.readLanguage,title:record.alternate_title||record.title,body:record.alternate_body,content:record.alternate_content};}
     document.getElementById('consent-print-root')?.remove();
     const paper=document.createElement('section');paper.id='consent-print-root';paper.dir=record.language==='ar'?'rtl':'ltr';paper.style.display='none';
     const ar=record.language==='ar',tr=(en,arabic)=>ar?arabic:en;
-    paper.innerHTML=`<h1>${e(record.title)}</h1>${identity(record,tr)}<p class="consent-print-note">${tr('Document','المستند')}: ${e(record.id)} · ${tr('Template version','إصدار النموذج')}: ${record.template_revision} · ${record.status==='draft'?tr('DRAFT — not finalized','مسودة — غير معتمدة'):tr('Finalized','معتمدة')}: ${e(date(record.finalized_at||record.created_at))}</p><div class="consent-copy">${e(record.body)}</div><div class="consent-print-signatures"><p>${tr('Patient / guardian name and signature','اسم وتوقيع المريض / ولي الأمر')}<br>${tr('Relationship (if guardian)','صلة القرابة (لولي الأمر)')}<br>${tr('Date','التاريخ')}: __________________</p><p>${tr('Treating doctor signature','توقيع الطبيب المعالج')}<br>${e(record.doctor_name)}<br>${tr('Date','التاريخ')}: __________________</p><p>${tr('Witness / interpreter (if needed)','الشاهد / المترجم (عند الحاجة)')}<br>${tr('Name and signature','الاسم والتوقيع')}: __________________</p></div>`;
+    paper.innerHTML=`<h1>${e(record.title)}</h1>${identity(record,tr)}<p class="consent-print-note">${tr('Document','المستند')}: ${e(record.id)} · ${tr('Template version','إصدار النموذج')}: ${record.template_revision} · ${record.status==='draft'?tr('DRAFT — not finalized','مسودة — غير معتمدة'):tr('Finalized','معتمدة')}: ${e(date(record.finalized_at||record.created_at))}</p><div class="consent-copy consent-rich-content">${rich().html(rich().read(record.content,record.body))}</div><div class="consent-print-signatures"><p>${tr('Patient / guardian name and signature','اسم وتوقيع المريض / ولي الأمر')}<br>${tr('Relationship (if guardian)','صلة القرابة (لولي الأمر)')}<br>${tr('Date','التاريخ')}: __________________</p><p>${tr('Treating doctor signature','توقيع الطبيب المعالج')}<br>${e(record.doctor_name)}<br>${tr('Date','التاريخ')}: __________________</p><p>${tr('Witness / interpreter (if needed)','الشاهد / المترجم (عند الحاجة)')}<br>${tr('Name and signature','الاسم والتوقيع')}: __________________</p></div>`;
     document.body.appendChild(paper);document.body.classList.add('consent-printing');
     const cleanup=()=>{document.body.classList.remove('consent-printing');paper.remove();};
     root.addEventListener('afterprint',cleanup,{once:true});
@@ -210,14 +256,16 @@
       ui.template=template;
       ui.overlay.querySelector('[data-consent-body]').innerHTML=`<form onsubmit="return false"><div class="consent-form-grid">${field(t('English title','العنوان الإنجليزي'),'title_en',template.title_en,{required:true})}${field(t('Arabic title','العنوان العربي'),'title_ar',template.title_ar)}</div>${field(t('English wording','النص الإنجليزي'),'body_en',template.body_en,{textarea:true,required:true,rows:12,dir:'ltr'})}<div style="height:20px"></div>${field(t('Arabic wording (optional)','النص العربي (اختياري)'),'body_ar',template.body_ar,{textarea:true,rows:12,dir:'rtl'})}<p class="consent-hint">${t('Automatic fields','حقول تلقائية')}: <bdi>{{patient_name}} · {{patient_number}} · {{birth_date}} · {{phone}} · {{address}} · {{age}} · {{gender}} · {{doctor_name}} · {{date}} · {{procedure}} · {{details}}</bdi></p><span class="consent-section-label">${t('Optional procedure links','ربط الإجراءات (اختياري)')}</span><p class="consent-hint">${t('Applying a linked procedure offers to create this form. No links means the form is available manually only.','عند تطبيق إجراء مرتبط يظهر اقتراح إنشاء هذا النموذج. دون روابط يتاح النموذج يدوياً فقط.')}</p><input class="consent-procedure-search consent-btn" type="search" aria-label="${t('Search procedures','البحث عن الإجراءات')}" placeholder="${t('Search procedures','البحث عن الإجراءات')}" style="width:100%;margin:12px 0"/><div class="consent-procedure-list">${admin.operations.map(operation=>`<label class="consent-check" data-operation-name="${e(operation.name.toLowerCase())}"><input type="checkbox" name="procedure_codes" value="${e(operation.code)}" ${template.procedure_codes.includes(operation.code)?'checked':''}/><span dir="auto">${e(operation.name)}${operation.active?'':' · '+t('Inactive','غير نشط')}</span></label>`).join('')}</div>${template.procedure_codes.filter(code=>!admin.operations.some(op=>op.code===code)).map(code=>`<input type="hidden" name="procedure_codes" value="${e(code)}"/>`).join('')}<label class="consent-check"><input type="checkbox" name="active" ${template.active?'checked':''}/>${t('Active — available for new patient consents','نشط — متاح للموافقات الجديدة')}</label></form>`;
       ui.overlay.querySelector('[data-consent-footer]').innerHTML=button('close',t('Cancel','إلغاء'),'x')+button('template-save',t('Save template','حفظ النموذج'),'save','consent-primary');
+      mountBilingual({en:{element:ui.overlay.querySelector('[data-consent-editor-slot="body_en"]'),name:'body_en',label:t('English wording','النص الإنجليزي'),text:template.body_en,document:template.content_en,required:true},ar:{element:ui.overlay.querySelector('[data-consent-editor-slot="body_ar"]'),name:'body_ar',label:t('Arabic wording','النص العربي'),text:template.body_ar,document:template.content_ar}},lang());
+      ui.overlay.querySelector('p.consent-hint bdi')?.closest('p').remove();
       ui.overlay.querySelector('.consent-procedure-search').addEventListener('input',event=>{const term=event.target.value.toLowerCase().trim();ui.overlay.querySelectorAll('[data-operation-name]').forEach(label=>label.hidden=!label.dataset.operationName.includes(term));});
       icons();
     }catch(error){if(modalCurrent(request,null,user,true))loadFailure(error);}
   }
   async function saveTemplate(){
-    if(ui.busy||!isAdmin()||!form()?.reportValidity())return;
+    if(ui.busy||!isAdmin()||!form()?.reportValidity()||!ui.editors.every(editor=>editor.validate()))return;
     const request=ui.request,user=userId(),values=new FormData(form());
-    const payload={title_en:String(values.get('title_en')||'').trim(),title_ar:String(values.get('title_ar')||'').trim(),body_en:String(values.get('body_en')||'').trim(),body_ar:String(values.get('body_ar')||'').trim(),procedure_codes:[...new Set(values.getAll('procedure_codes'))],active:values.get('active')==='on'};
+    const payload={title_en:String(values.get('title_en')||'').trim(),title_ar:String(values.get('title_ar')||'').trim(),body_en:String(values.get('body_en')||'').trim(),body_ar:String(values.get('body_ar')||'').trim(),content_en:ui.languageEditors.en.getDocument(),content_ar:ui.languageEditors.ar.getText()?ui.languageEditors.ar.getDocument():null,procedure_codes:[...new Set(values.getAll('procedure_codes'))],active:values.get('active')==='on'};
     busy(true);
     try{
       const saved=await result(ui.template.id?db.from('consent_templates').update(payload).eq('id',ui.template.id).eq('revision',ui.template.revision).select('id').maybeSingle():db.from('consent_templates').insert(payload).select('id').single());

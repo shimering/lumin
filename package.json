@@ -2,7 +2,9 @@
   "name": "lumin",
   "version": "1.0.0",
   "private": true,
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "build": "node scripts/build-web-assets.cjs",
     "test": "node --test --test-concurrency=3 tests/*.test.cjs",
@@ -10,9 +12,11 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "2.117.3",
+    "dompurify": "3.4.17",
     "fflate": "0.8.3",
     "lucide": "0.468.0",
     "pdf-lib": "1.17.1",
+    "quill": "2.0.2",
     "three": "0.186.1"
   },
   "devDependencies": {
