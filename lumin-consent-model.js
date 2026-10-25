@@ -45,14 +45,16 @@
   function fill(body,values){return String(body||'').replace(/\{\{([a-z_]+)\}\}/g,(match,key)=>Object.hasOwn(values,key)?String(values[key]??''):match);}
   function variableValues(patient,doctor={},options={}){
     const snapshot=patientSnapshot(patient);
-    return {patient_name:snapshot.name,patient_number:snapshot.number,birth_date:snapshot.birth_date,phone:snapshot.phone,address:snapshot.address,age:snapshot.age,gender:snapshot.gender,doctor_name:doctor.full_name||doctor.fullName||'',date:options.date||new Date().toLocaleDateString(options.language==='ar'?'ar-EG':'en-GB'),procedure:options.procedure_name||'',details:options.details||''};
+    const doctorName=doctor.full_name||doctor.fullName||'';
+    return {patient_name:snapshot.name,patient_number:snapshot.number,birth_date:snapshot.birth_date,phone:snapshot.phone,address:snapshot.address,age:snapshot.age,gender:snapshot.gender,doctor_name:doctorName,doctor_name_ar:doctor.full_name_ar||doctor.fullNameAr||(/[\u0600-\u06ff]/.test(doctorName)?doctorName:''),date:options.date||new Date().toLocaleDateString(options.language==='ar'?'ar-EG':'en-GB'),procedure:options.procedure_name||'',details:options.details||''};
   }
   function draft(template,patient,doctor={},options={}){
     const language=options.language==='ar'?'ar':'en',snapshot=patientSnapshot(patient);
     const values=variableValues(patient,doctor,{...options,language}),other=language==='ar'?'en':'ar';
     const record={patient_id:patient.id,template_id:template.id,template_revision:template.revision,language,title:template['title_'+language]||template.title_en,body:fill(template['body_'+language]||template.body_en,values),patient_data:snapshot,doctor_id:doctor.user_id||doctor.userId||null,doctor_name:values.doctor_name,procedure_code:options.procedure_code||'',procedure_name:options.procedure_name||'',finding_ids:options.finding_ids||[],status:'draft',alternate_title:template['title_'+other]||'',alternate_body:fill(template['body_'+other]||'',values)};
+    record.doctor_name_ar=values.doctor_name_ar;
     const rich=globalThis.LuminConsentDocument;
-    if(rich){const source=template['body_'+language]?language:'en';record.content=rich.resolve(rich.read(template['content_'+source],template['body_'+source]),values);record.body=rich.text(record.content);record.alternate_content=record.alternate_body?rich.resolve(rich.read(template['content_'+other],template['body_'+other]),values):null;if(record.alternate_content)record.alternate_body=rich.text(record.alternate_content);}
+    if(rich){const source=template['body_'+language]?language:'en';record.content=rich.resolve(rich.read(template['content_'+source],template['body_'+source]),values,{bind:true,keepEmpty:true});record.body=rich.text(record.content);record.alternate_content=record.alternate_body?rich.resolve(rich.read(template['content_'+other],template['body_'+other]),{...values,...variableValues(patient,doctor,{...options,language:other})},{bind:true,keepEmpty:true}):null;if(record.alternate_content)record.alternate_body=rich.text(record.alternate_content);}
     return record;
   }
   function matching(templates,code){return templates.filter(template=>template.active&&template.procedure_codes?.includes(code));}

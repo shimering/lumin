@@ -96,7 +96,7 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   await page.keyboard.press('Backspace');
   assert.doesNotMatch(await dialog.locator('[name="body_en"]').inputValue(),/\{\{patient_number\}\}$/,'A variable deletes atomically');
   await dialog.locator('[name="procedure_codes"][value="implant"]').check();
-  await write('body_en',model.templates[0].body_en+'\nClinic reviewed clause.');
+  await write('body_en',model.templates[0].body_en+'\nClinic reviewed clause.\nMy fee: {{implant_total}}\nArabic doctor: {{doctor_name_ar}}');
   await click('template-save');await dialog.waitFor({state:'detached'});
   assert.equal(await page.evaluate(()=>fixture.templates[0].revision),2);
   await page.locator('#admin-panel-consents [data-consent-action="template-new"]').click();
@@ -124,13 +124,14 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   await dialog.locator('[name="first_visit_percent"]').fill('35');
   await dialog.locator('[name="interval_months"]').selectOption('6');
   await dialog.locator('[name="monthly_count"]').fill('3');
-  assert.match(await dialog.locator('[data-implant-preview="en"]').innerText(),/Total amount: 25,000/);
-  assert.match(await dialog.locator('[data-implant-preview="en"]').innerText(),/5,416.68/);
+  assert.equal(await dialog.locator('[data-implant-preview]').count(),0,'There is no locked cost section');assert.match(await dialog.locator('[name="body"]').inputValue(),/My fee: 25,000/);
+
   assert.equal(await dialog.locator('[name="doctor_name"]').inputValue(),'Dr. Omar','Treating doctor comes from the chart');
   let body=await dialog.locator('[name="body"]').inputValue();
   assert.match(body,/Mariam Hassan/);assert.match(body,/274/);assert.match(body,/1990-01-02/);assert.match(body,/Clinic reviewed clause/);
   await dialog.locator('[name="doctor_id"]').selectOption(id(80));
-  body=await dialog.locator('[name="body"]').inputValue();assert.match(body,/Treating doctor: Dr\. Noor/);
+  await dialog.locator('[name="doctor_name_ar"]').fill('د. نور');
+  body=await dialog.locator('[name="body"]').inputValue();assert.match(body,/Treating doctor: Dr\. Noor/);assert.match(body,/Arabic doctor: د. نور/);
   await write('body',body+'\nPatient-specific clause.');
   await dialog.locator('[name="procedure_name"]').fill('Implant at site 36');
   const patientEditor=dialog.locator('[data-editor-name="body"]');
@@ -151,8 +152,13 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   await patientEditor.evaluate(node=>node.consentEditor.quill.setSelection(node.consentEditor.quill.getLength()-1,0));
   await patientEditor.locator('[data-editor-variable="doctor_name"]').click();
   assert.match(await dialog.locator('[name="body"]').inputValue(),/Dr\. Noor$/,'Patient variable labels insert the current doctor');
+  await patientEditor.evaluate(node=>node.consentEditor.quill.insertText(node.consentEditor.quill.getLength()-1,'\nTypes: \nFirst amount: \nBalance: \nLast installment: \nDoctor AR: \n','api'));
+  for(const [label,key]of [['Types: ','implant_details'],['First amount: ','first_visit_amount'],['Balance: ','remaining_amount'],['Last installment: ','final_installment_amount'],['Doctor AR: ','doctor_name_ar']]){await patientEditor.evaluate((node,label)=>node.consentEditor.quill.setSelection(node.consentEditor.quill.getText().indexOf(label)+label.length,0),label);await patientEditor.locator('[data-editor-variable="'+key+'"]').click();}
+  assert.match(await dialog.locator('[name="body"]').inputValue(),/Last installment: 5,416.68/);
   assert.equal(await dialog.locator('[data-consent-action="translate"]').count(),0);
-  await write('alternate_body','أوافق على العلاج الخاص بي.\nتمت الإجابة عن أسئلتي.');
+  await write('alternate_body','أوافق على العلاج الخاص بي.\nتمت الإجابة عن أسئلتي.\nالطبيب: ');
+  await dialog.locator('[data-editor-name="alternate_body"]').evaluate(node=>node.consentEditor.quill.setSelection(node.consentEditor.quill.getLength()-1,0));
+  await dialog.locator('[data-editor-name="alternate_body"] [data-editor-variable="doctor_name_ar"]').click();
   await dialog.locator('[name="alternate_title"]').fill('موافقة خاصة');
   await dialog.locator('[data-editor-name="alternate_body"]').evaluate(node=>node.consentEditor.quill.setSelection(0,5));
   await dialog.locator('[data-editor-name="alternate_body"] [data-editor-format="font"]').selectOption('Amiri');
@@ -163,7 +169,8 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   assert.match(await page.evaluate(()=>fixture.consents[0].alternate_body),/أوافق على العلاج/);
   assert.equal(await page.evaluate(()=>fixture.consents[0].implant_terms.monthly_count),3);
   assert.equal(await page.evaluate(()=>fixture.consents[0].finding_ids.length),2);
-  assert.match(await page.evaluate(()=>fixture.consents[0].alternate_body),/تاسعا: التكلفة:/);
+  assert.doesNotMatch(await page.evaluate(()=>fixture.consents[0].alternate_body),/تاسعا: التكلفة:/);assert.match(await page.evaluate(()=>fixture.consents[0].alternate_body),/د. نور/);
+  await page.evaluate(()=>{const record=fixture.consents[0];record.content=LuminConsentDocument.normalize({ops:[...record.content.ops,{insert:'تاسعا: التكلفة:\nLegacy saved agreement\n'}]});record.body=LuminConsentDocument.text(record.content);});
   await click('close');
   assert.equal(await page.locator('#view-patient-consents .consent-card').count(),1);
   await showAdmin();await page.locator(`[data-template-id="${id(20)}"] [data-consent-action="template-edit"]`).click();
@@ -172,13 +179,15 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   assert.match(await dialog.locator('[name="body"]').inputValue(),/Patient-specific clause/);
   assert.match(await dialog.locator('[name="body"]').inputValue(),/Procedure \/ teeth: Implant at site 36/);
   assert.doesNotMatch(await dialog.locator('[name="body"]').inputValue(),/New universal version/);
+  assert.match(await dialog.locator('[name="body"]').inputValue(),/تاسعا: التكلفة:/,'Legacy cost wording stays in the editable document');
+  await dialog.locator('[data-editor-name="body"]').evaluate(node=>node.consentEditor.replaceText('تاسعا: التكلفة:', 'My editable fees:'));
   await page.evaluate(()=>fixture.progress[0].implant_type='Astra');
-  assert.match(await dialog.locator('[data-implant-preview="en"]').innerText(),/Nobel/,'Saved draft keeps its agreed types until refreshed');
+  assert.match(await dialog.locator('[name="body"]').inputValue(),/Nobel/,'Saved draft keeps its agreed types until refreshed');
   await click('refresh-implant');
-  await page.waitForFunction(()=>document.querySelector('[data-implant-preview="en"]')?.textContent.includes('Astra'));
+  await page.waitForFunction(()=>document.querySelector('[name="body"]')?.value.includes('Astra'));
   assert.match(await dialog.locator('[name="body"]').inputValue(),/Patient-specific clause/,'Refreshing procedure data preserves the edited wording');
   await click('finalize');await page.waitForFunction(()=>fixture.consents[0].status==='finalized');
-  assert.equal(await page.evaluate(()=>fixture.consents[0].body.split('Ninth: Cost:').length),2,'Reopening and refreshing do not duplicate the generated section');
+  assert.doesNotMatch(await page.evaluate(()=>fixture.consents[0].body),/Ninth: Cost:/,'No heading or paragraph is forced into the document');
   assert.match(await page.evaluate(()=>fixture.consents[0].body),/Astra/);
   await dialog.locator('.consent-copy:visible').waitFor();assert.equal(await dialog.locator('textarea,input').count(),0);
   assert.ok(await dialog.locator('.consent-copy:visible strong').count()>0);
@@ -198,7 +207,7 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   assert.equal(await page.evaluate(()=>fixture.consents[0].status),'draft');
   await dialog.locator('[name="first_visit_mode"]').selectOption('amount');
   await dialog.locator('[name="first_visit_amount"]').fill('4000.50');
-  assert.match(await dialog.locator('[data-implant-preview="en"]').innerText(),/first visit\): 4,000.5\./);
+  assert.match(await dialog.locator('[name="body"]').inputValue(),/First amount: 4,000.5/);
   await dialog.locator('[data-consent-language="en"]').click();
   await dialog.locator('[data-editor-name="body"]').evaluate(node=>node.consentEditor.quill.setSelection(node.consentEditor.quill.getLength()-1,0));
   await dialog.locator('[data-editor-name="body"] [data-editor-command="table"]').click();
@@ -262,7 +271,7 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
     const expandedBounds=await visibleEditor.boundingBox();assert.ok(expandedBounds.x>=-1&&expandedBounds.x+expandedBounds.width<=width+1);
     assert.ok(await visibleEditor.evaluate(node=>node.scrollWidth<=node.clientWidth+1));
     await visibleEditor.locator('[data-editor-command="expand"]').focus();await page.keyboard.press('Shift+Tab');
-    assert.equal(await visibleEditor.locator('[data-editor-variable="details"]').evaluate(node=>node===document.activeElement),true);
+    assert.equal(await visibleEditor.locator('[data-editor-variable="final_installment_amount"]').evaluate(node=>node===document.activeElement),true);
     if([390,1320].includes(width))await page.screenshot({path:path.join(shots,`editor-expanded-${width}-${language}.png`)});
     await page.keyboard.press('Escape');assert.equal(await dialog.isVisible(),true);assert.equal(await dialog.locator('.consent-editor.is-expanded').count(),0);
     await click('close');

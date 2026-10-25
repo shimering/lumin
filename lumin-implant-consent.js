@@ -3,7 +3,7 @@
   const legacyTypes={dz_implantation_i9:'Economic (dual)',dz_implantation_i10:'Standard (b&b)'};
   const isImplant=operation=>Boolean(operation?.isImplantProcedure||operation?.is_implant_procedure||legacyTypes[operation?.code]);
   const defaultType=operation=>String(operation?.implantType||operation?.implant_type||legacyTypes[operation?.code]||'').trim();
-  const isTemplate=template=>template?.form_type?template.form_type==='implant':template?.key==='implant';
+  const isTemplate=template=>Boolean(template?.form_type==='implant'||(!template?.form_type&&template?.key==='implant')||/\{\{(?:implant_[a-z_]+|payment_arrangement|first_visit_[a-z_]+|restoration_months|remaining_amount|(?:monthly|final)_installment_[a-z_]+)\}\}/.test((template?.body_en||'')+'\n'+(template?.body_ar||'')));
   const cents=value=>Math.round(Number(value)*100);
   function settings(value={}){
     const result={interval_months:Number(value.interval_months??4),first_visit_percent:Number(value.first_visit_percent??50),payment_mode:value.payment_mode||'two',monthly_count:Number(value.monthly_count??4)};
@@ -50,6 +50,12 @@
     const monthly=Math.floor(remaining/terms.monthly_count),last=remaining-monthly*(terms.monthly_count-1);
     return {total:amount,first,remaining,monthly,last,count:entries.length};
   }
+  function variableValues(entries=[],terms={},language='en'){
+    terms=settings(terms);const ar=language==='ar',n=value=>new Intl.NumberFormat(ar?'ar-EG':'en-GB',{maximumFractionDigits:2}).format(value),money=value=>n(value/100),na=ar?'لا ينطبق':'Not applicable';
+    const values={implant_count:n(entries.length),implant_types:[...new Set(entries.map(item=>item.implant_type).filter(Boolean))].join(ar?'، ':', '),implant_teeth:entries.map(item=>item.tooth_label||item.tooth).join(ar?'، ':', '),implant_unit_price:'',implant_total:'',implant_details:entries.map(item=>`${item.tooth_label||item.tooth}: ${item.implant_type}`).join(ar?'؛ ':'; '),payment_arrangement:terms.payment_mode==='monthly'?(ar?'أقساط شهرية':'Monthly installments'):(ar?'دفعتان فقط':'Two payments'),first_visit_fee_mode:terms.first_visit_mode==='amount'?(ar?'مبلغ محدد':'Fixed amount'):(ar?'نسبة من الإجمالي':'Percentage of total'),first_visit_percent:n(terms.first_visit_percent),first_visit_amount:terms.first_visit_mode==='amount'?n(terms.first_visit_amount):'',restoration_months:n(terms.interval_months),remaining_amount:'',monthly_installment_count:terms.payment_mode==='monthly'?n(terms.monthly_count):na,monthly_installment_amount:terms.payment_mode==='monthly'?'':na,final_installment_amount:terms.payment_mode==='monthly'?'':na};
+    try{const amount=totals(entries,terms),prices=[...new Set(entries.map(unitCost))];Object.assign(values,{implant_unit_price:prices.length===1?money(prices[0]):entries.map(item=>`${item.tooth_label||item.tooth}: ${money(unitCost(item))}`).join(ar?'؛ ':'; '),implant_total:money(amount.total),first_visit_amount:money(amount.first),first_visit_percent:terms.first_visit_mode==='percent'?n(terms.first_visit_percent):n(amount.total?amount.first/amount.total*100:0),remaining_amount:money(amount.remaining)});if(terms.payment_mode==='monthly')Object.assign(values,{monthly_installment_amount:money(amount.monthly),final_installment_amount:money(amount.last)});}catch{/* Unassigned or incomplete procedures keep unresolved fields visible in drafts. */}
+    return values;
+  }
   function paragraph(entries,terms={},language='en'){
     terms=settings(terms);const amounts=totals(entries,terms),ar=language==='ar';
     const n=value=>new Intl.NumberFormat(ar?'ar-EG':'en-GB',{maximumFractionDigits:2}).format(value);
@@ -80,5 +86,5 @@
     for(const op of document.ops){const length=typeof op.insert==='string'?op.insert.length:1;if(remaining<=0)break;ops.push(typeof op.insert==='string'?{...op,insert:op.insert.slice(0,remaining)}:op);remaining-=length;}
     return {ops};
   }
-  return {isImplant,defaultType,isTemplate,settings,assignments,totals,paragraph,documentWithParagraph,withoutParagraph};
+  return {isImplant,defaultType,isTemplate,settings,assignments,totals,variableValues,paragraph,documentWithParagraph,withoutParagraph};
 });

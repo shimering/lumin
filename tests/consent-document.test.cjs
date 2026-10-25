@@ -14,4 +14,8 @@ test('rich consent documents preserve formatting, safely render data and fill at
   const table={ops:[{insert:'Type',attributes:{bold:true}},{insert:'\n',attributes:{table:'row-a',cellWidth:'200px',cellHeight:'64px'}},{insert:'Amount'},{insert:'\n',attributes:{table:'row-a',cellWidth:'120px',cellHeight:'64px'}},{insert:'After table\n'}]};
   const tableHtml=document.html(table);assert.match(tableHtml,/<table/);assert.match(tableHtml,/<col style="width:62.5%"/);assert.match(tableHtml,/<tr style="height:64px">/);assert.match(tableHtml,/<strong>Type<\/strong>/);assert.match(tableHtml,/<\/table>.*After table/);assert.equal(document.text(table),'Type\nAmount\nAfter table');
   for(const attributes of [{table:'<script>'},{cellWidth:'9999px'},{cellHeight:'1px'},{cellWidth:'url(unsafe)'},{table:22}])assert.throws(()=>document.normalize({ops:[{insert:'Cell\n',attributes}]}));
+  const fields=document.resolve(document.fromText('Fee: {{implant_total}} / {{implant_total}} · {{doctor_name_ar}}'),{implant_total:'25,000',doctor_name_ar:'د. نور'},{bind:true,keepEmpty:true});
+  assert.equal(document.text(fields),'Fee: 25,000 / 25,000 · د. نور');
+  const bound=fields.ops.filter(op=>op.attributes?.consentField==='implant_total');assert.equal(bound.length,2);assert.notEqual(bound[0].attributes.consentFieldId,bound[1].attributes.consentFieldId);
+  assert.throws(()=>document.normalize({ops:[{insert:'Fee',attributes:{consentField:'unexpected'}}]}));
 });

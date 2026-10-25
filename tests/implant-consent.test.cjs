@@ -39,3 +39,9 @@ test('generated cost sections reopen without duplication and retain the document
     assert.ok(saved.ops.some(op=>op.attributes?.bold&&op.attributes.font==='Amiri'));
   }
 });
+test('individual fee variables are localized without imposing a paragraph',()=>{
+  const entries=[entry('one','36',10000),entry('two','46',15000,'Nobel')],terms={payment_mode:'monthly',first_visit_percent:35,interval_months:6,monthly_count:3};
+  const en=implant.variableValues(entries,terms,'en'),ar=implant.variableValues(entries,terms,'ar');
+  assert.equal(en.implant_total,'25,000');assert.equal(en.first_visit_amount,'8,750');assert.equal(en.remaining_amount,'16,250');assert.equal(en.final_installment_amount,'5,416.68');assert.equal(en.restoration_months,'6');assert.match(en.implant_details,/46: Nobel/);assert.equal(ar.payment_arrangement,'أقساط شهرية');assert.equal(ar.restoration_months,'٦');assert.ok(Object.values(en).every(value=>!value.includes('Ninth: Cost:')));
+  assert.equal(implant.isTemplate({form_type:'general',body_en:'Agreed total: {{implant_total}}'}),true);
+});

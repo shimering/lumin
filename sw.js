@@ -1,4 +1,4 @@
-const LUMIN_CACHE = "lumin-dental-shell-v266";
+const LUMIN_CACHE = "lumin-dental-shell-v267";
 const LUMIN_SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -8,14 +8,14 @@ const LUMIN_SHELL = [
   "/icons/dental-icon-v1-512.png",
   "/icons/dental-icon-v1-maskable-512.png",
   "/lumin-app.css",
-  "/lumin-consent-model.js?v=3",
-  "/lumin-implant-consent.js?v=2",
-  "/lumin-consents.js?v=4",
+  "/lumin-consent-model.js?v=4",
+  "/lumin-implant-consent.js?v=3",
+  "/lumin-consents.js?v=5",
   "/lumin-consents.css?v=3",
-  "/lumin-consent-document.js?v=2",
+  "/lumin-consent-document.js?v=3",
   "/lumin-consent-tables.js?v=1",
-  "/lumin-consent-editor.js?v=2",
-  "/lumin-consent-editor.css?v=3",
+  "/lumin-consent-editor.js?v=3",
+  "/lumin-consent-editor.css?v=4",
   "/vendor/quill/quill-2.0.2.js",
   "/vendor/quill/quill.core-2.0.2.css",
   "/vendor/dompurify/purify-3.4.17.min.js",

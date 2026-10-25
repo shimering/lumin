@@ -29,5 +29,10 @@ test('consent tables add edge rows and columns, drag dimensions, persist and pri
     await page.keyboard.press('Escape');assert.equal(await page.locator('.consent-editor.is-expanded').count(),0);
     if(width===390)await page.screenshot({path:path.join(os.tmpdir(),`lumin-consent-table-${language}.png`),fullPage:true});
   }
+  await page.evaluate(()=>{editor.dispose();window.variables={implant_total:'10,000',doctor_name_ar:'د. نور'};window.editor=LuminConsentEditor.mount(document.getElementById('editor'),{name:'body',label:'Consent',language:'en',text:'Total: {{implant_total}} / {{implant_total}}\nDoctor: {{doctor_name_ar}}',values:()=>variables});variables.implant_total='20,000';editor.updateVariables(variables);});
+  assert.match(await page.locator('#editor .ql-editor').innerText(),/20,000 \/ 20,000/,'Repeated variables update independently');
+  await page.evaluate(()=>{let index=0;const op=editor.getDocument().ops.find(op=>{if(op.attributes?.consentField==='implant_total')return true;index+=typeof op.insert==='string'?op.insert.length:1;return false;});editor.quill.deleteText(index,op.insert.length,'user');editor.quill.insertText(index,'Custom fee','user');variables.implant_total='30,000';variables.doctor_name_ar='د. عمر';editor.updateVariables(variables);});
+  assert.match(await page.locator('#editor .ql-editor').innerText(),/Custom fee \/ 30,000/,'Directly edited variable values remain custom text');
+  assert.match(await page.locator('#editor .ql-editor').innerText(),/د. عمر/);
   assert.deepEqual(errors,[]);
 });

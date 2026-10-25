@@ -3,7 +3,11 @@
   const fonts=['Arial','Tahoma','Amiri','Segoe UI','Times New Roman','Georgia','Courier New'];
   const sizes=['10px','12px','14px','16px','18px','20px','24px','28px','32px','36px','48px'];
   const variables=[['patient_name','Patient name','اسم المريض'],['patient_number','File number','رقم الملف'],['birth_date','Date of birth','تاريخ الميلاد'],['phone','Phone','الهاتف'],['address','Address','العنوان'],['age','Age','العمر'],['gender','Gender','النوع'],['doctor_name','Treating doctor','الطبيب المعالج'],['date','Date','التاريخ'],['procedure','Procedure / teeth','الإجراء / الأسنان'],['details','Treatment details','تفاصيل العلاج']];
+  variables.push(['doctor_name_ar','Treating doctor (Arabic)','اسم الطبيب المعالج بالعربية'],['implant_count','Implant count','عدد الزراعات'],['implant_types','Implant types','أنواع الزراعات'],['implant_teeth','Implant teeth','أسنان الزراعة'],['implant_unit_price','Price per implant','ثمن الزرعة الواحدة'],['implant_total','Total implant fee','إجمالي تكلفة الزراعة'],['implant_details','Implant type and tooth details','نوع الزراعة ومكانها'],['payment_arrangement','Payment arrangement','طريقة السداد'],['first_visit_fee_mode','First visit fee method','طريقة حساب الدفعة الأولى'],['first_visit_percent','First visit percentage','نسبة دفعة الزيارة الأولى'],['first_visit_amount','First visit amount','مبلغ الزيارة الأولى'],['restoration_months','Restoration interval (months)','مدة التركيب بالأشهر'],['remaining_amount','Remaining amount','المبلغ المتبقي'],['monthly_installment_count','Monthly installment count','عدد الأقساط الشهرية'],['monthly_installment_amount','Monthly installment amount','قيمة القسط الشهري'],['final_installment_amount','Final installment amount','قيمة القسط الأخير']);
   const keys=variables.map(row=>row[0]);
+  const promptedKeys=new Set(keys.filter(key=>key==='doctor_name_ar'||key.startsWith('implant_')||key.startsWith('first_visit_')||key==='payment_arrangement'||key==='restoration_months'||key==='remaining_amount'||key.includes('installment_')));
+  let fieldSequence=0;
+  const fieldId=()=>`field-${Date.now().toString(36)}-${(++fieldSequence).toString(36)}`;
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const object=value=>value&&typeof value==='object'&&!Array.isArray(value);
   function dimensionValid(key,value){const number=typeof value==='string'&&/^\d+px$/.test(value)?Number(value.slice(0,-2)):NaN;return Number.isInteger(number)&&number>=(key==='cellWidth'?64:32)&&number<=(key==='cellWidth'?640:480);}
@@ -33,6 +37,8 @@
           if(key==='script')valid=['sub','super'].includes(value);
           if(key==='table')valid=typeof value==='string'&&/^[a-zA-Z0-9_-]{1,80}$/.test(value);
           if(['cellWidth','cellHeight'].includes(key))valid=dimensionValid(key,value);
+          if(key==='consentField')valid=keys.includes(value);
+          if(key==='consentFieldId')valid=typeof value==='string'&&/^[a-zA-Z0-9_-]{1,80}$/.test(value);
           if(!valid)throw new Error('document');attributes[key]=value;
         }
       }
@@ -48,6 +54,7 @@
   function tokenize(value){
     const ops=[];
     for(const op of normalize(value).ops){
+      if(op.attributes?.consentField){ops.push(op);continue;}
       if(typeof op.insert!=='string'){ops.push(op);continue;}
       let previous=0;
       for(const match of op.insert.matchAll(/\{\{([a-z_]+)\}\}/g)){
@@ -60,7 +67,7 @@
     return normalize({ops});
   }
   function text(value){return normalize(value).ops.map(op=>typeof op.insert==='string'?op.insert:'{{'+op.insert.consentVariable+'}}').join('').trim();}
-  function resolve(value,values){return normalize({ops:tokenize(value).ops.map(op=>({...op,insert:typeof op.insert==='string'?op.insert:String(values[op.insert.consentVariable]??'')}))});}
+  function resolve(value,values,options={}){return normalize({ops:tokenize(value).ops.map(op=>{if(typeof op.insert==='string')return op;const key=op.insert.consentVariable,raw=values[key],insert=(String(raw??'')||(options.keepEmpty&&promptedKeys.has(key)?'{{'+key+'}}':'')).replace(options.bind?/\r?\n/g:/$^/g,'; ');return {...op,insert,...(options.bind?{attributes:{...op.attributes,consentField:key,consentFieldId:fieldId()}}:{})};})});}
   function inline(op){
     const attrs=op.attributes||{};let result=typeof op.insert==='string'?escape(op.insert):`<span class="consent-variable-label">${escape('{{'+op.insert.consentVariable+'}}')}</span>`;
     if(attrs.bold)result=`<strong>${result}</strong>`;if(attrs.italic)result=`<em>${result}</em>`;if(attrs.underline)result=`<u>${result}</u>`;if(attrs.strike)result=`<s>${result}</s>`;
@@ -99,5 +106,5 @@
     }
     if(list)result+=`</${list}>`;return result;
   }
-  return {fonts,sizes,variables,escape,dimensionValid,normalize,fromText,read,tokenize,text,resolve,html};
+  return {fonts,sizes,variables,fieldId,escape,dimensionValid,normalize,fromText,read,tokenize,text,resolve,html};
 });

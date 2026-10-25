@@ -129,4 +129,14 @@ test('consents enforce clinic permissions, preserve snapshots and finalized text
   assert.equal((await db.query('delete from patient_consents where id=$1 returning id',[saved.id])).rows.length,0);
   await db.exec("select set_config('test.pages','chart',false)");
   assert.equal((await db.query('delete from patient_consents where id=$1 returning id',[saved.id])).rows.length,1,'Authorized clinical staff can delete finalized consents');
+  await db.exec('reset role');
+  const variablesMigration=fs.readdirSync('supabase/migrations').find(name=>name.endsWith('_consent_flexible_variables.sql'));
+  await db.exec(fs.readFileSync('supabase/migrations/'+variablesMigration,'utf8'));
+  await db.exec('set role authenticated');
+  const variableDocument={ops:[{insert:'2500',attributes:{consentField:'first_visit_amount',consentFieldId:'field-one'}},{insert:'\n'},{insert:'د. نور',attributes:{consentField:'doctor_name_ar',consentFieldId:'field-two'}},{insert:'\n'}]};
+  const created=(await db.query(implantInsert,args)).rows[0];
+  await db.query('update patient_consents set doctor_name_ar=$1,body=$2,content=$3 where id=$4',['د. نور','2500\nد. نور',JSON.stringify(variableDocument),created.id]);
+  assert.equal((await db.query('select doctor_name_ar from patient_consents where id=$1',[created.id])).rows[0].doctor_name_ar,'د. نور');
+  assert.equal((await db.query('select private.consent_document_valid($1) as valid',[JSON.stringify({ops:[{insert:{consentVariable:'restoration_months'}}]})])).rows[0].valid,true);
+  await assert.rejects(db.query('update patient_consents set content=$1 where id=$2',[JSON.stringify({ops:[{insert:'2500\nد. نور\n',attributes:{consentField:'unknown_key'}}]}),created.id]),/check constraint/);
 });
