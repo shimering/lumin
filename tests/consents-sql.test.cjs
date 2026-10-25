@@ -148,4 +148,18 @@ test('consents enforce clinic permissions, preserve snapshots and finalized text
     assert.equal((await db.query('select content from patient_consents where id=$1',[created.id])).rows[0].content.ops[1].attributes.cellHeight,height);
   }
   assert.equal((await db.query('select private.consent_document_valid($1) as valid',[JSON.stringify({ops:[{insert:'Cell\n',attributes:{table:'row-one',cellHeight:'15px'}}]})])).rows[0].valid,false);
+  await db.exec('reset role');
+  await db.exec(fs.readFileSync('supabase/migrations/'+fs.readdirSync('supabase/migrations').find(name=>name.endsWith('_consent_line_spacing.sql')),'utf8'));
+  await db.exec('set role authenticated');
+  for(const spacing of ['1','1.15','1.25','1.5','1.75','1.85','2','2.5','3'])assert.equal((await db.query('select private.consent_document_valid($1) as valid',[JSON.stringify({ops:[{insert:'Text\n',attributes:{lineSpacing:spacing}}]})])).rows[0].valid,true);
+  assert.equal((await db.query('select private.consent_document_valid($1) as valid',[JSON.stringify({ops:[{insert:'Text\n',attributes:{lineSpacing:'1;display:none'}}]})])).rows[0].valid,false);
+  await db.exec("select set_config('test.admin','false',false),set_config('test.active','true',false),set_config('test.pages','patients',false)");
+  assert.equal((await db.query('select count(*)::int as count from consent_print_settings')).rows[0].count,1);
+  assert.equal((await db.query("update consent_print_settings set header_text_en='Unauthorized' returning id")).rows.length,0);
+  await db.exec("select set_config('test.admin','true',false)");
+  assert.equal((await db.query("update consent_print_settings set header_text_en='Clinic',logo_width_mm=45,footer_height_mm=0 returning header_text_en")).rows[0].header_text_en,'Clinic');
+  await assert.rejects(db.query('update consent_print_settings set logo_width_mm=500'));
+  await db.exec("select set_config('test.admin','false',false),set_config('test.pages','',false)");
+  assert.equal((await db.query('select count(*)::int as count from consent_print_settings')).rows[0].count,0);
+
 });

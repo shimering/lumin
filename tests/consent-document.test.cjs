@@ -20,4 +20,8 @@ test('rich consent documents preserve formatting, safely render data and fill at
   assert.throws(()=>document.normalize({ops:[{insert:'Fee',attributes:{consentField:'unexpected'}}]}));
   assert.equal(document.dimensionValid('cellHeight','16px'),true);assert.equal(document.dimensionValid('cellHeight','auto'),true);assert.equal(document.dimensionValid('cellHeight','15px'),false);assert.equal(document.dimensionValid('cellWidth','auto'),false);
   assert.match(document.html({ops:[{insert:'Short'},{insert:'\n',attributes:{table:'row-fit',cellHeight:'auto',cellWidth:'160px'}}]}),/<tr style="height:auto">/);
+  for(const spacing of document.lineSpacings){const value={ops:[{insert:'Line'},{insert:'\n',attributes:{lineSpacing:spacing}}]};assert.match(document.html(value),new RegExp('line-height:'+spacing));}
+  assert.match(document.html({ops:[{insert:'Cell'},{insert:'\n',attributes:{table:'row-spacing',lineSpacing:'1.25',cellHeight:'auto'}}]}),/td style="line-height:1.25"/);
+  for(const value of [0,'0','4','1;display:none',1.5])assert.throws(()=>document.normalize({ops:[{insert:'Text\n',attributes:{lineSpacing:value}}]}));
+
 });

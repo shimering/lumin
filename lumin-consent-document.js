@@ -2,6 +2,7 @@
   'use strict';
   const fonts=['Arial','Tahoma','Amiri','Segoe UI','Times New Roman','Georgia','Courier New'];
   const sizes=['10px','12px','14px','16px','18px','20px','24px','28px','32px','36px','48px'];
+  const lineSpacings=['1','1.15','1.25','1.5','1.75','1.85','2','2.5','3'];
   const variables=[['patient_name','Patient name','اسم المريض'],['patient_number','File number','رقم الملف'],['birth_date','Date of birth','تاريخ الميلاد'],['phone','Phone','الهاتف'],['address','Address','العنوان'],['age','Age','العمر'],['gender','Gender','النوع'],['doctor_name','Treating doctor','الطبيب المعالج'],['date','Date','التاريخ'],['procedure','Procedure / teeth','الإجراء / الأسنان'],['details','Treatment details','تفاصيل العلاج']];
   variables.push(['doctor_name_ar','Treating doctor (Arabic)','اسم الطبيب المعالج بالعربية'],['implant_count','Implant count','عدد الزراعات'],['implant_types','Implant types','أنواع الزراعات'],['implant_teeth','Implant teeth','أسنان الزراعة'],['implant_unit_price','Price per implant','ثمن الزرعة الواحدة'],['implant_total','Total implant fee','إجمالي تكلفة الزراعة'],['implant_details','Implant type and tooth details','نوع الزراعة ومكانها'],['payment_arrangement','Payment arrangement','طريقة السداد'],['first_visit_fee_mode','First visit fee method','طريقة حساب الدفعة الأولى'],['first_visit_percent','First visit percentage','نسبة دفعة الزيارة الأولى'],['first_visit_amount','First visit amount','مبلغ الزيارة الأولى'],['restoration_months','Restoration interval (months)','مدة التركيب بالأشهر'],['remaining_amount','Remaining amount','المبلغ المتبقي'],['monthly_installment_count','Monthly installment count','عدد الأقساط الشهرية'],['monthly_installment_amount','Monthly installment amount','قيمة القسط الشهري'],['final_installment_amount','Final installment amount','قيمة القسط الأخير']);
   const keys=variables.map(row=>row[0]);
@@ -28,6 +29,7 @@
           if(['bold','italic','underline','strike','blockquote'].includes(key))valid=value===true;
           if(key==='font')valid=fonts.includes(value);
           if(key==='size')valid=sizes.includes(value);
+          if(key==='lineSpacing')valid=lineSpacings.includes(value);
           if(['color','background'].includes(key))valid=typeof value==='string'&&/^#[0-9a-f]{6}$/i.test(value);
           if(key==='header')valid=[1,2,3].includes(value);
           if(key==='indent')valid=Number.isInteger(value)&&value>=1&&value<=8;
@@ -95,16 +97,16 @@
         const rows=[];let rowId=null;
         while(index<lines.length&&lines[index].attrs.table){const cell=lines[index];if(cell.attrs.table!==rowId){rows.push([]);rowId=cell.attrs.table;}rows.at(-1).push(cell);index++;}index--;
         const widths=rows[0].map(cell=>parseInt(cell.attrs.cellWidth)||160),total=widths.reduce((sum,width)=>sum+width,0);
-        result+=`<div class="consent-table-print-wrap"><table class="consent-document-table" style="width:100%;max-width:${total}px;table-layout:fixed"><colgroup>${widths.map(width=>`<col style="width:${width/total*100}%"/>`).join('')}</colgroup><tbody>${rows.map(row=>`<tr style="height:${row.every(cell=>cell.attrs.cellHeight==='auto')?'auto':Math.max(...row.map(cell=>cell.attrs.cellHeight==='auto'?0:parseInt(cell.attrs.cellHeight)||44))+'px'}">${row.map(cell=>`<td${cell.attrs.direction||cell.attrs.align?` style="${cell.attrs.direction?'direction:'+cell.attrs.direction+';':''}${cell.attrs.align?'text-align:'+cell.attrs.align:''}"`:''}>${cell.body}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+        result+=`<div class="consent-table-print-wrap"><table class="consent-document-table" style="width:100%;max-width:${total}px;table-layout:fixed"><colgroup>${widths.map(width=>`<col style="width:${width/total*100}%"/>`).join('')}</colgroup><tbody>${rows.map(row=>`<tr style="height:${row.every(cell=>cell.attrs.cellHeight==='auto')?'auto':Math.max(...row.map(cell=>cell.attrs.cellHeight==='auto'?0:parseInt(cell.attrs.cellHeight)||44))+'px'}">${row.map(cell=>`<td${cell.attrs.direction||cell.attrs.align||cell.attrs.lineSpacing?` style="${cell.attrs.direction?'direction:'+cell.attrs.direction+';':''}${cell.attrs.align?'text-align:'+cell.attrs.align+';':''}${cell.attrs.lineSpacing?'line-height:'+cell.attrs.lineSpacing:''}"`:''}>${cell.body}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
         continue;
       }
       const a=line.attrs,wanted=a.list==='ordered'?'ol':a.list==='bullet'?'ul':'';
       if(list!==wanted){if(list)result+=`</${list}>`;if(wanted)result+=`<${wanted}>`;list=wanted;}
       const tag=wanted?'li':a.header?'h'+a.header:a.blockquote?'blockquote':'p';
-      const styles=[];if(a.align)styles.push('text-align:'+a.align);if(a.direction)styles.push('direction:'+a.direction);if(a.indent)styles.push('margin-inline-start:'+(a.indent*1.5)+'em');
+      const styles=[];if(a.align)styles.push('text-align:'+a.align);if(a.direction)styles.push('direction:'+a.direction);if(a.indent)styles.push('margin-inline-start:'+(a.indent*1.5)+'em');if(a.lineSpacing)styles.push('line-height:'+a.lineSpacing);
       result+=`<${tag}${styles.length?' style="'+styles.join(';')+'"':''}>${line.body}</${tag}>`;
     }
     if(list)result+=`</${list}>`;return result;
   }
-  return {fonts,sizes,variables,fieldId,escape,dimensionValid,normalize,fromText,read,tokenize,text,resolve,html};
+  return {fonts,sizes,lineSpacings,variables,fieldId,escape,dimensionValid,normalize,fromText,read,tokenize,text,resolve,html};
 });

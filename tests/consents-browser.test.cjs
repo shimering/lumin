@@ -15,7 +15,7 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
     if(pathname==='/'){res.setHeader('Content-Type','text/html');res.end(html);return;}
     const file=path.resolve(root,'.'+decodeURIComponent(pathname));
     if(!file.startsWith(root+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile()){res.writeHead(404).end();return;}
-    res.setHeader('Content-Type',file.endsWith('.css')?'text/css':'application/javascript');res.end(fs.readFileSync(file));
+    res.setHeader('Content-Type',file.endsWith('.html')?'text/html':file.endsWith('.css')?'text/css':'application/javascript');res.end(fs.readFileSync(file));
   });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   t.after(()=>new Promise(resolve=>{server.close(resolve);server.closeAllConnections();}));
@@ -23,7 +23,7 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   const page=await browser.newPage({viewport:{width:1320,height:940},timezoneId:'Africa/Cairo'}),errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   page.on('dialog',dialog=>dialog.accept());
-  await page.route('**/*',route=>route.request().url().startsWith('http://127.0.0.1:')?route.continue():route.abort());
+  await page.context().route('**/*',route=>route.request().url().startsWith('http://127.0.0.1:')?route.continue():route.abort());
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
   await page.addScriptTag({path:path.join(root,'vendor/lucide.min.js')});
   for(const file of ['vendor/quill/quill-2.0.2.js','vendor/dompurify/purify-3.4.17.min.js','lumin-consent-document.js','lumin-consent-tables.js','lumin-consent-editor.js','lumin-consent-model.js','lumin-implant-consent.js'])await page.addScriptTag({path:path.join(root,file)});
@@ -38,7 +38,7 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
     window.updatePatientWorkspaceNavigation=(patient,tab)=>{document.querySelectorAll('[data-patient-workspace-tab]').forEach(button=>button.setAttribute('aria-selected',String(button.dataset.patientWorkspaceTab===tab)));};
     window.dentalOperationByCode=code=>({code,name:code==='implant'?'Dental implant':'Orthodontic package',isImplantProcedure:code==='implant',implantType:'Straumann',price:10000});
     window.chartToothLabel=tooth=>'Tooth '+tooth;
-    window.print=()=>{window.printCalls=(window.printCalls||0)+1;};
+    window.fixture.printSettings=[{id:1,updated_at:'2026-10-25',logo_visible:false}];window.fixture.printLogo=[{id:1,logo_data_url:null}];
     const operations=[{code:'implant',name:'Dental implant',active:true},{code:'ortho',name:'Orthodontic package',active:true}];
     window.db={rpc:async()=>({data:doctors,error:null}),from(table){
       const filters=[],q={kind:'select',payload:null,start:0,end:999,one:false,sorts:[],
@@ -46,7 +46,7 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
         order(key,options={}){q.sorts.push([key,options.ascending!==false]);return q;},limit(value){q.end=q.start+value-1;return q;},range(start,end){q.start=start;q.end=end;return q;},
         insert(payload){q.kind='insert';q.payload=payload;return q;},update(payload){q.kind='update';q.payload=payload;return q;},delete(){q.kind='delete';return q;},single(){q.one=true;return q;},maybeSingle(){q.one=true;return q;},
         then(resolve,reject){return new Promise(done=>setTimeout(done,fixture.delay)).then(()=>{
-          const rows=table==='consent_templates'?fixture.templates:table==='patients'?fixture.patients:table==='dental_operations'?operations:table==='implant_progress'?fixture.progress:fixture.consents;
+          const rows=table==='consent_print_settings'?fixture.printSettings:table==='prescription_print_settings'?fixture.printLogo:table==='consent_templates'?fixture.templates:table==='patients'?fixture.patients:table==='dental_operations'?operations:table==='implant_progress'?fixture.progress:fixture.consents;
           let selected=rows.filter(row=>filters.every(filter=>filter(row)));
           if(q.kind==='insert'){
             const now=new Date().toISOString();const record={id:crypto.randomUUID(),active:true,procedure_codes:[],revision:1,created_at:now,updated_at:now,...q.payload};
@@ -69,6 +69,8 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
     document.getElementById('view-patient-consents').classList.remove('hidden');
     document.body.classList.add('lumin-raised');
   },{templates:model.templates.map((template,index)=>({...template,id:id(20+index),revision:1,active:true,created_at:'2026-10-25'})),patient,doctors,idB:id(91)});
+  await page.context().addInitScript(()=>{window.print=()=>{window.printCalls=(window.printCalls||0)+1;dispatchEvent(new Event('afterprint'));};});
+  await page.addScriptTag({path:path.join(root,'lumin-consent-print.js')});
   await page.addScriptTag({path:path.join(root,'lumin-consents.js')});
   const click=action=>page.locator(`[data-consent-action="${action}"]:visible`).first().click();
   const dialog=page.locator('.consent-dialog');
@@ -86,6 +88,12 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   };
   await showAdmin();
   assert.equal(await page.locator('#admin-panel-consents .consent-card').count(),7);
+  await page.locator('.consent-print-admin summary').click();
+  const layout=page.locator('[data-consent-print-settings]');await layout.locator('[name="header_text_en"]').fill('Clinic custom header');await layout.locator('[name="header_height_mm"]').fill('25');await layout.locator('[name="footer_font_px"]').fill('12');await layout.locator('[name="logo_align"]').selectOption('end');await layout.locator('button[type=submit]').click();
+  await layout.locator('[data-print-layout-message]').filter({hasText:'saved'}).waitFor();
+  assert.equal(await page.evaluate(()=>fixture.printSettings[0].header_height_mm),25);assert.equal(await page.evaluate(()=>fixture.printSettings[0].logo_align),'end');
+  await layout.locator('[name="header_text_en"]').fill('');await layout.locator('button[type=submit]').click();await page.waitForFunction(()=>fixture.printSettings[0].header_text_en==='');
+
   await page.locator(`[data-template-id="${id(20)}"] [data-consent-action="template-edit"]`).click();
   assert.equal(await dialog.locator('[data-consent-action="translate"]').count(),0,'Translation is excluded');
   const templateEditor=dialog.locator('[data-editor-name="body_en"]');
@@ -191,19 +199,19 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   assert.match(await page.evaluate(()=>fixture.consents[0].body),/Astra/);
   await dialog.locator('.consent-copy:visible').waitFor();assert.equal(await dialog.locator('textarea,input').count(),0);
   assert.ok(await dialog.locator('.consent-copy:visible strong').count()>0);
-  await click('print');assert.equal(await page.evaluate(()=>printCalls),1);
-  await page.emulateMedia({media:'print'});
-  assert.equal(await page.locator('#consent-print-root').isVisible(),true);
-  assert.equal(await page.locator('#app-shell').isVisible(),false);
-  assert.equal(await page.locator('#consent-print-root > h1, #consent-print-root > .consent-identity, #consent-print-root > .consent-print-note').count(),0,'Print does not prepend a header outside the draft wording');
-  assert.equal(await page.locator('#consent-print-root > :first-child').getAttribute('class'),'consent-copy consent-rich-content');
-  assert.match(await page.locator('#consent-print-root').innerText(),/Patient-specific clause/);
-  assert.ok(await page.locator('#consent-print-root strong').count()>0);
-  assert.ok(await page.locator('#consent-print-root [style*="font-family:Amiri"]').count()>0);
-  assert.ok(await page.locator('#consent-print-root').evaluate(node=>node.scrollWidth<=document.documentElement.clientWidth+1));
+  const firstPopup=page.waitForEvent('popup');await click('print');const printed=await firstPopup;
+  await printed.waitForFunction(()=>window.printCalls===1);await printed.emulateMedia({media:'print'});
+  assert.equal(await printed.locator('#consent-print-root').isVisible(),true);
+  assert.equal(await printed.locator('input,select,button,.consent-dialog,#app-shell').count(),0);
+  assert.equal(await printed.locator('#consent-print-root > h1, #consent-print-root > .consent-identity, #consent-print-root > .consent-print-note').count(),0,'Print does not prepend a header outside the draft wording');
+  assert.equal(await printed.locator('#consent-print-root > :first-child').getAttribute('class'),'consent-copy consent-rich-content');
+  assert.match(await printed.locator('#consent-print-root').innerText(),/Patient-specific clause/);
+  assert.ok(await printed.locator('#consent-print-root strong').count()>0);
+  assert.ok(await printed.locator('#consent-print-root [style*="font-family:Amiri"]').count()>0);
+  assert.ok(await printed.locator('#consent-print-root').evaluate(node=>node.scrollWidth<=document.documentElement.clientWidth+1));
   const shots=path.join(os.tmpdir(),'lumin-consents-preview');fs.mkdirSync(shots,{recursive:true});
-  await page.screenshot({path:path.join(shots,'consent-print.png'),fullPage:true});
-  await page.emulateMedia({media:'screen'});await page.evaluate(()=>dispatchEvent(new Event('afterprint')));await click('close');
+  await printed.screenshot({path:path.join(shots,'consent-print.png'),fullPage:true});
+  await printed.close();await click('close');
   await page.locator(`[data-consent-id="${consentId}"] [data-consent-action="history-reopen"]`).click();
   await dialog.locator('[name="first_visit_mode"]').waitFor();
   assert.equal(await page.evaluate(()=>fixture.consents[0].status),'draft');
@@ -224,8 +232,8 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   assert.equal(await dialog.locator('[name="first_visit_amount"]').inputValue(),'4000.5');
   await click('finalize');await page.waitForFunction(()=>fixture.consents[0].status==='finalized');
   assert.equal(await dialog.locator('.consent-copy:visible table td').count(),4);
-  await click('print');assert.equal(await page.locator('#consent-print-root table td').count(),4);
-  await page.evaluate(()=>dispatchEvent(new Event('afterprint')));await click('close');
+  const secondPopup=page.waitForEvent('popup');await click('print');const tablePrint=await secondPopup;await tablePrint.waitForFunction(()=>window.printCalls===1);assert.equal(await tablePrint.locator('#consent-print-root .consent-document-table td').count(),4);
+  await tablePrint.close();await click('close');
   // An applied multi-tooth/surface procedure creates one prompt and keeps context.
   await page.evaluate(()=>{
     const patient=fixture.patients[0];patient.chartState={3:{surfaces:{left:[{id:'00000000-0000-4000-8000-000000000002',code:'implant',createdAt:'applied'}],right:[{id:'00000000-0000-4000-8000-000000000002',code:'implant',createdAt:'applied'}]}}};

@@ -46,6 +46,20 @@ test('consent tables add edge rows and columns, drag dimensions, persist and pri
     await page.evaluate(()=>editor.quill.setSelection(12,5));assert.equal(await page.locator('[data-editor-format="size"]').inputValue(),'14px','Inherited word size is shown as a number');
     await page.locator('[data-editor-format="size"]').selectOption('10px');assert.equal(await page.evaluate(()=>editor.quill.getFormat(12,5).size),'10px');
   }
+
+  for(const language of ['en','ar']){
+    await page.evaluate(language=>{editor.dispose();currentUiLanguage=language;window.editor=LuminConsentEditor.mount(document.getElementById('editor'),{name:'body',label:'Consent',language,text:'First paragraph\nSecond paragraph\nThird paragraph'});editor.quill.setSelection(0,15);},language);
+    assert.equal(await page.locator('[data-editor-format="lineSpacing"]').inputValue(),'1.85');
+    await page.locator('[data-editor-format="lineSpacing"]').selectOption('1.25');
+    assert.equal(await page.evaluate(()=>editor.quill.getFormat(0,1).lineSpacing),'1.25');
+    assert.equal(await page.evaluate(()=>editor.quill.getFormat(16,1).lineSpacing),undefined,'Other paragraphs retain their spacing');
+    await page.evaluate(()=>editor.quill.setSelection(0,32));
+    await page.locator('[data-editor-format="lineSpacing"]').selectOption('2');
+    assert.equal(await page.evaluate(()=>editor.quill.getFormat(16,1).lineSpacing),'2');
+    await page.evaluate(()=>{const saved=editor.getDocument();editor.setDocument(saved);editor.quill.setSelection(16,0);document.getElementById('print').innerHTML=LuminConsentDocument.html(saved);});
+    assert.equal(await page.locator('[data-editor-format="lineSpacing"]').inputValue(),'2');
+    assert.equal(await page.locator('#print p').nth(1).evaluate(node=>node.style.lineHeight),'2');
+  }
   await page.evaluate(()=>{editor.dispose();window.variables={implant_total:'10,000',doctor_name_ar:'د. نور'};window.editor=LuminConsentEditor.mount(document.getElementById('editor'),{name:'body',label:'Consent',language:'en',text:'Total: {{implant_total}} / {{implant_total}}\nDoctor: {{doctor_name_ar}}',values:()=>variables});variables.implant_total='20,000';editor.updateVariables(variables);});
   assert.match(await page.locator('#editor .ql-editor').innerText(),/20,000 \/ 20,000/,'Repeated variables update independently');
   await page.evaluate(()=>{let index=0;const op=editor.getDocument().ops.find(op=>{if(op.attributes?.consentField==='implant_total')return true;index+=typeof op.insert==='string'?op.insert.length:1;return false;});editor.quill.deleteText(index,op.insert.length,'user');editor.quill.insertText(index,'Custom fee','user');variables.implant_total='30,000';variables.doctor_name_ar='د. عمر';editor.updateVariables(variables);});

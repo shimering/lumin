@@ -236,15 +236,15 @@
     icons();
   }
   function replaceDoctor(body,before,after){return body.replace('Treating doctor: '+before,'Treating doctor: '+after).replace('الطبيب المعالج: '+before,'الطبيب المعالج: '+after);}
-  async function openRecord(id,print=false){
-    if(!canUse())return;
-    const pid=patientId(),user=userId(),request=modal(t('Patient consent','موافقة المريض'));if(request===null)return;
+  async function openRecord(id,print=false,printView){
+    if(!canUse()){printView?.close();return;}
+    const pid=patientId(),user=userId(),request=modal(t('Patient consent','موافقة المريض'));if(request===null){printView?.close();return;}
     try{
       if(typeof ensureDentalCustomizationLoaded==='function')await ensureDentalCustomizationLoaded();
       const [record,doctors,patient,progress]=await Promise.all([result(db.from('patient_consents').select('*').eq('patient_id',pid).eq('id',id).single()),result(db.rpc('list_consent_doctors')),result(db.from('patients').select('id,chart_state').eq('id',pid).single()),result(db.from('implant_progress').select('finding_id,implant_type').eq('patient_id',pid).limit(1000))]);
-      if(!modalCurrent(request,pid,user))return;
-      Object.assign(ui,{record,doctors,patient,progress});renderEditor();if(print)printRecord(record);
-    }catch(error){if(modalCurrent(request,pid,user))loadFailure(error);}
+      if(!modalCurrent(request,pid,user)){printView?.close();return;}
+      Object.assign(ui,{record,doctors,patient,progress});renderEditor();if(print)await printRecord(record,printView);
+    }catch(error){printView?.close();if(modalCurrent(request,pid,user))loadFailure(error);}
   }
   function busy(value){ui.busy=value;ui.overlay?.querySelectorAll('button,input,select,textarea').forEach(node=>node.disabled=value);ui.editors.forEach(editor=>editor.setDisabled(value));if(!value&&form()?.elements.first_visit_mode)updateVariableValues();}
   function patientPayload(status,baseOnly=false){
@@ -273,23 +273,12 @@
     }catch(error){if(modalCurrent(request,id,user))feedback(error);}
     finally{if(request===ui.request)busy(false);}
   }
-  let printCleanup=null,printJob=0;
-  async function printRecord(record){
-    if(!record?.id||record.patient_id!==patientId()||!canUse())return;
-    if(ui.readLanguage&&ui.readLanguage!==record.language){if(!record.alternate_body)return;record={...record,language:ui.readLanguage,title:record.alternate_title||record.title,body:record.alternate_body,content:record.alternate_content};}
-    const job=++printJob;printCleanup?.();document.getElementById('consent-print-root')?.remove();
-    const paper=document.createElement('section');paper.id='consent-print-root';paper.dir=record.language==='ar'?'rtl':'ltr';paper.style.display='none';
-    const ar=record.language==='ar',tr=(en,arabic)=>ar?arabic:en;
-    paper.innerHTML=`<div class="consent-copy consent-rich-content">${rich().html(rich().read(record.content,record.body))}</div><div class="consent-print-signatures"><p>${tr('Patient / guardian name and signature','اسم وتوقيع المريض / ولي الأمر')}<br>${tr('Relationship (if guardian)','صلة القرابة (لولي الأمر)')}<br>${tr('Date','التاريخ')}: __________________</p><p>${tr('Treating doctor signature','توقيع الطبيب المعالج')}<br>${e(ar&&record.doctor_name_ar?record.doctor_name_ar:record.doctor_name)}<br>${tr('Date','التاريخ')}: __________________</p><p>${tr('Witness / interpreter (if needed)','الشاهد / المترجم (عند الحاجة)')}<br>${tr('Name and signature','الاسم والتوقيع')}: __________________</p></div>`;
-    document.body.appendChild(paper);
-    const cleanup=()=>{root.removeEventListener('afterprint',cleanup);if(printCleanup===cleanup){document.documentElement.classList.remove('consent-printing');document.body.classList.remove('consent-printing');printCleanup=null;}paper.remove();};printCleanup=cleanup;
-    try{
-      const families=[...new Set((rich().read(record.content,record.body).ops||[]).map(op=>op.attributes?.font).filter(Boolean))];
-      if(document.fonts){await Promise.allSettled(families.map(font=>document.fonts.load(`14px "${font}"`,ar?'نص الموافقة':'Consent')));await document.fonts.ready;}
-      if(job!==printJob||record.patient_id!==patientId()||!canUse()){cleanup();return;}
-      document.documentElement.classList.add('consent-printing');document.body.classList.add('consent-printing');
-      root.addEventListener('afterprint',cleanup,{once:true});root.print();
-    }catch(error){cleanup();throw error;}
+  let printJob=0;
+  async function printRecord(record,view){
+    if(!record?.id||record.patient_id!==patientId()||!canUse()){view?.close();return;}
+    if(ui.readLanguage&&ui.readLanguage!==record.language){if(!record.alternate_body){view?.close();return;}record={...record,language:ui.readLanguage,title:record.alternate_title||record.title,body:record.alternate_body,content:record.alternate_content};}
+    const job=++printJob,user=userId();
+    return root.LuminConsentPrint.print(record,{view,isCurrent:()=>job===printJob&&user===userId()&&record.patient_id===patientId()&&canUse()});
   }
   async function reopenConsent(){
     const record=ui.record;if(ui.busy||!record?.id||record.status!=='finalized'||!canUse())return;
@@ -317,7 +306,7 @@
       Object.assign(admin,{templates,operations});
       container.innerHTML=titleHeader(t('Consent templates','نماذج الموافقة'),t('Shared clinic wording. Updates apply to new consents; saved patient forms retain their text.','نصوص موحدة للعيادة. تسري التحديثات على الموافقات الجديدة وتحتفظ النماذج المحفوظة بنصها.'),button('admin-refresh',t('Refresh','تحديث'),'refresh-cw')+button('template-new',t('Add template','إضافة نموذج'),'plus','consent-primary'))+
         `<div class="consent-panel" style="margin-bottom:20px"><p class="consent-hint">${t('Seven original bilingual starter forms cover the procedure categories in Dentolize’s public generator. Review and adapt the clinical wording to your practice and local requirements before use. Procedure links are optional and managed below.','تغطي سبعة نماذج أولية أصلية باللغتين فئات الإجراءات في مولد Dentolize العام. راجع النص الطبي وعدله وفق العيادة والمتطلبات المحلية قبل الاستخدام. ربط الإجراءات اختياري ويمكن ضبطه أدناه.')}</p><a class="consent-reference" href="https://dentolize.com/tools/dental-consent-form-generator/" target="_blank" rel="noopener noreferrer">${t('Dentolize reference forms','نماذج Dentolize المرجعية')}${icon('external-link')}</a></div><div class="consent-grid">${templates.map(template=>`<article class="consent-card" data-template-id="${e(template.id)}"><div class="consent-meta"><span class="consent-badge ${template.active?'is-finalized':''}">${template.active?t('Active','نشط'):t('Archived','مؤرشف')}</span><span>${t('Version','الإصدار')} ${template.revision}</span></div><h3>${e(templateTitle(template))}</h3><p>${template.procedure_codes.length} ${t('linked procedures','إجراءات مرتبطة')}</p><div class="consent-actions">${button('template-edit',t('Edit template','تعديل النموذج'),'pencil')}</div></article>`).join('')}</div>`;
-      icons();
+      void root.LuminConsentPrint.mountAdmin(container);icons();
     }catch(error){if(request===admin.request&&user===userId()&&isAdmin()){container.innerHTML=`<div class="consent-panel"><p class="consent-error" role="alert">${e(errorText(error))}</p>${button('admin-refresh',t('Try again','حاول مجدداً'),'refresh-cw')}</div>`;icons();}}
   }
   async function editTemplate(id){
@@ -392,7 +381,7 @@
     if(name==='refresh')return render();if(name==='more')return render({append:true});
     if(name==='new')return openNew();
     if(name==='choose')return choose(trigger.dataset.templateId);
-    if(name==='open'||name==='history-print')return openRecord(trigger.closest('[data-consent-id]').dataset.consentId,name==='history-print');
+    if(name==='open'||name==='history-print')return openRecord(trigger.closest('[data-consent-id]').dataset.consentId,name==='history-print',name==='history-print'?root.LuminConsentPrint.reserve():null);
     if(name==='history-reopen'||name==='history-delete'){const id=trigger.closest('[data-consent-id]').dataset.consentId;await openRecord(id);if(ui.record?.id!==id)return;return name==='history-reopen'?reopenConsent():confirmDelete();}
     if(name==='reopen')return reopenConsent();if(name==='delete')return confirmDelete();if(name==='cancel-delete')return cancelDelete();if(name==='confirm-delete')return deleteConsent();
     if(name==='save-draft')return save('draft');if(name==='finalize')return save('finalized');
