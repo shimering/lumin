@@ -7,8 +7,15 @@
   <meta name="referrer" content="no-referrer">
   <title>Consent</title>
   <link rel="stylesheet" href="lumin-consent-editor.css?v=6">
-  <link rel="stylesheet" href="lumin-consent-print.css?v=1">
-  <script src="lumin-consent-print-view.js?v=1" defer></script>
+  <link rel="stylesheet" href="lumin-consent-print.css?v=2">
+  <script src="vendor/lucide.min.js" defer></script>
+  <script src="lumin-consent-print-view.js?v=2" defer></script>
 </head>
-<body><p style="padding:24px;text-align:center">Preparing consent… · جارٍ تجهيز الموافقة…</p></body>
+<body>
+  <header class="consent-print-controls" data-consent-print-controls>
+    <div class="consent-print-actions"><button type="button" data-print-consent disabled><i data-lucide="printer" aria-hidden="true"></i><span>Print / Save as PDF · طباعة</span></button><button type="button" data-print-back><i data-lucide="arrow-left" aria-hidden="true"></i><span>Back to consent · العودة</span></button></div>
+    <p data-print-status role="status">Preparing consent… · جارٍ تجهيز الموافقة…</p>
+  </header>
+  <div data-consent-print-document hidden></div>
+</body>
 </html>

@@ -219,8 +219,8 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   assert.ok(await dialog.locator('.consent-copy:visible strong').count()>0);
   const firstPopup=page.waitForEvent('popup');await click('print');const printed=await firstPopup;
   await printed.waitForFunction(()=>window.printCalls===1);await printed.emulateMedia({media:'print'});
-  assert.equal(await printed.locator('#consent-print-root').isVisible(),true);
-  assert.equal(await printed.locator('input,select,button,.consent-dialog,#app-shell').count(),0);
+  assert.equal(await printed.locator('#consent-print-root').isVisible(),true);assert.equal(await printed.locator('[data-consent-print-controls]').isVisible(),false);
+  assert.equal(await printed.locator('input,select,.consent-dialog,#app-shell').count(),0);
   assert.equal(await printed.locator('#consent-print-root > h1, #consent-print-root > .consent-identity, #consent-print-root > .consent-print-note').count(),0,'Print does not prepend a header outside the draft wording');
   assert.equal(await printed.locator('#consent-print-root > :first-child').getAttribute('class'),'consent-copy consent-rich-content');
   assert.match(await printed.locator('#consent-print-root').innerText(),/Patient-specific clause/);

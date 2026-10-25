@@ -20,12 +20,14 @@
     return {settings:normalize(layout.data),logo:logo(image.data?.logo_data_url),updatedAt:layout.data.updated_at};
   }
   function reserve(){
-    const view=root.open(new URL('consent-print.html',root.location.href).href,'_blank');
+    const view=root.open(new URL('consent-print.html?v=2',root.location.href).href,'_blank');
     if(!view)throw new Error(t('Allow pop-ups for Lumin to open the consent print view.','اسمح بالنوافذ المنبثقة لموقع Lumin لفتح صفحة طباعة الموافقة.'));
     const ready=new Promise((resolve,reject)=>{
-      const cleanup=()=>{root.removeEventListener('message',receive);clearTimeout(timeout);};
+      const cleanup=()=>{root.removeEventListener('message',receive);clearTimeout(timeout);clearInterval(poll);};
       const receive=event=>{if(event.source===view&&event.origin===root.location.origin&&event.data==='lumin-consent-print-ready'){cleanup();resolve();}};
       const timeout=setTimeout(()=>{cleanup();reject(new Error(t('Print view could not load. Please retry.','تعذر تحميل صفحة الطباعة. حاول مجدداً.')));},30000);
+      // Recover a ready message missed while a mobile browser activates its new tab.
+      const poll=setInterval(()=>{try{if(view.LuminConsentPrintView?.ready){cleanup();resolve();}else if(view.closed){cleanup();reject(new Error('Print view closed'));}}catch{}},200);
       root.addEventListener('message',receive);
     });
     ready.catch(()=>{});pendingViews.set(view,ready);
@@ -54,15 +56,13 @@
     try{
       const [configuration]=await Promise.all([load(),pendingViews.get(view)]);
       if(view.closed||!isCurrent()){view.close();return;}
-      const ar=record.language==='ar';view.document.documentElement.lang=ar?'ar':'en';view.document.documentElement.dir=ar?'rtl':'ltr';view.document.title=record.title;
-      view.document.body.innerHTML=body(record,configuration);
+      view.document.querySelector('[data-consent-print-document]').innerHTML=body(record,configuration);
       const families=[...new Set(root.LuminConsentDocument.read(record.content,record.body).ops.map(op=>op.attributes?.font).filter(Boolean))];
-      if(view.document.fonts){await Promise.allSettled(families.map(font=>view.document.fonts.load(`14px "${font}"`,ar?'نص الموافقة':'Consent')));await view.document.fonts.ready;}
-      await Promise.allSettled([...view.document.images].map(image=>image.decode()));
+      await view.LuminConsentPrintView.prepare({language:record.language,title:record.title,fonts:families});
       if(view.closed||!isCurrent()){view.close();return;}
       // Android can fire afterprint before its native preview has captured the page.
       // Keep this dedicated document alive; it never contains the patient editor.
-      view.focus();view.print();
+      view.focus();view.LuminConsentPrintView.autoPrint();
     }catch(error){if(!view.closed)view.close();throw error;}
   }
   async function mountAdmin(container){
