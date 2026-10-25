@@ -1,4 +1,4 @@
-const LUMIN_CACHE = "lumin-dental-shell-v263";
+const LUMIN_CACHE = "lumin-dental-shell-v264";
 const LUMIN_SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -13,7 +13,7 @@ const LUMIN_SHELL = [
   "/lumin-consents.css?v=1",
   "/lumin-consent-document.js?v=1",
   "/lumin-consent-editor.js?v=1",
-  "/lumin-consent-editor.css?v=1",
+  "/lumin-consent-editor.css?v=2",
   "/vendor/quill/quill-2.0.2.js",
   "/vendor/quill/quill.core-2.0.2.css",
   "/vendor/dompurify/purify-3.4.17.min.js",
