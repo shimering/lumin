@@ -26,17 +26,17 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   await page.route('**/*',route=>route.request().url().startsWith('http://127.0.0.1:')?route.continue():route.abort());
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
   await page.addScriptTag({path:path.join(root,'vendor/lucide.min.js')});
-  for(const file of ['vendor/quill/quill-2.0.2.js','vendor/dompurify/purify-3.4.17.min.js','lumin-consent-document.js','lumin-consent-editor.js','lumin-consent-model.js'])await page.addScriptTag({path:path.join(root,file)});
+  for(const file of ['vendor/quill/quill-2.0.2.js','vendor/dompurify/purify-3.4.17.min.js','lumin-consent-document.js','lumin-consent-editor.js','lumin-consent-model.js','lumin-implant-consent.js'])await page.addScriptTag({path:path.join(root,file)});
   const doctors=[{user_id:id(80),full_name:'Dr. Noor'},{user_id:id(81),full_name:'Dr. Omar'}];
-  const patient={id:id(90),name:'مريم عبد الرحمن / Mariam Hassan',patient_number:274,birth_date:'1990-01-02',phone:'01012345678',age:36,gender:'female',address:'Cairo',chart_state:{3:{wholeOperations:[{code:'implant',id:id(1),doctorId:doctors[1].user_id,createdAt:'2026-10-20'}]}}};
+  const patient={id:id(90),name:'مريم عبد الرحمن / Mariam Hassan',patient_number:274,birth_date:'1990-01-02',phone:'01012345678',age:36,gender:'female',address:'Cairo',chart_state:{3:{wholeOperations:[{code:'implant',id:id(1),price:10000,doctorId:doctors[1].user_id,createdAt:'2026-10-20'}]},4:{wholeOperations:[{code:'implant',id:id(3),price:15000,createdAt:'2026-10-19'}]}}};
   await page.evaluate(({templates,patient,doctors,idB})=>{
     window.currentSession={user:{id:'staff'}};window.currentUiLanguage='en';window.activeWorkspacePatientId=patient.id;
-    window.fixture={templates,patients:[patient,{...patient,id:idB,name:'Second patient',patient_number:275}],doctors,consents:[],admin:true,allowed:true,delay:0,writes:0};
+    window.fixture={templates,patients:[patient,{...patient,id:idB,name:'Second patient',patient_number:275}],doctors,consents:[],progress:[{patient_id:patient.id,finding_id:patient.chart_state[4].wholeOperations[0].id,implant_type:'Nobel'}],admin:true,allowed:true,delay:0,writes:0};
     window.hasPageAccess=page=>page==='admin'?fixture.admin:fixture.allowed;
     window.patientWorkspaceId=()=>activeWorkspacePatientId;
     window.getKnownPatient=pid=>fixture.patients.find(patient=>patient.id===pid);
     window.updatePatientWorkspaceNavigation=(patient,tab)=>{document.querySelectorAll('[data-patient-workspace-tab]').forEach(button=>button.setAttribute('aria-selected',String(button.dataset.patientWorkspaceTab===tab)));};
-    window.dentalOperationByCode=code=>({code,name:code==='implant'?'Dental implant':'Orthodontic package'});
+    window.dentalOperationByCode=code=>({code,name:code==='implant'?'Dental implant':'Orthodontic package',isImplantProcedure:code==='implant',implantType:'Straumann',price:10000});
     window.chartToothLabel=tooth=>'Tooth '+tooth;
     window.print=()=>{window.printCalls=(window.printCalls||0)+1;};
     const operations=[{code:'implant',name:'Dental implant',active:true},{code:'ortho',name:'Orthodontic package',active:true}];
@@ -46,7 +46,7 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
         order(key,options={}){q.sorts.push([key,options.ascending!==false]);return q;},limit(value){q.end=q.start+value-1;return q;},range(start,end){q.start=start;q.end=end;return q;},
         insert(payload){q.kind='insert';q.payload=payload;return q;},update(payload){q.kind='update';q.payload=payload;return q;},single(){q.one=true;return q;},maybeSingle(){q.one=true;return q;},
         then(resolve,reject){return new Promise(done=>setTimeout(done,fixture.delay)).then(()=>{
-          const rows=table==='consent_templates'?fixture.templates:table==='patients'?fixture.patients:table==='dental_operations'?operations:fixture.consents;
+          const rows=table==='consent_templates'?fixture.templates:table==='patients'?fixture.patients:table==='dental_operations'?operations:table==='implant_progress'?fixture.progress:fixture.consents;
           let selected=rows.filter(row=>filters.every(filter=>filter(row)));
           if(q.kind==='insert'){
             const now=new Date().toISOString();const record={id:crypto.randomUUID(),active:true,procedure_codes:[],revision:1,created_at:now,updated_at:now,...q.payload};
@@ -110,6 +110,20 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   await showPatient();await click('new');
   assert.equal(await dialog.locator(`[data-template-id="${customTemplate.id}"]`).count(),0,'Archived templates remain out of new consent choices');
   await dialog.locator(`[data-template-id="${id(20)}"]`).click();
+  await dialog.locator('[name="language"]').selectOption('ar');
+  await dialog.locator('[name="language"]').selectOption('en');
+  assert.equal(await dialog.locator('[data-consent-feedback]').isVisible(),false,'Form language can be changed before assigning procedures');
+  await click('save-draft');
+  assert.match(await dialog.locator('[data-consent-feedback]').innerText(),/Assign at least one implant procedure/);
+  assert.equal(await page.evaluate(()=>fixture.consents.length),0);
+  await dialog.locator('[name="assigned_finding_ids"]').first().check();
+  await dialog.locator('[name="assigned_finding_ids"]').nth(1).check();
+  await dialog.locator('[name="payment_mode"]').selectOption('monthly');
+  await dialog.locator('[name="first_visit_percent"]').fill('35');
+  await dialog.locator('[name="interval_months"]').selectOption('6');
+  await dialog.locator('[name="monthly_count"]').fill('3');
+  assert.match(await dialog.locator('[data-implant-preview="en"]').innerText(),/Total amount: 25,000/);
+  assert.match(await dialog.locator('[data-implant-preview="en"]').innerText(),/5,416.68/);
   assert.equal(await dialog.locator('[name="doctor_name"]').inputValue(),'Dr. Omar','Treating doctor comes from the chart');
   let body=await dialog.locator('[name="body"]').inputValue();
   assert.match(body,/Mariam Hassan/);assert.match(body,/274/);assert.match(body,/1990-01-02/);assert.match(body,/Clinic reviewed clause/);
@@ -145,6 +159,9 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   const consentId=await page.evaluate(()=>fixture.consents[0].id);
   assert.ok(await page.evaluate(()=>fixture.consents[0].content.ops.some(op=>op.attributes?.bold)));
   assert.match(await page.evaluate(()=>fixture.consents[0].alternate_body),/أوافق على العلاج/);
+  assert.equal(await page.evaluate(()=>fixture.consents[0].implant_terms.monthly_count),3);
+  assert.equal(await page.evaluate(()=>fixture.consents[0].finding_ids.length),2);
+  assert.match(await page.evaluate(()=>fixture.consents[0].alternate_body),/تاسعا: التكلفة:/);
   await click('close');
   assert.equal(await page.locator('#view-patient-consents .consent-card').count(),1);
   await showAdmin();await page.locator(`[data-template-id="${id(20)}"] [data-consent-action="template-edit"]`).click();
@@ -153,7 +170,14 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   assert.match(await dialog.locator('[name="body"]').inputValue(),/Patient-specific clause/);
   assert.match(await dialog.locator('[name="body"]').inputValue(),/Procedure \/ teeth: Implant at site 36/);
   assert.doesNotMatch(await dialog.locator('[name="body"]').inputValue(),/New universal version/);
+  await page.evaluate(()=>fixture.progress[0].implant_type='Astra');
+  assert.match(await dialog.locator('[data-implant-preview="en"]').innerText(),/Nobel/,'Saved draft keeps its agreed types until refreshed');
+  await click('refresh-implant');
+  await page.waitForFunction(()=>document.querySelector('[data-implant-preview="en"]')?.textContent.includes('Astra'));
+  assert.match(await dialog.locator('[name="body"]').inputValue(),/Patient-specific clause/,'Refreshing procedure data preserves the edited wording');
   await click('finalize');await page.waitForFunction(()=>fixture.consents[0].status==='finalized');
+  assert.equal(await page.evaluate(()=>fixture.consents[0].body.split('Ninth: Cost:').length),2,'Reopening and refreshing do not duplicate the generated section');
+  assert.match(await page.evaluate(()=>fixture.consents[0].body),/Astra/);
   await dialog.locator('.consent-copy:visible').waitFor();assert.equal(await dialog.locator('textarea,input').count(),0);
   assert.ok(await dialog.locator('.consent-copy:visible strong').count()>0);
   await click('print');assert.equal(await page.evaluate(()=>printCalls),1);
@@ -191,12 +215,15 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
     await page.setViewportSize({width,height:940});
     await page.evaluate(async language=>{currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';await LuminConsents.render();},language);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`history ${width}/${language}`);
-    await click('new');await dialog.locator(`[data-template-id="${id(21)}"]`).click();
+    await click('new');await dialog.locator(`[data-template-id="${id(20)}"]`).click();
+    await dialog.locator('[name="assigned_finding_ids"]').first().check();
+    await dialog.locator('[name="payment_mode"]').selectOption('monthly');
     assert.equal(await dialog.locator('[name="body"]').getAttribute('dir'),language==='ar'?'rtl':'ltr');
     const bounds=await dialog.boundingBox();assert.ok(bounds.x>=-1&&bounds.x+bounds.width<=width+1);
     assert.ok(await dialog.evaluate(node=>node.scrollWidth<=node.clientWidth+1));
     for(const control of await dialog.locator('button:visible,input:visible,select:visible').all()){
-      const rect=await control.boundingBox();assert.ok(rect.height>=43.9&&rect.width>=43.9);
+      const target=await control.getAttribute('type')==='checkbox'?control.locator('..'):control;
+      const rect=await target.boundingBox();assert.ok(rect.height>=43.9&&rect.width>=43.9);
     }
     await dialog.locator('[data-consent-action="close"]').first().focus();await page.keyboard.press('Shift+Tab');
     assert.equal(await dialog.locator('[data-consent-action="finalize"]').evaluate(node=>node===document.activeElement),true);

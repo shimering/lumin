@@ -122,8 +122,9 @@
   <script src="vendor/dompurify/purify-3.4.17.min.js"></script>
   <script src="lumin-consent-document.js?v=1"></script>
   <script src="lumin-consent-editor.js?v=1"></script>
-  <script src="lumin-consent-model.js?v=2"></script>
-  <script src="lumin-consents.js?v=2"></script>
+  <script src="lumin-consent-model.js?v=3"></script>
+  <script src="lumin-implant-consent.js?v=1"></script>
+  <script src="lumin-consents.js?v=3"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <link rel="stylesheet" href="lumin-tooth-images.css?v=1" />
   
@@ -5407,7 +5408,7 @@
   <link rel="stylesheet" href="lumin-clinical-actions.css?v=8" />
   <link rel="stylesheet" href="lumin-media-teeth.css?v=1" />
   <link rel="stylesheet" href="lumin-quotations.css?v=6" />
-  <link rel="stylesheet" href="lumin-consents.css?v=1" />
+  <link rel="stylesheet" href="lumin-consents.css?v=2" />
   <link rel="stylesheet" href="vendor/quill/quill.core-2.0.2.css" />
   <link rel="stylesheet" href="lumin-consent-editor.css?v=2" />
   <style id="finance-ledger-styles">
@@ -7875,6 +7876,13 @@
                 </span>
               </label>
             </div>
+            <section class="consent-panel" style="padding:16px">
+              <label class="consent-check"><input id="admin-operation-is-implant" type="checkbox" onchange="document.getElementById('admin-operation-implant-settings').hidden=!this.checked;if(this.checked){document.getElementById('admin-operation-scope').value='whole';renderDentalVisualPresetOptions();}" /><span data-implant-label="procedure">Implant-specific procedure</span></label>
+              <div id="admin-operation-implant-settings" hidden>
+                <label class="consent-field"><span data-implant-label="type">Default implant type</span><input id="admin-operation-implant-type" maxlength="160" list="implant-type-options" /></label>
+                <p class="consent-hint" data-implant-label="hint">Automatically offers an implant consent and enables implant progress tracking. The type can be changed for each implant in Implant Progress.</p>
+              </div>
+            </section>
             <p id="admin-operation-message" class="hidden rounded-xl px-3 py-2 text-xs font-bold" role="status"></p>
             </div>
             <div class="grid shrink-0 grid-cols-2 gap-2 border-t border-slate-100 bg-slate-50/80 p-4 sm:flex sm:justify-end" style="padding-bottom:max(1rem, env(safe-area-inset-bottom));">
@@ -9840,10 +9848,11 @@
           </label>
           <label class="block">
             <span class="mb-1.5 block text-xs font-black text-slate-700">Implant Type</span>
-            <select id="implant-form-type" required class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20">
+            <input id="implant-form-type" required maxlength="160" list="implant-type-options" class="w-full min-h-11 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20" />
+            <datalist id="implant-type-options">
               <option value="Standard (b&b)">Standard (b&b)</option>
               <option value="Economic (dual)">Economic (dual)</option>
-            </select>
+            </datalist>
           </label>
           <label class="block">
             <span class="mb-1.5 block text-xs font-black text-slate-700">Implant Size</span>
@@ -14776,6 +14785,8 @@
         active: Boolean(record.active),
         sortOrder: Number(record.sort_order) || 0,
         trackImplantProgress: Boolean(record.track_implant_progress),
+        isImplantProcedure: Boolean(record.is_implant_procedure),
+        implantType: String(record.implant_type || ''),
         isOrthoPackage: Boolean(record.is_ortho_package),
         steps: normaliseDentalProcedureSteps(record.procedure_steps),
         createdAt: record.created_at,
@@ -15400,9 +15411,12 @@
 
       let [specialtiesResult, operationsResult] = await Promise.all([
         db.from('dental_specialties').select('id, name, description, icon_name, accent_color, active, sort_order, created_at, updated_at').order('sort_order').order('name'),
-        db.from('dental_operations').select('id, specialty_id, code, name, action_scope, visual_code, price, active, sort_order, track_implant_progress, procedure_steps, is_ortho_package, created_at, updated_at').order('sort_order').order('name')
+        db.from('dental_operations').select('id, specialty_id, code, name, action_scope, visual_code, price, active, sort_order, track_implant_progress, procedure_steps, is_ortho_package, is_implant_procedure, implant_type, created_at, updated_at').order('sort_order').order('name')
       ]);
       if (specialtiesResult.error) throw specialtiesResult.error;
+      if (operationsResult.error && /is_implant_procedure|implant_type/i.test(String(operationsResult.error.message || ''))) {
+        operationsResult = await db.from('dental_operations').select('id, specialty_id, code, name, action_scope, visual_code, price, active, sort_order, track_implant_progress, procedure_steps, is_ortho_package, created_at, updated_at').order('sort_order').order('name');
+      }
       if (operationsResult.error && /is_ortho_package|procedure_steps/i.test(String(operationsResult.error.message || ''))) {
         operationsResult = await db.from('dental_operations').select('id, specialty_id, code, name, action_scope, visual_code, price, active, sort_order, track_implant_progress, created_at, updated_at').order('sort_order').order('name');
       }
@@ -15900,6 +15914,10 @@
       document.getElementById('admin-operation-has-steps').checked = false;
       const orthoPkgReset = document.getElementById('admin-operation-is-ortho-package');
       if (orthoPkgReset) orthoPkgReset.checked = false;
+      document.getElementById('admin-operation-is-implant').checked = false;
+      document.getElementById('admin-operation-implant-type').value = '';
+      document.getElementById('admin-operation-implant-settings').hidden = true;
+      updateImplantProcedureLabels();
       document.getElementById('admin-operation-form-title').textContent = 'Add clinical operation';
       setAdminMessage('admin-operation-message', '');
       renderDentalVisualPresetOptions();
@@ -15923,6 +15941,15 @@
       showAdminDentalDialog('modal-dental-specialty-form', 'admin-specialty-name');
     }
 
+    function updateImplantProcedureLabels() {
+      const labels = currentUiLanguage === 'ar'
+        ? { procedure: 'إجراء خاص بزراعة الأسنان', type: 'نوع الزراعة الافتراضي', hint: 'يقترح موافقة الزراعة تلقائياً ويفعّل متابعة الزراعة. يمكن تغيير النوع لكل زرعة من صفحة متابعة الزراعة.' }
+        : { procedure: 'Implant-specific procedure', type: 'Default implant type', hint: 'Automatically offers an implant consent and enables implant progress tracking. The type can be changed for each implant in Implant Progress.' };
+      document.querySelectorAll('[data-implant-label]').forEach(node => { node.textContent = labels[node.dataset.implantLabel]; });
+      const list = document.getElementById('implant-type-options');
+      if (list) list.innerHTML = [...new Set(['Standard (b&b)', 'Economic (dual)', ...dentalOperations.map(operation => window.LuminImplantConsent.defaultType(operation))].filter(Boolean))].map(type => `<option value="${escapeHtml(type)}"></option>`).join('');
+    }
+
     function editDentalOperation(operationId) {
       const operation = dentalOperations.find(item => item.id === operationId);
       if (!operation || !hasPageAccess('admin')) return;
@@ -15938,6 +15965,10 @@
       document.getElementById('admin-operation-has-steps').checked = dentalOperationStepDraft.length > 0;
       const orthoPkgEdit = document.getElementById('admin-operation-is-ortho-package');
       if (orthoPkgEdit) orthoPkgEdit.checked = Boolean(operation.isOrthoPackage);
+      document.getElementById('admin-operation-is-implant').checked = window.LuminImplantConsent.isImplant(operation);
+      document.getElementById('admin-operation-implant-type').value = window.LuminImplantConsent.defaultType(operation);
+      document.getElementById('admin-operation-implant-settings').hidden = !window.LuminImplantConsent.isImplant(operation);
+      updateImplantProcedureLabels();
       document.getElementById('admin-operation-form-title').textContent = 'Edit clinical operation';
       renderDentalVisualPresetOptions(operation.visualCode);
       renderDentalOperationStepsEditor();
@@ -16004,8 +16035,12 @@
         sort_order: Number(document.getElementById('admin-operation-sort-order').value) || 0,
         active: document.getElementById('admin-operation-active').checked,
         procedure_steps: procedureSteps,
-        is_ortho_package: isOrthoPackage
+        is_ortho_package: isOrthoPackage,
+        is_implant_procedure: document.getElementById('admin-operation-is-implant').checked,
+        implant_type: document.getElementById('admin-operation-is-implant').checked ? document.getElementById('admin-operation-implant-type').value.trim() : '',
+        track_implant_progress: document.getElementById('admin-operation-is-implant').checked || Boolean(existingOperation?.trackImplantProgress)
       };
+      if (payload.is_implant_procedure && (!payload.implant_type || actionScope !== 'whole')) return setAdminMessage('admin-operation-message', currentUiLanguage === 'ar' ? 'حدد نوع الزراعة واختر نطاق السن بالكامل لإجراء الزراعة.' : 'Set an implant type and choose Whole tooth scope for an implant procedure.', 'error');
       if (!operationId) payload.code = dentalOperationCode(name, specialtyId);
       button.disabled = true;
       button.textContent = 'Saving...';
@@ -23130,6 +23165,7 @@
     function openNewImplantModal() {
       const modal = document.getElementById('modal-implant-record');
       if (!modal) return;
+      updateImplantProcedureLabels();
       document.getElementById('implant-modal-title').textContent = currentUiLanguage === 'ar' ? 'إضافة زراعة جديدة' : 'New Implant Entry';
       document.getElementById('implant-form-id').value = '';
       document.getElementById('implant-form-patient-id').value = '';
@@ -23168,6 +23204,7 @@
       if (!record) return;
       const modal = document.getElementById('modal-implant-record');
       if (!modal) return;
+      updateImplantProcedureLabels();
 
       const patient = record.patients || patients.find(p => p.id === record.patient_id);
       const slot = resolveToothSlotNumber(record.tooth_number);
@@ -23188,8 +23225,7 @@
 
       const typeSelect = document.getElementById('implant-form-type');
       if (typeSelect) {
-        const isStandard = !String(record.implant_type || '').toLowerCase().includes('economic') && !String(record.implant_type || '').toLowerCase().includes('dual');
-        typeSelect.value = isStandard ? 'Standard (b&b)' : 'Economic (dual)';
+        typeSelect.value = record.implant_type || '';
       }
 
       document.getElementById('implant-form-size').value = record.implant_size || '';
@@ -23247,7 +23283,9 @@
       const rawTooth = String(document.getElementById('implant-form-tooth').value || '').trim();
       const resolvedSlot = resolveToothSlotNumber(rawTooth);
       const toothNumber = resolvedSlot ? String(resolvedSlot) : rawTooth;
-      const implantType = document.getElementById('implant-form-type').value;
+      const implantType = document.getElementById('implant-form-type').value.trim();
+      if (!implantType) return;
+      const existingRecord = implantProgressRecords.find(record => record.id === recordId);
       const implantSize = String(document.getElementById('implant-form-size').value || '').trim();
       const healingCollar = document.getElementById('implant-form-healing-collar').checked;
       let status = document.getElementById('implant-form-status').value;
@@ -23259,8 +23297,8 @@
         const payload = {
           patient_id: patientId,
           finding_id: findingId || (recordId ? undefined : `manual_${Date.now()}`),
-          operation_code: implantType.includes('Economic') ? 'dz_implantation_i9' : 'dz_implantation_i10',
-          operation_name: implantType,
+          operation_code: existingRecord?.operation_code || (implantType.includes('Economic') ? 'dz_implantation_i9' : 'dz_implantation_i10'),
+          operation_name: existingRecord?.operation_name || implantType,
           tooth_number: toothNumber,
           implant_type: implantType,
           implant_size: implantSize,
@@ -23494,7 +23532,7 @@
     async function syncImplantProgressFromChartOperation(patient, toothId, finding, prevStatus) {
       if (!patient || !finding) return;
       const op = dentalOperationByCode(finding.code);
-      const isTracked = op ? Boolean(op.trackImplantProgress) : ['dz_implantation_i10', 'dz_implantation_i9'].includes(finding.code);
+      const isTracked = op ? Boolean(op.trackImplantProgress || window.LuminImplantConsent.isImplant(op)) : ['dz_implantation_i10', 'dz_implantation_i9'].includes(finding.code);
       if (!isTracked) return;
 
       const findingId = finding.id;
@@ -23504,9 +23542,7 @@
         const rawBeginDate = finding.beginDate || (finding.status === 'In' || finding.status === 'C' ? (finding.createdAt || new Date().toISOString()) : null);
         const procedureDate = rawBeginDate ? String(rawBeginDate).slice(0, 10) : (finding.createdAt ? String(finding.createdAt).slice(0, 10) : appointmentDateKey(new Date()));
         const deliveryDate = addMonthsToDate(procedureDate, 4);
-        const implantType = op?.code === 'dz_implantation_i9'
-          ? 'Economic (dual)'
-          : (op?.code === 'dz_implantation_i10' ? 'Standard (b&b)' : (op?.name || 'Standard (b&b)'));
+        const implantType = window.LuminImplantConsent.defaultType(op) || op?.name || 'Standard (b&b)';
 
         const payload = {
           patient_id: patient.id,
@@ -23522,8 +23558,14 @@
           updated_at: new Date().toISOString()
         };
 
-        const existing = (implantProgressRecords || []).find(r => r.patient_id === patient.id && r.finding_id === findingId);
+        let existing = (implantProgressRecords || []).find(r => r.patient_id === patient.id && r.finding_id === findingId);
+        if (!existing) {
+          const saved = await db.from('implant_progress').select('*').eq('patient_id', patient.id).eq('finding_id', findingId).maybeSingle();
+          if (saved.error) { console.error('Failed to read saved implant details:', saved.error); return; }
+          existing = saved.data;
+        }
         if (existing) {
+          payload.implant_type = existing.implant_type || payload.implant_type;
           payload.implant_size = existing.implant_size || payload.implant_size;
           payload.healing_collar = existing.healing_collar ?? false;
           payload.delivery_date = existing.delivery_date || payload.delivery_date;
