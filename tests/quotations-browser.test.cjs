@@ -251,7 +251,7 @@ test('patient Quotations tab supports editing, deletion, pagination and patient 
       if(body.action==='create'||body.action==='update'){savedQuote={...savedQuote,...body,id:'${id(99)}',token:'${'b'.repeat(64)}',patient_id:patient.id,revision:(savedQuote?.revision||0)+1,created_at:savedQuote?.created_at||new Date().toISOString()};return{data:{quotation:savedQuote}};}
       return{data:{settings}};
     }}};
-    ${['setupPatientWorkspaceTabScrolling','openPatientWorkspace','openPatientWorkspaceTab','updatePatientWorkspaceNavigation','chartFindingBillingMultiplier','chartFindingBatchTotal','chartFindingInvoiceAmounts','formatInvoiceMoney','chartFindingSelectionMap','chartFindingDeletionLocked','renderFindingInvoiceToolbar'].map(source).join('\n')}
+    ${['setupPatientWorkspaceTabScrolling','canOpenPatientWorkspaceTab','openPatientWorkspace','openPatientWorkspaceTab','updatePatientWorkspaceNavigation','chartFindingBillingMultiplier','chartFindingBatchTotal','chartFindingInvoiceAmounts','formatInvoiceMoney','chartFindingSelectionMap','chartFindingDeletionLocked','renderFindingInvoiceToolbar'].map(source).join('\n')}
   `});
   await page.addScriptTag({path:path.join(root,'lumin-quotations.js')});
   await page.evaluate(()=>{document.getElementById('patient-workspace-header').classList.remove('hidden');setupPatientWorkspaceTabScrolling();updatePatientWorkspaceNavigation(patient,'chart');});
@@ -273,17 +273,19 @@ test('patient Quotations tab supports editing, deletion, pagination and patient 
     }
   }
   await page.evaluate(()=>{patient.name='Omar Hassan';currentUiLanguage='en';document.documentElement.dir='ltr';updatePatientWorkspaceNavigation(patient,'chart');});
-  await page.setViewportSize({width:1052,height:884});
+  await page.setViewportSize({width:768,height:884});
   for(const lang of ['en','ar']) {
     await page.evaluate(async lang=>{currentUiLanguage=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';updatePatientWorkspaceNavigation(patient,'profile');await new Promise(requestAnimationFrame);document.querySelector('.patient-workspace-tabs').scrollLeft=0;},lang);
     const tabs=page.locator('.patient-workspace-tabs');
     const scrollbar=await tabs.evaluate(node=>({width:getComputedStyle(node).scrollbarWidth,custom:CSS.supports('selector(::-webkit-scrollbar)'),height:getComputedStyle(node,'::-webkit-scrollbar').height,display:getComputedStyle(node,'::-webkit-scrollbar').display,overflow:getComputedStyle(node).overflowX,space:node.offsetHeight-node.clientHeight,overflowWidth:node.scrollWidth-node.clientWidth}));
+    const wheelDistance=Math.min(240,scrollbar.overflowWidth);
+    assert.ok(wheelDistance>0,'The tablet fixture exercises an overflowing tab row');
     assert.equal(scrollbar.width,scrollbar.custom?'auto':'thin');
     if(scrollbar.custom){assert.equal(scrollbar.height,'8px');assert.ok(scrollbar.space>=7,JSON.stringify(scrollbar));}
     await page.waitForFunction(()=>Math.abs(document.querySelector('.patient-workspace-tabs').scrollLeft)<1,null,{timeout:5000});
     const bounds=await tabs.boundingBox();await page.mouse.move(bounds.x+bounds.width/2,bounds.y+bounds.height/2);
     await page.mouse.wheel(0,240);
-    await page.waitForFunction(()=>Math.abs(Math.abs(document.querySelector('.patient-workspace-tabs').scrollLeft)-240)<1,null,{timeout:5000});
+    await page.waitForFunction(distance=>Math.abs(Math.abs(document.querySelector('.patient-workspace-tabs').scrollLeft)-distance)<1,wheelDistance,{timeout:5000});
     assert.equal(await tabs.evaluate(node=>Math.sign(node.scrollLeft)),lang==='ar'?-1:1);
     await page.mouse.wheel(0,-240);
     await page.waitForFunction(()=>Math.abs(document.querySelector('.patient-workspace-tabs').scrollLeft)<1,null,{timeout:5000});
@@ -291,7 +293,7 @@ test('patient Quotations tab supports editing, deletion, pagination and patient 
     const thumbStart=lang==='ar'?bounds.x+bounds.width-thumbWidth/2:bounds.x+thumbWidth/2;
     await page.mouse.move(thumbStart,bounds.y+bounds.height-4);
     await page.mouse.down();await page.mouse.move(thumbStart+(lang==='ar'?-80:80),bounds.y+bounds.height-4,{steps:8});await page.mouse.up();
-    await page.waitForFunction(()=>Math.abs(document.querySelector('.patient-workspace-tabs').scrollLeft)>50,null,{timeout:5000});
+    await page.waitForFunction(distance=>Math.abs(document.querySelector('.patient-workspace-tabs').scrollLeft)>distance,Math.min(50,scrollbar.overflowWidth/2),{timeout:5000});
     assert.equal(await tabs.evaluate(node=>{
       const rtl=getComputedStyle(node).direction==='rtl';node.scrollLeft=rtl?-(node.scrollWidth-node.clientWidth):node.scrollWidth-node.clientWidth;
       const event=new WheelEvent('wheel',{deltaY:100,cancelable:true});node.dispatchEvent(event);return event.defaultPrevented;

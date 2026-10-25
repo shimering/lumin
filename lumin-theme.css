@@ -238,7 +238,7 @@
     body.lumin-raised #patient-workspace-header :is(.text-cyan-100, .text-cyan-300, .text-blue-300) { color: hsl(var(--lumin-hue) calc(61.3% * var(--lumin-chroma)) 35.5%); }
     body.lumin-raised #patient-workspace-header .text-amber-300 { color: #92400e; }
     body.lumin-raised #patient-workspace-header :is([data-patient-workspace-back], [data-patient-workspace-tab]) { background: var(--lumin-face); }
-    body.lumin-raised #patient-workspace-header [data-patient-workspace-tab][aria-selected="true"] {
+    body.lumin-raised #patient-workspace-header .patient-workspace-tabs [data-patient-workspace-tab][aria-selected="true"] {
       background: linear-gradient(145deg, hsl(var(--lumin-hue) calc(72.3% * var(--lumin-chroma)) 54.7%), hsl(var(--lumin-hue) calc(68.0% * var(--lumin-chroma)) 44.1%));
       color: #ffffff;
       box-shadow: var(--lumin-small-raised);
@@ -791,9 +791,22 @@ body.lumin-raised #app-header button { border: 1px solid ButtonText; }
     body.lumin-raised[data-ui-tint="amber"] { --lumin-hue: 35; }
     body.lumin-raised[data-ui-tint="slate"] { --lumin-hue: 215; --lumin-chroma: 0.08; }
     body.lumin-raised #app-primary-nav > button[aria-current="page"],
-    body.lumin-raised #patient-workspace-header [data-patient-workspace-tab][aria-selected="true"] {
+    body.lumin-raised #patient-workspace-header .patient-workspace-tabs [data-patient-workspace-tab][aria-selected="true"] {
       background: linear-gradient(145deg, hsl(var(--lumin-hue) calc(70% * var(--lumin-chroma)) 36%), hsl(var(--lumin-hue) calc(68% * var(--lumin-chroma)) 28%)) !important;
       color: #ffffff;
+    }
+    body.lumin-raised #patient-workspace-header .patient-workspace-subtab {
+      background: transparent;
+      box-shadow: none;
+    }
+    body.lumin-raised #patient-workspace-header .patient-workspace-subtab[aria-selected="true"] {
+      background: var(--lumin-face);
+      color: hsl(var(--lumin-hue) calc(70% * var(--lumin-chroma)) 30%);
+      box-shadow: var(--lumin-small-raised);
+    }
+    body.lumin-raised #patient-workspace-header .patient-workspace-subtab[aria-selected="true"]:not(:focus-visible) { outline: none; }
+    body.lumin-raised #patient-workspace-header .patient-workspace-subtab:hover:not(:disabled) {
+      background: var(--lumin-face);
     }
     body.lumin-raised #view-dashboard .dashboard-patient-link:hover:not(:disabled) { color: hsl(var(--lumin-hue) calc(70% * var(--lumin-chroma)) 30%); }
 

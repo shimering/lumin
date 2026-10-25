@@ -23,7 +23,7 @@ function context(extra = {}, names = []) {
 test('opening a patient navigates immediately without a bulk directory request', async () => {
   const routes = [];
   const ctx = context({hasPageAccess:()=>true, rememberPatientWorkspaceOrigin(){}, switchView:v=>routes.push(v),
-    ensurePatientsLoaded(){throw Error('Bulk loading is forbidden')},activeWorkspacePatientId:null,activePatientId:null}, ['openPatientWorkspace']);
+    ensurePatientsLoaded(){throw Error('Bulk loading is forbidden')},activeWorkspacePatientId:null,activePatientId:null}, ['canOpenPatientWorkspaceTab','openPatientWorkspace']);
   await ctx.openPatientWorkspace('patient-b');
   assert.deepEqual(routes,['patient-profile']);
   assert.equal(ctx.activePatientId,'patient-b');

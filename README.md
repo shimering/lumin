@@ -42,7 +42,7 @@ Shared quotation pages and their WhatsApp introduction default to Arabic, regard
 
 Set the clinic name and international WhatsApp number in **Admin → Print forms → Quotation settings**. Quotations automatically use the clinic logo saved in the prescription form settings, including later logo changes or removal on existing links. Use **Manage form logo** to reach that shared setting. Select planned procedures on a patient's chart and use the small quotation button beside **Add invoice**. Preview the dental chart and item prices, choose an expiry date (30 days by default), create the link, then copy it or open a prepared WhatsApp message. Sending the message remains a staff action in WhatsApp.
 
-Open the patient's **Quotations** tab to browse their saved quotations, including older pages, with current totals, creation dates, expiry dates and link status. **Edit** lets chart staff add planned procedures, remove included procedures and change the expiry date while preserving the link. Expired links can be renewed; editing a disabled link keeps it disabled. **Delete** requires confirmation, permanently removes that quotation and stops its patient link without changing the patient's treatments. Concurrent edits or deletions are rejected when the quotation revision has changed.
+Open the patient's **Finances → Quotations** tab to browse their saved quotations, including older pages, with current totals, creation dates, expiry dates and link status. **Edit** lets chart staff add planned procedures, remove included procedures and change the expiry date while preserving the link. Expired links can be renewed; editing a disabled link keeps it disabled. **Delete** requires confirmation, permanently removes that quotation and stops its patient link without changing the patient's treatments. Concurrent edits or deletions are rejected when the quotation revision has changed.
 
 Staff can also disable a link while keeping its record. The same link follows saved prices, tooth/surface changes, and Plan/In Progress statuses; completed, deleted, and Existed procedures disappear. New procedures are included only when staff update the selection. Patients can switch English/Arabic, inspect the chart, print, and contact the clinic.
 
@@ -102,8 +102,9 @@ checks in `supabase/tests/whatsapp_message_deletion.test.sql`.
 
 ## Patient 3D scans
 
-Patients have a **3D Scans** tab beside **X-Rays & Media**, with multiple original
-ZIP archives, import previews, textured OBJ arches, synchronized two-scan comparison,
+Patients have a **Media** category with **X-Rays** and **3D Scans** subcategories.
+The scan workspace supports multiple original ZIP archives, import previews,
+textured OBJ arches, synchronized two-scan comparison,
 rendering controls, and movable section cuts. Originals stay unchanged on local
 storage and can be downloaded with their imported filename. Names, notes, scan dates,
 and arch selections use the existing patient media metadata and permissions.
