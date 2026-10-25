@@ -26,7 +26,7 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   await page.context().route('**/*',route=>route.request().url().startsWith('http://127.0.0.1:')?route.continue():route.abort());
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
   await page.addScriptTag({path:path.join(root,'vendor/lucide.min.js')});
-  for(const file of ['vendor/quill/quill-2.0.2.js','vendor/dompurify/purify-3.4.17.min.js','lumin-consent-document.js','lumin-consent-tables.js','lumin-consent-editor.js','lumin-consent-model.js','lumin-implant-consent.js'])await page.addScriptTag({path:path.join(root,file)});
+  for(const file of ['lumin-modal-gestures.js','vendor/quill/quill-2.0.2.js','vendor/dompurify/purify-3.4.17.min.js','lumin-consent-document.js','lumin-consent-tables.js','lumin-consent-editor.js','lumin-consent-model.js','lumin-implant-consent.js'])await page.addScriptTag({path:path.join(root,file)});
   const doctors=[{user_id:id(80),full_name:'Dr. Noor'},{user_id:id(81),full_name:'Dr. Omar'}];
   const patient={id:id(90),name:'مريم عبد الرحمن / Mariam Hassan',patient_number:274,birth_date:'1990-01-02',phone:'01012345678',age:36,gender:'female',address:'Cairo',chart_state:{3:{wholeOperations:[{code:'implant',id:id(1),price:10000,doctorId:doctors[1].user_id,createdAt:'2026-10-20'}]},4:{wholeOperations:[{code:'implant',id:id(3),price:15000,createdAt:'2026-10-19'}]}}};
   await page.evaluate(({templates,patient,doctors,idB})=>{

@@ -1,4 +1,4 @@
-const LUMIN_CACHE = "lumin-dental-shell-v270";
+const LUMIN_CACHE = "lumin-dental-shell-v271";
 const LUMIN_SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -66,7 +66,8 @@ const LUMIN_SHELL = [
   "/lumin-storage-sync.css?v=8",
   "/lumin-google-drive.js?v=2",
   "/lumin-google-drive.css?v=1",
-  "/lumin-patient-swipe.js?v=1",
+  "/lumin-modal-gestures.js?v=1",
+  "/lumin-patient-swipe.js?v=2",
   "/lumin-patients.js?v=5",
   "/lumin-chart-sync.js?v=2",
   "/lumin-chart-media.js?v=20",

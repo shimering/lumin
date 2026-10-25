@@ -93,7 +93,8 @@
   <script src="lumin-google-drive.js?v=2"></script>
   <link rel="stylesheet" href="lumin-google-drive.css?v=1" />
   <link rel="stylesheet" href="lumin-storage-sync.css?v=8" />
-  <script src="lumin-patient-swipe.js?v=1"></script>
+  <script src="lumin-modal-gestures.js?v=1"></script>
+  <script src="lumin-patient-swipe.js?v=2"></script>
   <script src="lumin-patients.js?v=5"></script>
   <script src="lumin-chart-sync.js?v=2"></script>
   <script src="lumin-chart-media.js?v=20"></script>
@@ -26582,7 +26583,7 @@
           userAgent: navigator.userAgent, platform: navigator.userAgentData?.platform || navigator.platform,
           maxTouchPoints: navigator.maxTouchPoints, mobile: navigator.userAgentData?.mobile, width: window.innerWidth
         }),
-        isBlocked: () => Array.from(document.querySelectorAll('[aria-modal="true"], [role="dialog"]'))
+        isBlocked: () => window.LuminModalGestures?.hasOpenDialog() || Array.from(document.querySelectorAll('[aria-modal="true"], [role="dialog"]'))
           .some(dialog => dialog.getClientRects().length && getComputedStyle(dialog).visibility !== 'hidden'),
         getDestination: () => {
           const view = patientWorkspaceBackDestination();

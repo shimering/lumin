@@ -173,11 +173,21 @@ test('reduced motion settles immediately, and application zoom preserves physica
   f.end(); assert.equal([...f.timers.values()][0].delay, 0); await f.flush(); f.restored();
 });
 
+test('a dialog opening at release or during settling cancels patient Back navigation', async () => {
+  for(const timing of ['release','settling']){
+    const f=fixture();f.start();f.move(220);
+    if(timing==='release')f.setBlocked(true);
+    f.end();
+    if(timing==='settling')f.setBlocked(true);
+    await f.flush();assert.equal(f.backCount(),0,timing);f.restored();
+  }
+});
+
 test('integration keeps patient sections in one swipe sheet and versions the offline asset', () => {
   const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
   const sw = fs.readFileSync(path.join(__dirname, '../sw.js'), 'utf8');
   assert.match(html, /<div id="patient-workspace-sheet" class="hidden">\s*<header id="patient-workspace-header"/);
   assert.match(html, /patient-workspace-sheet'\).classList.toggle\('hidden', patientWorkspaceHeader.classList.contains\('hidden'\)\)/);
   assert.match(html, /setupPatientWorkspaceSwipeBack\(\);/);
-  assert.match(sw, /lumin-patient-swipe\.js\?v=1/);
+  assert.match(sw, /lumin-patient-swipe\.js\?v=2/);
 });

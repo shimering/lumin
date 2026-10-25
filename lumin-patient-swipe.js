@@ -118,7 +118,7 @@
       timer = win.setTimeout(async () => {
         timer = null;
         if (gesture !== state) return;
-        if (!commit) { cleanup(); return; }
+        if (!commit || !enabled() || isBlocked()) { cleanup(); return; }
         navigatingBack = true;
         try { await onBack(); }
         catch (error) { win.console.error('Patient swipe back navigation failed', error); }
@@ -160,7 +160,7 @@
     surface.addEventListener('touchend', event => {
       const state = gesture;
       if (!state || !['pending', 'dragging'].includes(state.phase)) return;
-      if (event.touches.length || !enabled()) { cleanup(); return; }
+      if (event.touches.length || !enabled() || isBlocked()) { cleanup(); return; }
       if (state.phase === 'pending') { cleanup(); return; }
       if (event.cancelable) event.preventDefault();
       const flick = now() - state.lastTime < 100 && state.velocity > 0.45 && state.distance >= 64;
