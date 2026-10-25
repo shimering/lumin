@@ -14,7 +14,7 @@ test('consent bullets, numbering and wrapped lines indent from the correct side 
   const browser=await chromium.launch({headless:true,channel:process.env.LUMIN_TEST_BROWSER_CHANNEL||'chrome'});t.after(()=>browser.close());
   const page=await browser.newPage();await page.route('**/*',route=>route.request().url().startsWith('http://127.0.0.1:')?route.continue():route.abort());
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
-  for(const file of ['vendor/lucide.min.js','vendor/quill/quill-2.0.2.js','vendor/dompurify/purify-3.4.17.min.js','lumin-consent-document.js','lumin-consent-editor.js'])await page.addScriptTag({path:path.join(root,file)});
+  for(const file of ['vendor/lucide.min.js','vendor/quill/quill-2.0.2.js','vendor/dompurify/purify-3.4.17.min.js','lumin-consent-document.js','lumin-consent-tables.js','lumin-consent-editor.js'])await page.addScriptTag({path:path.join(root,file)});
   for(const width of [390,820,1320])for(const scenario of ['en','ar','mixed']){
     await page.setViewportSize({width,height:1000});
     await page.evaluate(scenario=>{

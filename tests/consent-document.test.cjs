@@ -11,4 +11,7 @@ test('rich consent documents preserve formatting, safely render data and fill at
   assert.equal(document.text(document.read({ops:[{insert:{image:'javascript:alert(1)'}}]},'Legacy text')),'Legacy text');
   for(const attributes of [{link:'javascript:alert(1)'},{font:'Arial;position:fixed'},{size:'99999px'},{color:'red;display:none'},{onclick:'alert(1)'},{header:99}])assert.throws(()=>document.normalize({ops:[{insert:'Unsafe',attributes}]}));
   assert.throws(()=>document.normalize({ops:[{insert:'x'.repeat(40002)}]}));
+  const table={ops:[{insert:'Type',attributes:{bold:true}},{insert:'\n',attributes:{table:'row-a',cellWidth:'200px',cellHeight:'64px'}},{insert:'Amount'},{insert:'\n',attributes:{table:'row-a',cellWidth:'120px',cellHeight:'64px'}},{insert:'After table\n'}]};
+  const tableHtml=document.html(table);assert.match(tableHtml,/<table/);assert.match(tableHtml,/<col style="width:62.5%"/);assert.match(tableHtml,/<tr style="height:64px">/);assert.match(tableHtml,/<strong>Type<\/strong>/);assert.match(tableHtml,/<\/table>.*After table/);assert.equal(document.text(table),'Type\nAmount\nAfter table');
+  for(const attributes of [{table:'<script>'},{cellWidth:'9999px'},{cellHeight:'1px'},{cellWidth:'url(unsafe)'},{table:22}])assert.throws(()=>document.normalize({ops:[{insert:'Cell\n',attributes}]}));
 });

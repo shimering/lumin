@@ -6,6 +6,7 @@
   const keys=variables.map(row=>row[0]);
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const object=value=>value&&typeof value==='object'&&!Array.isArray(value);
+  function dimensionValid(key,value){const number=typeof value==='string'&&/^\d+px$/.test(value)?Number(value.slice(0,-2)):NaN;return Number.isInteger(number)&&number>=(key==='cellWidth'?64:32)&&number<=(key==='cellWidth'?640:480);}
   function normalize(value){
     if(!object(value)||Object.keys(value).some(key=>key!=='ops')||!Array.isArray(value.ops)||value.ops.length>2500)throw new Error('document');
     let length=0;
@@ -30,6 +31,8 @@
           if(key==='direction')valid=['rtl','ltr'].includes(value);
           if(key==='list')valid=['bullet','ordered'].includes(value);
           if(key==='script')valid=['sub','super'].includes(value);
+          if(key==='table')valid=typeof value==='string'&&/^[a-zA-Z0-9_-]{1,80}$/.test(value);
+          if(['cellWidth','cellHeight'].includes(key))valid=dimensionValid(key,value);
           if(!valid)throw new Error('document');attributes[key]=value;
         }
       }
@@ -78,7 +81,16 @@
     }
     if(chunks.length)lines.push({body:chunks.join(''),attrs:{}});
     let result='',list='';
-    for(const line of lines){
+    for(let index=0;index<lines.length;index++){
+      const line=lines[index];
+      if(line.attrs.table){
+        if(list){result+=`</${list}>`;list='';}
+        const rows=[];let rowId=null;
+        while(index<lines.length&&lines[index].attrs.table){const cell=lines[index];if(cell.attrs.table!==rowId){rows.push([]);rowId=cell.attrs.table;}rows.at(-1).push(cell);index++;}index--;
+        const widths=rows[0].map(cell=>parseInt(cell.attrs.cellWidth)||160),total=widths.reduce((sum,width)=>sum+width,0);
+        result+=`<div class="consent-table-print-wrap"><table class="consent-document-table" style="width:100%;max-width:${total}px;table-layout:fixed"><colgroup>${widths.map(width=>`<col style="width:${width/total*100}%"/>`).join('')}</colgroup><tbody>${rows.map(row=>`<tr style="height:${Math.max(...row.map(cell=>parseInt(cell.attrs.cellHeight)||44))}px">${row.map(cell=>`<td${cell.attrs.direction||cell.attrs.align?` style="${cell.attrs.direction?'direction:'+cell.attrs.direction+';':''}${cell.attrs.align?'text-align:'+cell.attrs.align:''}"`:''}>${cell.body}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+        continue;
+      }
       const a=line.attrs,wanted=a.list==='ordered'?'ol':a.list==='bullet'?'ul':'';
       if(list!==wanted){if(list)result+=`</${list}>`;if(wanted)result+=`<${wanted}>`;list=wanted;}
       const tag=wanted?'li':a.header?'h'+a.header:a.blockquote?'blockquote':'p';
@@ -87,5 +99,5 @@
     }
     if(list)result+=`</${list}>`;return result;
   }
-  return {fonts,sizes,variables,escape,normalize,fromText,read,tokenize,text,resolve,html};
+  return {fonts,sizes,variables,escape,dimensionValid,normalize,fromText,read,tokenize,text,resolve,html};
 });

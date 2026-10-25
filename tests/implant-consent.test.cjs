@@ -10,6 +10,10 @@ test('implant fees and installment rounding keep the agreed total in both langua
   assert.match(english,/Ninth: Cost:/);assert.match(english,/Total amount: 25,000/);assert.match(english,/8,750 \(35%\)/);assert.match(english,/5,416.68/);assert.match(english,/after 6 month/);assert.match(english,/Implant type Nobel at tooth 46/);
   assert.match(arabic,/تاسعا: التكلفة:/);assert.match(arabic,/الزراعة نوع Nobel في مكان ضرس 46/);assert.match(arabic,/التركيبة الزركون/);
   const two=implant.paragraph(entries,{...terms,payment_mode:'two'},'en');assert.match(two,/remaining amount of 16,250.*after 6 month/);assert.doesNotMatch(two,/monthly installment/);
+  const fixed={...terms,first_visit_mode:'amount',first_visit_amount:4321.25};
+  const fixedAmounts=implant.totals(entries,fixed);assert.equal(fixedAmounts.first,432125);assert.equal(fixedAmounts.first+fixedAmounts.monthly*2+fixedAmounts.last,fixedAmounts.total);
+  assert.match(implant.paragraph(entries,fixed,'en'),/first visit\): 4,321.25\./);assert.doesNotMatch(implant.paragraph(entries,fixed,'en'),/35%/);
+  assert.throws(()=>implant.totals(entries,{...fixed,first_visit_amount:25001}),/implant-first-payment/);
   for(const percent of [0,100]){const a=implant.totals(entries,{first_visit_percent:percent});assert.equal(a.first+a.remaining,a.total);}
   assert.throws(()=>implant.settings({monthly_count:0}),/implant-settings/);assert.throws(()=>implant.settings({interval_months:0}),/implant-settings/);assert.throws(()=>implant.settings({first_visit_percent:101}),/implant-settings/);
   assert.throws(()=>implant.totals([],{}),/implant-procedures/);assert.throws(()=>implant.totals([entry('one','',100)],{}),/implant-procedures/);assert.throws(()=>implant.totals([entry('one','36',null)],{}),/implant-procedures/);assert.throws(()=>implant.totals([entry('one','36',100,'')],{}),/implant-procedures/);

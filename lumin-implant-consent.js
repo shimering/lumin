@@ -7,7 +7,9 @@
   const cents=value=>Math.round(Number(value)*100);
   function settings(value={}){
     const result={interval_months:Number(value.interval_months??4),first_visit_percent:Number(value.first_visit_percent??50),payment_mode:value.payment_mode||'two',monthly_count:Number(value.monthly_count??4)};
+    result.first_visit_mode=value.first_visit_mode||'percent';result.first_visit_amount=Number(value.first_visit_amount??0);
     if(!Number.isInteger(result.interval_months)||result.interval_months<1||result.interval_months>24||!Number.isFinite(result.first_visit_percent)||result.first_visit_percent<0||result.first_visit_percent>100||!['two','monthly'].includes(result.payment_mode)||!Number.isInteger(result.monthly_count)||result.monthly_count<1||result.monthly_count>60)throw new Error('implant-settings');
+    if(!['percent','amount'].includes(result.first_visit_mode)||!Number.isFinite(result.first_visit_amount)||result.first_visit_amount<0||result.first_visit_amount>1000000000)throw new Error('implant-settings');
     return result;
   }
   // Each chart finding is counted once, even when a surface finding is repeated.
@@ -43,7 +45,8 @@
     // A discounted batch multiplier is spread across its teeth, so consent fees
     // agree with the chart instead of charging the base price for every tooth.
     const total=entries.reduce((sum,item)=>sum+unitCost(item),0);
-    const amount=Math.round(total),first=Math.round(amount*terms.first_visit_percent/100),remaining=amount-first;
+    const amount=Math.round(total),first=terms.first_visit_mode==='amount'?cents(terms.first_visit_amount):Math.round(amount*terms.first_visit_percent/100),remaining=amount-first;
+    if(first>amount)throw new Error('implant-first-payment');
     const monthly=Math.floor(remaining/terms.monthly_count),last=remaining-monthly*(terms.monthly_count-1);
     return {total:amount,first,remaining,monthly,last,count:entries.length};
   }
@@ -54,6 +57,7 @@
     const prices=[...new Set(entries.map(unitCost))];
     const per=prices.length===1?money(prices[0]):entries.map(item=>`${item.tooth_label||item.tooth}: ${money(unitCost(item))}`).join(ar?'؛ ':'; ');
     let lines=ar?['تاسعا: التكلفة:',`تم الاتفاق على عمل عدد ${n(amounts.count)} زراعات من نوع ${types}`,`ثمن الزرعة الواحدة: ${per}`,'(المبلغ شامل التركيبة الزركون لضرس واحد)',`اجمالي المبلغ: ${money(amounts.total)}`,'',`سيتم دفع في جلسة الزراعة (اول جلسة): ${money(amounts.first)} (${n(terms.first_visit_percent)}٪)`]:['Ninth: Cost:',`It has been agreed to place ${n(amounts.count)} implant(s) of type ${types}.`,`Price per implant: ${per}`,'(The amount includes a zirconia crown for one tooth.)',`Total amount: ${money(amounts.total)}`,'',`Payment at the implant placement visit (first visit): ${money(amounts.first)} (${n(terms.first_visit_percent)}%).`];
+    if(terms.first_visit_mode==='amount')lines[6]=ar?`سيتم دفع في جلسة الزراعة (اول جلسة): ${money(amounts.first)}`:`Payment at the implant placement visit (first visit): ${money(amounts.first)}.`;
     if(terms.payment_mode==='two')lines.push(ar?`و بقية المبلغ بعد ${n(terms.interval_months)} أشهر أثناء التركيب على الزراعات، بقيمة: ${money(amounts.remaining)}`:`The remaining amount of ${money(amounts.remaining)} is payable after ${n(terms.interval_months)} month(s), when the restorations are fitted to the implants.`);
     else{
       lines.push(ar?`بقية المبلغ: ${money(amounts.remaining)} على ${n(terms.monthly_count)} أقساط شهرية تبدأ بعد شهر من جلسة الزراعة.`:`The remaining amount of ${money(amounts.remaining)} is payable in ${n(terms.monthly_count)} monthly installment(s), starting one month after the implant placement visit.`);
