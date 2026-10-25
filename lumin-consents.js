@@ -10,7 +10,7 @@
   const userId=()=>typeof currentSession!=='undefined'?currentSession?.user?.id:null;
   const state={request:0,records:[],templates:[],patient:null,hasMore:false};
   const admin={request:0,templates:[],operations:[]};
-  const ui={request:0,overlay:null,record:null,template:null,templates:[],doctors:[],patient:null,context:{},busy:false,dirty:false,editors:[],languageEditors:{}};
+  const ui={request:0,overlay:null,record:null,template:null,templates:[],doctors:[],patient:null,context:{},busy:false,dirty:false,editors:[],languageEditors:{},discard:null};
   const rich=()=>root.LuminConsentDocument;
   const implant=()=>root.LuminImplantConsent;
   const icon=name=>`<i data-lucide="${name}" aria-hidden="true"></i>`;
@@ -34,7 +34,7 @@
   function bind(container){
     if(container.dataset.consentBound)return;
     container.dataset.consentBound='true';
-    container.addEventListener('click',event=>{const trigger=event.target.closest('[data-consent-action]');if(trigger&&!trigger.disabled)void action(trigger.dataset.consentAction,trigger);});
+    container.addEventListener('click',event=>{const trigger=event.target.closest('[data-consent-action]');if(trigger&&!trigger.disabled){event.preventDefault();event.stopPropagation();void action(trigger.dataset.consentAction,trigger);}});
   }
   function titleHeader(title,subtitle,actions=''){
     return `<div class="consent-toolbar"><div><h2>${title}</h2><p>${subtitle}</p></div><div class="consent-actions">${actions}</div></div>`;
@@ -64,16 +64,33 @@
       renderHistory();
     }catch(error){if(current(request,id,user)){container.innerHTML=`<div class="consent-panel"><p class="consent-error" role="alert">${e(errorText(error))}</p>${button('refresh',t('Try again','حاول مجدداً'),'refresh-cw')}</div>`;icons();}}
   }
-  function close(force=false){
-    if(!force&&(ui.busy||(ui.dirty&&!root.confirm(t('Discard unsaved consent changes?','تجاهل التغييرات غير المحفوظة؟')))))return false;
+  function requestDiscard(resume){
+    if(ui.discard){ui.overlay.querySelector('[data-consent-action="cancel-discard"]').focus();return;}
+    const body=ui.overlay.querySelector('.consent-dialog-body'),footer=ui.overlay.querySelector('[data-consent-footer]');
+    ui.discard={resume,body,footer,bodyHidden:body.hidden,footerHidden:footer.hidden,focus:document.activeElement};
+    const confirmation=document.createElement('section');confirmation.className='consent-discard-confirmation';confirmation.dataset.consentDiscardConfirmation='true';
+    confirmation.setAttribute('role','alertdialog');confirmation.setAttribute('aria-modal','true');confirmation.setAttribute('aria-labelledby','consent-discard-title');confirmation.setAttribute('aria-describedby','consent-discard-description');
+    confirmation.innerHTML=`<span class="consent-discard-icon">${icon('file-pen-line')}</span><h3 id="consent-discard-title">${t('Discard unsaved changes?','تجاهل التغييرات غير المحفوظة؟')}</h3><p id="consent-discard-description">${t('Cancel to keep this form open with all your changes. Discard changes to leave without saving.','اضغط إلغاء للبقاء في النموذج والاحتفاظ بكل تعديلاتك. اضغط تجاهل التغييرات للخروج دون حفظ.')}</p><div class="consent-actions">${button('cancel-discard',t('Cancel','إلغاء'),t('arrow-left','arrow-right'))}${button('confirm-discard',t('Discard changes','تجاهل التغييرات'),'trash-2','consent-danger')}</div>`;
+    body.hidden=true;footer.hidden=true;footer.before(confirmation);icons();confirmation.querySelector('[data-consent-action="cancel-discard"]').focus();
+  }
+  function cancelDiscard(){
+    const pending=ui.discard;if(!pending)return;
+    ui.overlay.querySelector('[data-consent-discard-confirmation]').remove();pending.body.hidden=pending.bodyHidden;pending.footer.hidden=pending.footerHidden;ui.discard=null;
+    if(pending.focus?.isConnected)pending.focus.focus({preventScroll:true});
+  }
+  function close(force=false,resume){
+    if(force!==true){
+      if(ui.busy)return false;
+      if(ui.discard||ui.dirty){requestDiscard(resume);return false;}
+    }
     ui.request++;
     disposeEditors();
     if(ui.overlay){ui.overlay.remove();document.body.style.overflow=ui.overflow;ui.returnFocus?.isConnected&&ui.returnFocus.focus({preventScroll:true});}
-    Object.assign(ui,{overlay:null,record:null,template:null,patient:null,templates:[],doctors:[],context:{},busy:false,dirty:false,readLanguage:null});
+    Object.assign(ui,{overlay:null,record:null,template:null,patient:null,templates:[],doctors:[],context:{},busy:false,dirty:false,readLanguage:null,discard:null});
     return true;
   }
-  function modal(title){
-    if(!close())return null;
+  function modal(title,resume){
+    if(!close(false,resume))return null;
     ui.returnFocus=document.activeElement;ui.overflow=document.body.style.overflow;document.body.style.overflow='hidden';
     const overlay=document.createElement('div');overlay.className='consent-overlay';overlay.dir=lang()==='ar'?'rtl':'ltr';overlay.setAttribute('translate','no');
     overlay.innerHTML=`<section class="consent-dialog" role="dialog" aria-modal="true" aria-labelledby="consent-dialog-title"><header><h2 id="consent-dialog-title">${title}</h2>${button('close',`<span class="sr-only">${t('Close','إغلاق')}</span>`,'x')}</header><div class="consent-dialog-body"><p class="consent-error" data-consent-feedback role="alert" hidden></p><div data-consent-body>${skeleton()}</div></div><footer data-consent-footer>${button('close',t('Close','إغلاق'),'x')}</footer></section>`;
@@ -82,9 +99,10 @@
     overlay.addEventListener('input',event=>{if(event.target.name)ui.dirty=true;});
     overlay.addEventListener('change',event=>{if(event.target.name)ui.dirty=true;});
     overlay.addEventListener('keydown',event=>{
-      if(event.key==='Escape'){event.preventDefault();close();}
+      if(event.key==='Escape'){event.preventDefault();event.stopPropagation();if(ui.discard)cancelDiscard();else close();}
       if(event.key!=='Tab')return;
-      const controls=[...overlay.querySelectorAll('button,input,textarea,select,a[href]')].filter(node=>!node.disabled&&node.getClientRects().length);
+      const scope=ui.discard?overlay.querySelector('[data-consent-discard-confirmation]'):overlay;
+      const controls=[...scope.querySelectorAll('button,input,textarea,select,a[href]')].filter(node=>!node.disabled&&node.getClientRects().length);
       const first=controls[0],last=controls.at(-1);
       if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}
       if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}
@@ -165,7 +183,7 @@
   }
   async function openNew(context={}){
     if(!canUse()||!patientId())return;
-    const id=patientId(),user=userId(),request=modal(t('New patient consent','موافقة جديدة للمريض'));if(request===null)return;
+    const id=patientId(),user=userId(),request=modal(t('New patient consent','موافقة جديدة للمريض'),()=>openNew(context));if(request===null)return;
     try{
       if(typeof ensureDentalCustomizationLoaded==='function')await ensureDentalCustomizationLoaded();
       const [patient,templates,doctors,progress]=await Promise.all([
@@ -238,7 +256,7 @@
   function replaceDoctor(body,before,after){return body.replace('Treating doctor: '+before,'Treating doctor: '+after).replace('الطبيب المعالج: '+before,'الطبيب المعالج: '+after);}
   async function openRecord(id,print=false,printView){
     if(!canUse()){printView?.close();return;}
-    const pid=patientId(),user=userId(),request=modal(t('Patient consent','موافقة المريض'));if(request===null){printView?.close();return;}
+    const pid=patientId(),user=userId(),request=modal(t('Patient consent','موافقة المريض'),()=>openRecord(id,print,print?root.LuminConsentPrint.reserve():null));if(request===null){printView?.close();return;}
     try{
       if(typeof ensureDentalCustomizationLoaded==='function')await ensureDentalCustomizationLoaded();
       const [record,doctors,patient,progress]=await Promise.all([result(db.from('patient_consents').select('*').eq('patient_id',pid).eq('id',id).single()),result(db.rpc('list_consent_doctors')),result(db.from('patients').select('id,chart_state').eq('id',pid).single()),result(db.from('implant_progress').select('finding_id,implant_type').eq('patient_id',pid).limit(1000))]);
@@ -311,7 +329,7 @@
   }
   async function editTemplate(id){
     if(!isAdmin())return;
-    const user=userId(),request=modal(id?t('Edit consent template','تعديل نموذج الموافقة'):t('New consent template','نموذج موافقة جديد'));if(request===null)return;
+    const user=userId(),request=modal(id?t('Edit consent template','تعديل نموذج الموافقة'):t('New consent template','نموذج موافقة جديد'),()=>editTemplate(id));if(request===null)return;
     try{
       const template=id?await result(db.from('consent_templates').select('*').eq('id',id).single()):{title_en:'',title_ar:'',body_en:'',body_ar:'',procedure_codes:[],active:true};
       if(!modalCurrent(request,null,user,true))return;
@@ -377,6 +395,8 @@
     }finally{prompting=false;if(!ui.overlay)void drainPrompts();}
   }
   async function action(name,trigger){
+    if(name==='cancel-discard'){cancelDiscard();return;}
+    if(name==='confirm-discard'){const pending=ui.discard;if(!pending)return;close(true);if(pending.resume)return pending.resume();void drainPrompts();return;}
     if(name==='close'||name==='skip-prompt'){if(close())void drainPrompts();return;}
     if(name==='refresh')return render();if(name==='more')return render({append:true});
     if(name==='new')return openNew();
@@ -409,7 +429,7 @@
     if(name==='accept-prompt'){const context={...ui.context};if(context.templateIds.length===1)context.autoTemplateId=context.templateIds[0];close(true);return openNew(context);}
   }
   function reset(){epoch++;prompts.length=0;state.request++;admin.request++;close(true);state.records=[];state.patient=null;admin.templates=[];admin.operations=[];document.getElementById('view-patient-consents')?.replaceChildren();document.getElementById('admin-panel-consents')?.replaceChildren();}
-  function beforeNavigate(){epoch++;prompts.length=0;state.request++;admin.request++;return close();}
+  function beforeNavigate(resume){if(!close(false,resume))return false;epoch++;prompts.length=0;state.request++;admin.request++;return true;}
   function languageChanged(){
     if(state.patient?.id===patientId()&&canUse()&&!document.getElementById('view-patient-consents')?.classList.contains('hidden'))renderHistory();
     if(isAdmin()&&!document.getElementById('admin-panel-consents')?.classList.contains('hidden'))void renderAdmin({quiet:true});

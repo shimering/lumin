@@ -127,7 +127,7 @@
   <script src="lumin-consent-model.js?v=4"></script>
   <script src="lumin-implant-consent.js?v=3"></script>
   <script src="lumin-consent-print.js?v=1"></script>
-  <script src="lumin-consents.js?v=8"></script>
+  <script src="lumin-consents.js?v=9"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <link rel="stylesheet" href="lumin-tooth-images.css?v=1" />
   
@@ -5411,7 +5411,7 @@
   <link rel="stylesheet" href="lumin-clinical-actions.css?v=8" />
   <link rel="stylesheet" href="lumin-media-teeth.css?v=1" />
   <link rel="stylesheet" href="lumin-quotations.css?v=6" />
-  <link rel="stylesheet" href="lumin-consents.css?v=6" />
+  <link rel="stylesheet" href="lumin-consents.css?v=7" />
   <link rel="stylesheet" href="vendor/quill/quill.core-2.0.2.css" />
   <link rel="stylesheet" href="lumin-consent-editor.css?v=6" />
   <style id="finance-ledger-styles">
@@ -17221,7 +17221,7 @@
     function switchAdminTab(tabName) {
       if (!hasPageAccess('admin')) return;
       if (tabName === 'whatsapp') tabName = 'templates';
-      if (typeof window !== 'undefined' && window.LuminConsents?.beforeNavigate() === false) return;
+      if (typeof window !== 'undefined' && window.LuminConsents?.beforeNavigate(()=>switchAdminTab(tabName)) === false) return;
       adminActiveTab = ['access', 'templates', 'print-forms', 'payments', 'expense-types', 'attendance', 'customization', 'loyalty', 'storage', 'finance-sync', 'consents'].includes(tabName) ? tabName : 'access';
       const showConsents = adminActiveTab === 'consents';
       document.getElementById('admin-tab-consents').setAttribute('aria-selected', String(showConsents));
@@ -26799,7 +26799,7 @@
 
     async function openPatientWorkspace(patientId, tabName = 'profile', returnView = null) {
       if (!patientId) return;
-      if (typeof window !== 'undefined' && window.LuminConsents?.beforeNavigate() === false) return;
+      if (typeof window !== 'undefined' && window.LuminConsents?.beforeNavigate(()=>openPatientWorkspace(patientId,tabName,returnView)) === false) return;
       if (tabName === 'finances') tabName = ['invoices', 'payments', 'quotations'].find(canOpenPatientWorkspaceTab);
       if (!tabName || !canOpenPatientWorkspaceTab(tabName)) return;
       rememberPatientWorkspaceOrigin(returnView);
@@ -30018,7 +30018,7 @@
     }
 
     async function switchView(viewName) {
-      if (typeof window !== 'undefined' && window.LuminConsents?.beforeNavigate() === false) return;
+      if (typeof window !== 'undefined' && window.LuminConsents?.beforeNavigate(()=>switchView(viewName)) === false) return;
       if (window.LuminInventory) LuminInventory.leave();
       if (window.LuminClinicManagement) LuminClinicManagement.closeAlerts(false);
       if (typeof closeClinicalSpecialtyPicker === 'function') closeClinicalSpecialtyPicker();

@@ -72,7 +72,7 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   await page.context().addInitScript(()=>{window.print=()=>{window.printCalls=(window.printCalls||0)+1;dispatchEvent(new Event('afterprint'));};});
   await page.addScriptTag({path:path.join(root,'lumin-consent-print.js')});
   await page.addScriptTag({path:path.join(root,'lumin-consents.js')});
-  const click=action=>page.locator(`[data-consent-action="${action}"]:visible`).first().click();
+  const click=async action=>{await page.locator(`[data-consent-action="${action}"]:visible`).first().click();if(action==='close'&&await page.locator('[data-consent-discard-confirmation]').count())await page.locator('[data-consent-action="confirm-discard"]').click();};
   const dialog=page.locator('.consent-dialog');
   const write=async(name,text)=>{
     const canvas=dialog.locator('[data-editor-name="'+name+'"] .ql-editor');
@@ -150,6 +150,24 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   await patientEditor.locator('[data-editor-command="list"][data-value="bullet"]').click();
   await patientEditor.locator('[data-editor-command="undo"]').click();
   await patientEditor.locator('[data-editor-command="redo"]').click();
+  const captureDraft=()=>page.evaluate(()=>({fields:[...new FormData(document.querySelector('.consent-dialog form')).entries()],documents:[...document.querySelectorAll('.consent-editor')].map(node=>node.consentEditor.getDocument()),writes:fixture.writes}));
+  const retained=await captureDraft();await patientEditor.evaluate(node=>{window.retainedConsentEditor=node.consentEditor;});
+  for(const width of [390,820,1320])for(const language of ['en','ar']){
+    await page.setViewportSize({width,height:940});await page.evaluate(language=>{currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';},language);
+    await page.locator('.consent-overlay').click({position:{x:1,y:1}});
+    await dialog.locator('[data-consent-discard-confirmation]').waitFor();
+    if(width===390&&language==='ar')await page.screenshot({path:path.join(os.tmpdir(),'lumin-consent-cancel-ar.png')});
+    assert.equal(await dialog.locator('[data-consent-action="cancel-discard"]').evaluate(node=>node===document.activeElement),true,'Cancel is the default confirmation action');
+    await click('cancel-discard');assert.equal(await dialog.locator('[data-consent-discard-confirmation]').count(),0);
+    assert.equal(await dialog.isVisible(),true);assert.deepEqual(await captureDraft(),retained,`Backdrop Cancel retains all edits at ${width}/${language}`);
+    assert.equal(await patientEditor.evaluate(node=>node.consentEditor===window.retainedConsentEditor),true,'Cancel retains the mounted editor');
+  }
+  await page.evaluate(()=>{currentUiLanguage='en';document.documentElement.dir='ltr';window.cancelledNavigationCount=0;});
+  await dialog.locator('[data-consent-action="close"]').first().click();await click('cancel-discard');assert.deepEqual(await captureDraft(),retained,'Close button Cancel retains edits');
+  await page.keyboard.press('Escape');await dialog.locator('[data-consent-discard-confirmation]').waitFor();await page.keyboard.press('Escape');assert.deepEqual(await captureDraft(),retained,'Escape cancels the confirmation');
+  assert.equal(await page.evaluate(()=>LuminConsents.beforeNavigate(()=>cancelledNavigationCount++)),false);
+  await click('cancel-discard');assert.equal(await page.evaluate(()=>cancelledNavigationCount),0);assert.deepEqual(await captureDraft(),retained,'Cancelled navigation cannot clear editing state');
+  await page.evaluate(()=>LuminConsents.openNew());await click('cancel-discard');assert.deepEqual(await captureDraft(),retained,'Cancel keeps the existing form when another consent was requested');
   const formatted=await patientEditor.evaluate(node=>node.consentEditor.getDocument());
   assert.ok(formatted.ops.some(op=>op.attributes?.bold&&op.attributes?.italic&&op.attributes?.underline&&op.attributes?.font==='Amiri'&&op.attributes?.size==='24px'));
   assert.ok(formatted.ops.some(op=>op.attributes?.list==='bullet'));
@@ -286,6 +304,11 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
     await page.keyboard.press('Escape');assert.equal(await dialog.isVisible(),true);assert.equal(await dialog.locator('.consent-editor.is-expanded').count(),0);
     await click('close');
   }
+  await click('new');await dialog.locator(`[data-template-id="${id(20)}"]`).click();await dialog.locator('[name="doctor_name"]').fill('Uncommitted doctor');
+  const writesBeforeDiscard=await page.evaluate(()=>fixture.writes);
+  assert.equal(await page.evaluate(()=>LuminConsents.beforeNavigate(()=>cancelledNavigationCount++)),false);
+  await click('confirm-discard');await dialog.waitFor({state:'detached'});
+  assert.equal(await page.evaluate(()=>cancelledNavigationCount),1,'Explicit Discard resumes navigation exactly once');assert.equal(await page.evaluate(()=>fixture.writes),writesBeforeDiscard,'Discard does not save changes');
   await page.evaluate(async()=>{activeWorkspacePatientId=fixture.patients[1].id;LuminConsents.reset();await LuminConsents.render();});
   assert.equal(await page.locator('#view-patient-consents .consent-card').count(),0,'History is patient specific');
   await page.evaluate(()=>{fixture.delay=100;LuminConsents.openNew();LuminConsents.beforeNavigate();activeWorkspacePatientId=fixture.patients[0].id;});
