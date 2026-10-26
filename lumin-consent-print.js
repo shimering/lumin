@@ -14,6 +14,9 @@
     const boxes=['margin-top','margin-bottom','margin-inline-start','margin-inline-end','padding-top','padding-bottom','padding-inline-start','padding-inline-end','background-color','list-style-type','border-collapse','border-spacing','table-layout',...['top','right','bottom','left'].flatMap(side=>['width','style','color'].map(part=>`border-${side}-${part}`))];
     copies.forEach((node,index)=>{
       const original=originals[index];
+      if(original.matches('.consent-palmer-token')&&root.LuminConsentDocument.palmerPattern.test(original.dataset.palmer)){
+        const template=document.createElement('template');template.innerHTML=root.LuminConsentDocument.palmerHtml(original.dataset.palmer,root.getComputedStyle(original).color);const token=template.content.firstElementChild;apply(token,root.getComputedStyle(original),textProperties);node.replaceWith(token);return;
+      }
       if(!allowed.has(node.tagName)){node.remove();return;}
       const classes=[...node.classList].filter(name=>/^(?:ql-ui|ql-indent-[1-8]|ql-direction-rtl|consent-table-print-wrap|consent-document-table)$/.test(name));
       const list=original.getAttribute('data-list'),start=original.getAttribute('start');
@@ -51,7 +54,7 @@
     return {settings:normalize(layout.data),logo:logo(image.data?.logo_data_url),updatedAt:layout.data.updated_at};
   }
   function reserve(){
-    const view=root.open(new URL('consent-print.html?v=4',root.location.href).href,'_blank');
+    const view=root.open(new URL('consent-print.html?v=5',root.location.href).href,'_blank');
     if(!view)throw new Error(t('Allow pop-ups for Lumin to open the consent print view.','اسمح بالنوافذ المنبثقة لموقع Lumin لفتح صفحة طباعة الموافقة.'));
     const ready=new Promise((resolve,reject)=>{
       const cleanup=()=>{root.removeEventListener('message',receive);clearTimeout(timeout);clearInterval(poll);};
@@ -65,7 +68,7 @@
     return view;
   }
   function body(record,configuration,snapshot=null){
-    const s=normalize(configuration.settings),image=logo(configuration.logo),ar=record.language==='ar',tr=(en,arabic)=>ar?arabic:en;
+    const base=normalize(configuration.settings),layout=root.LuminConsentLayout?.normalize(record.print_layout,base),s={...base,...layout},image=logo(configuration.logo),ar=record.language==='ar',tr=(en,arabic)=>ar?arabic:en;
     const header=s['header_text_'+record.language],footer=s['footer_text_'+record.language];
     const signatures=s.signatures_visible?`<div class="consent-print-signatures"><p>${tr('Patient / guardian name and signature','اسم وتوقيع المريض / ولي الأمر')}<br>${tr('Relationship (if guardian)','صلة القرابة (لولي الأمر)')}<br>${tr('Date','التاريخ')}: __________________</p><p>${tr('Treating doctor signature','توقيع الطبيب المعالج')}<br>${e(ar&&record.doctor_name_ar?record.doctor_name_ar:record.doctor_name)}<br>${tr('Date','التاريخ')}: __________________</p><p>${tr('Witness / interpreter (if needed)','الشاهد / المترجم (عند الحاجة)')}<br>${tr('Name and signature','الاسم والتوقيع')}: __________________</p></div>`:'';
     const template=document.createElement('template');template.innerHTML=snapshot?snapshot.html:root.LuminConsentDocument.html(root.LuminConsentDocument.read(record.content,record.body));
@@ -81,7 +84,8 @@
       }else blocks.push(node.outerHTML);
     }
     if(signatures)blocks.push(signatures);
-    return `<main id="consent-print-root"><div class="consent-copy consent-rich-content${snapshot?' consent-draft-copy'+(snapshot.quill?' ql-editor':''):''}"${snapshot?` style="${e(snapshot.style)}"`:''}><table class="consent-print-page" role="presentation"><thead><tr><td><header class="consent-page-header" style="min-height:${s.header_height_mm}mm;font-size:${s.header_font_px}px">${s.logo_visible&&image?`<div style="text-align:${s.logo_align}"><img class="consent-clinic-logo" src="${image}" alt="${tr('Clinic logo','شعار العيادة')}" style="width:${s.logo_width_mm}mm"/></div>`:''}${header?`<div class="consent-letterhead-text">${e(header)}</div>`:''}</header></td></tr></thead><tfoot><tr><td><div class="consent-footer-spacer" aria-hidden="true" style="min-height:${s.footer_height_mm}mm;font-size:${s.footer_font_px}px">${e(footer)}</div></td></tr></tfoot><tbody>${blocks.map(block=>`<tr><td>${block}</td></tr>`).join('')}</tbody></table></div></main><footer class="consent-page-footer" style="min-height:${s.footer_height_mm}mm;font-size:${s.footer_font_px}px">${e(footer)}</footer>`;
+    const logoHtml=root.LuminConsentLayout?root.LuminConsentLayout.logoMarkup(s,image,record.language):(s.logo_visible&&image?`<div style="text-align:${s.logo_align}"><img class="consent-clinic-logo" src="${image}" alt="${tr('Clinic logo','شعار العيادة')}" style="width:${s.logo_width_mm}mm"/></div>`:'');
+    return `<main id="consent-print-root" data-consent-layout="${e(JSON.stringify(layout||{}))}" style="${layout?root.LuminConsentLayout.styles(layout):''}"><div class="consent-copy consent-rich-content${snapshot?' consent-draft-copy'+(snapshot.quill?' ql-editor':''):''}"${snapshot?` style="${e(snapshot.style)}"`:''}><table class="consent-print-page" role="presentation"><thead><tr><td><header class="consent-page-header" style="min-height:${s.header_height_mm}mm;font-size:${s.header_font_px}px">${logoHtml}${header?`<div class="consent-letterhead-text">${e(header)}</div>`:''}</header></td></tr></thead><tfoot><tr><td><div class="consent-footer-spacer" aria-hidden="true" style="min-height:${s.footer_height_mm}mm;font-size:${s.footer_font_px}px">${e(footer)}</div></td></tr></tfoot><tbody>${blocks.map(block=>`<tr><td>${block}</td></tr>`).join('')}</tbody></table></div></main><footer class="consent-page-footer" style="min-height:${s.footer_height_mm}mm;font-size:${s.footer_font_px}px">${e(footer)}</footer>`;
   }
   async function print(record,{view,isCurrent=()=>true,source}={}){
     view=view||reserve();
@@ -122,5 +126,5 @@
     }catch(error){slot.querySelector('[role=status]').textContent=error.message;}
     if(root.lucide)root.lucide.createIcons();
   }
-  root.LuminConsentPrint={normalize,capture,body,reserve,print,mountAdmin};
+  root.LuminConsentPrint={normalize,capture,body,reserve,print,mountAdmin,load};
 })(window);

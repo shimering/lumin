@@ -31,9 +31,13 @@
     doc.querySelector('[data-consent-print-document]').hidden=false;
     if(doc.fonts){await Promise.allSettled(fonts.map(font=>doc.fonts.load(`14px "${font}"`,language==='ar'?'نص الموافقة':'Consent')));await doc.fonts.ready;}
     await Promise.allSettled([...doc.querySelectorAll('[data-consent-print-document] img')].map(image=>image.decode()));
+    const layout=JSON.parse(doc.querySelector('#consent-print-root').dataset.consentLayout||'{}');
+    if(root.LuminConsentLayout?.needsPages(layout)){
+      const {prepareNativePages}=await import('./lumin-consent-pdf.mjs?v=3');await prepareNativePages(doc);
+    }
     if(appleTouch){
       try{
-        const {consentPdf}=await import('./lumin-consent-pdf.mjs?v=2');
+        const {consentPdf}=await import('./lumin-consent-pdf.mjs?v=3');
         const bytes=await consentPdf(doc);
         const file=new File([bytes],(title||t('Consent','موافقة')).replace(/[\\/:*?"<>|\u0000-\u001f]/g,' ').slice(0,100)+'.pdf',{type:'application/pdf'});
         if(pdfUrl)root.URL.revokeObjectURL(pdfUrl);

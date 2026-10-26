@@ -52,3 +52,5 @@
 .consent-rich-content :is(ul,ol){margin:0;padding-inline:2em 0}
 .consent-rich-content li{margin:0;padding:0;white-space:pre-wrap}
 @media print{.consent-document-table{max-width:var(--consent-table-width,100%)!important}.consent-document-table td{padding:4px 12px}}
+.consent-palmer-token{display:inline-block;direction:ltr;unicode-bidi:isolate;vertical-align:-.25em;white-space:nowrap;line-height:1;cursor:text}
+.consent-palmer-symbol{display:inline-block;width:2em;height:1.4em;overflow:visible;vertical-align:middle}

@@ -29,7 +29,7 @@ test('printed consent matches the actual draft table, typography, paragraph gaps
     const tables=[...node.querySelectorAll('table:not([role])')],table=tables[0],first=table.rows[0].cells[0].getBoundingClientRect();
     const blocks=[...node.querySelectorAll('p,li')].filter(item=>!item.closest('table:not([role])'));
     const style=node=>{const s=getComputedStyle(node);return Object.fromEntries(['fontFamily','fontSize','fontWeight','lineHeight','whiteSpace','letterSpacing','paddingInlineStart','paddingInlineEnd','marginTop','marginBottom','direction','textAlign'].map(key=>[key,s[key]]));};
-    return {width:table.getBoundingClientRect().width,columns:[...table.rows[0].cells].map(cell=>cell.getBoundingClientRect().width),rows:tables.flatMap(table=>[...table.rows].map(row=>row.getBoundingClientRect().height)),cells:tables.flatMap(table=>[...table.querySelectorAll('td')].map(style)),blocks:blocks.map(block=>({text:block.textContent,top:block.getBoundingClientRect().top-first.top,height:block.getBoundingClientRect().height,style:style(block)}))};
+    return {width:table.getBoundingClientRect().width,columns:[...table.rows[0].cells].map(cell=>cell.getBoundingClientRect().width),rows:tables.flatMap(table=>[...table.rows].map(row=>row.getBoundingClientRect().height)),cells:tables.flatMap(table=>[...table.querySelectorAll('td')].map(style)),blocks:blocks.map(block=>({text:block.textContent.replace(/\ufeff/g,''),top:block.getBoundingClientRect().top-first.top,height:block.getBoundingClientRect().height,style:style(block)}))};
   };
   const folder=path.join(os.tmpdir(),'lumin-consent-draft-match');fs.mkdirSync(folder,{recursive:true});
   for(const language of ['ar','en']){
@@ -41,6 +41,7 @@ test('printed consent matches the actual draft table, typography, paragraph gaps
         ops.push({insert:'\n',attributes:{table:'row-'+row,cellWidth:col?'309px':'160px',cellHeight:'auto',lineSpacing:'1',direction:ar?'rtl':'ltr'}});
       }
       for(let section=0;section<2;section++){
+        if(section===0)ops.push({insert:ar?'الأسنان: 6┘ / └6':'Teeth: 6┘ / └6',attributes:{font:'Arial',size:'10px'}},{insert:'\n',attributes:{lineSpacing:'1.25',direction:ar?'rtl':'ltr'}});
         ops.push({insert:ar?'شرح العلاج':'Treatment explanation',attributes:{font:'Arial',size:'12px',bold:true}},{insert:'\n',attributes:{lineSpacing:'1.25',direction:ar?'rtl':'ltr'}});
         ops.push({insert:ar?'تم شرح تفاصيل العلاج والمواعيد والتكلفة.':'The treatment, appointments and fee were explained.',attributes:{font:'Arial',size:'10px'}},{insert:'\n',attributes:{lineSpacing:'1.25',direction:ar?'rtl':'ltr'}});
         for(let item=0;item<5;item++)ops.push({insert:ar?'حضور المواعيد واتباع تعليمات الطبيب المعالج.':'Attend appointments and follow the treating doctor’s instructions.',attributes:{font:'Arial',size:'10px'}},{insert:'\n',attributes:{list:'bullet',lineSpacing:'1.25',direction:ar?'rtl':'ltr'}});

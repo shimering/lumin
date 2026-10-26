@@ -162,4 +162,22 @@ test('consents enforce clinic permissions, preserve snapshots and finalized text
   await db.exec("select set_config('test.admin','false',false),set_config('test.pages','',false)");
   assert.equal((await db.query('select count(*)::int as count from consent_print_settings')).rows[0].count,0);
 
+  await db.exec('reset role');
+  const pageMigration=fs.readdirSync('supabase/migrations').find(name=>name.endsWith('_consent_page_layout_and_palmer.sql'));
+  await db.exec(fs.readFileSync('supabase/migrations/'+pageMigration,'utf8'));
+  await db.exec("set role authenticated; select set_config('test.pages','patients',false)");
+  const palmer={ops:[{insert:'Sites: '},{insert:{consentTooth:'6┘'}},{insert:' / '},{insert:{consentTooth:'┌5'}},{insert:'\n'}]};
+  const layout={logo_visible:true,logo_width_mm:40,logo_align:'right',logo_pages:'first',logo_offset_mm:4,margin_top_mm:10,margin_bottom_mm:10,margin_left_mm:12,margin_right_mm:12,frame:'rounded'};
+  await db.query('update patient_consents set content=$1,body=$2,print_layout=$3 where id=$4',[JSON.stringify(palmer),'Sites: 6┘ / ┌5',JSON.stringify(layout),created.id]);
+  assert.deepEqual((await db.query('select print_layout from patient_consents where id=$1',[created.id])).rows[0].print_layout,layout);
+  assert.equal((await db.query('select private.consent_document_text($1) as text',[JSON.stringify(palmer)])).rows[0].text,'Sites: 6┘ / ┌5\n');
+  for(const invalid of [{...layout,logo_width_mm:900},{...layout,logo_pages:'other'},{...layout,margin_left_mm:2},{...layout,frame:'black-box'},{...layout,margin_top_mm:0},{...layout,unknown:'unsafe'}])await assert.rejects(db.query('update patient_consents set print_layout=$1 where id=$2',[JSON.stringify(invalid),created.id]),/check constraint/);
+  for(const tooth of ['<svg onload=alert(1)>','99┘','┘6','┌Z'])assert.equal((await db.query('select private.consent_document_valid($1) as valid',[JSON.stringify({ops:[{insert:{consentTooth:tooth}}]})])).rows[0].valid,false);
+  await db.query("update patient_consents set status='finalized' where id=$1",[created.id]);
+  await assert.rejects(db.query('update patient_consents set print_layout=$1 where id=$2',[JSON.stringify({...layout,logo_visible:false}),created.id]),/Reopen/);
+  await db.query("update patient_consents set status='draft' where id=$1",[created.id]);
+  await db.query('update patient_consents set print_layout=$1 where id=$2',[JSON.stringify({...layout,logo_visible:false}),created.id]);
+  await db.exec("select set_config('test.pages','',false)");
+  assert.equal((await db.query('select count(*)::int as count from patient_consents')).rows[0].count,0,'Layout and Palmer fields retain consent row permissions');
+
 });

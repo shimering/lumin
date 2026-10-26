@@ -26,7 +26,7 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   await page.context().route('**/*',route=>route.request().url().startsWith('http://127.0.0.1:')?route.continue():route.abort());
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
   await page.addScriptTag({path:path.join(root,'vendor/lucide.min.js')});
-  for(const file of ['lumin-modal-gestures.js','vendor/quill/quill-2.0.2.js','vendor/dompurify/purify-3.4.17.min.js','lumin-consent-document.js','lumin-consent-tables.js','lumin-consent-editor.js','lumin-consent-model.js','lumin-implant-consent.js'])await page.addScriptTag({path:path.join(root,file)});
+  for(const file of ['lumin-modal-gestures.js','vendor/quill/quill-2.0.2.js','vendor/dompurify/purify-3.4.17.min.js','lumin-consent-document.js','lumin-consent-layout.js','lumin-consent-tables.js','lumin-consent-editor.js','lumin-consent-model.js','lumin-implant-consent.js'])await page.addScriptTag({path:path.join(root,file)});
   const doctors=[{user_id:id(80),full_name:'Dr. Noor'},{user_id:id(81),full_name:'Dr. Omar'}];
   const patient={id:id(90),name:'مريم عبد الرحمن / Mariam Hassan',patient_number:274,birth_date:'1990-01-02',phone:'01012345678',age:36,gender:'female',address:'Cairo',chart_state:{3:{wholeOperations:[{code:'implant',id:id(1),price:10000,doctorId:doctors[1].user_id,createdAt:'2026-10-20'}]},4:{wholeOperations:[{code:'implant',id:id(3),price:15000,createdAt:'2026-10-19'}]}}};
   await page.evaluate(({templates,patient,doctors,idB})=>{
@@ -70,6 +70,7 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
     document.body.classList.add('lumin-raised');
   },{templates:model.templates.map((template,index)=>({...template,id:id(20+index),revision:1,active:true,created_at:'2026-10-25'})),patient,doctors,idB:id(91)});
   await page.context().addInitScript(()=>{window.print=()=>{window.printCalls=(window.printCalls||0)+1;dispatchEvent(new Event('afterprint'));};});
+  await page.evaluate(image=>{fixture.printLogo[0].logo_data_url=image;fixture.printSettings[0].logo_visible=true;},'data:image/png;base64,'+fs.readFileSync(path.join(root,'icons/dental-icon-v1-192.png')).toString('base64'));
   await page.addScriptTag({path:path.join(root,'lumin-consent-print.js')});
   await page.addScriptTag({path:path.join(root,'lumin-consents.js')});
   const click=async action=>{await page.locator(`[data-consent-action="${action}"]:visible`).first().click();if(action==='close'&&await page.locator('[data-consent-discard-confirmation]').count())await page.locator('[data-consent-action="confirm-discard"]').click();};
@@ -121,6 +122,12 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   assert.equal(await dialog.locator(`[data-template-id="${customTemplate.id}"]`).count(),0,'Archived templates remain out of new consent choices');
   await dialog.locator(`[data-template-id="${id(20)}"]`).click();
   assert.equal(await dialog.locator('[data-consent-language="ar"]').getAttribute('aria-selected'),'true','Arabic is the default draft view, including in the English app UI');
+  await dialog.locator('.consent-editor:visible .consent-draft-letterhead img').waitFor();
+  await dialog.locator('[data-layout-key="logo_width_mm"]').fill('42');await dialog.locator('[data-layout-key="logo_align"]').selectOption('right');
+  await dialog.locator('[data-layout-key="logo_pages"]').selectOption('first');await dialog.locator('[data-layout-key="frame"]').selectOption('single');
+  assert.equal(await dialog.locator('[data-layout-key="margin_top_mm"]').inputValue(),'8','Frames automatically reserve a safe inner margin');
+  assert.equal(await dialog.locator('.consent-editor:visible .consent-draft-letterhead img').evaluate(image=>image.style.width),'42mm');
+  await dialog.locator('[data-layout-key="logo_visible"]').uncheck();assert.equal(await dialog.locator('.consent-editor:visible .consent-draft-letterhead img').count(),0);await dialog.locator('[data-layout-key="logo_visible"]').check();
   await dialog.locator('[name="language"]').selectOption('ar');
   await dialog.locator('[name="language"]').selectOption('en');
   assert.equal(await dialog.locator('[data-consent-feedback]').isVisible(),false,'Form language can be changed before assigning procedures');
@@ -195,6 +202,7 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   await click('save-draft');await page.waitForFunction(()=>fixture.consents.length===1);
   await page.waitForFunction(()=>document.querySelector('[data-consent-action="save-draft"]')?.disabled===false);
   const consentId=await page.evaluate(()=>fixture.consents[0].id);
+  assert.equal(await page.evaluate(()=>fixture.consents[0].print_layout.logo_pages),'first');assert.equal(await page.evaluate(()=>fixture.consents[0].print_layout.frame),'single');
   assert.ok(await page.evaluate(()=>fixture.consents[0].content.ops.some(op=>op.attributes?.bold)));
   assert.match(await page.evaluate(()=>fixture.consents[0].alternate_body),/أوافق على العلاج/);
   assert.equal(await page.evaluate(()=>fixture.consents[0].implant_terms.monthly_count),3);
@@ -221,7 +229,7 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   await click('finalize');await page.waitForFunction(()=>fixture.consents[0].status==='finalized');
   assert.doesNotMatch(await page.evaluate(()=>fixture.consents[0].body),/Ninth: Cost:/,'No heading or paragraph is forced into the document');
   assert.match(await page.evaluate(()=>fixture.consents[0].body),/Astra/);
-  await dialog.locator('.consent-copy:visible').waitFor();assert.equal(await dialog.locator('textarea,input').count(),0);
+  await dialog.locator('.consent-copy:visible').waitFor();assert.equal(await dialog.locator('textarea:enabled,input:enabled').count(),0);
   assert.ok(await dialog.locator('.consent-copy:visible strong').count()>0);
   const firstPopup=page.waitForEvent('popup');await click('print');const printed=await firstPopup;
   await printed.waitForFunction(()=>window.printCalls===1);await printed.emulateMedia({media:'print'});
@@ -263,7 +271,7 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   assert.equal(await dialog.locator('[name="first_visit_amount"]').inputValue(),'4000.5');
   await click('finalize');await page.waitForFunction(()=>fixture.consents[0].status==='finalized');
   assert.equal(await dialog.locator('.consent-copy:visible table td').count(),4);
-  const secondPopup=page.waitForEvent('popup');await click('print');const tablePrint=await secondPopup;await tablePrint.waitForFunction(()=>window.printCalls===1);assert.equal(await tablePrint.locator('#consent-print-root .consent-document-table td').count(),4);
+  const secondPopup=page.waitForEvent('popup');await click('print');const tablePrint=await secondPopup;await tablePrint.waitForFunction(()=>window.printCalls===1);assert.equal(await tablePrint.locator('#consent-print-root .consent-document-table:visible td').count(),4);
   await tablePrint.close();await click('close');
   // An applied multi-tooth/surface procedure creates one prompt and keeps context.
   await page.evaluate(()=>{

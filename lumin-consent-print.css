@@ -6,7 +6,7 @@ html,body{margin:0;padding:0;width:auto;min-width:0;height:auto;overflow:visible
 .consent-print-page{width:100%;border:0;border-collapse:collapse;table-layout:fixed}
 .consent-print-page>thead{display:table-header-group}.consent-print-page>tfoot{display:table-footer-group}
 .consent-print-page>tbody>tr{break-inside:avoid}
-.consent-print-page>thead>tr>td,.consent-print-page>tfoot>tr>td,.consent-print-page>tbody>tr>td{padding:0 12mm;border:0;vertical-align:top}
+.consent-print-page>thead>tr>td,.consent-print-page>tfoot>tr>td,.consent-print-page>tbody>tr>td{padding:0 var(--consent-margin-right-mm,12mm) 0 var(--consent-margin-left-mm,12mm);border:0;vertical-align:top}
 .consent-page-header{padding-block:4mm 3mm;white-space:pre-wrap;text-align:center;overflow-wrap:anywhere}
 .consent-clinic-logo{display:inline-block;max-width:100%;height:auto;max-height:45mm;object-fit:contain}
 .consent-page-footer,.consent-footer-spacer{padding-block:3mm 4mm;white-space:pre-wrap;text-align:center;overflow-wrap:anywhere}
@@ -27,8 +27,8 @@ html[dir=rtl] [data-print-back] svg{transform:scaleX(-1)}
 /* The raster PDF uses these same content styles at a fixed physical A4 size.
    Only its viewport clips between complete lines; fonts are never scaled to fit. */
 .consent-pdf-stage{position:fixed;left:-10000px;top:0;width:210mm;height:297mm;background:#fff;color:inherit;overflow:hidden;font:inherit;direction:inherit}
-.consent-pdf-header{padding-inline:12mm}.consent-pdf-footer{position:absolute;bottom:0;left:12mm;right:12mm;padding-block:3mm 4mm;text-align:center;white-space:pre-wrap;overflow-wrap:anywhere}
-.consent-pdf-clip{position:absolute;left:12mm;right:12mm;overflow:hidden}
+.consent-pdf-header{padding-left:var(--consent-margin-left-mm,12mm);padding-right:var(--consent-margin-right-mm,12mm)}.consent-pdf-footer{position:absolute;bottom:var(--consent-margin-bottom-mm,0mm);left:var(--consent-margin-left-mm,12mm);right:var(--consent-margin-right-mm,12mm);padding-block:3mm 4mm;text-align:center;white-space:pre-wrap;overflow-wrap:anywhere}
+.consent-pdf-clip{position:absolute;left:var(--consent-margin-left-mm,12mm);right:var(--consent-margin-right-mm,12mm);overflow:hidden}
 .consent-pdf-flow{display:flow-root;transform-origin:top left}
 .consent-pdf-flow>.consent-table-part,.consent-pdf-flow>.consent-print-signatures{break-inside:avoid}.consent-pdf-flow>:is(h1,h2,h3){break-after:avoid}
 .consent-print-actions a{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:44px;min-height:44px;padding:10px 16px;border:0;border-radius:12px;background:#eff6ff;color:#1d4ed8;font:600 14px/1.5 Arial,Tahoma,sans-serif;text-decoration:none;transition:background .15s,transform .15s}
@@ -41,3 +41,5 @@ html[dir=rtl] [data-print-back] svg{transform:scaleX(-1)}
 .consent-draft-copy.ql-editor{height:auto;min-height:0;max-height:none;padding:0;overflow:visible}
 .consent-draft-copy .ql-ui::before{margin:0!important;width:1.5em!important;text-align:end!important}
 .consent-draft-copy .consent-document-table{max-width:100%!important}
+.consent-native-pages{display:none}.consent-native-sheet{position:relative;width:210mm;height:297mm;background:#fff;color:inherit;font:inherit;overflow:hidden;break-after:page;page-break-after:always}.consent-native-sheet:last-child{break-after:auto;page-break-after:auto}
+@media print{#consent-print-root[data-consent-paged=true]>.consent-copy,#consent-print-root[data-consent-paged=true]+.consent-page-footer{display:none!important}#consent-print-root[data-consent-paged=true]>.consent-native-pages{display:block}}
