@@ -120,6 +120,7 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   await showPatient();await click('new');
   assert.equal(await dialog.locator(`[data-template-id="${customTemplate.id}"]`).count(),0,'Archived templates remain out of new consent choices');
   await dialog.locator(`[data-template-id="${id(20)}"]`).click();
+  assert.equal(await dialog.locator('[data-consent-language="ar"]').getAttribute('aria-selected'),'true','Arabic is the default draft view, including in the English app UI');
   await dialog.locator('[name="language"]').selectOption('ar');
   await dialog.locator('[name="language"]').selectOption('en');
   assert.equal(await dialog.locator('[data-consent-feedback]').isVisible(),false,'Form language can be changed before assigning procedures');
@@ -152,6 +153,9 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   await patientEditor.locator('[data-editor-command="redo"]').click();
   const captureDraft=()=>page.evaluate(()=>({fields:[...new FormData(document.querySelector('.consent-dialog form')).entries()],documents:[...document.querySelectorAll('.consent-editor')].map(node=>node.consentEditor.getDocument()),writes:fixture.writes}));
   const retained=await captureDraft();await patientEditor.evaluate(node=>{window.retainedConsentEditor=node.consentEditor;});
+  await page.evaluate(async()=>{LuminConsents.reset({preserveOpen:true});await LuminConsents.render({quiet:true});});
+  assert.deepEqual(await captureDraft(),retained,'Background access refresh preserves every unsaved field and document');
+  assert.equal(await patientEditor.evaluate(node=>node.consentEditor===window.retainedConsentEditor),true,'Background refresh retains the mounted editor');
   for(const width of [390,820,1320])for(const language of ['en','ar']){
     await page.setViewportSize({width,height:940});await page.evaluate(language=>{currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';},language);
     await page.locator('.consent-overlay').click({position:{x:1,y:1}});
@@ -202,6 +206,8 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   await showAdmin();await page.locator(`[data-template-id="${id(20)}"] [data-consent-action="template-edit"]`).click();
   await write('body_en','New universal version for future patients.');await click('template-save');await dialog.waitFor({state:'detached'});
   await showPatient();await click('open');
+  assert.equal(await dialog.locator('[data-consent-language="ar"]').getAttribute('aria-selected'),'true','Reopened drafts default to Arabic');
+  await dialog.locator('[data-consent-language="en"]').click();
   assert.match(await dialog.locator('[name="body"]').inputValue(),/Patient-specific clause/);
   assert.match(await dialog.locator('[name="body"]').inputValue(),/Procedure \/ teeth: Implant at site 36/);
   assert.doesNotMatch(await dialog.locator('[name="body"]').inputValue(),/New universal version/);
@@ -222,14 +228,20 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   assert.equal(await printed.locator('#consent-print-root').isVisible(),true);assert.equal(await printed.locator('[data-consent-print-controls]').isVisible(),false);
   assert.equal(await printed.locator('input,select,.consent-dialog,#app-shell').count(),0);
   assert.equal(await printed.locator('#consent-print-root > h1, #consent-print-root > .consent-identity, #consent-print-root > .consent-print-note').count(),0,'Print does not prepend a header outside the draft wording');
-  assert.equal(await printed.locator('#consent-print-root > :first-child').getAttribute('class'),'consent-copy consent-rich-content');
+  assert.ok(await printed.locator('#consent-print-root > .consent-copy.consent-rich-content.consent-draft-copy').count());
   assert.match(await printed.locator('#consent-print-root').innerText(),/Patient-specific clause/);
   assert.ok(await printed.locator('#consent-print-root strong').count()>0);
-  assert.ok(await printed.locator('#consent-print-root [style*="font-family:Amiri"]').count()>0);
+  assert.ok(await printed.locator('#consent-print-root').evaluate(node=>[...node.querySelectorAll('*')].some(child=>getComputedStyle(child).fontFamily.includes('Amiri'))));
   assert.ok(await printed.locator('#consent-print-root').evaluate(node=>node.scrollWidth<=document.documentElement.clientWidth+1));
   const shots=path.join(os.tmpdir(),'lumin-consents-preview');fs.mkdirSync(shots,{recursive:true});
   await printed.screenshot({path:path.join(shots,'consent-print.png'),fullPage:true});
-  await printed.close();await click('close');
+  await printed.close();
+  await page.evaluate(async()=>{window.printReturnDialog=document.querySelector('.consent-dialog');LuminConsents.reset({preserveOpen:true});await LuminConsents.render({quiet:true});});
+  assert.equal(await dialog.evaluate(node=>node===window.printReturnDialog),true,'Returning from print and background refresh retain the same consent window');
+  await click('close');
+  await click('open');await dialog.locator('.consent-copy:visible').waitFor();
+  assert.equal(await dialog.locator('[data-consent-language="ar"]').getAttribute('aria-selected'),'true','Finalized consents default to Arabic when reopened');
+  assert.match(await dialog.locator('.consent-copy:visible').innerText(),/أوافق على العلاج/);await click('close');
   await page.locator(`[data-consent-id="${consentId}"] [data-consent-action="history-reopen"]`).click();
   await dialog.locator('[name="first_visit_mode"]').waitFor();
   assert.equal(await page.evaluate(()=>fixture.consents[0].status),'draft');
@@ -246,6 +258,7 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   await click('save-draft');await page.waitForFunction(()=>fixture.consents[0].implant_terms.first_visit_mode==='amount');
   await page.waitForFunction(()=>document.querySelector('[data-consent-action="save-draft"]')?.disabled===false);await click('close');
   await page.locator(`[data-consent-id="${consentId}"] [data-consent-action="open"]`).click();
+  await dialog.locator('[data-consent-language="en"]').click();
   await dialog.locator('[data-editor-name="body"] table').waitFor();
   assert.equal(await dialog.locator('[name="first_visit_amount"]').inputValue(),'4000.5');
   await click('finalize');await page.waitForFunction(()=>fixture.consents[0].status==='finalized');
@@ -259,7 +272,7 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   });
   await page.locator('[data-consent-action="accept-prompt"]').waitFor();await click('skip-prompt');assert.equal(await page.evaluate(()=>fixture.consents.length),1);
   await page.evaluate(()=>LuminConsents.procedureApplied(fixture.patients[0],'implant','applied'));
-  await page.locator('[data-consent-action="accept-prompt"]').waitFor();await click('accept-prompt');await dialog.locator('[data-editor-name="body"] .ql-editor:visible').waitFor();
+  await page.locator('[data-consent-action="accept-prompt"]').waitFor();await click('accept-prompt');await dialog.locator('.consent-editor:visible .ql-editor').waitFor();
   assert.match(await dialog.locator('[name="procedure_name"]').inputValue(),/Dental implant · Tooth 3/);
   await click('save-draft');await page.waitForFunction(()=>fixture.consents.length===2);
   assert.equal(await page.evaluate(()=>fixture.consents[1].finding_ids.length),1);
@@ -313,7 +326,9 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   assert.equal(await page.locator('#view-patient-consents .consent-card').count(),0,'History is patient specific');
   await page.evaluate(()=>{fixture.delay=100;LuminConsents.openNew();LuminConsents.beforeNavigate();activeWorkspacePatientId=fixture.patients[0].id;});
   await page.waitForTimeout(200);assert.equal(await dialog.count(),0,'Late reads cannot reopen a previous patient dialog');
-  await page.evaluate(()=>{fixture.allowed=false;LuminConsents.reset();});
+  await page.evaluate(async()=>{fixture.delay=0;await LuminConsents.render();});await click('open');await dialog.waitFor();
+  await page.evaluate(()=>{fixture.allowed=false;LuminConsents.reset({preserveOpen:true});});
+  assert.equal(await dialog.count(),0,'An access refresh still closes the consent when permission is revoked');
   assert.equal(await page.locator('#view-patient-consents').innerText(),'');
   assert.equal(await page.evaluate(()=>fixture.consents.find(record=>record.id===fixture.consents[0].id).id),consentId);
   assert.deepEqual(errors,[]);console.log('Consent previews:',shots);

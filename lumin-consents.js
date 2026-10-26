@@ -92,6 +92,7 @@
   function modal(title,resume){
     if(!close(false,resume))return null;
     ui.returnFocus=document.activeElement;ui.overflow=document.body.style.overflow;document.body.style.overflow='hidden';
+    ui.ownerUser=userId();
     const overlay=document.createElement('div');overlay.className='consent-overlay';overlay.dir=lang()==='ar'?'rtl':'ltr';overlay.setAttribute('translate','no');
     overlay.innerHTML=`<section class="consent-dialog" role="dialog" aria-modal="true" aria-labelledby="consent-dialog-title"><header><h2 id="consent-dialog-title">${title}</h2>${button('close',`<span class="sr-only">${t('Close','إغلاق')}</span>`,'x')}</header><div class="consent-dialog-body"><p class="consent-error" data-consent-feedback role="alert" hidden></p><div data-consent-body>${skeleton()}</div></div><footer data-consent-footer>${button('close',t('Close','إغلاق'),'x')}</footer></section>`;
     ui.overlay=overlay;document.body.appendChild(overlay);bind(overlay);
@@ -144,9 +145,15 @@
     return values;
   }
   function mountPatientEditors(record){
+    const selected=preferredReadLanguage(record);
     const primary=ui.overlay.querySelector('[data-consent-editor-slot="body"]'),alternate=document.createElement('div'),other=record.language==='ar'?'en':'ar';
     const label=language=>language==='ar'?t('Arabic consent text','نص الموافقة بالعربية'):t('English consent text','نص الموافقة بالإنجليزية');
     mountBilingual({[record.language]:{element:primary,name:'body',label:label(record.language),text:record.body,document:record.content,required:true},[other]:{element:alternate,name:'alternate_body',label:label(other),text:record.alternate_body||'',document:record.alternate_content,titleField:field(other==='ar'?t('Arabic title','العنوان العربي'):t('English title','العنوان الإنجليزي'),'alternate_title',record.alternate_title||'')}},record.language,true);
+    ui.selectLanguage(selected);
+  }
+  function preferredReadLanguage(record){
+    if(ui.readLanguage)return ui.readLanguage;
+    return record.language==='ar'||String(record.alternate_body||'').trim()?'ar':record.language;
   }
   function isImplantRecord(){return Boolean(ui.record?.implant_terms||implant()?.isTemplate(ui.template));}
   function consentToothLabel(tooth){return typeof palmerToothNotation==='function'?palmerToothNotation(tooth,typeof resolveToothSlotNumber==='function'?resolveToothSlotNumber(tooth):Number(tooth)):typeof chartToothLabel==='function'?chartToothLabel(tooth):tooth;}
@@ -173,9 +180,9 @@
     for(const language of ['en','ar'])ui.languageEditors[language]?.updateVariables(patientVariableValues(language));
   }
   function renderLockedVersions(record){
-    const body=ui.overlay.querySelector('[data-consent-body]'),copy=body.querySelector('.consent-copy'),group=document.createElement('div');group.className='consent-bilingual';group.innerHTML=tabsMarkup(record.language);
+    const selected=preferredReadLanguage(record),body=ui.overlay.querySelector('[data-consent-body]'),copy=body.querySelector('.consent-copy'),group=document.createElement('div');group.className='consent-bilingual';group.innerHTML=tabsMarkup(selected);
     for(const language of ['en','ar']){const alternate=language!==record.language,text=alternate?record.alternate_body:record.body,document=alternate?record.alternate_content:record.content;group.insertAdjacentHTML('beforeend',`<div class="consent-language-panel" data-consent-language-panel="${language}"><h3 dir="auto">${e(alternate?record.alternate_title||record.title:record.title)}</h3><div class="consent-copy consent-rich-content" dir="${language==='ar'?'rtl':'ltr'}">${text?rich().html(rich().read(document,text)):e(t('No version saved in this language.','لا توجد نسخة محفوظة بهذه اللغة.'))}</div></div>`);}
-    copy.previousElementSibling?.remove();copy.replaceWith(group);ui.selectLanguage=bindLanguageTabs(group,record.language,language=>{ui.readLanguage=language;const print=ui.overlay.querySelector('[data-consent-action="print"]');if(print)print.disabled=language!==record.language&&!record.alternate_body;});
+    copy.previousElementSibling?.remove();copy.replaceWith(group);ui.selectLanguage=bindLanguageTabs(group,selected,language=>{ui.readLanguage=language;const print=ui.overlay.querySelector('[data-consent-action="print"]');if(print)print.disabled=language!==record.language&&!record.alternate_body;});
   }
   function identity(record,tr=t){
     const p=record.patient_data||{};
@@ -296,7 +303,9 @@
     if(!record?.id||record.patient_id!==patientId()||!canUse()){view?.close();return;}
     if(ui.readLanguage&&ui.readLanguage!==record.language){if(!record.alternate_body){view?.close();return;}record={...record,language:ui.readLanguage,title:record.alternate_title||record.title,body:record.alternate_body,content:record.alternate_content};}
     const job=++printJob,user=userId();
-    return root.LuminConsentPrint.print(record,{view,isCurrent:()=>job===printJob&&user===userId()&&record.patient_id===patientId()&&canUse()});
+    const panel=ui.overlay?.querySelector(`[data-consent-language-panel="${record.language}"]`);
+    const source=ui.languageEditors?.[record.language]?.quill.root||panel?.querySelector('.consent-rich-content');
+    return root.LuminConsentPrint.print(record,{view,source,isCurrent:()=>job===printJob&&user===userId()&&record.patient_id===patientId()&&canUse()});
   }
   async function reopenConsent(){
     const record=ui.record;if(ui.busy||!record?.id||record.status!=='finalized'||!canUse())return;
@@ -428,7 +437,12 @@
     if(name==='template-save')return saveTemplate();
     if(name==='accept-prompt'){const context={...ui.context};if(context.templateIds.length===1)context.autoTemplateId=context.templateIds[0];close(true);return openNew(context);}
   }
-  function reset(){epoch++;prompts.length=0;state.request++;admin.request++;close(true);state.records=[];state.patient=null;admin.templates=[];admin.operations=[];document.getElementById('view-patient-consents')?.replaceChildren();document.getElementById('admin-panel-consents')?.replaceChildren();}
+  function reset({preserveOpen=false}={}){
+    const keep=preserveOpen&&ui.overlay&&ui.ownerUser===userId()&&ui.record?.patient_id===patientId()&&canUse();
+    epoch++;prompts.length=0;state.request++;admin.request++;
+    if(!keep)close(true);
+    state.records=[];state.patient=null;admin.templates=[];admin.operations=[];document.getElementById('view-patient-consents')?.replaceChildren();document.getElementById('admin-panel-consents')?.replaceChildren();
+  }
   function beforeNavigate(resume){if(!close(false,resume))return false;epoch++;prompts.length=0;state.request++;admin.request++;return true;}
   function languageChanged(){
     if(state.patient?.id===patientId()&&canUse()&&!document.getElementById('view-patient-consents')?.classList.contains('hidden'))renderHistory();

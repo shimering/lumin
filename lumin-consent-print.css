@@ -1,7 +1,7 @@
 /* Zero page margins suppress browser date/title/URL/page-number decorations.
    Repeating table groups provide editable clinic letterhead inside the page. */
 @page{size:auto;margin:0}
-html,body{margin:0;padding:0;width:auto;min-width:0;height:auto;overflow:visible;background:#fff;color:#1e293b;font:14px/1.85 Arial,Tahoma,sans-serif;zoom:1}
+html,body{margin:0;padding:0;width:auto;min-width:0;height:auto;overflow:visible;background:#fff;color:#1e293b;font:14px/1.85 system-ui,-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable Text","Segoe UI","Noto Sans Arabic",Tahoma,Arial,sans-serif;zoom:1;-webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:pan-x pan-y}
 *{box-sizing:border-box}
 .consent-print-page{width:100%;border:0;border-collapse:collapse;table-layout:fixed}
 .consent-print-page>thead{display:table-header-group}.consent-print-page>tfoot{display:table-footer-group}
@@ -11,11 +11,10 @@ html,body{margin:0;padding:0;width:auto;min-width:0;height:auto;overflow:visible
 .consent-clinic-logo{display:inline-block;max-width:100%;height:auto;max-height:45mm;object-fit:contain}
 .consent-page-footer,.consent-footer-spacer{padding-block:3mm 4mm;white-space:pre-wrap;text-align:center;overflow-wrap:anywhere}
 .consent-rich-content{line-height:1.85;overflow-wrap:anywhere;white-space:pre-wrap}
-.consent-rich-content p{margin:0 0 10px}.consent-rich-content h1{font-size:26px;margin:0 0 12px}.consent-rich-content h2{font-size:22px;margin:0 0 10px}.consent-rich-content h3{font-size:18px;margin:0 0 8px}
-.consent-rich-content ul{list-style:disc}.consent-rich-content ol{list-style:decimal}.consent-rich-content :is(ul,ol){margin-block:0 10px}
+.consent-rich-content ul{list-style:disc}.consent-rich-content ol{list-style:decimal}
 .consent-print-signatures{display:flex;gap:6mm;break-inside:avoid;margin-top:8mm;padding-top:4mm;border-top:1px solid #cbd5e1;font-size:11px}
 .consent-print-signatures p{flex:1;min-width:0;margin:0;overflow-wrap:anywhere}
-.consent-table-print-wrap{overflow:visible}.consent-document-table{max-width:100%!important}.consent-document-table td{padding:4px 8px}
+.consent-table-print-wrap{overflow:visible}.consent-document-table td{padding:4px 12px}
 .consent-table-part table{margin:0}.consent-table-part.is-first{margin-top:16px}.consent-table-part.is-last{margin-bottom:16px}.consent-table-part:not(.is-first){margin-top:-1px}
 @media screen{body{max-width:210mm;margin:auto}}
 
@@ -24,3 +23,21 @@ html,body{margin:0;padding:0;width:auto;min-width:0;height:auto;overflow:visible
 @media print{.consent-print-controls{display:none!important}}
 
 html[dir=rtl] [data-print-back] svg{transform:scaleX(-1)}
+
+/* The raster PDF uses these same content styles at a fixed physical A4 size.
+   Only its viewport clips between complete lines; fonts are never scaled to fit. */
+.consent-pdf-stage{position:fixed;left:-10000px;top:0;width:210mm;height:297mm;background:#fff;color:inherit;overflow:hidden;font:inherit;direction:inherit}
+.consent-pdf-header{padding-inline:12mm}.consent-pdf-footer{position:absolute;bottom:0;left:12mm;right:12mm;padding-block:3mm 4mm;text-align:center;white-space:pre-wrap;overflow-wrap:anywhere}
+.consent-pdf-clip{position:absolute;left:12mm;right:12mm;overflow:hidden}
+.consent-pdf-flow{display:flow-root;transform-origin:top left}
+.consent-pdf-flow>.consent-table-part,.consent-pdf-flow>.consent-print-signatures{break-inside:avoid}.consent-pdf-flow>:is(h1,h2,h3){break-after:avoid}
+.consent-print-actions a{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:44px;min-height:44px;padding:10px 16px;border:0;border-radius:12px;background:#eff6ff;color:#1d4ed8;font:600 14px/1.5 Arial,Tahoma,sans-serif;text-decoration:none;transition:background .15s,transform .15s}
+.consent-print-actions a:hover{background:#dbeafe}.consent-print-actions a:active{transform:scale(.98)}.consent-print-actions a:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}.consent-print-actions a[hidden]{display:none}
+.consent-print-controls{padding-top:max(16px,env(safe-area-inset-top));padding-bottom:max(16px,env(safe-area-inset-bottom))}
+@media print{.consent-pdf-stage{display:none!important}}
+
+/* A draft snapshot supplies its measured text and block styles. Quill's editor
+   viewport and selection UI have no role on paper. Keep its list counters only. */
+.consent-draft-copy.ql-editor{height:auto;min-height:0;max-height:none;padding:0;overflow:visible}
+.consent-draft-copy .ql-ui::before{margin:0!important;width:1.5em!important;text-align:end!important}
+.consent-draft-copy .consent-document-table{max-width:100%!important}

@@ -5,6 +5,37 @@
   const defaults={header_text_en:'',header_text_ar:'',footer_text_en:'',footer_text_ar:'',header_height_mm:18,footer_height_mm:12,header_font_px:14,footer_font_px:11,logo_visible:true,logo_width_mm:34,logo_align:'center',signatures_visible:true};
   const limits={header_height_mm:[0,70],footer_height_mm:[0,50],header_font_px:[8,32],footer_font_px:[8,32],logo_width_mm:[10,80]};
   const pendingViews=new WeakMap();
+  const textProperties=['font-family','font-size','font-weight','font-style','font-stretch','font-kerning','font-variant','font-feature-settings','font-variation-settings','font-synthesis','line-height','letter-spacing','word-spacing','text-align','text-indent','text-transform','text-decoration-line','text-decoration-color','text-decoration-style','direction','white-space','overflow-wrap','word-break','tab-size','vertical-align','color'];
+  function capture(source){
+    if(!source?.isConnected)return null;
+    const copy=source.cloneNode(true),originals=[...source.querySelectorAll('*')],copies=[...copy.querySelectorAll('*')];
+    const allowed=new Set(['DIV','P','H1','H2','H3','BLOCKQUOTE','OL','UL','LI','TABLE','TBODY','THEAD','TFOOT','TR','TD','TH','COLGROUP','COL','SPAN','STRONG','B','EM','I','U','S','SUB','SUP','BR']);
+    const apply=(node,style,properties)=>properties.forEach(property=>node.style.setProperty(property,style.getPropertyValue(property)));
+    const boxes=['margin-top','margin-bottom','margin-inline-start','margin-inline-end','padding-top','padding-bottom','padding-inline-start','padding-inline-end','background-color','list-style-type','border-collapse','border-spacing','table-layout',...['top','right','bottom','left'].flatMap(side=>['width','style','color'].map(part=>`border-${side}-${part}`))];
+    copies.forEach((node,index)=>{
+      const original=originals[index];
+      if(!allowed.has(node.tagName)){node.remove();return;}
+      const classes=[...node.classList].filter(name=>/^(?:ql-ui|ql-indent-[1-8]|ql-direction-rtl|consent-table-print-wrap|consent-document-table)$/.test(name));
+      const list=original.getAttribute('data-list'),start=original.getAttribute('start');
+      for(const attribute of [...node.attributes])node.removeAttribute(attribute.name);
+      if(classes.length)node.className=classes.join(' ');
+      if(['bullet','ordered'].includes(list))node.dataset.list=list;
+      if(start&&/^\d+$/.test(start))node.setAttribute('start',start);
+      const style=root.getComputedStyle(original);apply(node,style,[...textProperties,...boxes]);
+      if(node.tagName==='COL')node.style.width=original.style.width||style.width;
+      if(node.matches('td,th,tr'))node.style.height=original.style.height||style.height;
+      if(node.matches('table')){
+        node.classList.add('consent-document-table');node.style.width=style.width;node.style.maxWidth='100%';
+        if(!node.querySelector('colgroup')&&original.rows[0]){
+          const widths=[...original.rows[0].cells].map(cell=>parseFloat(root.getComputedStyle(cell).width)),total=widths.reduce((sum,width)=>sum+width,0),columns=document.createElement('colgroup');
+          widths.forEach(width=>{const col=document.createElement('col');col.style.width=(width/total*100)+'%';columns.append(col);});node.prepend(columns);
+        }
+      }
+      if(node.classList.contains('ql-ui'))apply(node,style,['position','inset-inline-start','inset-inline-end','width','text-align']);
+    });
+    const profile=document.createElement('div');apply(profile,root.getComputedStyle(source),textProperties);
+    return {html:copy.innerHTML,style:profile.style.cssText,quill:source.classList.contains('ql-editor')};
+  }
   function normalize(value={}){
     const result={...defaults};
     for(const key of ['header_text_en','header_text_ar','footer_text_en','footer_text_ar'])result[key]=String(value[key]??'').slice(0,600);
@@ -20,7 +51,7 @@
     return {settings:normalize(layout.data),logo:logo(image.data?.logo_data_url),updatedAt:layout.data.updated_at};
   }
   function reserve(){
-    const view=root.open(new URL('consent-print.html?v=2',root.location.href).href,'_blank');
+    const view=root.open(new URL('consent-print.html?v=4',root.location.href).href,'_blank');
     if(!view)throw new Error(t('Allow pop-ups for Lumin to open the consent print view.','اسمح بالنوافذ المنبثقة لموقع Lumin لفتح صفحة طباعة الموافقة.'));
     const ready=new Promise((resolve,reject)=>{
       const cleanup=()=>{root.removeEventListener('message',receive);clearTimeout(timeout);clearInterval(poll);};
@@ -33,30 +64,32 @@
     ready.catch(()=>{});pendingViews.set(view,ready);
     return view;
   }
-  function body(record,configuration){
+  function body(record,configuration,snapshot=null){
     const s=normalize(configuration.settings),image=logo(configuration.logo),ar=record.language==='ar',tr=(en,arabic)=>ar?arabic:en;
     const header=s['header_text_'+record.language],footer=s['footer_text_'+record.language];
     const signatures=s.signatures_visible?`<div class="consent-print-signatures"><p>${tr('Patient / guardian name and signature','اسم وتوقيع المريض / ولي الأمر')}<br>${tr('Relationship (if guardian)','صلة القرابة (لولي الأمر)')}<br>${tr('Date','التاريخ')}: __________________</p><p>${tr('Treating doctor signature','توقيع الطبيب المعالج')}<br>${e(ar&&record.doctor_name_ar?record.doctor_name_ar:record.doctor_name)}<br>${tr('Date','التاريخ')}: __________________</p><p>${tr('Witness / interpreter (if needed)','الشاهد / المترجم (عند الحاجة)')}<br>${tr('Name and signature','الاسم والتوقيع')}: __________________</p></div>`:'';
-    const template=document.createElement('template');template.innerHTML=root.LuminConsentDocument.html(root.LuminConsentDocument.read(record.content,record.body));
+    const template=document.createElement('template');template.innerHTML=snapshot?snapshot.html:root.LuminConsentDocument.html(root.LuminConsentDocument.read(record.content,record.body));
     const blocks=[];
     for(const node of template.content.children){
-      if(node.matches('.consent-table-print-wrap')){
+      if(node.matches('table,.consent-table-print-wrap')){
         // Separate table rows prevent nested-table fragments covering repeated letterhead.
-        const table=node.querySelector('table'),rows=[...table.rows];
-        rows.forEach((row,index)=>{const part=table.cloneNode(false);part.append(table.querySelector('colgroup').cloneNode(true));const section=document.createElement('tbody');section.append(row.cloneNode(true));part.append(section);blocks.push(`<div class="consent-table-print-wrap consent-table-part ${index===0?'is-first':''} ${index===rows.length-1?'is-last':''}">${part.outerHTML}</div>`);});
+        const table=node.matches('table')?node:node.querySelector('table'),rows=[...table.rows];
+        const before=table.style.marginTop,after=table.style.marginBottom;
+        rows.forEach((row,index)=>{const part=table.cloneNode(false);part.style.margin='0';const columns=table.querySelector('colgroup');if(columns)part.append(columns.cloneNode(true));const section=document.createElement('tbody');section.append(row.cloneNode(true));part.append(section);blocks.push(`<div class="consent-table-print-wrap consent-table-part ${index===0?'is-first':''} ${index===rows.length-1?'is-last':''}"${snapshot?` style="${index===0?'margin-top:'+e(before||'0')+';':''}${index===rows.length-1?'margin-bottom:'+e(after||'0')+';':''}"`:''}>${part.outerHTML}</div>`);});
       }else if(node.matches('ol,ul')){
         [...node.children].forEach((item,index)=>{const list=node.cloneNode(false);if(node.tagName==='OL')list.start=index+1;list.append(item.cloneNode(true));blocks.push(list.outerHTML);});
       }else blocks.push(node.outerHTML);
     }
     if(signatures)blocks.push(signatures);
-    return `<main id="consent-print-root"><div class="consent-copy consent-rich-content"><table class="consent-print-page" role="presentation"><thead><tr><td><header class="consent-page-header" style="min-height:${s.header_height_mm}mm;font-size:${s.header_font_px}px">${s.logo_visible&&image?`<div style="text-align:${s.logo_align}"><img class="consent-clinic-logo" src="${image}" alt="${tr('Clinic logo','شعار العيادة')}" style="width:${s.logo_width_mm}mm"/></div>`:''}${header?`<div class="consent-letterhead-text">${e(header)}</div>`:''}</header></td></tr></thead><tfoot><tr><td><div class="consent-footer-spacer" aria-hidden="true" style="min-height:${s.footer_height_mm}mm;font-size:${s.footer_font_px}px">${e(footer)}</div></td></tr></tfoot><tbody>${blocks.map(block=>`<tr><td>${block}</td></tr>`).join('')}</tbody></table></div></main><footer class="consent-page-footer" style="min-height:${s.footer_height_mm}mm;font-size:${s.footer_font_px}px">${e(footer)}</footer>`;
+    return `<main id="consent-print-root"><div class="consent-copy consent-rich-content${snapshot?' consent-draft-copy'+(snapshot.quill?' ql-editor':''):''}"${snapshot?` style="${e(snapshot.style)}"`:''}><table class="consent-print-page" role="presentation"><thead><tr><td><header class="consent-page-header" style="min-height:${s.header_height_mm}mm;font-size:${s.header_font_px}px">${s.logo_visible&&image?`<div style="text-align:${s.logo_align}"><img class="consent-clinic-logo" src="${image}" alt="${tr('Clinic logo','شعار العيادة')}" style="width:${s.logo_width_mm}mm"/></div>`:''}${header?`<div class="consent-letterhead-text">${e(header)}</div>`:''}</header></td></tr></thead><tfoot><tr><td><div class="consent-footer-spacer" aria-hidden="true" style="min-height:${s.footer_height_mm}mm;font-size:${s.footer_font_px}px">${e(footer)}</div></td></tr></tfoot><tbody>${blocks.map(block=>`<tr><td>${block}</td></tr>`).join('')}</tbody></table></div></main><footer class="consent-page-footer" style="min-height:${s.footer_height_mm}mm;font-size:${s.footer_font_px}px">${e(footer)}</footer>`;
   }
-  async function print(record,{view,isCurrent=()=>true}={}){
+  async function print(record,{view,isCurrent=()=>true,source}={}){
     view=view||reserve();
     try{
+      const snapshot=capture(source);
       const [configuration]=await Promise.all([load(),pendingViews.get(view)]);
       if(view.closed||!isCurrent()){view.close();return;}
-      view.document.querySelector('[data-consent-print-document]').innerHTML=body(record,configuration);
+      view.document.querySelector('[data-consent-print-document]').innerHTML=body(record,configuration,snapshot);
       const families=[...new Set(root.LuminConsentDocument.read(record.content,record.body).ops.map(op=>op.attributes?.font).filter(Boolean))];
       await view.LuminConsentPrintView.prepare({language:record.language,title:record.title,fonts:families});
       if(view.closed||!isCurrent()){view.close();return;}
@@ -89,5 +122,5 @@
     }catch(error){slot.querySelector('[role=status]').textContent=error.message;}
     if(root.lucide)root.lucide.createIcons();
   }
-  root.LuminConsentPrint={normalize,body,reserve,print,mountAdmin};
+  root.LuminConsentPrint={normalize,capture,body,reserve,print,mountAdmin};
 })(window);

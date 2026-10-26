@@ -2,18 +2,20 @@
 <html lang="en" dir="ltr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; frame-src 'self'">
   <meta name="referrer" content="no-referrer">
   <title>Consent</title>
-  <link rel="stylesheet" href="lumin-consent-editor.css?v=6">
-  <link rel="stylesheet" href="lumin-consent-print.css?v=2">
+  <link rel="stylesheet" href="vendor/quill/quill.core-2.0.2.css">
+  <link rel="stylesheet" href="lumin-consent-editor.css?v=7">
+  <link rel="stylesheet" href="lumin-consent-print.css?v=4">
   <script src="vendor/lucide.min.js" defer></script>
-  <script src="lumin-consent-print-view.js?v=2" defer></script>
+  <script src="vendor/html2canvas/html2canvas-1.4.1.min.js" defer></script>
+  <script src="lumin-consent-print-view.js?v=4" defer></script>
 </head>
 <body>
   <header class="consent-print-controls" data-consent-print-controls>
-    <div class="consent-print-actions"><button type="button" data-print-consent disabled><i data-lucide="printer" aria-hidden="true"></i><span>Print / Save as PDF · طباعة</span></button><button type="button" data-print-back><i data-lucide="arrow-left" aria-hidden="true"></i><span>Back to consent · العودة</span></button></div>
+    <div class="consent-print-actions"><button type="button" data-print-consent disabled><i data-lucide="printer" aria-hidden="true"></i><span>Print / Save as PDF · طباعة</span></button><a data-print-pdf target="_blank" rel="noopener" hidden><i data-lucide="file-text" aria-hidden="true"></i><span>Open PDF · فتح PDF</span></a><button type="button" data-print-back><i data-lucide="arrow-left" aria-hidden="true"></i><span>Back to consent · العودة</span></button></div>
     <p data-print-status role="status">Preparing consent… · جارٍ تجهيز الموافقة…</p>
   </header>
   <div data-consent-print-document hidden></div>

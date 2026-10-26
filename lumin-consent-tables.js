@@ -73,6 +73,7 @@
     overlay.addEventListener('keydown',event=>{const handle=event.target.closest('[data-table-resize]');if(!handle||!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key))return;event.preventDefault();const axis=handle.dataset.tableResize,index=Number(handle.dataset.index),rtl=getComputedStyle(active).direction==='rtl',sign=(event.key==='ArrowLeft'||event.key==='ArrowUp'?-1:1)*(axis==='column'&&rtl?-1:1);resize(axis,index,Number(handle.getAttribute('aria-valuenow'))+sign*8);refresh();overlay.querySelector(`[data-table-resize="${axis}"][data-index="${index}"]`)?.focus();});
     function rootPointer(event){const cell=event.target.closest('td');if(cell){active=cell.closest('table');schedule();}else{active=null;overlay.hidden=true;menu.hidden=true;}}
     quill.root.addEventListener('pointerup',rootPointer);quill.on('selection-change',schedule);quill.on('text-change',schedule);stage.addEventListener('scroll',schedule);
+    layout();
     const observer=new ResizeObserver(schedule);observer.observe(stage);schedule();
     return {insert,refresh:schedule,setDisabled(value){disabled=value;menu.querySelectorAll('button').forEach(button=>button.disabled=value);refresh();},dispose(){disposed=true;observer.disconnect();cancelAnimationFrame(frame);quill.off('selection-change',schedule);quill.off('text-change',schedule);quill.root.removeEventListener('pointerup',rootPointer);}};
   }

@@ -97,13 +97,13 @@
         const rows=[];let rowId=null;
         while(index<lines.length&&lines[index].attrs.table){const cell=lines[index];if(cell.attrs.table!==rowId){rows.push([]);rowId=cell.attrs.table;}rows.at(-1).push(cell);index++;}index--;
         const widths=rows[0].map(cell=>parseInt(cell.attrs.cellWidth)||160),total=widths.reduce((sum,width)=>sum+width,0);
-        result+=`<div class="consent-table-print-wrap"><table class="consent-document-table" style="width:100%;max-width:${total}px;table-layout:fixed"><colgroup>${widths.map(width=>`<col style="width:${width/total*100}%"/>`).join('')}</colgroup><tbody>${rows.map(row=>`<tr style="height:${row.every(cell=>cell.attrs.cellHeight==='auto')?'auto':Math.max(...row.map(cell=>cell.attrs.cellHeight==='auto'?0:parseInt(cell.attrs.cellHeight)||44))+'px'}">${row.map(cell=>`<td${cell.attrs.direction||cell.attrs.align||cell.attrs.lineSpacing?` style="${cell.attrs.direction?'direction:'+cell.attrs.direction+';':''}${cell.attrs.align?'text-align:'+cell.attrs.align+';':''}${cell.attrs.lineSpacing?'line-height:'+cell.attrs.lineSpacing:''}"`:''}>${cell.body}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+        result+=`<div class="consent-table-print-wrap"><table class="consent-document-table" style="--consent-table-width:${total}px;width:100%;max-width:${total}px;table-layout:fixed"><colgroup>${widths.map(width=>`<col style="width:${width/total*100}%"/>`).join('')}</colgroup><tbody>${rows.map(row=>`<tr style="height:${row.every(cell=>cell.attrs.cellHeight==='auto')?'auto':Math.max(...row.map(cell=>cell.attrs.cellHeight==='auto'?0:parseInt(cell.attrs.cellHeight)||44))+'px'}">${row.map(cell=>`<td${cell.attrs.direction||cell.attrs.align||cell.attrs.lineSpacing?` style="${cell.attrs.direction?'direction:'+cell.attrs.direction+';':''}${cell.attrs.align?'text-align:'+cell.attrs.align+';':''}${cell.attrs.lineSpacing?'line-height:'+cell.attrs.lineSpacing:''}"`:''}>${cell.body}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
         continue;
       }
       const a=line.attrs,wanted=a.list==='ordered'?'ol':a.list==='bullet'?'ul':'';
       if(list!==wanted){if(list)result+=`</${list}>`;if(wanted)result+=`<${wanted}>`;list=wanted;}
       const tag=wanted?'li':a.header?'h'+a.header:a.blockquote?'blockquote':'p';
-      const styles=[];if(a.align)styles.push('text-align:'+a.align);if(a.direction)styles.push('direction:'+a.direction);if(a.indent)styles.push('margin-inline-start:'+(a.indent*1.5)+'em');if(a.lineSpacing)styles.push('line-height:'+a.lineSpacing);
+      const styles=[];if(a.align)styles.push('text-align:'+a.align);if(a.direction)styles.push('direction:'+a.direction);if(a.indent)styles.push('margin-inline-start:'+(a.indent*2)+'em');if(a.lineSpacing)styles.push('line-height:'+a.lineSpacing);
       result+=`<${tag}${styles.length?' style="'+styles.join(';')+'"':''}>${line.body}</${tag}>`;
     }
     if(list)result+=`</${list}>`;return result;
