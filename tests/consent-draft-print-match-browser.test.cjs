@@ -54,6 +54,13 @@ test('printed consent matches the actual draft table, typography, paragraph gaps
     },language);
     await page.evaluate(()=>document.fonts.ready);
     await page.waitForFunction(()=>document.querySelector('#editor .ql-editor table').style.width==='469px');
+    const spacing=await page.locator('#editor .ql-editor').evaluate(node=>{
+      node.focus();const table=node.querySelector('table'),after=table.nextElementSibling,style=getComputedStyle(node);
+      return {above:table.getBoundingClientRect().top-node.getBoundingClientRect().top-parseFloat(style.paddingTop),below:after.getBoundingClientRect().top-table.getBoundingClientRect().bottom,focusBox:style.boxShadow};
+    });
+    assert.ok(Math.abs(spacing.above)<1,`${language}: the first table starts at the content edge without a blank area`);
+    assert.ok(Math.abs(spacing.below)<1,`${language}: the following text starts directly below the table`);
+    assert.equal(spacing.focusBox,'none','Focusing the wording does not draw a separating box inside the document');
     const expected=await page.locator('#editor .ql-editor').evaluate(inspect);
     const popup=page.waitForEvent('popup');await page.locator('#print').click();const view=await popup;await view.waitForFunction(()=>document.documentElement.dataset.consentPrintPrepared==='true');await page.evaluate(()=>window.printJob);
     for(const media of ['screen','print']){

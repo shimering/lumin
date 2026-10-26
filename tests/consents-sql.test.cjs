@@ -177,6 +177,15 @@ test('consents enforce clinic permissions, preserve snapshots and finalized text
   await assert.rejects(db.query('update patient_consents set print_layout=$1 where id=$2',[JSON.stringify({...layout,logo_visible:false}),created.id]),/Reopen/);
   await db.query("update patient_consents set status='draft' where id=$1",[created.id]);
   await db.query('update patient_consents set print_layout=$1 where id=$2',[JSON.stringify({...layout,logo_visible:false}),created.id]);
+  await db.exec('reset role');
+  await db.exec(fs.readFileSync('supabase/migrations/'+fs.readdirSync('supabase/migrations').find(name=>name.endsWith('_consent_signature_editor.sql')),'utf8'));
+  await db.exec('set role authenticated');
+  const signatures={...layout,signatures_visible:true,signature_divider:false,signature_labels_ar:{patient:'توقيع المريض',date:'بتاريخ'},signature_labels_en:{patient:'Patient signature'}};
+  await db.query('update patient_consents set print_layout=$1 where id=$2',[JSON.stringify(signatures),created.id]);
+  assert.deepEqual((await db.query('select print_layout from patient_consents where id=$1',[created.id])).rows[0].print_layout,signatures);
+  for(const bad of [{signatures_visible:'true'},{signature_divider:1},{signature_labels_ar:{unknown:'Label'}},{signature_labels_en:{patient:'x'.repeat(161)}},{signature_labels_ar:[]},{signature_labels_ar:{date:42}}])await assert.rejects(db.query('update patient_consents set print_layout=$1 where id=$2',[JSON.stringify(bad),created.id]),/check constraint/);
+  await db.query("update patient_consents set status='finalized' where id=$1",[created.id]);
+  await assert.rejects(db.query('update patient_consents set print_layout=$1 where id=$2',[JSON.stringify({...signatures,signature_labels_ar:{patient:'Changed'}}),created.id]),/Reopen/);
   await db.exec("select set_config('test.pages','',false)");
   assert.equal((await db.query('select count(*)::int as count from patient_consents')).rows[0].count,0,'Layout and Palmer fields retain consent row permissions');
 

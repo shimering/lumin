@@ -1,6 +1,13 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const layout=require('../lumin-consent-layout.js'),doc=require('../lumin-consent-document.js');
 const fs=require('node:fs'),vm=require('node:vm');
+test('signature labels inherit clinic visibility, remain bilingual and render only safe text',()=>{
+  const saved=layout.normalize({signature_labels_ar:{patient:'توقيع المريض'},signature_divider:false},{signatures_visible:false});
+  assert.equal(saved.signatures_visible,false);assert.equal(saved.signature_labels_ar.date,'التاريخ');assert.equal(saved.signature_labels_en.patient,'Patient / guardian name and signature');
+  assert.equal(layout.signatureMarkup(saved,{doctor_name:'Doctor'},'ar'),'');
+  const html=layout.signatureMarkup({...saved,signatures_visible:true,signature_labels_ar:{patient:'<img onerror=alert(1)>'}},{doctor_name:'<script>Doctor</script>'},'ar');
+  assert.match(html,/without-divider/);assert.match(html,/dir="rtl"/);assert.match(html,/&lt;img/);assert.doesNotMatch(html,/<img|<script/);
+});
 test('consent layouts inherit clinic defaults, validate dimensions and retain safe frame margins',()=>{
   assert.equal(layout.normalize({}, {logo_width_mm:48,logo_visible:false}).logo_width_mm,48);
   assert.equal(layout.normalize({}, {logo_visible:false}).logo_visible,false);

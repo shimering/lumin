@@ -15,7 +15,7 @@ html,body{margin:0;padding:0;width:auto;min-width:0;height:auto;overflow:visible
 .consent-print-signatures{display:flex;gap:6mm;break-inside:avoid;margin-top:8mm;padding-top:4mm;border-top:1px solid #cbd5e1;font-size:11px}
 .consent-print-signatures p{flex:1;min-width:0;margin:0;overflow-wrap:anywhere}
 .consent-table-print-wrap{overflow:visible}.consent-document-table td{padding:4px 12px}
-.consent-table-part table{margin:0}.consent-table-part.is-first{margin-top:16px}.consent-table-part.is-last{margin-bottom:16px}.consent-table-part:not(.is-first){margin-top:-1px}
+.consent-table-part table{margin:0}.consent-table-part.is-first{margin-top:0}.consent-table-part.is-last{margin-bottom:0}.consent-table-part:not(.is-first){margin-top:-1px}
 @media screen{body{max-width:210mm;margin:auto}}
 
 .consent-footer-spacer{visibility:hidden}.consent-page-footer{margin-inline:12mm}@media print{.consent-page-footer{position:fixed;bottom:0;inset-inline:12mm;margin:0}}

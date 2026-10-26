@@ -29,10 +29,13 @@ test('consent page frames, margins, first-page logos and Palmer symbols survive 
   await page.evaluate(()=>{values.implant_teeth='┌5 / 5┐';editor.updateVariables(values);});
   assert.equal(await page.locator('#editor .consent-palmer-token').count(),2);
   assert.match(await page.evaluate(()=>editor.getText()),/┌5 \/ 5┐/,'Bound tooth variables update without losing their actual tooth labels');
+  await page.evaluate(()=>{record.print_layout.signature_labels_ar={patient:'توقيع المريض المعدل'};record.print_layout.signature_divider=false;});
   const folder=path.join(os.tmpdir(),'lumin-consent-layout-print');fs.mkdirSync(folder,{recursive:true});
   for(const mode of ['first','all','hidden']){
     await page.evaluate(mode=>{record.print_layout.logo_pages=mode==='all'?'all':'first';record.print_layout.logo_visible=mode!=='hidden';},mode);
     const popup=page.waitForEvent('popup');await page.locator('#print').click();const view=await popup;await view.waitForFunction(()=>document.documentElement.dataset.consentPrintPrepared==='true',null,{timeout:60000});await page.evaluate(()=>window.printJob);
+    assert.match(await view.locator('#consent-print-root>.consent-copy .consent-signature-block').innerText(),/توقيع المريض المعدل/);
+    assert.equal(await view.locator('#consent-print-root>.consent-copy .consent-signature-block').evaluate(node=>getComputedStyle(node).borderTopStyle),'none');
     const sheets=view.locator('.consent-native-sheet');const count=await sheets.count();assert.ok(count>=2,'A long consent must span multiple physical pages');
     await view.emulateMedia({media:'print'});
     for(let index=0;index<count;index++){
