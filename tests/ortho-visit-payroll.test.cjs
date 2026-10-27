@@ -25,6 +25,9 @@ test('orthodontic visit invoices use their own fees and effective doctors in das
   await db.exec(migration('20260919163000_add_ortho_package_procedures.sql'));
   await db.exec('drop function private.chart_finding_by_id(jsonb,uuid)');
   await db.exec(migration('20261020133050_ortho_visit_billing_and_payroll.sql'));
+  await db.exec(migration('20261027212346_optimize_hr_finding_lookup.sql'));
+  await db.exec(migration('20261027213009_batch_clinic_payroll_finding_reads.sql'));
+  await db.exec(migration('20261027213238_skip_absent_payroll_chart_findings.sql'));
   await db.exec(fs.readFileSync(path.join(__dirname,'fixtures/ortho-visit-doctor-sync.sql'),'utf8'));
   await db.query(`insert into public.dental_operations(id,code,name,price,is_ortho_package) values($1,'ortho','Orthodontics',5000,true)`,[uuid(50)]);
   const visit=(id,price,extra={})=>({id:uuid(id),visitNumber:id-60,price,status:'C',date:'2026-10-13T10:00:00Z',createdAt:'2026-10-12T10:00:00Z',...extra});

@@ -39,6 +39,16 @@ test('SQL projections calculate split shares, snapshots, permissions and ledger 
     await db.exec(fs.readFileSync(path.join(__dirname,'fixtures/clinic-management.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261013143556_clinic_management_overview.sql'),'utf8'));
     await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261013210209_exclude_settled_clinic_salary_alerts.sql'),'utf8'));
+    const projection=fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261013143556_clinic_management_overview.sql'),'utf8').split('-- Private storage/payment snapshots')[0];
+    await db.exec(projection.replaceAll('private.clinic_doctor_invoice_lines','private.baseline_clinic_doctor_invoice_lines'));
+    await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261027213009_batch_clinic_payroll_finding_reads.sql'),'utf8'));
+    for(const [start,end] of [['2026-10-13','2026-10-13'],['2026-10-01','2026-10-31'],['2026-10-14','2026-10-14']]){
+      for(const doctor of [null,'00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000002']){
+        const actual=await db.query('select * from private.clinic_doctor_invoice_lines($1,$2,$3) order by invoice_item_id,doctor_id,finding_id',[start,end,doctor]);
+        const expected=await db.query('select * from private.baseline_clinic_doctor_invoice_lines($1,$2,$3) order by invoice_item_id,doctor_id,finding_id',[start,end,doctor]);
+        assert.deepEqual(actual.rows,expected.rows,'Batched lookups retain dates, allocations and per-doctor rounding');
+      }
+    }
     const call=async sql=>(await db.query('select '+sql+' as result')).rows[0].result;
     const day=await call("public.get_clinic_doctor_day_payroll('2026-10-13','00000000-0000-4000-8000-000000000001')");
     assert.equal(day.ready_amount,900);assert.equal(day.untransferred_amount,739.98);assert.equal(day.invoice_count,4);assert.equal(day.rows.length,4);

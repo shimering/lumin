@@ -78,7 +78,7 @@
   <script src="lumin-loyalty.js?v=5"></script>
   <script src="lumin-finance-sync.js?v=3"></script>
   <script src="lumin-cash-flow.js?v=1"></script>
-  <script src="lumin-clinic-management.js?v=6"></script>
+  <script src="lumin-clinic-management.js?v=7"></script>
   <script src="lumin-inventory-model.js?v=7"></script>
   <script src="lumin-inventory-images.js?v=5"></script>
   <script src="lumin-supplier-list-model.js?v=2"></script>
@@ -10304,6 +10304,11 @@
     let hrSalaryPayments = [];
     let hrSalaryAdvances = [];
     let hrDoctorPayrollLines = [];
+    let hrDoctorPayrollLoadedMonth = '';
+    let hrDoctorPayrollLoadPromise = null;
+    let hrDoctorPayrollRequestToken = 0;
+    let hrDoctorPayrollError = false;
+    let hrDirectoryRequestToken = 0;
     let hrDoctorSettlementCases = [];
     let hrDoctorSettlementRangeKey = '';
     let hrDoctorSettlementLoading = false;
@@ -13252,6 +13257,11 @@
         hrPerformanceAdjustments = [];
         hrSalaryPayments = [];
         hrDoctorPayrollLines = [];
+        hrDoctorPayrollLoadedMonth = '';
+        hrDoctorPayrollLoadPromise = null;
+        hrDoctorPayrollRequestToken += 1;
+        hrDoctorPayrollError = false;
+        hrDirectoryRequestToken += 1;
         hrDoctorSettlementCases = [];
         hrDoctorSettlementRangeKey = '';
         hrDoctorSettlementLoading = false;
@@ -13425,6 +13435,11 @@
         hrPerformanceAdjustments = [];
         hrSalaryPayments = [];
         hrDoctorPayrollLines = [];
+        hrDoctorPayrollLoadedMonth = '';
+        hrDoctorPayrollLoadPromise = null;
+        hrDoctorPayrollRequestToken += 1;
+        hrDoctorPayrollError = false;
+        hrDirectoryRequestToken += 1;
         hrDoctorSettlementCases = [];
         hrDoctorSettlementRangeKey = '';
         hrDoctorSettlementLoading = false;
@@ -21289,7 +21304,7 @@
         ['Working days', schedule.days.length, 'border-rose-200 bg-rose-50/70 text-rose-800'],
         ['Weekly hours', weeklyHours, 'border-blue-200 bg-blue-50/70 text-blue-800'],
         ['Salary rules', rules.length + (universal.enabled ? 1 : 0), 'border-violet-200 bg-violet-50/70 text-violet-800'],
-        ['Selected salary', formatInvoiceMoney(settlementSalary), 'border-emerald-200 bg-emerald-50/70 text-emerald-800']
+        ['Selected salary', hrDoctorSettlementRangeKey || hrDoctorPayrollLoadedMonth === currentHrMonth() ? formatInvoiceMoney(settlementSalary) : '—', 'border-emerald-200 bg-emerald-50/70 text-emerald-800']
       ];
       container.innerHTML = kpis.map(([label, value, classes]) => `<div class="rounded-2xl border p-3.5 shadow-xs ${classes}"><span class="text-[9px] font-black uppercase tracking-wider opacity-70">${escapeHtml(label)}</span><p class="mt-2 text-lg font-black">${escapeHtml(String(value))}</p></div>`).join('');
     }
@@ -21698,6 +21713,7 @@
       doctors.className = activeHrTeamTab === 'doctors' ? active : inactive;
       hrRoleFilter = 'all';
       renderHrDirectory();
+      if (activeHrTeamTab === 'doctors') void refreshHrDirectory();
     }
 
     function renderHrDirectory() {
@@ -21714,6 +21730,23 @@
       const baseUsers = hrDirectoryUsers.filter(user => user.active && (activeHrTeamTab === 'doctors' ? user.isDoctor : !user.isDoctor));
       renderHrRoleFilters(baseUsers);
       const users = baseUsers.filter(user => (hrRoleFilter === 'all' || user.roleId === hrRoleFilter || user.roleName === hrRoleFilter) && (!query || [user.fullName, user.loginName, user.roleName].some(value => value.toLowerCase().includes(query))));
+      if (doctorDirectory && hrDoctorPayrollLoadedMonth !== currentHrMonth()) {
+        document.getElementById('hr-team-total').textContent = String(users.length);
+        for (const id of ['hr-attended-total', 'hr-late-total', 'hr-salary-total']) document.getElementById(id).textContent = '—';
+        document.getElementById('hr-attended-total-label').textContent = 'Completed quantity';
+        document.getElementById('hr-late-total-label').textContent = 'Procedure types';
+        document.getElementById('hr-salary-total-label').textContent = 'Calculated salary';
+        renderHrPeriodControls();
+        const message = hrDoctorPayrollError
+          ? hrSalaryPaymentText('Could not load doctor payroll. Please retry.', 'تعذر تحميل رواتب الأطباء. يرجى إعادة المحاولة.')
+          : hrSalaryPaymentText('Loading doctor payroll...', 'جارٍ تحميل رواتب الأطباء...');
+        setStableHtml(tbody, `<tr><td colspan="5" class="px-5 py-12 text-center"><p role="status" class="text-sm font-medium text-slate-500">${message}</p>${hrDoctorPayrollError
+          ? `<button type="button" onclick="refreshHrDoctorPayroll({ refresh: true })" class="mt-4 inline-flex min-h-11 min-w-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 transition-all duration-150 ease-out hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 disabled:opacity-50 disabled:pointer-events-none"><i data-lucide="refresh-cw" class="h-4 w-4"></i>${hrSalaryPaymentText('Retry', 'إعادة المحاولة')}</button>`
+          : '<div aria-hidden="true" class="mt-4 space-y-3 animate-pulse"><div class="h-4 rounded-lg bg-slate-100"></div><div class="h-4 rounded-lg bg-slate-100"></div><div class="h-4 rounded-lg bg-slate-100"></div></div>'}</td></tr>`);
+        if (activeHrDoctorDetailsId) renderHrDoctorDetails();
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
       const metrics = users.map(user => ({ user, ...(user.isDoctor ? hrDoctorMetrics(user) : hrUserMetrics(user)) }));
       document.getElementById('hr-team-total').textContent = String(users.length);
       document.getElementById('hr-attended-total').textContent = String(metrics.reduce((sum, item) => sum + item.attended, 0));
@@ -21757,17 +21790,68 @@
       lucide.createIcons();
     }
 
+    async function refreshHrDoctorPayroll(options = {}) {
+      const month = currentHrMonth();
+      if (!hasPageAccess('hr') || !hrDirectoryLoaded || hrLoadedMonth !== month) return false;
+      if (!options.refresh && hrDoctorPayrollLoadedMonth === month) return true;
+      const actor = currentSession?.user?.id;
+      const generation = targetedLoadingGeneration;
+      const key = `${actor}:${generation}:${month}`;
+      if (hrDoctorPayrollLoadPromise?.key === key) return hrDoctorPayrollLoadPromise.promise;
+      const token = ++hrDoctorPayrollRequestToken;
+      const current = () => token === hrDoctorPayrollRequestToken && actor === currentSession?.user?.id
+        && generation === targetedLoadingGeneration && hasPageAccess('hr') && currentHrMonth() === month;
+      hrDoctorPayrollError = false;
+      hrDoctorPayrollLoadedMonth = '';
+      if (activeHrTeamTab === 'doctors') renderHrDirectory();
+      const read = { key, promise: null };
+      read.promise = (async () => {
+        try {
+          const { data, error } = await db.rpc('get_hr_doctor_payroll', { p_pay_month: hrMonthBounds(month).start });
+          if (!current()) return false;
+          if (error) throw error;
+          hrDoctorPayrollLines = data || [];
+          hrDoctorPayrollLoadedMonth = month;
+          return true;
+        } catch (error) {
+          if (current()) hrDoctorPayrollError = true;
+          return false;
+        } finally {
+          if (hrDoctorPayrollLoadPromise === read) hrDoctorPayrollLoadPromise = null;
+          if (current()) renderHrDirectory();
+        }
+      })();
+      hrDoctorPayrollLoadPromise = read;
+      return read.promise;
+    }
+
     async function refreshHrDirectory(options = {}) {
       if (!hasPageAccess('hr')) return false;
       const month = currentHrMonth();
       const { start, end } = hrMonthBounds(month);
-      const { refresh = false } = options;
+      const { refresh = false, includeDoctorPayroll = false } = options;
       const errorElement = document.getElementById('hr-directory-error');
-      if (hrDirectoryLoaded && hrLoadedMonth === month && !refresh) { renderHrDirectory(); return true; }
-      if (hrDirectoryLoadPromise) return hrDirectoryLoadPromise;
+      const loadPayroll = () => includeDoctorPayroll || activeHrTeamTab === 'doctors'
+        ? refreshHrDoctorPayroll() : Promise.resolve(true);
+      if (hrDirectoryLoaded && hrLoadedMonth === month && !refresh) { renderHrDirectory(); return loadPayroll(); }
+      const actor = currentSession?.user?.id;
+      const generation = targetedLoadingGeneration;
+      const key = `${actor}:${generation}:${month}`;
+      if (hrDirectoryLoadPromise?.key === key) {
+        try { return await hrDirectoryLoadPromise.promise ? loadPayroll() : false; }
+        catch (error) { return false; }
+      }
+      const token = ++hrDirectoryRequestToken;
+      const current = () => token === hrDirectoryRequestToken && actor === currentSession?.user?.id
+        && generation === targetedLoadingGeneration && hasPageAccess('hr') && currentHrMonth() === month;
+      hrDoctorPayrollLoadedMonth = '';
+      hrDoctorPayrollError = false;
+      hrDoctorPayrollRequestToken += 1;
+      hrDoctorPayrollLoadPromise = null;
       errorElement?.classList.add('hidden');
-      hrDirectoryLoadPromise = (async () => {
-        const [usersResult, settingsResult, attendanceResult, extraResult, performanceResult, periodResult, paymentsResult, doctorPayrollResult, advancesResult] = await Promise.all([
+      const read = { key, promise: null };
+      read.promise = (async () => {
+        const [usersResult, settingsResult, attendanceResult, extraResult, performanceResult, periodResult, paymentsResult, advancesResult] = await Promise.all([
           db.from('user_profiles').select('user_id, email, full_name, login_name, is_doctor, active, access_roles(id,name)').order('full_name'),
           db.from('hr_staff_settings').select('user_id, attendance_enabled, regular_shift_rate, extra_shift_rate, weekly_schedule'),
           db.from('hr_attendance_sessions').select('id,user_id,work_date,check_in_at,check_out_at,planned_start,planned_end,source,check_in_method,check_out_method,note').gte('work_date', start).lt('work_date', end),
@@ -21775,10 +21859,10 @@
           db.from('hr_performance_adjustments').select('id,user_id,adjustment_date,kind,amount,performance_score,note').gte('adjustment_date', start).lt('adjustment_date', end),
           db.from('hr_payroll_periods').select('*').eq('pay_month', start).maybeSingle(),
           db.from('hr_salary_payments').select('*').eq('pay_month', start),
-          db.rpc('get_hr_doctor_payroll', { p_pay_month: start }),
           db.from('hr_salary_advances').select('id,user_id,advance_date,amount,note,payment_method_id,expense_id,payment_methods(id,name)').gte('advance_date', start).lt('advance_date', end)
         ]);
-        for (const result of [usersResult, settingsResult, attendanceResult, extraResult, performanceResult, periodResult, paymentsResult, doctorPayrollResult, advancesResult]) if (result.error) throw result.error;
+        if (!current()) return false;
+        for (const result of [usersResult, settingsResult, attendanceResult, extraResult, performanceResult, periodResult, paymentsResult, advancesResult]) if (result.error) throw result.error;
         hrDirectoryUsers = (usersResult.data || []).map(normaliseHrDirectoryUser);
         hrStaffSettings = settingsResult.data || [];
         hrAttendanceSessions = attendanceResult.data || [];
@@ -21787,15 +21871,18 @@
         hrSalaryAdvances = advancesResult.data || [];
         hrPayrollPeriod = periodResult.data || { pay_month: start, status: 'draft' };
         hrSalaryPayments = paymentsResult.data || [];
-        hrDoctorPayrollLines = doctorPayrollResult.data || [];
+        hrDoctorPayrollLines = [];
         hrDirectoryLoaded = true;
         hrLoadedMonth = month;
         renderHrDirectory();
         return true;
       })();
-      try { return await hrDirectoryLoadPromise; }
-      catch (error) { if (errorElement) { errorElement.textContent = error?.message || 'Could not load the monthly HR records.'; errorElement.classList.remove('hidden'); } return false; }
-      finally { hrDirectoryLoadPromise = null; }
+      hrDirectoryLoadPromise = read;
+      let loaded = false;
+      try { loaded = await read.promise; }
+      catch (error) { if (current() && errorElement) { errorElement.textContent = error?.message || 'Could not load the monthly HR records.'; errorElement.classList.remove('hidden'); } return false; }
+      finally { if (hrDirectoryLoadPromise === read) hrDirectoryLoadPromise = null; }
+      return loaded ? loadPayroll() : false;
     }
 
     function shiftHrMonth(offset) {
@@ -29480,14 +29567,15 @@
         await switchFinanceTab(activeFinanceTab);
       }
       else if (authorizedTab === 'analytics') await refreshActiveAnalyticsTab();
-      else if (authorizedTab === 'hr') await Promise.allSettled([refreshHrDirectory(), ensureDentalCustomizationLoaded()]);
+      else if (authorizedTab === 'hr') await refreshHrDirectory();
       else if (authorizedTab === 'inventory' && window.LuminInventory) { LuminInventory.init(); await LuminInventory.refresh(); }
       if (authorizedTab !== 'inventory' && window.LuminInventory) LuminInventory.leave();
       document.getElementById('cm-alert-bell')?.classList.toggle('hidden', !['finances','analytics','hr'].some(page => hasPageAccess(page)));
       if (document.getElementById('cm-alert-bell')) document.getElementById('cm-alert-bell').hidden = !['finances','analytics','hr'].some(page => hasPageAccess(page));
       if (window.LuminClinicManagement) {
         LuminClinicManagement.closeAlerts(false);
-        if (authorizedTab !== 'inventory') await LuminClinicManagement.refresh();
+        if (authorizedTab === 'overview') await LuminClinicManagement.refresh();
+        else if (authorizedTab !== 'inventory') void LuminClinicManagement.refresh();
       }
       if (updateHash) window.location.hash = 'clinic-management';
       lucide.createIcons();

@@ -18,14 +18,14 @@ test('clinic overview, dropdown, payroll payment, permissions and bilingual layo
   await page.addScriptTag({path:path.join(root,'vendor/lucide.min.js')});
   await page.addScriptTag({content:
     "let currentUiLanguage='en',currentSession={user:{id:'actor'}},currentUserAccess={active:true,isAdmin:true,permissions:new Set(['finances','analytics','hr','finance_depts','patients'])},activeClinicManagementTab='overview',activeFinanceTab='invoices',activeHrDoctorDetailsId=null,hrDirectoryLoaded=true;"+
-    "window.calls=[];window.paymentCancelled=true;window.payrollPaid=false;window.failPayroll=false;window.empty=false;window.deferDoctor=false;window.deferred=[];"+
+    "window.calls=[];window.hrReads=[];window.paymentCancelled=true;window.payrollPaid=false;window.failPayroll=false;window.empty=false;window.deferDoctor=false;window.deferred=[];"+
     "window.transferComplete=false;window.transferFailure=false;window.deferTransfer=false;window.transferResolvers=[];window.patientRefreshes=0;function renderPatientInvoices(){patientRefreshes++}"+
     "function hasPageAccess(page){return page==='clinic-management'?['finances','analytics','hr'].some(key=>currentUserAccess.permissions.has(key)):currentUserAccess.permissions.has(page)}"+
     "function canModifyHr(){return hasPageAccess('hr')&&currentUserAccess.isAdmin}"+
     "function formatInvoiceMoney(value){return 'EGP '+Number(value).toLocaleString('en-US')}"+
     "function invoiceNumber(value){return 'INV-'+value}function dentalTranslate(value){return value}function canViewPatientInvoices(){return true}function hrClinicDateValue(){return '2026-10-13'}function currentHrMonth(){return '2026-10'}"+
     "const hrDirectoryUsers=[{userId:'a',fullName:'Dr. Ahmed',active:true,isDoctor:true},{userId:'staff',fullName:'Staff',active:true,isDoctor:false}],hrAttendanceSessions=[{user_id:'a',work_date:'2026-10-13',check_in_at:'today'},{user_id:'staff',work_date:'2026-10-12',check_in_at:'yesterday'}],hrSalaryAdvances=[{amount:300}],hrPayrollPeriod={status:'draft'};"+
-    "function hrDoctorMetrics(){return{salary:300}}function hrUserMetrics(){return{salary:500,paid:false}}async function refreshHrDirectory(){return true}async function ensureDentalCustomizationLoaded(){}function showAppointmentNotificationToast(){}"+
+    "function hrDoctorMetrics(){return{salary:300}}function hrUserMetrics(){return{salary:500,paid:false}}async function refreshHrDirectory(options={}){hrReads.push(options);return true}async function ensureDentalCustomizationLoaded(){}function showAppointmentNotificationToast(){}"+
     "async function openHrSalaryPaymentDialog(config){window.paymentConfig=config;if(paymentCancelled)return false;await config.pay('cash');return true}"+
     "async function openHrDoctorDetails(id){activeHrDoctorDetailsId=id}async function loadHrDoctorSettlementCases(){calls.push({name:'hr-detail'})}"+
     "async function switchFinanceTab(tab){activeFinanceTab=tab}async function refreshActiveAnalyticsTab(){}function openPatientInvoices(patient,view){window.invoiceOpened={patient,view}}"+
@@ -43,6 +43,12 @@ test('clinic overview, dropdown, payroll payment, permissions and bilingual layo
   assert.equal(await page.locator('#cm-start-date').inputValue(),'2026-10-13');
   assert.equal(await page.locator('#cm-end-date').inputValue(),'2026-10-13');
   assert.deepEqual(await page.evaluate(()=>calls.find(call=>call.name==='get_clinic_management_overview').args),{p_start_date:'2026-10-13',p_end_date:'2026-10-13'});
+  const beforeHidden=await page.evaluate(()=>({hr:hrReads.length,day:calls.filter(call=>call.name==='get_clinic_doctor_day_payroll').length}));
+  await page.evaluate(async()=>{await switchClinicManagementTab('hr');LuminClinicManagement.reset();await LuminClinicManagement.refresh({force:true})});
+  assert.equal(await page.evaluate(()=>hrReads.length),beforeHidden.hr+1,'HR navigation only loads its staff data');
+  assert.equal(await page.evaluate(()=>calls.filter(call=>call.name==='get_clinic_doctor_day_payroll').length),beforeHidden.day,'Hidden overview does not request daily payroll');
+  await page.evaluate(()=>switchClinicManagementTab('overview'));
+  assert.equal(await page.evaluate(()=>hrReads.at(-1).includeDoctorPayroll),true,'Returning to a cached overview loads its missing team payroll');
   for(const [preset,start,end] of [['yesterday','2026-10-12','2026-10-12'],['last7','2026-10-07','2026-10-13'],['month','2026-10-01','2026-10-13'],['lastMonth','2026-09-01','2026-09-30'],['year','2026-01-01','2026-10-13']]){
     await page.locator('#cm-range-preset').selectOption(preset);
     await page.waitForFunction(([start,end])=>calls.filter(call=>call.name==='get_clinic_management_overview').at(-1)?.args.p_start_date===start&&calls.filter(call=>call.name==='get_clinic_management_overview').at(-1)?.args.p_end_date===end,[start,end]);

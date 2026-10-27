@@ -184,17 +184,21 @@
     state.calendarDay=currentDay;
     if(range&&(range.start!==state.start||range.end!==state.end)){state.start=range.start;state.end=range.end;state.report=null;state.loadedAt=0;}
     renderStatic();
-    if(!options.force&&state.report&&Date.now()-state.loadedAt<30000){render();if(allowed('hr')&&!state.payroll)await loadPayroll();return;}
+    const loadDetails=activeClinicManagementTab==='overview';
+    if(!options.force&&state.report&&Date.now()-state.loadedAt<30000){
+      if(loadDetails&&allowed('hr')&&!state.team){const ready=await refreshHrDirectory({includeDoctorPayroll:true});if(context!==signature())return;state.team=ready?captureTeam():null;}
+      render();if(loadDetails&&allowed('hr')&&!state.payroll)await loadPayroll();return;
+    }
     const token=++state.token;state.loading=true;render();el('cm-refresh').disabled=true;
     const jobs=[db.rpc('get_clinic_management_overview',{p_start_date:state.start,p_end_date:state.end})];
-    if(allowed('hr'))jobs.push(refreshHrDirectory({refresh:Boolean(options.force)}));
+    if(loadDetails&&allowed('hr'))jobs.push(refreshHrDirectory({refresh:Boolean(options.force),includeDoctorPayroll:true}));
     const results=await Promise.allSettled(jobs);
     if(token!==state.token||context!==signature())return;
     const overview=results[0];state.loading=false;
     if(overview.status==='fulfilled'&&!overview.value.error){state.report=overview.value.data;state.error='';state.loadedAt=Date.now();}else{state.error='load';state.loadedAt=0;}
-    if(allowed('hr')){const hr=results[1];state.team=hr?.status==='fulfilled'&&hr.value===true?captureTeam():null;}
+    if(loadDetails&&allowed('hr')){const hr=results[1];state.team=hr?.status==='fulfilled'&&hr.value===true?captureTeam():null;}
     render();el('cm-refresh').disabled=false;
-    if(allowed('hr'))await loadPayroll();
+    if(loadDetails&&allowed('hr'))await loadPayroll();
   }
   async function loadPayroll() {
     if(!allowed('hr')||!actor()||!validDay(state.day)||state.paying)return;
@@ -311,7 +315,7 @@
     menu.style.left=x+'px';menu.style.top=y+'px';menu.style.maxHeight=Math.max(140,offsetY+height-y-12)+'px';
     menu.style.setProperty('--cm-menu-body-height',Math.max(60,offsetY+height-y-100)+'px');
   }
-  function invalidate() {state.loadedAt=0;if(allowed('clinic-management')&&!el('view-clinic-management')?.classList.contains('hidden'))void refresh({force:true});}
+  function invalidate() {state.loadedAt=0;state.team=null;if(!state.paying)state.payroll=null;if(allowed('clinic-management')&&!el('view-clinic-management')?.classList.contains('hidden'))void refresh({force:true});}
   function languageChanged(){if(el('view-clinic-overview')){renderStatic();render();}}
   function tabKeydown(event) {
     if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
