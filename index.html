@@ -8782,6 +8782,16 @@
                     <option value="gemini-3.8-flash">Gemini 3.8 Flash — deeper reasoning</option>
                   </select>
                 </label>
+                <label class="wa-settings-field is-wide">
+                  <span class="wa-settings-label">Max reasoning turns <small>8–10 turns recommended for busy clinic schedules</small></span>
+                  <select id="setting-whatsapp-max-turns" class="wa-settings-input">
+                    <option value="5">5 turns — compact, quick</option>
+                    <option value="8" selected>8 turns — balanced, recommended</option>
+                    <option value="10">10 turns — resilient, handles busy slot conflicts</option>
+                    <option value="12">12 turns — extended multi-step search</option>
+                    <option value="15">15 turns — maximum multi-step inquiry</option>
+                  </select>
+                </label>
               </div>
             </section>
 
@@ -41295,7 +41305,7 @@
 
       try {
         const { data, error } = await db.from('clinic_settings').select(
-          'whatsapp_enabled, whatsapp_dispatch_mode, whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token, gemini_api_key, whatsapp_ai_model'
+          'whatsapp_enabled, whatsapp_dispatch_mode, whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token, gemini_api_key, whatsapp_ai_model, whatsapp_ai_max_turns'
         ).eq('id', 1).maybeSingle();
 
         if (error) throw error;
@@ -41310,6 +41320,8 @@
         document.getElementById('setting-whatsapp-gemini-key').value = data.gemini_api_key || '';
         const modelSelect = document.getElementById('setting-whatsapp-model');
         if (modelSelect) modelSelect.value = data.whatsapp_ai_model || 'gemini-3.5-flash-lite';
+        const turnsSelect = document.getElementById('setting-whatsapp-max-turns');
+        if (turnsSelect) turnsSelect.value = String(data.whatsapp_ai_max_turns || 8);
         document.getElementById('setting-whatsapp-access-token').value = data.whatsapp_access_token || '';
         return data;
       } finally {
@@ -41423,6 +41435,7 @@
         whatsapp_verify_token: String(document.getElementById('setting-whatsapp-verify-token')?.value || '').trim(),
         gemini_api_key: String(document.getElementById('setting-whatsapp-gemini-key')?.value || '').trim(),
         whatsapp_ai_model: String(document.getElementById('setting-whatsapp-model')?.value || 'gemini-3.5-flash-lite').trim(),
+        whatsapp_ai_max_turns: Math.min(Math.max(parseInt(document.getElementById('setting-whatsapp-max-turns')?.value || '8', 10) || 8, 3), 20),
         whatsapp_access_token: String(document.getElementById('setting-whatsapp-access-token')?.value || '').trim(),
         updated_at: new Date().toISOString()
       };

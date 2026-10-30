@@ -331,7 +331,7 @@ async function getClinicWhatsAppSettings(supabase: any) {
   let { data, error } = await supabase
     .from("clinic_settings")
     .select(
-      "whatsapp_enabled, whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token, gemini_api_key, whatsapp_ai_instructions, whatsapp_ai_instruction_blocks, whatsapp_ai_model, attendance_timezone, onesignal_rest_api_key"
+      "whatsapp_enabled, whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token, gemini_api_key, whatsapp_ai_instructions, whatsapp_ai_instruction_blocks, whatsapp_ai_model, whatsapp_ai_max_turns, attendance_timezone, onesignal_rest_api_key"
     )
     .eq("id", 1)
     .maybeSingle();
@@ -359,6 +359,7 @@ async function getClinicWhatsAppSettings(supabase: any) {
     geminiApiKey: String(data?.gemini_api_key || Deno.env.get("GEMINI_API_KEY") || "").trim(),
     aiInstructions: compileWhatsAppAiInstructions(data?.whatsapp_ai_instruction_blocks, data?.whatsapp_ai_instructions),
     aiModel: String(data?.whatsapp_ai_model || "gemini-3.5-flash-lite").trim(),
+    aiMaxTurns: Number.isFinite(Number(data?.whatsapp_ai_max_turns)) && Number(data?.whatsapp_ai_max_turns) >= 3 && Number(data?.whatsapp_ai_max_turns) <= 20 ? Number(data?.whatsapp_ai_max_turns) : 8,
     attendanceTimezone: String(data?.attendance_timezone || "Africa/Cairo").trim(),
     oneSignalApiKey: String(data?.onesignal_rest_api_key || Deno.env.get("ONESIGNAL_REST_API_KEY") || "").trim(),
   };
@@ -1492,6 +1493,7 @@ async function handleGeminiToolCall(
 
       const availableSlots: string[] = [];
       const occupiedSlots: string[] = [];
+      const slotDoctorMap: Record<string, string[]> = {};
       const isToday = targetDate === clinicNow.dateStr;
 
       for (const slot of allCandidateSlots) {
@@ -1512,14 +1514,17 @@ async function handleGeminiToolCall(
 
         if (docsAtThisSlot.length === 0) continue;
 
-        const hasFreeDoctor = docsAtThisSlot.some((doc: any) => {
+        const freeDocsAtSlot = docsAtThisSlot.filter((doc: any) => {
           const docApts = bookedAppointments.filter((apt: any) => apt.assigned_user_id === doc.userId);
           const isConflict = docApts.some((apt: any) => slotStartMin < apt.endMin && slotEndMin > apt.startMin);
           return !isConflict;
         });
 
-        if (hasFreeDoctor) {
+        if (freeDocsAtSlot.length > 0) {
           availableSlots.push(slot);
+          if (!selectedDoctor) {
+            slotDoctorMap[slot] = freeDocsAtSlot.map((d: any) => `Dr. ${d.fullName}`);
+          }
         } else {
           occupiedSlots.push(slot);
         }
@@ -1541,6 +1546,7 @@ async function handleGeminiToolCall(
         morning_slots: morningSlots.slice(0, 5),
         evening_slots: eveningSlots.slice(0, 8),
         available_slots: availableSlots,
+        available_doctors_by_slot: !selectedDoctor ? slotDoctorMap : undefined,
         occupied_slots: occupiedSlots,
         total_free: availableSlots.length,
         total_occupied: occupiedSlots.length,
@@ -1580,10 +1586,13 @@ async function handleGeminiToolCall(
         morning_slots: singleDayRes.morning_slots,
         evening_slots: singleDayRes.evening_slots,
         available_slots: singleDayRes.available_slots,
+        available_doctors_by_slot: singleDayRes.available_doctors_by_slot,
         occupied_slots: singleDayRes.occupied_slots,
         total_free: singleDayRes.total_free,
         total_occupied: singleDayRes.total_occupied,
-        rules_and_warnings: singleDayRes.occupied_slots.length > 0
+        rules_and_warnings: !selectedDoctor
+          ? `CRITICAL: When proposing or booking any slot from available_slots, only offer or book it with a doctor listed in available_doctors_by_slot for that specific slot. If the patient requested a specific doctor, NEVER offer or book a slot where that doctor is not available.`
+          : singleDayRes.occupied_slots.length > 0
           ? `IMPORTANT: The following slots are OCCUPIED/ALREADY BOOKED: ${singleDayRes.occupied_slots.join(", ")}. NEVER offer or book any occupied slot. If the patient requested an occupied slot, tell them it is taken and propose alternative slots from available_slots.`
           : `All scheduled ${durationMinutes}-minute slots on this date are currently available.`,
       };
@@ -1637,6 +1646,7 @@ async function handleGeminiToolCall(
         day: d.day,
         total_free: d.total_free,
         available_slots: d.available_slots,
+        available_doctors_by_slot: d.available_doctors_by_slot,
         morning_slots: d.morning_slots,
         evening_slots: d.evening_slots,
       })),
@@ -2299,11 +2309,12 @@ async function runGeminiAgentWithModel(
   initialContents: any[],
   tools: any[],
   timeZone: string = "Africa/Cairo",
-  customInstructions: string = ""
+  customInstructions: string = "",
+  maxTurns: number = 8
 ): Promise<string> {
   const contents = JSON.parse(JSON.stringify(initialContents));
 
-  for (let turn = 0; turn < 5; turn++) {
+  for (let turn = 0; turn < maxTurns; turn++) {
     const data = await callGeminiApi(model, apiKey, systemInstruction, contents, tools, 45000);
 
     const candidate = data.candidates?.[0];
@@ -2342,6 +2353,27 @@ async function runGeminiAgentWithModel(
     }
   }
 
+  // If turn budget was exhausted while executing tools, perform a final synthesis call without tools
+  // so the AI writes a polite, complete response to the patient based on the tool results gathered.
+  try {
+    console.log(`[${model}] Max turns (${maxTurns}) reached on tool calls. Generating final conversational reply.`);
+    const finalData = await callGeminiApi(
+      model,
+      apiKey,
+      systemInstruction + "\n\nCRITICAL: Maximum tool calls reached. You must now formulate a warm, polite, and complete final response to the patient explaining the appointment status or alternatives based on the tool results returned above. Do NOT request any more function calls.",
+      contents,
+      [],
+      30000
+    );
+    const candidate = finalData.candidates?.[0];
+    const textPart = candidate?.content?.parts?.find((p: any) => p.text);
+    if (textPart?.text) {
+      return textPart.text;
+    }
+  } catch (err: any) {
+    console.warn(`[${model}] Final synthesis failed:`, err?.message || err);
+  }
+
   return "تم تسجيل طلبك وسيقوم فريق العيادة بالتواصل معك لتأكيد الموعد.";
 }
 
@@ -2354,7 +2386,8 @@ async function runGeminiAgent(
   conversationHistory: any[],
   preferredModel: string = "gemini-3.5-flash-lite",
   incomingAudioPart: any = null,
-  timeZone: string = "Africa/Cairo"
+  timeZone: string = "Africa/Cairo",
+  maxTurns: number = 8
 ): Promise<string> {
   const clinicNow = getClinicNow(timeZone);
   const todayStr = clinicNow.display;
@@ -2755,7 +2788,8 @@ ${customInstructions ? `Additional clinic instruction sections:\n${customInstruc
         initialContents,
         dynamicTools,
         timeZone,
-        customInstructions
+        customInstructions,
+        maxTurns
       );
     } catch (err: any) {
       console.warn(`Model ${model} failed (attempting next in chain):`, err?.message || err);
@@ -3497,7 +3531,8 @@ Deno.serve(async (req: Request) => {
                         history.length > 0 ? history : [{ sender: "patient", content: textContent }],
                         settings.aiModel || "gemini-3.5-flash-lite",
                         currentAudioPart,
-                        settings.attendanceTimezone || "Africa/Cairo"
+                        settings.attendanceTimezone || "Africa/Cairo",
+                        settings.aiMaxTurns || 8
                       );
 
                       // Guard right before dispatch: ensure no newer patient message arrived during generation
