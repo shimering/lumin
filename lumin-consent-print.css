@@ -33,6 +33,7 @@ html[dir=rtl] [data-print-back] svg{transform:scaleX(-1)}
 .consent-pdf-flow>.consent-table-part,.consent-pdf-flow>.consent-print-signatures{break-inside:avoid}.consent-pdf-flow>:is(h1,h2,h3){break-after:avoid}
 .consent-print-actions a{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:44px;min-height:44px;padding:10px 16px;border:0;border-radius:12px;background:#eff6ff;color:#1d4ed8;font:600 14px/1.5 Arial,Tahoma,sans-serif;text-decoration:none;transition:background .15s,transform .15s}
 .consent-print-actions a:hover{background:#dbeafe}.consent-print-actions a:active{transform:scale(.98)}.consent-print-actions a:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}.consent-print-actions a[hidden]{display:none}
+.consent-print-actions [data-print-pdf]{display:none}
 .consent-print-controls{padding-top:max(16px,env(safe-area-inset-top));padding-bottom:max(16px,env(safe-area-inset-bottom))}
 @media print{.consent-pdf-stage{display:none!important}}
 

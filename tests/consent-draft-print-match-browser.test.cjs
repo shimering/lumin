@@ -13,7 +13,7 @@ test('printed consent matches the actual draft table, typography, paragraph gaps
   const browser=process.env.LUMIN_TEST_WEBKIT_PATH?await webkit.launch({headless:true,executablePath:process.env.LUMIN_TEST_WEBKIT_PATH}):await chromium.launch({headless:true,channel:process.env.LUMIN_TEST_BROWSER_CHANNEL||'chrome'});t.after(()=>browser.close());
   const apple=Boolean(process.env.LUMIN_TEST_APPLE_TOUCH),context=await browser.newContext({viewport:{width:1320,height:1000},hasTouch:apple});
   await context.addInitScript(apple=>{
-    window.print=()=>{};
+    window.addEventListener('click',event=>{if(event.target.closest?.('[data-print-pdf]')){event.preventDefault();window.pdfOpenRequests=(window.pdfOpenRequests||0)+1;}},true);window.print=()=>{};
     if(apple){Object.defineProperty(navigator,'platform',{configurable:true,get:()=> 'MacIntel'});Object.defineProperty(navigator,'maxTouchPoints',{configurable:true,get:()=>5});}
     const create=URL.createObjectURL.bind(URL);URL.createObjectURL=blob=>{if(blob.type==='application/pdf')window.fixturePdfBlob=blob;return create(blob);};
     let renderer;Object.defineProperty(window,'html2canvas',{configurable:true,get:()=>renderer,set(value){renderer=(element,options)=>{
@@ -85,7 +85,7 @@ test('printed consent matches the actual draft table, typography, paragraph gaps
         assert.ok(Math.abs(bounds.width-expected.width)<1,'The PDF renderer keeps the measured draft table width');
         bounds.columns.forEach((width,index)=>assert.ok(Math.abs(width-expected.columns[index])<1,'The PDF renderer keeps each draft column width'));
       }
-      const encoded=await view.evaluate(async()=>{const bytes=new Uint8Array(await fixturePdfBlob.arrayBuffer());let data='';for(const byte of bytes)data+=String.fromCharCode(byte);return btoa(data);});
+      const encoded=await view.evaluate(async()=>{const bytes=new Uint8Array(await (await opener.fetch(document.querySelector('[data-print-pdf]').href)).arrayBuffer());let data='';for(const byte of bytes)data+=String.fromCharCode(byte);return btoa(data);});
       fs.writeFileSync(path.join(folder,`ipad-print-${language}.pdf`),Buffer.from(encoded,'base64'));
     }else await view.pdf({path:path.join(folder,`print-${language}.pdf`),format:'A4',printBackground:true});
     await view.close();

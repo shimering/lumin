@@ -69,7 +69,7 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
     document.getElementById('view-patient-consents').classList.remove('hidden');
     document.body.classList.add('lumin-raised');
   },{templates:model.templates.map((template,index)=>({...template,id:id(20+index),revision:1,active:true,created_at:'2026-10-25'})),patient,doctors,idB:id(91)});
-  await page.context().addInitScript(()=>{window.print=()=>{window.printCalls=(window.printCalls||0)+1;dispatchEvent(new Event('afterprint'));};});
+  await page.context().addInitScript(()=>{window.addEventListener('click',event=>{if(event.target.closest?.('[data-print-pdf]')){event.preventDefault();window.pdfOpenRequests=(window.pdfOpenRequests||0)+1;}},true);window.print=()=>{window.printCalls=(window.printCalls||0)+1;dispatchEvent(new Event('afterprint'));};});
   await page.evaluate(image=>{fixture.printLogo[0].logo_data_url=image;fixture.printSettings[0].logo_visible=true;},'data:image/png;base64,'+fs.readFileSync(path.join(root,'icons/dental-icon-v1-192.png')).toString('base64'));
   await page.addScriptTag({path:path.join(root,'lumin-consent-print.js')});
   await page.addScriptTag({path:path.join(root,'lumin-consents.js')});
@@ -247,7 +247,7 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   assert.ok(await dialog.locator('.consent-copy:visible strong').count()>0);
   assert.match(await dialog.locator('.consent-language-panel:visible .consent-draft-signatures').innerText(),/Patient signature \(custom\)/);
   const firstPopup=page.waitForEvent('popup');await click('print');const printed=await firstPopup;
-  await printed.waitForFunction(()=>window.printCalls===1);await printed.emulateMedia({media:'print'});
+  await printed.waitForFunction(()=>document.documentElement.dataset.consentPdfReady==='true');await printed.emulateMedia({media:'print'});
   assert.equal(await printed.locator('#consent-print-root').isVisible(),true);assert.equal(await printed.locator('[data-consent-print-controls]').isVisible(),false);
   assert.equal(await printed.locator('input,select,.consent-dialog,#app-shell').count(),0);
   assert.equal(await printed.locator('#consent-print-root > h1, #consent-print-root > .consent-identity, #consent-print-root > .consent-print-note').count(),0,'Print does not prepend a header outside the draft wording');
@@ -289,7 +289,7 @@ test('clinic templates, patient drafts, finalization, printing, procedure prompt
   assert.equal(await dialog.locator('[name="first_visit_amount"]').inputValue(),'4000.5');
   await click('finalize');await page.waitForFunction(()=>fixture.consents[0].status==='finalized');
   assert.equal(await dialog.locator('.consent-copy:visible table td').count(),4);
-  const secondPopup=page.waitForEvent('popup');await click('print');const tablePrint=await secondPopup;await tablePrint.waitForFunction(()=>window.printCalls===1);assert.equal(await tablePrint.locator('#consent-print-root .consent-document-table:visible td').count(),4);
+  const secondPopup=page.waitForEvent('popup');await click('print');const tablePrint=await secondPopup;await tablePrint.waitForFunction(()=>document.documentElement.dataset.consentPdfReady==='true');assert.equal(await tablePrint.locator('#consent-print-root .consent-document-table:visible td').count(),4);
   await tablePrint.close();await click('close');
   // An applied multi-tooth/surface procedure creates one prompt and keeps context.
   await page.evaluate(()=>{

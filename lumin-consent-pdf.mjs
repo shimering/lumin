@@ -1,5 +1,59 @@
 // Render the prepared consent locally, one A4 page at a time. No patient data
 // leaves the device, and the canvas size stays below iOS's memory limits.
+function listNumber(value,style){
+  if(style==='lower-alpha'){
+    let label='';for(let n=value;n>0;n=Math.floor((n-1)/26))label=String.fromCharCode(97+(n-1)%26)+label;
+    return label;
+  }
+  if(style==='lower-roman'){
+    let label='';for(const [amount,symbol] of [[1000,'m'],[900,'cm'],[500,'d'],[400,'cd'],[100,'c'],[90,'xc'],[50,'l'],[40,'xl'],[10,'x'],[9,'ix'],[5,'v'],[4,'iv'],[1,'i']])while(value>=amount){label+=symbol;value-=amount;}
+    return label;
+  }
+  return String(value);
+}
+
+function preparePdfLists(flow){
+  const win=flow.ownerDocument.defaultView;
+  for(const list of flow.querySelectorAll('ol,ul')){
+    const counters=Array(9).fill(0);let number=(Number(list.getAttribute('start'))||1)-1;
+    for(const item of [...list.children].filter(node=>node.tagName==='LI')){
+      const quill=item.hasAttribute('data-list'),level=Number([...item.classList].find(name=>/^ql-indent-[1-8]$/.test(name))?.split('-').at(-1)||0);
+      const ordered=quill?item.dataset.list==='ordered':list.tagName==='OL';
+      let text='•';
+      if(ordered){
+        const value=quill?++counters[level]:++number;
+        text=listNumber(value,quill?['decimal','lower-alpha','lower-roman'][level%3]:win.getComputedStyle(item).listStyleType)+'.';
+      }
+      counters.fill(0,level+1);
+      const style=win.getComputedStyle(item),rtl=style.direction==='rtl',font=parseFloat(style.fontSize);
+      const inset=parseFloat(rtl?style.paddingRight:style.paddingLeft)-(quill?2:1.8)*font;
+      const marker=item.querySelector(':scope>.ql-ui')||flow.ownerDocument.createElement('span');
+      // Freeze markers as real text. Canvas renderers cannot reliably resolve
+      // Quill counters or logical positioning on generated ::before content.
+      marker.className='consent-pdf-list-marker';marker.textContent=text;
+      marker.style.cssText=`position:absolute;top:0;${rtl?'right':'left'}:${inset}px;width:${1.5*font}px;margin:0;padding:0;border:0;white-space:nowrap;direction:ltr;unicode-bidi:isolate;text-align:${rtl?'left':'right'};font:inherit;color:inherit`;
+      item.style.position='relative';item.style.listStyleType='none';item.prepend(marker);
+    }
+  }
+}
+
+function preserveArabicWords(stage){
+  const doc=stage.ownerDocument,walker=doc.createTreeWalker(stage,4),nodes=[];
+  while(walker.nextNode())if(/[\u0600-\u06ff]/.test(walker.currentNode.textContent)&&/\s/.test(walker.currentNode.textContent))nodes.push(walker.currentNode);
+  // A word plus its trailing space can span two line boxes. html2canvas then
+  // draws individual Arabic letters, losing their joined forms. Separate word
+  // nodes keep shaping intact. Do this before pagination so any wrapping is
+  // measured from the exact text nodes the canvas renderer will receive.
+  for(const node of nodes){
+    const fragment=doc.createDocumentFragment();
+    for(const part of node.textContent.split(/(\s+)/)){
+      if(!part)continue;
+      fragment.append(doc.createTextNode(part));
+    }
+    node.replaceWith(fragment);
+  }
+}
+
 export async function prepareConsentPages(document) {
   const win = document.defaultView;
   const source = document.querySelector('.consent-print-page');
@@ -30,6 +84,8 @@ export async function prepareConsentPages(document) {
   document.body.append(stage);
   try {
     await document.fonts?.ready;
+    preserveArabicWords(stage);
+    preparePdfLists(flow);
     const width = stage.getBoundingClientRect().width, height = stage.getBoundingClientRect().height;
     const headerHeight = header.getBoundingClientRect().height, footerHeight = footer.getBoundingClientRect().height;
     const available = height - headerHeight - footerHeight - layout.margin_bottom_mm*96/25.4;
@@ -73,7 +129,7 @@ export async function consentPdf(document) {
   const win=document.defaultView;if(!win.html2canvas)throw new Error('PDF renderer unavailable');
   const pages=await prepareConsentPages(document),{stage,width,height}=pages;
   try{
-    const pdf=await PDFDocument.create();pdf.catalog.getOrCreateViewerPreferences().setPrintScaling(PrintScaling.None);
+    const pdf=await PDFDocument.create();pdf.setTitle(document.title||'Consent');pdf.catalog.getOrCreateViewerPreferences().setPrintScaling(PrintScaling.None);
     for(let index=0;index<pages.count;index++){
       pages.select(index);
       const canvas = await win.html2canvas(stage, {

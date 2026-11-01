@@ -54,7 +54,7 @@
     return {settings:normalize(layout.data),logo:logo(image.data?.logo_data_url),updatedAt:layout.data.updated_at};
   }
   function reserve(){
-    const view=root.open(new URL('consent-print.html?v=5',root.location.href).href,'_blank');
+    const view=root.open(new URL('consent-print.html?v=6',root.location.href).href,'_blank');
     if(!view)throw new Error(t('Allow pop-ups for Lumin to open the consent print view.','اسمح بالنوافذ المنبثقة لموقع Lumin لفتح صفحة طباعة الموافقة.'));
     const ready=new Promise((resolve,reject)=>{
       const cleanup=()=>{root.removeEventListener('message',receive);clearTimeout(timeout);clearInterval(poll);};
@@ -79,8 +79,6 @@
         const table=node.matches('table')?node:node.querySelector('table'),rows=[...table.rows];
         const before=table.style.marginTop,after=table.style.marginBottom;
         rows.forEach((row,index)=>{const part=table.cloneNode(false);part.style.margin='0';const columns=table.querySelector('colgroup');if(columns)part.append(columns.cloneNode(true));const section=document.createElement('tbody');section.append(row.cloneNode(true));part.append(section);blocks.push(`<div class="consent-table-print-wrap consent-table-part ${index===0?'is-first':''} ${index===rows.length-1?'is-last':''}"${snapshot?` style="${index===0?'margin-top:'+e(before||'0')+';':''}${index===rows.length-1?'margin-bottom:'+e(after||'0')+';':''}"`:''}>${part.outerHTML}</div>`);});
-      }else if(node.matches('ol,ul')){
-        [...node.children].forEach((item,index)=>{const list=node.cloneNode(false);if(node.tagName==='OL')list.start=index+1;list.append(item.cloneNode(true));blocks.push(list.outerHTML);});
       }else blocks.push(node.outerHTML);
     }
     if(signatures)blocks.push(signatures);
@@ -95,11 +93,16 @@
       if(view.closed||!isCurrent()){view.close();return;}
       view.document.querySelector('[data-consent-print-document]').innerHTML=body(record,configuration,snapshot);
       const families=[...new Set(root.LuminConsentDocument.read(record.content,record.body).ops.map(op=>op.attributes?.font).filter(Boolean))];
-      await view.LuminConsentPrintView.prepare({language:record.language,title:record.title,fonts:families});
+      await view.LuminConsentPrintView.prepare({language:record.language,title:record.title,fonts:families,createPdfUrl(file){
+        // The editor owns the URL so navigating the reserved tab to its PDF does
+        // not revoke the file. Release it when that tab closes.
+        const url=root.URL.createObjectURL(file),timer=root.setInterval(()=>{
+          if(view.closed){root.clearInterval(timer);root.URL.revokeObjectURL(url);}
+        },1000);
+        return url;
+      }});
       if(view.closed||!isCurrent()){view.close();return;}
-      // Android can fire afterprint before its native preview has captured the page.
-      // Keep this dedicated document alive; it never contains the patient editor.
-      view.focus();view.LuminConsentPrintView.autoPrint();
+      view.focus();view.LuminConsentPrintView.autoOpen();
     }catch(error){if(!view.closed)view.close();throw error;}
   }
   async function mountAdmin(container){

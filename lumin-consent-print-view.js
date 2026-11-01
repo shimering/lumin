@@ -1,58 +1,54 @@
 (function(root){
   'use strict';
-  const doc=root.document,button=doc.querySelector('[data-print-consent]'),back=doc.querySelector('[data-print-back]'),status=doc.querySelector('[data-print-status]'),pdfLink=doc.querySelector('[data-print-pdf]');
-  // iPadOS can identify itself as a Mac, including in home-screen mode.
-  const appleTouch=/iPad|iPhone|iPod/.test(root.navigator.userAgent)||(/Mac/.test(root.navigator.platform)&&root.navigator.maxTouchPoints>1);
-  let prepared=false,automaticRequested=false,automaticAttempted=false,scheduled=false,pdfUrl=null;
+  const doc=root.document,button=doc.querySelector('[data-print-consent]'),back=doc.querySelector('[data-print-back]'),status=doc.querySelector('[data-print-status]'),pdfLink=doc.querySelector('[data-print-pdf]'),download=doc.querySelector('[data-download-pdf]');
+  let prepared=false,automaticRequested=false,automaticAttempted=false,scheduled=false,pdfUrl=null,options=null;
   const t=(en,ar)=>doc.documentElement.lang==='ar'?ar:en;
-  function openPrint(){
+  function openPdf(){
     if(!prepared)return;
-    // Keep this synchronous: tablet browsers may require a direct tap in this tab.
     automaticAttempted=true;
-    if(appleTouch&&pdfUrl){pdfLink.click();return;}
-    root.print();
+    if(pdfUrl)pdfLink.click();
+    else void api.prepare(options).then(()=>{if(pdfUrl)openPdf();});
   }
-  function tryAutomaticPrint(){
-    if(appleTouch||!prepared||!automaticRequested||automaticAttempted||scheduled||doc.visibilityState!=='visible')return;
+  function tryAutomaticOpen(){
+    if(!prepared||!pdfUrl||!automaticRequested||automaticAttempted||scheduled||doc.visibilityState!=='visible')return;
     scheduled=true;
     root.requestAnimationFrame(()=>root.requestAnimationFrame(()=>{
       scheduled=false;if(doc.visibilityState!=='visible'||automaticAttempted)return;
-      openPrint();
+      openPdf();
     }));
   }
-  button.addEventListener('click',openPrint);
+  button.addEventListener('click',openPdf);
+  pdfLink.addEventListener('click',()=>{automaticAttempted=true;});
   back.addEventListener('click',()=>{if(root.opener&&!root.opener.closed)root.opener.focus();root.close();});
-  doc.addEventListener('visibilitychange',tryAutomaticPrint);
-  const api={ready:false,async prepare({language,title,fonts=[]}){
+  doc.addEventListener('visibilitychange',tryAutomaticOpen);
+  const api={ready:false,async prepare(value){
+    options=value;
+    const {language,title,fonts=[],createPdfUrl=file=>root.URL.createObjectURL(file)}=value;
+    prepared=false;button.disabled=true;
     doc.documentElement.lang=language==='ar'?'ar':'en';doc.documentElement.dir=language==='ar'?'rtl':'ltr';doc.title=title;
-    button.querySelector('span').textContent=t('Print / Save as PDF','طباعة / حفظ PDF');back.querySelector('span').textContent=t('Back to consent','العودة إلى الموافقة');
-    pdfLink.querySelector('span').textContent=t('Open PDF','فتح PDF');
-    status.textContent=t('Preparing consent…','جارٍ تجهيز الموافقة…');
+    button.querySelector('span').textContent=t('Open PDF','فتح PDF');back.querySelector('span').textContent=t('Back to consent','العودة إلى الموافقة');
+    pdfLink.querySelector('span').textContent=t('Open PDF','فتح PDF');download.querySelector('span').textContent=t('Download PDF','تنزيل PDF');
+    status.textContent=t('Preparing PDF…','جارٍ تجهيز ملف PDF…');
     doc.querySelector('[data-consent-print-document]').hidden=false;
-    if(doc.fonts){await Promise.allSettled(fonts.map(font=>doc.fonts.load(`14px "${font}"`,language==='ar'?'نص الموافقة':'Consent')));await doc.fonts.ready;}
-    await Promise.allSettled([...doc.querySelectorAll('[data-consent-print-document] img')].map(image=>image.decode()));
-    const layout=JSON.parse(doc.querySelector('#consent-print-root').dataset.consentLayout||'{}');
-    if(root.LuminConsentLayout?.needsPages(layout)){
-      const {prepareNativePages}=await import('./lumin-consent-pdf.mjs?v=3');await prepareNativePages(doc);
+    doc.documentElement.dataset.consentPdfReady='false';
+    try{
+      if(doc.fonts){await Promise.allSettled(fonts.map(font=>doc.fonts.load(`14px "${font}"`,language==='ar'?'نص الموافقة':'Consent')));await doc.fonts.ready;}
+      await Promise.allSettled([...doc.querySelectorAll('[data-consent-print-document] img')].map(image=>image.decode()));
+      const {consentPdf}=await import('./lumin-consent-pdf.mjs?v=4');
+      const bytes=await consentPdf(doc);
+      const file=new File([bytes],(title||t('Consent','موافقة')).replace(/[\\/:*?"<>|\u0000-\u001f]/g,' ').slice(0,100)+'.pdf',{type:'application/pdf'});
+      pdfUrl=createPdfUrl(file);pdfLink.href=download.href=pdfUrl;download.download=file.name;
+      pdfLink.hidden=false;download.hidden=false;
+      doc.documentElement.dataset.consentPdfReady='true';
+      status.textContent=t('Your PDF is ready. Open it to print or save a copy.','ملف PDF جاهز. افتحه للطباعة أو احفظ نسخة منه.');
+    }catch(error){
+      console.error('Consent PDF preparation failed',error);
+      button.querySelector('span').textContent=t('Retry PDF export','إعادة تصدير PDF');
+      status.textContent=t('The PDF could not be prepared. Retry the export or return to your consent.','تعذر تجهيز ملف PDF. أعد محاولة التصدير أو عد إلى الموافقة.');
     }
-    if(appleTouch){
-      try{
-        const {consentPdf}=await import('./lumin-consent-pdf.mjs?v=3');
-        const bytes=await consentPdf(doc);
-        const file=new File([bytes],(title||t('Consent','موافقة')).replace(/[\\/:*?"<>|\u0000-\u001f]/g,' ').slice(0,100)+'.pdf',{type:'application/pdf'});
-        if(pdfUrl)root.URL.revokeObjectURL(pdfUrl);
-        pdfUrl=root.URL.createObjectURL(file);pdfLink.href=pdfUrl;pdfLink.hidden=false;
-        button.querySelector('span').textContent=t('Open PDF to print','فتح PDF للطباعة');
-        status.textContent=t('Open the PDF, then choose Share → Print. Your consent keeps its page layout.','افتح PDF، ثم اختر مشاركة ← طباعة. تحتفظ الموافقة بتنسيق الصفحة.');
-      }catch(error){
-        // Retain native printing and the document if a required offline asset fails.
-        console.error('Consent PDF preparation failed',error);
-        status.textContent=t('PDF could not be prepared. Use Print, or return to the consent and try again.','تعذر تجهيز PDF. استخدم طباعة، أو عد إلى الموافقة وحاول مجدداً.');
-      }
-    }else status.textContent=t('Print or save a PDF of this consent.','اطبع هذه الموافقة أو احفظها كملف PDF.');
     prepared=true;button.disabled=false;
     doc.documentElement.dataset.consentPrintPrepared='true';if(root.lucide)root.lucide.createIcons();
-  },autoPrint(){automaticRequested=true;tryAutomaticPrint();}};
+  },autoOpen(){automaticRequested=true;tryAutomaticOpen();}};
   root.LuminConsentPrintView=api;
   root.addEventListener('load',()=>{api.ready=true;if(root.opener)root.opener.postMessage('lumin-consent-print-ready',root.location.origin);},{once:true});
 })(window);

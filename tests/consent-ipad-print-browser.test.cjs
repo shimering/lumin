@@ -16,7 +16,7 @@ test('iPad consent printing opens a locally prepared PDF with saved fonts, spaci
     const errors=[],external=[];
     await context.route('**/*',route=>{const url=route.request().url();if(url.startsWith('http://127.0.0.1:')||!/^https?:/.test(url))return route.continue();external.push(url);return route.abort();});
     await context.addInitScript(()=>{
-      Object.defineProperty(navigator,'platform',{configurable:true,get:()=> 'MacIntel'});Object.defineProperty(navigator,'maxTouchPoints',{configurable:true,get:()=>5});
+      window.addEventListener('click',event=>{if(event.target.closest?.('[data-print-pdf]')){event.preventDefault();window.pdfOpenRequests=(window.pdfOpenRequests||0)+1;}},true);Object.defineProperty(navigator,'platform',{configurable:true,get:()=> 'MacIntel'});Object.defineProperty(navigator,'maxTouchPoints',{configurable:true,get:()=>5});
       window.printCalls=0;window.print=()=>{window.printCalls++;dispatchEvent(new Event('afterprint'));};
       const createObjectURL=URL.createObjectURL.bind(URL);URL.createObjectURL=blob=>{if(blob.type==='application/pdf')window.fixturePdfBlob=blob;return createObjectURL(blob);};
       let renderer;Object.defineProperty(window,'html2canvas',{configurable:true,get:()=>renderer,set(value){renderer=(element,options)=>{
@@ -53,7 +53,7 @@ test('iPad consent printing opens a locally prepared PDF with saved fonts, spaci
     const popup=page.waitForEvent('popup');await page.locator('#print').click();const view=await popup;
     await view.waitForFunction(()=>document.documentElement.dataset.consentPrintPrepared==='true',null,{timeout:60000});await page.evaluate(()=>window.job);
     assert.equal(await view.evaluate(()=>printCalls),0,'iPad printing must not depend on an ignored automatic window.print call');
-    assert.equal(await view.locator('[data-print-pdf]').isVisible(),true,await view.locator('[data-print-status]').innerText());
+    assert.equal(await view.locator('[data-download-pdf]').isVisible(),true,await view.locator('[data-print-status]').innerText());
     assert.equal(await view.locator('[data-print-consent]').isEnabled(),true);
     assert.equal(await view.locator('.consent-pdf-stage').count(),0,'Temporary page/canvas resources are released');
     assert.deepEqual(await view.evaluate(()=>fixturePageCuts.flat()),[],'Every PDF page boundary must fall between complete text lines');
@@ -70,24 +70,15 @@ test('iPad consent printing opens a locally prepared PDF with saved fonts, spaci
       assert.equal(await view.locator('.consent-print-page>tbody>tr').nth(1).locator('p').evaluate(node=>getComputedStyle(node).whiteSpace),'pre-wrap');
     }
     await view.emulateMedia({media:'screen'});
-    const encoded=await view.evaluate(async()=>{const bytes=new Uint8Array(await fixturePdfBlob.arrayBuffer());let data='';for(const byte of bytes)data+=String.fromCharCode(byte);return btoa(data);});
+    const encoded=await view.evaluate(async()=>{const bytes=new Uint8Array(await (await opener.fetch(document.querySelector('[data-print-pdf]').href)).arrayBuffer());let data='';for(const byte of bytes)data+=String.fromCharCode(byte);return btoa(data);});
     const bytes=Buffer.from(encoded,'base64'),pdf=await PDFDocument.load(bytes);
     assert.ok(pdf.getPageCount()>=4,'Long consents must retain every table row and split long paragraphs onto further sheets');
     assert.equal(pdf.catalog.getOrCreateViewerPreferences().getPrintScaling(),'None');
     for(const pdfPage of pdf.getPages()){assert.ok(Math.abs(pdfPage.getWidth()-595.28)<.1);assert.ok(Math.abs(pdfPage.getHeight()-841.89)<.1);}
     fs.writeFileSync(path.join(folder,`consent-ipad-${language}.pdf`),bytes);
     await view.screenshot({path:path.join(folder,`consent-ipad-${language}.png`),fullPage:true});
-    if(process.env.LUMIN_TEST_WEBKIT_PATH)await view.evaluate(()=>document.querySelector('[data-print-pdf]').addEventListener('click',event=>{event.preventDefault();window.pdfOpenRequests=(window.pdfOpenRequests||0)+1;}));
     for(let attempt=0;attempt<2;attempt++){
-      if(process.env.LUMIN_TEST_WEBKIT_PATH){
-        // Windows WebKit has no PDF viewer. Check the same direct-tap link action;
-        // Chromium below exercises the real local PDF viewer navigation.
-        await view.locator('[data-print-consent]').click();assert.equal(await view.evaluate(()=>pdfOpenRequests),attempt+1);
-      }else{
-        const opened=context.waitForEvent('page');await view.locator('[data-print-consent]').click();const pdfView=await opened;
-        await pdfView.waitForURL('blob:**',{waitUntil:'commit'});assert.ok(pdfView.url().startsWith('blob:'),'The print tap opens the already prepared local PDF');
-        await pdfView.close();
-      }
+      await view.locator('[data-print-consent]').click();assert.equal(await view.evaluate(()=>pdfOpenRequests),attempt+2,'Manual actions reuse the exported PDF');
     }
     assert.equal(await page.locator('textarea').inputValue(),'Original consent editor');
     if(desktopIdentity){
@@ -95,8 +86,8 @@ test('iPad consent printing opens a locally prepared PDF with saved fonts, spaci
       const failedPopup=page.waitForEvent('popup');await page.locator('#print').click();const failedView=await failedPopup;
       await failedView.waitForFunction(()=>document.documentElement.dataset.consentPrintPrepared==='true');await page.evaluate(()=>window.job);
       assert.equal(await failedView.locator('[data-print-pdf]').isVisible(),false);
-      assert.equal(await failedView.locator('[data-print-consent]').isEnabled(),true,'A PDF error must retain a usable native print action');
-      await failedView.locator('[data-print-consent]').click();assert.equal(await failedView.evaluate(()=>printCalls),1);
+      assert.equal(await failedView.locator('[data-print-consent]').isEnabled(),true,'A PDF error must retain a retry action');
+      assert.match(await failedView.locator('[data-print-consent]').innerText(),/Retry PDF/);assert.equal(await failedView.evaluate(()=>printCalls),0);
       assert.equal(await failedView.locator('#consent-print-root').isVisible(),true);await failedView.close();
     }
     assert.deepEqual(errors,[]);assert.deepEqual(external,[],'PDF preparation uses bundled assets and makes no external requests');
