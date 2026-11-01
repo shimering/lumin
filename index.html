@@ -112,7 +112,7 @@
   <script src="lumin-mobile-nav.js?v=3"></script>
   <script src="lumin-appointment-status.js?v=2"></script>
   <script src="lumin-appointment-operations.js?v=3"></script>
-  <script src="lumin-appointment-details.js?v=3"></script>
+  <script src="lumin-appointment-details.js?v=4"></script>
   <script src="lumin-dashboard-motion.js?v=3"></script>
   <script src="lumin-whatsapp-actions.js?v=2"></script>
   <script src="lumin-quotation-model.js?v=1"></script>
@@ -36183,11 +36183,7 @@
       });
       timeline.querySelectorAll('[data-week-appointment-id]').forEach(block => {
         block.addEventListener('pointerdown', event => beginAppointmentWeekDrag(event, block.dataset.weekAppointmentId));
-        block.addEventListener('keydown', event => {
-          if (!['Enter', ' '].includes(event.key)) return;
-          event.preventDefault();
-          toggleAppointmentCardPopover(block.dataset.weekAppointmentId, block);
-        });
+        block.addEventListener('click', activateAppointmentCard);
       });
       const weekSurface = timeline.querySelector('[data-appointment-week-surface]');
       weekSurface?.addEventListener('pointerdown', beginAppointmentRangeSelection);
@@ -36299,11 +36295,7 @@
 
       timeline.querySelectorAll('[data-timeline-appointment-id]').forEach(block => {
         block.addEventListener('pointerdown', event => beginAppointmentDrag(event, block.dataset.timelineAppointmentId));
-        block.addEventListener('keydown', event => {
-          if (!['Enter', ' '].includes(event.key)) return;
-          event.preventDefault();
-          toggleAppointmentCardPopover(block.dataset.timelineAppointmentId, block);
-        });
+        block.addEventListener('click', activateAppointmentCard);
       });
       timeline.querySelectorAll('[data-appointment-resize-handle]').forEach(handle => {
         handle.addEventListener('pointerdown', event => beginAppointmentResize(event, handle.dataset.appointmentResizeHandle));
@@ -36595,11 +36587,7 @@
       if (appointmentWeekDragGesture) return;
       const entry = appointments.find(appointment => appointment.id === appointmentId);
       if (!entry) return;
-      if (!canModifyAppointments()) {
-        armAppointmentCardPopoverTouchGuard(event);
-        toggleAppointmentCardPopover(appointmentId, event.currentTarget);
-        return;
-      }
+      if (!canModifyAppointments()) return;
 
       const block = event.currentTarget;
       const surface = block.closest('[data-appointment-week-surface]');
@@ -36713,11 +36701,7 @@
           appointmentPeriodSwipeClickGuardUntil = Date.now() + 500;
         }
         cleanup();
-        if (!wasActive) {
-          armAppointmentCardPopoverTouchGuard(finishEvent);
-          toggleAppointmentCardPopover(appointmentId, block);
-          return;
-        }
+        if (!wasActive) return;
         if (!moved) {
           renderAppointments();
           return;
@@ -36761,11 +36745,7 @@
       if (appointmentDayDragGesture) return;
       const entry = appointments.find(appointment => appointment.id === appointmentId);
       if (!entry) return;
-      if (!canModifyAppointments()) {
-        armAppointmentCardPopoverTouchGuard(event);
-        toggleAppointmentCardPopover(appointmentId, event.currentTarget);
-        return;
-      }
+      if (!canModifyAppointments()) return;
 
       const block = event.currentTarget;
       const surface = block.closest('[data-appointment-slot-surface]');
@@ -36883,11 +36863,7 @@
           appointmentDaySwipeClickGuardUntil = Date.now() + 500;
         }
         cleanup();
-        if (!wasActive) {
-          armAppointmentCardPopoverTouchGuard(finishEvent);
-          toggleAppointmentCardPopover(appointmentId, block);
-          return;
-        }
+        if (!wasActive) return;
         if (!moved) {
           renderAppointments();
           return;
@@ -36928,7 +36904,7 @@
       const block = event.currentTarget.closest('[data-timeline-appointment-id]');
       if (!entry || !canModifyAppointments() || !block) return;
 
-      event.preventDefault();
+      if (event.pointerType === 'mouse') event.preventDefault();
       const originalStart = appointmentMinuteOfDay(entry);
       const originalDuration = entry.duration;
       const maximumDuration = Math.max(1, 1440 - originalStart);
@@ -36974,16 +36950,13 @@
 
       const finish = async finishEvent => {
         if (finishEvent.pointerId !== event.pointerId) return;
-        finishEvent.preventDefault();
         finishEvent.stopPropagation();
         cleanup();
-        // The resize strip is part of the card's tap target. Only a deliberate
-        // drag changes duration; a tap opens the same details as the card body.
-        if (!moved && !resized) {
-          armAppointmentCardPopoverTouchGuard(finishEvent);
-          toggleAppointmentCardPopover(appointmentId, block);
-          return;
-        }
+        // Let the button's completed click open details after a tap. A resize
+        // consumes that click so dropping a drag never opens the popup.
+        if (!moved && !resized) return;
+        finishEvent.preventDefault();
+        appointmentDaySwipeClickGuardUntil = Date.now() + 500;
         if (nextDuration === originalDuration) return;
         await persistResizedAppointment(appointmentId, nextDuration);
       };
@@ -37231,7 +37204,7 @@
         appointmentCardPopoverTouchGuard = null;
         return;
       }
-      if (!event.target?.closest?.('#appointment-card-popover')) return;
+      if (!event.target?.closest?.('#appointment-card-popover-layer')) return;
       const clickX = Number(event.clientX);
       const clickY = Number(event.clientY);
       const hasCoordinates = Number.isFinite(clickX) && Number.isFinite(clickY) && (clickX !== 0 || clickY !== 0);
@@ -37248,6 +37221,18 @@
         return;
       }
       openAppointmentCardPopover(appointmentId, anchor);
+    }
+
+    function activateAppointmentCard(event) {
+      const block = event.currentTarget;
+      const appointmentId = block.dataset.timelineAppointmentId || block.dataset.weekAppointmentId;
+      const guardUntil = block.hasAttribute('data-week-appointment-id') ? appointmentPeriodSwipeClickGuardUntil : appointmentDaySwipeClickGuardUntil;
+      event.preventDefault();
+      event.stopPropagation();
+      if (!appointmentId || (event.detail !== 0 && Date.now() < guardUntil)) return;
+      // Wait for the browser to finish its native tap/click sequence before
+      // placing a modal over the card. Pointerup is reserved for drag cleanup.
+      toggleAppointmentCardPopover(appointmentId, block);
     }
 
     function openAppointmentCardPopover(appointmentId, anchor = null) {

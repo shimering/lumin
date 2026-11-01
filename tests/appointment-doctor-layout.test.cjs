@@ -112,7 +112,7 @@ test('overlapping appointments sit side by side within stable doctor columns acr
     function showAppointmentDayZoomIndicator() {}
     ${['layoutDayAppointments', 'layoutDayDoctorAppointments', 'appointmentMinuteOfDay', 'appointmentDurationLabel',
       'appointmentEndDate', 'appointmentTimeRange', 'appointmentTimeFromMinutes', 'renderAppointmentDayTimeline',
-      'beginAppointmentDrag', 'beginAppointmentResize', 'appointmentRootZoomScale', 'applyAppointmentDayHourHeight',
+      'beginAppointmentDrag', 'beginAppointmentResize', 'activateAppointmentCard', 'appointmentRootZoomScale', 'applyAppointmentDayHourHeight',
       'syncAppointmentDayHorizontalScroll', 'appointmentDaySwipeTargetIsInteractive', 'beginAppointmentDayTouchSwipe'].map(helper).join('\n')}
     document.getElementById('auth-gate').remove();
     document.getElementById('app-shell').classList.remove('hidden');

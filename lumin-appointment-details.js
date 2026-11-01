@@ -61,13 +61,20 @@ function setupAppointmentDetailSheet() {
   panel.dataset.sheetReady = 'true';
   let backdropTap = null;
   layer.addEventListener('pointerdown', event => {
+    backdropTap = null;
     if (event.target !== layer) return;
-    backdropTap = { x: event.clientX, y: event.clientY, moved: false };
+    backdropTap = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false, released: false };
     event.stopPropagation();
   });
   layer.addEventListener('pointermove', event => {
-    if (backdropTap && Math.hypot(event.clientX - backdropTap.x, event.clientY - backdropTap.y) > 8) backdropTap.moved = true;
+    if (backdropTap?.id === event.pointerId && Math.hypot(event.clientX - backdropTap.x, event.clientY - backdropTap.y) > 8) backdropTap.moved = true;
   });
+  layer.addEventListener('pointerup', event => {
+    if (backdropTap?.id !== event.pointerId) return;
+    backdropTap.released = event.target === layer;
+    if (Math.hypot(event.clientX - backdropTap.x, event.clientY - backdropTap.y) > 8) backdropTap.moved = true;
+  });
+  layer.addEventListener('pointercancel', () => { backdropTap = null; });
   layer.addEventListener('touchmove', event => {
     if (event.target === layer && event.cancelable) event.preventDefault();
   }, { passive: false });
@@ -77,7 +84,7 @@ function setupAppointmentDetailSheet() {
     if (event.target !== layer) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    if (!backdropTap?.moved && !appointmentDetailSheetExit) closeAppointmentCardPopover();
+    if (backdropTap?.released && !backdropTap.moved && !appointmentDetailSheetExit) closeAppointmentCardPopover();
     backdropTap = null;
   });
   panel.addEventListener('touchstart', event => {

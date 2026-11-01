@@ -43,7 +43,8 @@ test('optional appointment operations save, edit and open the chart across deskt
     'openAppointmentModal','closeAppointmentModal','saveAppointment','normaliseAppointmentRecord','renderDashboard',
     'isPrimaryToothId','palmerPositionForSlot','palmerQuadrantForSlot','palmerToothNotation','palmerQuadrantLabel','palmerNotationSVG','wholeMouthIconSVG',
     'normaliseSpecialtyIconName','specialtyIconMarkup','appointmentPopoverText','appointmentPopoverAnchor',
-    'positionAppointmentCardPopover','closeAppointmentCardPopover','openAppointmentCardPopover','changeAppointmentCardStatus','setupAppointmentCardPopover','blockAppointmentCardPopoverTouchThrough'];
+    'positionAppointmentCardPopover','closeAppointmentCardPopover','openAppointmentCardPopover','changeAppointmentCardStatus','setupAppointmentCardPopover','blockAppointmentCardPopoverTouchThrough','armAppointmentCardPopoverTouchGuard',
+    'activateAppointmentCard','toggleAppointmentCardPopover','beginAppointmentDrag','beginAppointmentWeekDrag','beginAppointmentResize','appointmentMinuteOfDay','appointmentRootZoomScale'];
   await page.addScriptTag({content: `
     let currentUiLanguage='en', currentSession={user:{id:'staff'}}, targetedLoadingGeneration=0, allowed=true;
     let editingAppointmentId=null, appointmentModalEntryMode='patient',appointmentModalOpenSequence=0,patientModalReturnToAppointment=false;
@@ -56,6 +57,14 @@ test('optional appointment operations save, edit and open the chart across deskt
     const appointmentDayFormatter=LuminDates.formatter(),appointmentTimeFormatter=new Intl.DateTimeFormat('en',{hour:'numeric',minute:'2-digit'});
     let dashboardInvoiceRenderToken=0,expandedDashboardAppointmentId=null,appointmentsLoaded=true;
     let appointmentCardPopoverId=null,appointmentCalendarMode='day',whatsappTemplatePickerScope=null,appointmentCardPopoverTouchGuard=null;
+    const APPOINTMENT_CARD_POPOVER_TOUCH_GUARD_MS=700,APPOINTMENT_CARD_POPOVER_TOUCH_GUARD_RADIUS=48;
+    const APPOINTMENT_CARD_DRAG_DELAY=500,APPOINTMENT_RANGE_MOVE_TOLERANCE=12,APPOINTMENT_MIN_DURATION=15;
+    let appointmentDayDragGesture=null,appointmentWeekDragGesture=null,appointmentDaySwipeGesture=null,appointmentDayTouchGesture=null;
+    let appointmentPeriodSwipeGesture=null,appointmentPeriodTouchGesture=null,appointmentDaySwipeClickGuardUntil=0,appointmentPeriodSwipeClickGuardUntil=0;
+    let appointmentDayHourHeight=96;
+    function resetAppointmentDaySwipeVisual(){} function resetAppointmentPeriodSwipeVisual(){}
+    function clearAppointmentWeekEdgeHold(){} function setAppointmentWeekDropTarget(){} function autoScrollAppointmentWeek(){}
+    function appointmentWeekDates(date){return Array.from({length:7},(_,i)=>new Date(date.getFullYear(),date.getMonth(),date.getDate()+i))}
     ${html.slice(html.indexOf('    const PRIMARY_TOOTH_BY_SLOT ='),html.indexOf('    const CONDITION_LABELS ='))}
     ${html.slice(html.indexOf('    const SPECIALTY_ICON_OPTIONS ='),html.indexOf('    const DEFAULT_SPECIALTY_ACCENT_COLOR ='))}
     ${html.match(/    const APPOINTMENT_STATUSES = [^\n]+/)[0]}
@@ -153,6 +162,87 @@ test('optional appointment operations save, edit and open the chart across deskt
     fixture.options[1].tooth_ids=['8','9','24','25','E','F','O','P'];
     appointments.find(a=>a.id==='a2').operations=[structuredClone(fixture.options[1])];
     const anchor=document.createElement('button');anchor.type='button';anchor.dataset.timelineAppointmentId='a2';anchor.textContent='Appointment';document.body.append(anchor);
+  });
+
+  await t.test('the click left over from opening a touch popup cannot dismiss its backdrop', async st => {
+    st.after(()=>page.evaluate(()=>closeAppointmentCardPopover()));
+    await page.setViewportSize({width:820,height:1180});
+    await page.evaluate(()=>{
+      openAppointmentCardPopover('a2');
+      armAppointmentCardPopoverTouchGuard({pointerType:'touch',clientX:30,clientY:30});
+      document.getElementById('appointment-card-popover-layer').dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,detail:1,clientX:30,clientY:30}));
+    });
+    assert.equal(await page.locator('#appointment-card-popover').isVisible(),true,'the opening touch must not immediately close the actual popup');
+  });
+
+  await t.test('80 native tablet taps keep the real popup open in day and week views', async st => {
+    const touch=await page.context().newCDPSession(page);
+    st.after(async()=>{
+      await page.evaluate(()=>{
+        closeAppointmentCardPopover();
+        const anchor=document.querySelector('[data-timeline-appointment-id="a2"],[data-week-appointment-id="a2"]');
+        anchor.removeEventListener('pointerdown',fixture.tapDown);anchor.removeEventListener('click',activateAppointmentCard);
+        anchor.removeAttribute('data-week-appointment-id');anchor.dataset.timelineAppointmentId='a2';
+        anchor.removeAttribute('style');anchor.textContent='Appointment';document.body.append(anchor);
+        document.getElementById('fixture-calendar-surface').remove();
+        document.documentElement.style.zoom='';allowed=true;appointmentCalendarMode='day';
+      });
+      await touch.detach();
+    });
+    await touch.send('Network.setUserAgentOverride',{userAgent:'Mozilla/5.0 (Linux; Android 14; SM-X610) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'});
+    await page.evaluate(()=>{
+      const anchor=document.querySelector('[data-timeline-appointment-id="a2"]');
+      const surface=document.createElement('div');surface.id='fixture-calendar-surface';
+      surface.dataset.appointmentSlotSurface='';surface.dataset.appointmentWeekSurface='';
+      surface.style.cssText='position:fixed;left:16px;top:80px;width:300px;height:400px;z-index:60;touch-action:pan-x pan-y';
+      document.body.append(surface);surface.append(anchor);
+      anchor.style.cssText='position:relative;display:block;width:280px;height:96px;padding:8px;text-align:start;touch-action:pan-x pan-y';
+      anchor.innerHTML='<p>Patient name</p><span>Doctor and visit</span><span class="appointment-resize-handle" data-appointment-resize-handle="a2"></span>';
+      fixture.tapDown=event=>{
+        if(event.target.closest('[data-appointment-resize-handle]'))beginAppointmentResize(event,'a2');
+        else if(appointmentCalendarMode==='week')beginAppointmentWeekDrag(event,'a2');
+        else beginAppointmentDrag(event,'a2');
+      };
+      anchor.addEventListener('pointerdown',fixture.tapDown);anchor.addEventListener('click',activateAppointmentCard);
+      fixture.tapTrace=[];
+      for(const type of ['pointerdown','pointerup','pointercancel','click'])document.addEventListener(type,event=>{
+        fixture.tapTrace.push({type,target:event.target.id||event.target.tagName});
+        if(fixture.tapTrace.length>20)fixture.tapTrace.shift();
+      },true);
+    });
+    const scenarios=[
+      [820,'en','day',true,1],[820,'ar','day',true,.85],[1280,'en','day',true,1.25],
+      [1280,'ar','week',true,1],[820,'en','week',true,1],[820,'ar','day',false,1],
+      [1280,'en','week',false,.85],[820,'ar','week',false,1.25]
+    ];
+    const popup=page.locator('#appointment-card-popover');
+    for(const [width,language,mode,editable,scale] of scenarios){
+      await page.setViewportSize({width,height:width>1000?800:1180});
+      await page.evaluate(({language,mode,editable,scale})=>{
+        currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';document.documentElement.style.zoom=String(scale);
+        allowed=editable;appointmentCalendarMode=mode;appointmentDaySwipeClickGuardUntil=0;appointmentPeriodSwipeClickGuardUntil=0;
+        const anchor=document.querySelector('[data-timeline-appointment-id="a2"],[data-week-appointment-id="a2"]');
+        anchor.removeAttribute('data-timeline-appointment-id');anchor.removeAttribute('data-week-appointment-id');
+        anchor.setAttribute(mode==='week'?'data-week-appointment-id':'data-timeline-appointment-id','a2');
+        anchor.querySelector('[data-appointment-resize-handle]').hidden=mode==='week'||!editable;
+        fixture.tapWrites=fixture.writes.length;
+      },{language,mode,editable,scale});
+      for(let repeat=0;repeat<10;repeat++){
+        const anchor=page.locator('[data-timeline-appointment-id="a2"],[data-week-appointment-id="a2"]');
+        const box=await anchor.boundingBox();
+        const point={x:repeat%2?box.x+box.width-12*scale:box.x+24*scale,y:repeat%3===2?box.y+box.height-4*scale:box.y+20*scale};
+        await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[point]});
+        assert.equal(await popup.isVisible(),false,'the popup waits until the opening finger is released');
+        if(repeat%2)await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:point.x+2,y:point.y+2}]});
+        await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+        await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+        assert.equal(await popup.isVisible(),true,JSON.stringify({width,language,mode,editable,scale,repeat,trace:await page.evaluate(()=>fixture.tapTrace)}));
+        assert.equal(await page.evaluate(()=>fixture.writes.length===fixture.tapWrites),true,'tapping never changes appointment fields');
+        await page.keyboard.press('Escape');
+        assert.equal(await popup.isVisible(),false,'the popup remains dismissible');
+      }
+    }
+    await touch.send('Network.setUserAgentOverride',{userAgent:''});
   });
 
   for(const [width,height] of [[1440,1000],[834,1112],[390,844],[320,568]]) for(const language of ['en','ar']) {
