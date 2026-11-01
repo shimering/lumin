@@ -205,7 +205,7 @@ Deno.serve(async (request: Request) => {
         en: `${staffName || "A staff member"} checked ${isCheckOut ? "out" : "in"}. Open HR to review it.`,
         ar: `تم تسجيل ${isCheckOut ? "انصراف" : "حضور"} ${staffName || "أحد الموظفين"}. افتح صفحة الموارد البشرية للمراجعة.`,
       },
-      data: { view: "hr", action, attendance_session_id: attendanceSessionId },
+      data: { view: "hr", action, attendance_session_id: attendanceSessionId, recipient_user_ids: recipientUserIds },
       priority: 10,
       ttl: 43_200,
       name: isCheckOut ? "Staff check-out" : "Staff check-in",

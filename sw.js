@@ -1,4 +1,4 @@
-const LUMIN_CACHE = "lumin-dental-shell-v280";
+const LUMIN_CACHE = "lumin-dental-shell-v281";
 const LUMIN_SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -8,6 +8,8 @@ const LUMIN_SHELL = [
   "/icons/dental-icon-v1-512.png",
   "/icons/dental-icon-v1-maskable-512.png",
   "/lumin-app.css",
+  "/lumin-accounts.js?v=1",
+  "/lumin-accounts.css?v=1",
   "/lumin-consent-model.js?v=4",
   "/lumin-implant-consent.js?v=3",
   "/consent-print.html?v=6",
@@ -19,7 +21,7 @@ const LUMIN_SHELL = [
   "/lumin-consent-layout.css?v=2",
   "/vendor/html2canvas/html2canvas-1.4.1.min.js",
   "/vendor/pdf-lib-1.17.1.min.mjs",
-  "/lumin-consents.js?v=12",
+  "/lumin-consents.js?v=13",
   "/lumin-consents.css?v=7",
   "/lumin-consent-document.js?v=7",
   "/lumin-consent-tables.js?v=3",
@@ -52,7 +54,7 @@ const LUMIN_SHELL = [
   "/lumin-inventory-images.js?v=5",
   "/lumin-supplier-list-model.js?v=2",
   "/lumin-inventory-supplier.js?v=3",
-  "/lumin-inventory.js?v=15",
+  "/lumin-inventory.js?v=16",
   "/lumin-inventory.css?v=15",
   "/lumin-clinic-management.css?v=4",
   "/lumin-patient-scans.js?v=7",

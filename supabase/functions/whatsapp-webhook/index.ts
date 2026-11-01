@@ -948,6 +948,7 @@ async function sendAppointmentPushNotification(
       appointment_id: appointmentId,
       source: "whatsapp_ai",
       assigned_user_id: assignedUserId,
+      recipient_user_id: assignedUserId,
       date,
       time,
       patient_name: patientName,
@@ -1063,6 +1064,7 @@ async function sendIncomingWhatsAppPushNotification(
     },
     data: {
       view: "whatsapp",
+      recipient_user_ids: recipientUserIds,
       conversation_id: conversationId,
       phone,
       patient_name: patientName,

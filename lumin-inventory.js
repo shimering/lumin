@@ -543,6 +543,6 @@
   function invalidate(){state.loadedAt=0;host.LuminInventorySupplier?.checkAccess();if(!allowed()){reset();return;}state.dataSequence++;if(state.quickSaving){state.quickRefreshQueued=true;return;}if(visible())scheduleRefresh();}
   function languageChanged(){const label=el('clinic-management-tab-inventory')?.querySelector('span');if(label)label.textContent=t('inventory');if(state.dialog)closeDialog();host.LuminInventorySupplier?.close(true);state.loadedAt=0;if(visible()){render();return refresh({force:true});}}
   function leave(){pickerToken++;closeDialog(false,true);host.LuminInventorySupplier?.close(true);}
-  host.LuminInventory={init,refresh,reset,invalidate,languageChanged,leave,summary:()=>state.report?.summary||null};
+  host.LuminInventory={init,refresh,reset,invalidate,languageChanged,leave,summary:()=>state.report?.summary||null,hasPendingWrites:()=>Boolean(state.saving||state.quickSaving||state.quickPending||state.quickQueue.length||state.organizePending)};
   if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',init);
 })(typeof window==='undefined'?globalThis:window);

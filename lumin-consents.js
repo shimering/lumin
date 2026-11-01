@@ -455,5 +455,5 @@
     if(state.patient?.id===patientId()&&canUse()&&!document.getElementById('view-patient-consents')?.classList.contains('hidden'))renderHistory();
     if(isAdmin()&&!document.getElementById('admin-panel-consents')?.classList.contains('hidden'))void renderAdmin({quiet:true});
   }
-  root.LuminConsents={render,renderAdmin,openNew,procedureApplied,reset,beforeNavigate,close,languageChanged};
+  root.LuminConsents={render,renderAdmin,openNew,procedureApplied,reset,beforeNavigate,close,languageChanged,hasUnsavedChanges:()=>ui.dirty,isSaving:()=>ui.busy};
 })(window);

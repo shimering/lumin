@@ -75,6 +75,7 @@
   <link rel="stylesheet" href="lumin-dates.css?v=1" />
   <link rel="stylesheet" href="lumin-loading.css?v=1" />
   <script src="vendor/supabase.js"></script>
+  <script src="lumin-accounts.js?v=1"></script>
   <script src="lumin-loyalty.js?v=5"></script>
   <script src="lumin-finance-sync.js?v=3"></script>
   <script src="lumin-cash-flow.js?v=1"></script>
@@ -83,7 +84,7 @@
   <script src="lumin-inventory-images.js?v=5"></script>
   <script src="lumin-supplier-list-model.js?v=2"></script>
   <script src="lumin-inventory-supplier.js?v=3"></script>
-  <script src="lumin-inventory.js?v=15"></script>
+  <script src="lumin-inventory.js?v=16"></script>
   <link rel="stylesheet" href="lumin-inventory.css?v=15" />
   <link rel="stylesheet" href="lumin-clinic-management.css?v=4" />
   <script src="lumin-patient-scans.js?v=7"></script>
@@ -128,7 +129,7 @@
   <script src="lumin-consent-layout.js?v=2"></script>
   <script src="lumin-implant-consent.js?v=3"></script>
   <script src="lumin-consent-print.js?v=7"></script>
-  <script src="lumin-consents.js?v=12"></script>
+  <script src="lumin-consents.js?v=13"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <link rel="stylesheet" href="lumin-tooth-images.css?v=1" />
   
@@ -5416,6 +5417,7 @@
   <link rel="stylesheet" href="vendor/quill/quill.core-2.0.2.css" />
   <link rel="stylesheet" href="lumin-consent-editor.css?v=9" />
   <link rel="stylesheet" href="lumin-consent-layout.css?v=2" />
+  <link rel="stylesheet" href="lumin-accounts.css?v=1" />
   <style id="finance-ledger-styles">
     #finance-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     #finance-summary-cards > div { min-width: 0; }
@@ -5622,15 +5624,22 @@
           <input id="login-password" name="password" type="password" autocomplete="current-password" required class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="Your password" />
         </div>
         <div class="flex items-start justify-between gap-4">
-          <label class="flex cursor-pointer items-center gap-2 text-xs font-bold text-slate-600">
+          <label class="la-check">
             <input id="login-remember-identifier" name="remember-username" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
-            <span>Remember login name on this device</span>
+            <span>Remember this account on this device</span>
           </label>
         </div>
+        <label class="la-check">
+          <input id="login-trust-account" type="checkbox" disabled />
+          <span>Allow password-free switching (trusted device)</span>
+        </label>
         <p class="-mt-3 text-[11px] leading-5 text-slate-400">After your first successful sign-in, this device keeps you signed in until you choose Sign out.</p>
         <p id="login-error" class="hidden rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700" role="alert"></p>
         <button id="login-submit" type="submit" class="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60">
           <i data-lucide="log-in" class="h-4 w-4"></i> Sign in
+        </button>
+        <button id="login-saved-accounts" type="button" class="la-button la-entry" onclick="LuminAccounts.open(this)" aria-haspopup="dialog" aria-expanded="false" hidden>
+          <i data-lucide="users-round" class="h-4 w-4"></i><span>Saved accounts</span>
         </button>
         <button id="login-install-app" data-install-app-button type="button" onclick="requestAppInstall()" class="hidden w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-black text-blue-700 transition hover:bg-blue-100" aria-label="Install app" title="Install app">
           <i data-lucide="download" class="h-4 w-4"></i> <span>Install App</span>
@@ -5725,7 +5734,7 @@
           <i data-lucide="plus" class="app-new-patient-desktop-icon hidden w-4 h-4"></i>
           <span id="btn-new-patient-label">New</span>
         </button>
-        <button id="btn-current-user" type="button" onclick="switchView('settings')" class="hidden items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition" aria-label="Open my settings">
+        <button id="btn-current-user" type="button" onclick="LuminAccounts.open(this)" class="items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition" aria-label="Switch accounts" aria-haspopup="dialog" aria-expanded="false">
           <i data-lucide="circle-user-round" class="h-4 w-4"></i>
           <span id="current-user-details">
             <span id="current-user-name" class="block max-w-36 truncate text-xs font-black text-slate-700"></span>
@@ -8228,6 +8237,16 @@
           </button>
         </form>
 
+        <div id="settings-accounts-card" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="flex items-center gap-3 min-w-0">
+              <span class="la-heading-icon"><i data-lucide="users-round" class="h-5 w-5"></i></span>
+              <div class="min-w-0"><h3 class="text-sm font-semibold text-slate-800">Your accounts</h3><p class="text-xs text-slate-400">Switch between accounts saved in this browser.</p></div>
+            </div>
+            <button type="button" class="la-button la-primary la-entry" onclick="LuminAccounts.open(this)" aria-haspopup="dialog" aria-expanded="false"><i data-lucide="arrow-right-left" class="h-4 w-4"></i><span>Switch accounts</span></button>
+          </div>
+        </div>
+
         <!-- Account Session / Sign Out Card -->
         <div id="settings-logout-card" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -10099,6 +10118,7 @@
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxYmF5amt5cHpmeHZua3Nnd3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkxMjI4NzAsImV4cCI6MjEwNDY5ODg3MH0.e5tPe3PKUiFiS_ZnXcpDF9CRtGtp_B1oZsK37phOQ8Q'; // NewLumin
 
     const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { fetch: (...args) => window.LuminAccounts.fetch(...args) },
       auth: {
         persistSession: true,
         autoRefreshToken: true,
@@ -10779,6 +10799,12 @@
       'Sign in': 'تسجيل الدخول',
       'Signing in...': 'جارٍ تسجيل الدخول...',
       'Remember login name on this device': 'تذكر اسم الدخول على هذا الجهاز',
+      'Remember this account on this device': 'تذكر هذا الحساب على هذا الجهاز',
+      'Allow password-free switching (trusted device)': 'السماح بالتبديل دون كلمة مرور (جهاز موثوق)',
+      'Saved accounts': 'الحسابات المحفوظة',
+      'Your accounts': 'حساباتك',
+      'Switch accounts': 'تبديل الحسابات',
+      'Switch between accounts saved in this browser.': 'بدّل بين الحسابات المحفوظة في هذا المتصفح.',
       'Your browser can securely autofill saved passwords.': 'يمكن للمتصفح تعبئة كلمات المرور المحفوظة بأمان.',
       'Accounts are created by the clinic administrator.': 'يتم إنشاء الحسابات بواسطة مسؤول العيادة.',
       'EMR & Realistic Odontogram': 'السجل الطبي ومخطط الأسنان',
@@ -11862,6 +11888,36 @@
 
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     let oneSignalInitialized = false;
+    let oneSignalIdentityQueue = Promise.resolve();
+
+    function queueOneSignalIdentity(work) {
+      const next = oneSignalIdentityQueue.catch(() => {}).then(() => {
+        if (navigator.locks?.request) return navigator.locks.request('lumin-push-identity', work);
+        return work();
+      });
+      oneSignalIdentityQueue = next.catch(() => {});
+      return next;
+    }
+
+    function notificationBelongsToCurrentAccount(notification) {
+      const userId = currentUserAccess?.userId;
+      if (!userId || window.LuminAccounts?.isTransitioning()) return false;
+      if (window.OneSignal?.User?.externalId !== userId) return false;
+      const data = notification?.additionalData || {};
+      const recipient = data.recipient_user_id || data.assigned_user_id;
+      if (recipient) return recipient === userId;
+      return Array.isArray(data.recipient_user_ids) && data.recipient_user_ids.includes(userId);
+    }
+
+    function disconnectOneSignalIdentity(userId = currentUserAccess?.userId) {
+      if (!window.OneSignal || !oneSignalInitialized || !userId) return Promise.resolve();
+      return queueOneSignalIdentity(async () => {
+        // A delayed logout in another tab must never detach the newly active user.
+        if (OneSignal.User?.externalId !== userId) return;
+        if (OneSignal.User?.PushSubscription?.optOut) await OneSignal.User.PushSubscription.optOut();
+        await OneSignal.logout();
+      });
+    }
 
     async function syncOneSignalState() {
       if (typeof window.OneSignal === 'undefined' || !oneSignalInitialized) return;
@@ -11881,7 +11937,7 @@
           permission &&
           optedIn &&
           subscriptionId &&
-          (!expectedUserId || identityMatched)
+          identityMatched
         );
 
         appointmentNotificationHostState = {
@@ -11895,7 +11951,6 @@
           error: ''
         };
 
-        storeAppointmentNotificationPreference(isEnabled);
         initializeAppointmentNotificationSettings();
       } catch (e) {
         console.warn('syncOneSignalState error:', e);
@@ -11927,6 +11982,7 @@
             OneSignal.Notifications.addEventListener('foregroundWillDisplay', event => {
               try {
                 const notification = event?.notification;
+                if (!notificationBelongsToCurrentAccount(notification)) { event.preventDefault(); return; }
                 if (notification) {
                   const title = notification.title || (currentUiLanguage === 'ar' ? 'إشعار جديد' : 'New Notification');
                   const body = notification.body || '';
@@ -11936,6 +11992,13 @@
             });
             OneSignal.Notifications.addEventListener('click', event => {
               try {
+                if (!notificationBelongsToCurrentAccount(event?.notification)) {
+                  showAppointmentNotificationToast(
+                    currentUiLanguage === 'ar' ? 'إشعار لحساب آخر' : 'Account notification',
+                    currentUiLanguage === 'ar' ? 'بدّل إلى الحساب الذي تلقّى هذا الإشعار لعرضه.' : 'Switch to the account that received this notification to view it.'
+                  );
+                  return;
+                }
                 const additionalData = event?.notification?.additionalData;
                 const view = additionalData?.view;
                 if (view && typeof switchView === 'function' && hasPageAccess(view)) {
@@ -11947,6 +12010,8 @@
 
           if (currentUserAccess) {
             await sendOneSignalIdentity();
+          } else {
+            await disconnectOneSignalIdentity(OneSignal.User?.externalId);
           }
         } catch (err) {
           console.warn('OneSignal initialization error:', err);
@@ -11968,27 +12033,39 @@
     }
 
     async function sendOneSignalIdentity() {
-      if (!currentUserAccess) return;
+      if (!currentUserAccess || window.LuminAccounts?.isTransitioning()) return;
+      const user = currentUserAccess;
+      const stillCurrent = () => currentUserAccess?.userId === user.userId && !window.LuminAccounts?.isTransitioning();
       postToLuminHost({
         type: 'lumin:identity',
         userId: currentUserAccess.userId,
         language: currentUserAccess.language === 'ar' ? 'ar' : 'en',
         roleName: currentUserAccess.roleName,
-        canViewAppointments: hasPageAccess('appointments')
+        canViewAppointments: hasPageAccess('appointments'),
+        notificationsEnabled: storedAppointmentNotificationPreference()
       });
 
       if (window.OneSignal && oneSignalInitialized) {
         try {
-          if (OneSignal.User?.externalId !== currentUserAccess.userId) {
-            await OneSignal.login(currentUserAccess.userId);
-          }
-          if (OneSignal.User?.addTags) {
-            await OneSignal.User.addTags({
-              role: currentUserAccess.roleName || '',
-              language: currentUserAccess.language === 'ar' ? 'ar' : 'en'
-            });
-          }
-          await syncOneSignalState();
+          await queueOneSignalIdentity(async () => {
+            if (!stillCurrent()) return;
+            const subscription = OneSignal.User?.PushSubscription;
+            if (OneSignal.User?.externalId !== user.userId) {
+              if (subscription?.optOut) await subscription.optOut();
+              if (!stillCurrent()) return;
+              await OneSignal.login(user.userId);
+            }
+            if (!stillCurrent()) return;
+            const activeSubscription = OneSignal.User?.PushSubscription;
+            const enabled = storedAppointmentNotificationPreference() && Boolean(OneSignal.Notifications?.permission);
+            if (enabled && activeSubscription?.optIn && !activeSubscription.optedIn) await activeSubscription.optIn();
+            else if (!enabled && activeSubscription?.optOut && activeSubscription.optedIn) await activeSubscription.optOut();
+            if (!stillCurrent()) return;
+            if (OneSignal.User?.addTags) {
+              await OneSignal.User.addTags({ role: user.roleName || '', language: user.language === 'ar' ? 'ar' : 'en' });
+            }
+            if (stillCurrent()) await syncOneSignalState();
+          });
         } catch (err) {
           console.warn('OneSignal login error:', err);
         }
@@ -12015,9 +12092,6 @@
           enabled: Boolean(data.notificationEnabled),
           error: String(data.notificationError || '')
         };
-        if (appointmentNotificationHostState.ready) {
-          storeAppointmentNotificationPreference(appointmentNotificationHostState.enabled);
-        }
         updateInstallAppButton();
         initializeAppointmentNotificationSettings();
         if (currentUserAccess && data.requestedView === 'appointments' && hasPageAccess('appointments')) {
@@ -12077,6 +12151,7 @@
         const rememberedIdentifier = localStorage.getItem(REMEMBERED_LOGIN_STORAGE_KEY) || '';
         rememberToggle.checked = Boolean(rememberedIdentifier);
         if (rememberedIdentifier && !identifierInput.value) identifierInput.value = rememberedIdentifier;
+        window.LuminAccounts?.restoreLoginPreference();
         return Boolean(identifierInput.value);
       } catch (_) {
         rememberToggle.checked = false;
@@ -13108,8 +13183,8 @@
       return error;
     }
 
-    async function loadCurrentUserAccess(session) {
-      const { data: profile, error } = await db
+    async function loadCurrentUserAccess(session, client = db) {
+      const { data: profile, error } = await client
         .from('user_profiles')
         .select('user_id, email, full_name, login_name, appointment_color, ui_language, is_doctor, active, role_id, access_roles(id, name, is_admin, role_permissions(page_key, can_view, can_modify))')
         .eq('user_id', session.user.id)
@@ -13148,6 +13223,7 @@
     }
 
     async function applyAuthSession(session) {
+      if (window.LuminAccounts?.isTransitioning()) return;
       if (!session) {
         closeWhatsAppMessageMenu();
         closeChartFindingDateDialog({ force: true, restoreFocus: false });
@@ -13157,7 +13233,7 @@
         stopRealtimeSync();
         postToLuminHost({ type: 'lumin:logout' });
         if (window.OneSignal && oneSignalInitialized) {
-          try { void OneSignal.logout(); } catch (_) {}
+          void disconnectOneSignalIdentity().catch(() => {});
         }
         currentSession = null;
         if (typeof resetQuotationUi === 'function') resetQuotationUi();
@@ -13333,6 +13409,7 @@
       }
       if (currentSession?.user?.id === session.user?.id && currentUserAccess) {
         currentSession = session;
+        if (window.LuminAccounts?.authorized(session, currentUserAccess) === false) return;
         syncUiThemeFromSession(session);
         void refreshUiThemePreference();
         resetAuthRecoveryState();
@@ -13343,6 +13420,7 @@
         const access = await loadCurrentUserAccess(session);
         currentSession = session;
         currentUserAccess = access;
+        if (window.LuminAccounts?.authorized(session, access) === false) return;
         syncUiThemeFromSession(session);
         void refreshUiThemePreference();
         appointmentShowMineOnly = false;
@@ -13593,6 +13671,16 @@
         if (sessionError) throw sessionError;
         await queueAuthSessionApplication(data.session);
         saveRememberedLoginIdentifier(identifier, document.getElementById('login-remember-identifier').checked);
+        if (currentUserAccess?.userId === data.session?.user?.id) {
+          try {
+            window.LuminAccounts?.capture(data.session, currentUserAccess, {
+              remember: document.getElementById('login-remember-identifier').checked,
+              trusted: document.getElementById('login-trust-account').checked
+            });
+          } catch (storageError) {
+            showAppointmentNotificationToast(currentUiLanguage === 'ar' ? 'الحسابات المحفوظة' : 'Saved accounts', storageError.message);
+          }
+        }
         document.getElementById('login-form').reset();
       } catch (error) {
         setLoginError(error.message || 'Sign in failed. Check the login name/email and password.');
@@ -13604,13 +13692,15 @@
     }
 
     async function handleLogout() {
+      if (window.LuminAccounts?.isTransitioning()) return;
+      try { window.LuminAccounts?.signedOut(currentSession?.user?.id); } catch (_) {}
       authLogoutInProgress = true;
       resetAuthRecoveryState();
       stopRealtimeSync();
       stopStorageConnectionMonitor();
       postToLuminHost({ type: 'lumin:logout' });
       if (window.OneSignal && oneSignalInitialized) {
-        try { void OneSignal.logout(); } catch (_) {}
+        void disconnectOneSignalIdentity().catch(() => {});
       }
       try {
         await db.auth.signOut({ scope: 'local' });
@@ -13871,8 +13961,7 @@
 
     function storeAppointmentNotificationPreference(enabled) {
       try {
-        if (enabled) localStorage.setItem(appointmentNotificationStorageKey(), 'enabled');
-        else localStorage.removeItem(appointmentNotificationStorageKey());
+        localStorage.setItem(appointmentNotificationStorageKey(), enabled ? 'enabled' : 'disabled');
       } catch (_) {}
     }
 
@@ -13921,7 +14010,7 @@
       }
 
       if (appointmentNotificationHostState.ready) {
-        const enabled = appointmentNotificationHostState.enabled;
+        const enabled = appointmentNotificationHostState.enabled && storedAppointmentNotificationPreference();
         toggle.checked = enabled;
         toggle.disabled = !appointmentNotificationHostState.supported;
         if (enabled) {
@@ -13968,7 +14057,7 @@
       if (!toggle || !currentUserAccess || !hasPageAccess('appointments')) return;
       if (window.parent !== window) {
         toggle.disabled = true;
-        if (!enabled) storeAppointmentNotificationPreference(false);
+        storeAppointmentNotificationPreference(enabled);
         let directRequest = null;
         try {
           const bridge = window.parent.LuminNotificationBridge;
@@ -14003,20 +14092,15 @@
               permission = await OneSignal.Notifications.requestPermission();
             }
             if (permission) {
-              if (OneSignal.User?.PushSubscription?.optIn) {
-                await OneSignal.User.PushSubscription.optIn();
-              }
-              await sendOneSignalIdentity();
               storeAppointmentNotificationPreference(true);
+              await sendOneSignalIdentity();
               void sendTestNotificationPrompt();
             } else {
               storeAppointmentNotificationPreference(false);
             }
           } else {
-            if (OneSignal.User?.PushSubscription?.optOut) {
-              await OneSignal.User.PushSubscription.optOut();
-            }
             storeAppointmentNotificationPreference(false);
+            await sendOneSignalIdentity();
           }
           await syncOneSignalState();
           return;
@@ -14071,7 +14155,7 @@
               badge: 'icons/dental-icon-v1-32.png',
               tag: 'lumin-test-alert',
               renotify: true,
-              data: { url: '/?view=appointments' }
+              data: { url: '/?view=appointments', recipient_user_id: currentUserAccess?.userId }
             });
             osDelivered = true;
           }
@@ -41945,6 +42029,38 @@
 
     // Startup Initialization
     window.addEventListener('DOMContentLoaded', async () => {
+      window.LuminAccounts.init({
+        db,
+        session: () => currentSession,
+        access: () => currentUserAccess,
+        language: () => currentUiLanguage,
+        settings: () => switchView('settings'),
+        loadAccess: loadCurrentUserAccess,
+        authStorageKey: `sb-${new URL(SUPABASE_URL).hostname.split('.')[0]}-auth-token`,
+        createClient: () => window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'lumin-account-probe' },
+          global: { fetch: (input, init = {}) => fetch(input, { ...init, signal: AbortSignal.timeout(20000) }) }
+        }),
+        hasUnsavedChanges: () => whatsappAiInstructionsDirty || loyaltySettingsDirty || loyaltyPatientControlsDirty || financeSyncDirty || Boolean(window.LuminConsents?.hasUnsavedChanges?.()),
+        hasPendingWrites: () => Boolean(themeSaveRequest || whatsappAiInstructionsSaving || prescriptionComposerSaving || window.LuminInventory?.hasPendingWrites?.() || window.LuminConsents?.isSaving?.()),
+        beforeSwitch: async () => {
+          resetAuthRecoveryState();
+          stopRealtimeSync();
+          stopStorageConnectionMonitor();
+          clearStorageCredentials();
+          postToLuminHost({ type: 'lumin:logout' });
+          if (window.OneSignal && oneSignalInitialized) {
+            await disconnectOneSignalIdentity();
+          }
+        },
+        resume: async () => {
+          await db.auth.startAutoRefresh();
+          startRealtimeSync();
+          startStorageConnectionMonitor();
+          void sendOneSignalIdentity();
+        },
+        reload: () => window.location.reload()
+      });
       setupAppDateMonitor();
       syncNavMountLocation();
       setupStorageConnectionMonitor();
@@ -42034,6 +42150,7 @@
       });
       db.auth.onAuthStateChange((event, session) => {
         if (event === 'INITIAL_SESSION') return;
+        if (window.LuminAccounts.authChanged(event, session)) return;
         setTimeout(() => {
           if (event === 'SIGNED_OUT') void queueAuthSessionApplication(null);
           else if (session) void queueAuthSessionApplication(session);
