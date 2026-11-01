@@ -36921,7 +36921,7 @@
     }
 
     function beginAppointmentResize(event, appointmentId) {
-      if (event.button !== 0) return;
+      if (event.button !== 0 || event.isPrimary === false) return;
       event.stopPropagation();
 
       const entry = appointments.find(appointment => appointment.id === appointmentId);
@@ -36938,11 +36938,15 @@
       const startY = event.clientY;
       let nextDuration = Math.min(originalDuration, maximumDuration);
       let resized = false;
+      let moved = false;
 
       block.setPointerCapture(event.pointerId);
       block.classList.add('is-resizing');
 
       const onMove = moveEvent => {
+        if (moveEvent.pointerId !== event.pointerId) return;
+        moved = moved || Math.hypot(moveEvent.clientX - event.clientX, moveEvent.clientY - startY) > APPOINTMENT_RANGE_MOVE_TOLERANCE;
+        if (!moved) return;
         const deltaMinutes = renderedMinuteHeight
           ? (moveEvent.clientY - startY) / renderedMinuteHeight
           : (moveEvent.clientY - startY) / appointmentDayHourHeight * 60;
@@ -36960,16 +36964,39 @@
         block.setAttribute('aria-label', `${entry.patient}, ${range}, ${appointmentDurationLabel(nextDuration)}`);
       };
 
-      const finish = async () => {
+      const cleanup = () => {
         block.removeEventListener('pointermove', onMove);
+        block.removeEventListener('pointerup', finish);
+        block.removeEventListener('pointercancel', cancel);
         block.classList.remove('is-resizing');
-        if (!resized) return;
+        if (block.hasPointerCapture?.(event.pointerId)) block.releasePointerCapture(event.pointerId);
+      };
+
+      const finish = async finishEvent => {
+        if (finishEvent.pointerId !== event.pointerId) return;
+        finishEvent.preventDefault();
+        finishEvent.stopPropagation();
+        cleanup();
+        // The resize strip is part of the card's tap target. Only a deliberate
+        // drag changes duration; a tap opens the same details as the card body.
+        if (!moved && !resized) {
+          armAppointmentCardPopoverTouchGuard(finishEvent);
+          toggleAppointmentCardPopover(appointmentId, block);
+          return;
+        }
+        if (nextDuration === originalDuration) return;
         await persistResizedAppointment(appointmentId, nextDuration);
       };
 
+      const cancel = cancelEvent => {
+        if (cancelEvent.pointerId !== event.pointerId) return;
+        cleanup();
+        renderAppointments();
+      };
+
       block.addEventListener('pointermove', onMove);
-      block.addEventListener('pointerup', finish, { once: true });
-      block.addEventListener('pointercancel', () => renderAppointments(), { once: true });
+      block.addEventListener('pointerup', finish);
+      block.addEventListener('pointercancel', cancel);
     }
 
     async function flushAppointmentMoveQueue(appointmentId) {

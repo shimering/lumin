@@ -101,8 +101,9 @@ test('overlapping appointments sit side by side within stable doctor columns acr
     function getCalendarNonWorkingIntervalsForDate() { return []; }
     function beginAppointmentRangeSelection() {}
     function armAppointmentCardPopoverTouchGuard() {}
-    function toggleAppointmentCardPopover(id) { window.openedAppointment = id; }
+    function toggleAppointmentCardPopover(id) { window.openedAppointment = id; window.popoverOpenCalls = (window.popoverOpenCalls || 0) + 1; }
     function closeAppointmentCardPopover() {}
+    function renderAppointments() { renderAppointmentDayTimeline(); }
     function resetAppointmentDaySwipeVisual() {}
     function autoScrollAppointmentWeek() {}
     function persistDraggedAppointment(id, minutes) { window.savedMove = {id, minutes}; }
@@ -167,6 +168,60 @@ test('overlapping appointments sit side by side within stable doctor columns acr
   await card('cancelled').focus();
   await page.keyboard.press('Enter');
   assert.equal(await page.evaluate(() => window.openedAppointment), 'cancelled');
+
+  await t.test('tablet taps open details across the whole card, including the resize strip', async st => {
+    st.after(async () => {
+      await page.setViewportSize({width:1440,height:900});
+      await page.evaluate(() => {
+        appointments = window.tabletEntries || appointments; delete window.tabletEntries;
+        document.documentElement.dir = 'ltr'; currentUiLanguage = 'en'; appointmentDayHourHeight = 96;
+        renderAppointmentDayTimeline(); document.getElementById('appointments-day-timeline-scroll').scrollTop = 18 * 96;
+      });
+    });
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await page.evaluate(() => {
+      window.tabletEntries = appointments;
+      // Isolate the short card so its visible tap area isn't covered by the
+      // minimum touch height of an immediately adjacent appointment.
+      appointments = appointments.filter(item => item.id === 'b2130');
+    });
+    for (const dir of ['ltr', 'rtl']) for (const hourHeight of [96, 40]) {
+      await page.evaluate(({dir, hourHeight}) => {
+        document.documentElement.dir = dir; currentUiLanguage = dir === 'rtl' ? 'ar' : 'en';
+        appointmentDayHourHeight = hourHeight;
+        renderAppointmentDayTimeline();
+      }, {dir, hourHeight});
+      const target = card('b2130');
+      await target.scrollIntoViewIfNeeded();
+      const box = await target.boundingBox();
+      for (const point of [
+        {x: box.width / 2, y: 5},
+        {x: box.width - 8, y: box.height / 2},
+        {x: box.width / 2, y: box.height - 3}
+      ]) {
+        await page.evaluate(() => { window.openedAppointment = null; window.savedResize = null; window.popoverOpenCalls = 0; });
+        await target.tap({position:point});
+        assert.equal(await page.evaluate(() => window.openedAppointment), 'b2130', `${dir}, hour height ${hourHeight}, tap ${JSON.stringify(point)}`);
+        assert.equal(await page.evaluate(() => window.popoverOpenCalls), 1, 'each tap opens the menu once');
+        assert.equal(await page.evaluate(() => window.savedResize), null, 'a tap never saves a duration change');
+      }
+    }
+    const touch = await page.context().newCDPSession(page);
+    st.after(() => touch.detach());
+    for (const cancelled of [false, true]) {
+      const target = card('b2130');
+      await target.scrollIntoViewIfNeeded();
+      const handle = await target.locator('[data-appointment-resize-handle]').boundingBox();
+      const point = {x:handle.x + handle.width / 2, y:handle.y + handle.height / 2};
+      await page.evaluate(() => { window.openedAppointment = null; window.savedResize = null; window.popoverOpenCalls = 0; });
+      await touch.send('Input.dispatchTouchEvent', {type:'touchStart',touchPoints:[point]});
+      await touch.send('Input.dispatchTouchEvent', {type:'touchMove',touchPoints:[{x:point.x + 2,y:point.y + 2}]});
+      await touch.send('Input.dispatchTouchEvent', {type:cancelled?'touchCancel':'touchEnd',touchPoints:[]});
+      assert.equal(await page.evaluate(() => window.openedAppointment), cancelled ? null : 'b2130', 'small finger movement remains a tap, while cancellation never opens details');
+      assert.equal(await page.evaluate(() => window.savedResize), null, 'small movement or cancellation never saves a duration');
+      assert.equal(await target.evaluate(node => node.classList.contains('is-resizing')), false, 'resize state is cleared');
+    }
+  });
 
   await t.test('holding an overlapping appointment preserves its booked time, then dragging snaps correctly', async () => {
     const box = await card('cancelled').boundingBox();
