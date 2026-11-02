@@ -5395,7 +5395,7 @@
       .wa-settings-primary-button { flex: 1 1 0; }
     }
   </style>
-  <link rel="stylesheet" href="lumin-theme.css?v=24" />
+  <link rel="stylesheet" href="lumin-theme.css?v=25" />
   <link rel="stylesheet" href="lumin-backgrounds.css?v=1" />
   <link rel="stylesheet" href="lumin-whatsapp-actions.css?v=2" />
   <link rel="stylesheet" href="lumin-dashboard-motion.css?v=2" />
@@ -6928,21 +6928,27 @@
       <div data-appointments-calendar-shell>
         <div data-appointments-calendar-card class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
           <div id="appointments-calendar-toolbar" data-compact-calendar-toolbar class="flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-2">
-            <div class="flex min-w-0 items-center gap-2" aria-live="polite">
+            <div class="appointment-calendar-summary flex min-w-0 items-center gap-2" aria-live="polite">
               <span class="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 sm:flex">
                 <i data-lucide="calendar-days" class="h-4 w-4"></i>
               </span>
               <h3 id="appointments-month-heading" class="hidden truncate text-sm font-black text-slate-800 sm:block sm:text-base"></h3>
-              <h3 id="appointments-mobile-heading" class="truncate whitespace-nowrap text-sm font-black text-slate-800 sm:hidden"></h3>
+              <h3 id="appointments-mobile-heading" class="truncate whitespace-nowrap text-slate-800 sm:hidden"></h3>
+              <i data-lucide="chevron-down" class="appointment-mobile-view-chevron" aria-hidden="true"></i>
+              <select id="appointment-mobile-view" aria-label="Calendar view" title="Calendar view" onchange="setAppointmentCalendarMode(this.value)">
+                <option value="month">Month</option>
+                <option value="week">Week</option>
+                <option value="day">Day</option>
+              </select>
             </div>
             <div class="flex shrink-0 items-center justify-end gap-1.5">
-              <div class="flex overflow-hidden rounded-lg border border-slate-200 bg-slate-50" aria-label="Calendar view">
+              <div class="appointment-calendar-view-buttons flex overflow-hidden rounded-lg border border-slate-200 bg-slate-50" aria-label="Calendar view">
                 <button id="appointment-view-month" type="button" onclick="setAppointmentCalendarMode('month')" class="inline-flex items-center justify-center px-2.5 py-1 text-[11px] font-bold bg-white text-blue-700 shadow-xs" aria-label="Month view" title="Month view"><i data-lucide="calendar-range" class="h-4 w-4 sm:hidden"></i><span class="hidden sm:inline">Month</span></button>
                 <button id="appointment-view-week" type="button" onclick="setAppointmentCalendarMode('week')" class="inline-flex items-center justify-center border-l border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-500 hover:text-slate-800" aria-label="Week view" title="Week view"><i data-lucide="columns-3" class="h-4 w-4 sm:hidden"></i><span class="hidden sm:inline">Week</span></button>
                 <button id="appointment-view-day" type="button" onclick="setAppointmentCalendarMode('day')" class="inline-flex items-center justify-center border-l border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-500 hover:text-slate-800" aria-label="Day view" title="Day view"><i data-lucide="calendar-days" class="h-4 w-4 sm:hidden"></i><span class="hidden sm:inline">Day</span></button>
               </div>
               <button id="appointment-today-button" type="button" onclick="showAppointmentToday()" class="schedule-today-button" aria-label="Back to today" title="Back to today"><i data-lucide="rotate-ccw" aria-hidden="true"></i><span>Today</span></button>
-              <div class="flex overflow-hidden rounded-lg border border-slate-200">
+              <div class="appointment-calendar-navigation flex overflow-hidden rounded-lg border border-slate-200">
                 <button onclick="changeAppointmentPeriod(-1)" class="p-1 text-slate-600 transition hover:bg-slate-50" aria-label="Previous period">
                   <i data-lucide="chevron-left" class="w-4 h-4"></i>
                 </button>
@@ -35741,6 +35747,8 @@
 
       heading.textContent = appointmentMonthFormatter.format(appointmentVisibleMonth);
       mobileHeading.textContent = appointmentMonthFormatter.format(appointmentVisibleMonth);
+      mobileHeading.removeAttribute('aria-label');
+      mobileHeading.removeAttribute('title');
 
       for (let index = leadingDays - 1; index >= 0; index -= 1) {
         cells.push({ date: new Date(appointmentVisibleMonth.getFullYear(), appointmentVisibleMonth.getMonth() - 1, previousMonthLastDay - index), currentMonth: false });
@@ -36054,9 +36062,14 @@
       return Array.from({ length: 7 }, (_, dayIndex) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + dayIndex));
     }
 
-    function appointmentWeekRangeLabel(weekDates) {
+    function appointmentWeekRangeLabel(weekDates, compact = false) {
       const start = weekDates[0];
       const end = weekDates[weekDates.length - 1];
+      if (compact) {
+        const sameMonth = start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth();
+        const startLabel = appointmentWeekRangeFormatter.format(start).slice(0, sameMonth ? 2 : 5);
+        return `${startLabel}–${appointmentWeekRangeFormatter.format(end)}`;
+      }
       if (typeof appointmentWeekRangeFormatter.formatRange === 'function') {
         return appointmentWeekRangeFormatter.formatRange(start, end);
       }
@@ -36086,7 +36099,9 @@
       );
 
       heading.textContent = weekLabel;
-      mobileHeading.textContent = weekLabel;
+      mobileHeading.textContent = appointmentWeekRangeLabel(weekDates, true);
+      mobileHeading.setAttribute('aria-label', weekLabel);
+      mobileHeading.title = weekLabel;
 
       const dayHeaders = weekDates.map(date => {
         const selected = sameAppointmentDate(date, appointmentSelectedDate);
@@ -36228,6 +36243,8 @@
 
       heading.textContent = appointmentDayFormatter.format(appointmentSelectedDate);
       mobileHeading.textContent = appointmentCompactDayFormatter.format(appointmentSelectedDate);
+      mobileHeading.removeAttribute('aria-label');
+      mobileHeading.removeAttribute('title');
 
       const hourRows = Array.from({ length: 24 }, (_, hour) => `
         <div data-day-hour-line="${hour}" class="absolute inset-x-0 border-t border-slate-200 pointer-events-none" style="top:${hour * appointmentDayHourHeight}px;height:${appointmentDayHourHeight}px">
@@ -37401,6 +37418,8 @@
     }
 
     function updateAppointmentViewButtons() {
+      const mobileView = document.getElementById('appointment-mobile-view');
+      if (mobileView) mobileView.value = appointmentCalendarMode;
       const monthButton = document.getElementById('appointment-view-month');
       const weekButton = document.getElementById('appointment-view-week');
       const dayButton = document.getElementById('appointment-view-day');

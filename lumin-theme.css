@@ -463,17 +463,42 @@ body.lumin-raised :is(#btn-current-user, #btn-logout) {
     body.lumin-raised .dashboard-date-icon,
     body.lumin-raised #app-shell .schedule-today-button { background: hsl(var(--lumin-hue) calc(80% * var(--lumin-chroma)) 94%); color: hsl(var(--lumin-hue) calc(65% * var(--lumin-chroma)) 38%); }
     body.lumin-raised #view-dashboard #dashboard-doctor-heading { color: var(--lumin-muted); }
+    #appointment-mobile-view, .appointment-mobile-view-chevron { display: none; }
+    @media (max-width: 767px) {
+      /* The date doubles as the native view picker, leaving one touch-safe row. */
+      #appointments-calendar-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; padding: 4px; }
+      #appointments-calendar-toolbar .appointment-calendar-summary { position: relative; min-height: calc(44px / var(--lumin-app-scale, 1)); gap: 4px; padding-inline: 2px; border-radius: 10px; transition: background-color 150ms ease-out, transform 150ms ease-out; }
+      #appointments-calendar-toolbar .appointment-calendar-summary > span,
+      #appointments-month-heading { display: none; }
+      #appointments-mobile-heading { display: block; font-size: calc(12px / var(--lumin-app-scale, 1)); font-weight: 600; letter-spacing: -.025em; line-height: 1.4; white-space: nowrap; font-variant-numeric: tabular-nums; }
+      .appointment-mobile-view-chevron { display: block; flex: none; width: 12px; height: 12px; color: #64748b; }
+      #appointment-mobile-view { display: block; position: absolute; inset: 0; width: 100%; height: 100%; min-width: calc(44px / var(--lumin-app-scale, 1)); min-height: calc(44px / var(--lumin-app-scale, 1)); opacity: 0; cursor: pointer; font-size: 16px; }
+      #appointments-calendar-toolbar .appointment-calendar-view-buttons { display: none; }
+      #appointments-calendar-toolbar > div:last-child { gap: 4px; }
+      #appointments-calendar-toolbar .appointment-calendar-navigation { border: 0; border-radius: 10px; }
+      #appointments-calendar-toolbar .appointment-calendar-navigation button { border: 0; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; transition: background-color 150ms ease-out, transform 150ms ease-out; }
+      #app-shell #appointment-today-button { padding-inline: 8px; }
+      #appointment-today-button span { display: none; }
+      #appointments-calendar-toolbar .appointment-calendar-summary:hover,
+      #appointments-calendar-toolbar .appointment-calendar-navigation button:hover { background: #f1f5f9; }
+      #appointments-calendar-toolbar .appointment-calendar-summary:active,
+      #appointments-calendar-toolbar .appointment-calendar-navigation button:active { transform: scale(.98); }
+      #appointments-calendar-toolbar .appointment-calendar-summary:has(select:focus-visible),
+      #appointments-calendar-toolbar .appointment-calendar-navigation button:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
+      #appointment-mobile-view:disabled,
+      #appointments-calendar-toolbar .appointment-calendar-navigation button:disabled { opacity: .5; pointer-events: none; }
+      [dir="rtl"] .appointment-calendar-navigation svg { transform: scaleX(-1); }
+    }
+    @media (max-width: 359px) {
+      #appointments-mobile-heading { font-size: calc(11px / var(--lumin-app-scale, 1)); }
+    }
     @media (max-width: 639px) {
       .dashboard-date-navigation { width: 100%; justify-content: space-between; }
-      #appointments-calendar-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
-      #appointments-calendar-toolbar > div:last-child { display: contents; }
-      #appointments-calendar-toolbar > div:last-child > div:first-child { grid-column: 1; grid-row: 2; justify-self: start; }
-      #appointments-calendar-toolbar #appointment-today-button { grid-column: 2; grid-row: 1; }
-      #appointments-calendar-toolbar > div:last-child > div:last-child { grid-column: 2; grid-row: 2; justify-self: end; }
-      #appointments-mobile-heading { white-space: normal; overflow-wrap: anywhere; }
     }
     @media (prefers-reduced-motion: reduce) {
-      #dashboard-date-toolbar button, #app-shell .schedule-today-button { transition: none; }
+      #dashboard-date-toolbar button, #app-shell .schedule-today-button,
+      #appointments-calendar-toolbar .appointment-calendar-summary,
+      #appointments-calendar-toolbar .appointment-calendar-navigation button { transition: none; }
     }
     body.lumin-raised #view-dashboard #dashboard-invoice-count {
       padding: 0.5rem 0.875rem;

@@ -38,6 +38,8 @@ test('schedule controls and compact attendance work across themes, devices and l
     let resolveAttendanceLocation, resolveAttendanceRefresh;
     const currentSession = { user: { id: 'fixture' } };
     const appointmentToday = new Date(2026, 9, 23);
+    let appointmentSelectedDate = new Date(2026, 10, 4), appointmentVisibleMonth = new Date(2026, 10, 1);
+    let appointmentCalendarMode = 'day', appointmentWeekNavigationDirection = 0, selectedAppointmentId = null;
     let dashboardSelectedDate = new Date(2026, 9, 24), expandedDashboardAppointmentId = null;
     let dashboardInvoiceRenderToken = 0, activeDashboardMobileTab = 'schedule', appointmentsLoaded = true;
     const dashboardDayCache = new Map();
@@ -56,6 +58,13 @@ test('schedule controls and compact attendance work across themes, devices and l
     function ensureAppointmentWaitIndicatorTimer() {}
     function renderDashboardInvoices() { document.getElementById('dashboard-invoice-date').textContent = appointmentDayFormatter.format(dashboardSelectedDate); }
     function refreshAppCurrentDate() { appointmentToday.setTime(new Date().setHours(0, 0, 0, 0)); }
+    function renderAppointments() {
+      const label = appointmentCalendarMode === 'month' ? appointmentMonthFormatter.format(appointmentVisibleMonth)
+        : appointmentCalendarMode === 'week' ? appointmentWeekRangeLabel([new Date(2026, 9, 31), new Date(2026, 10, 6)], true) : appointmentCompactDayFormatter.format(appointmentSelectedDate);
+      document.getElementById('appointments-mobile-heading').textContent = label;
+      document.getElementById('appointments-month-heading').textContent = label;
+      updateAppointmentViewButtons();
+    }
     function getDevicePosition() {
       attendanceLocationRequests++;
       return new Promise(resolve => { resolveAttendanceLocation = () => resolve({ coords: { latitude: 30, longitude: 31, accuracy: 10 } }); });
@@ -65,7 +74,8 @@ test('schedule controls and compact attendance work across themes, devices and l
       functions: { invoke: async () => ({ data: { sent: true } }) }
     };
     ${['syncDashboardMobileTabs', 'renderDashboard', 'changeDashboardDay', 'showDashboardToday', 'renderMyAttendanceState',
-      'queueHrAttendancePushNotification', 'recordMobileAttendance'].map(source).join('\n')}
+      'queueHrAttendancePushNotification', 'recordMobileAttendance', 'updateAppointmentViewButtons',
+      'setAppointmentCalendarMode', 'changeAppointmentPeriod', 'showAppointmentToday', 'appointmentWeekRangeLabel'].map(source).join('\n')}
     document.getElementById('auth-gate').classList.add('hidden');
     document.getElementById('app-shell').classList.remove('hidden');
     window.LuminMobileNav = { isPhone: () => innerWidth < 768 };
@@ -76,13 +86,13 @@ test('schedule controls and compact attendance work across themes, devices and l
       document.documentElement.classList.toggle('lumin-phone-nav', innerWidth < 768);
       document.body.classList.toggle('lumin-raised', theme === 'raised');
       for (const section of document.querySelectorAll('section[id^="view-"]')) section.classList.toggle('hidden', section.id !== 'view-' + view);
-      configureAppointmentFormatters(); renderDashboard(); lucide.createIcons();
+      configureAppointmentFormatters(); renderDashboard(); renderAppointments(); lucide.createIcons();
     };
     showFixture('en', 'raised');
   ` });
   const shots = path.join(root, '.lumin-drive-test-tools', 'schedule-toolbar-preview');
   fs.mkdirSync(shots, { recursive: true });
-  for (const width of [320, 390, 820, 1151, 1440]) for (const language of ['en', 'ar']) for (const theme of ['flat', 'raised']) {
+  for (const width of [320, 390, 640, 767, 820, 1151, 1440]) for (const language of ['en', 'ar']) for (const theme of ['flat', 'raised']) {
     await page.setViewportSize({ width, height: 884 });
     await page.evaluate(({ language, theme }) => { dashboardSelectedDate = new Date(2026, 9, 24); showFixture(language, theme); }, { language, theme });
     assert.equal(await page.locator('#dashboard-day-eyebrow').count(), 0);
@@ -110,15 +120,68 @@ test('schedule controls and compact attendance work across themes, devices and l
     if (theme === 'raised' && [390, 1151].includes(width)) await page.locator('#view-dashboard').screenshot({ path: path.join(shots, `dashboard-${width}-${language}.png`) });
     await page.evaluate(({ language, theme }) => showFixture(language, theme, 'appointments'), { language, theme });
     const calendarToday = page.locator('#appointment-today-button');
-    assert.equal(await calendarToday.locator('span').isVisible(), true);
+    assert.equal(await calendarToday.locator('span').isVisible(), width >= 768);
     const box = await calendarToday.boundingBox();
     assert.ok(box.width >= 44 && box.height >= 44 && box.x >= 0 && box.x + box.width <= width);
     for (const button of await page.locator('#appointments-calendar-toolbar button').all()) {
+      if (!await button.isVisible()) continue;
       const target = await button.boundingBox();
       assert.ok(target.width >= 43.9 && target.height >= 43.9 && target.x >= 0 && target.x + target.width <= width + 1, `calendar touch target: ${width} ${language} ${theme} ${JSON.stringify(target)}`);
     }
+    const mobileView = page.locator('#appointment-mobile-view');
+    assert.equal(await mobileView.isVisible(), width < 768);
+    if (width < 768) {
+      const pickerBox = await mobileView.boundingBox();
+      assert.ok(pickerBox.width >= 44 && pickerBox.height >= 44);
+      for (const mode of ['month', 'week', 'day']) {
+        await mobileView.selectOption(mode);
+        assert.equal(await page.evaluate(() => appointmentCalendarMode), mode);
+        assert.equal(await mobileView.inputValue(), mode);
+        const toolbarBox = await page.locator('#appointments-calendar-toolbar').boundingBox();
+        assert.ok(toolbarBox.height <= 54, `one compact row: ${width} ${language} ${theme} ${mode}`);
+        const heading = page.locator('#appointments-mobile-heading');
+        const headingSize = await heading.evaluate(node => ({ content: node.scrollWidth, width: node.clientWidth }));
+        if (headingSize.content > headingSize.width + 1) await page.locator('#appointments-calendar-toolbar').screenshot({ path: path.join(shots, 'calendar-overflow.png') });
+        assert.ok(headingSize.content <= headingSize.width + 1, `full date visible: ${width} ${language} ${theme} ${mode} ${JSON.stringify(headingSize)}`);
+        for (const button of await page.locator('#appointments-calendar-toolbar button:visible').all()) {
+          const target = await button.boundingBox();
+          assert.ok(Math.abs(target.y + target.height / 2 - pickerBox.y - pickerBox.height / 2) < 1, 'all controls share one row');
+        }
+      }
+      await page.locator('.appointment-calendar-navigation button').last().click();
+      assert.equal(await page.locator('#appointments-mobile-heading').textContent(), language === 'ar' ? 'الخميس · 05/11/2026' : 'Thu · 05/11/2026');
+      await calendarToday.click();
+      assert.equal(await page.evaluate(() => appointmentSelectedDate.getTime()), await page.evaluate(() => new Date().setHours(0, 0, 0, 0)));
+      await page.evaluate(() => { appointmentSelectedDate = new Date(2026, 10, 4); renderAppointments(); });
+      if (theme === 'raised' && [320, 390].includes(width)) await page.locator('#appointments-calendar-toolbar').screenshot({ path: path.join(shots, `calendar-${width}-${language}.png`) });
+    }
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   }
+  for (const width of [320, 390]) for (const scale of [0.8, 1.25]) for (const language of ['en', 'ar']) {
+    await page.setViewportSize({ width, height: 884 });
+    await page.evaluate(({ scale, language }) => {
+      const root = document.documentElement;
+      root.style.setProperty('--lumin-app-scale', scale);
+      root.style.setProperty('--lumin-app-viewport-width', innerWidth / scale + 'px');
+      root.classList.add('lumin-app-scaled');
+      showFixture(language, 'raised', 'appointments');
+    }, { scale, language });
+    const picker = page.locator('#appointment-mobile-view');
+    for (const mode of ['month', 'week', 'day']) {
+      await picker.selectOption(mode);
+      const headingSize = await page.locator('#appointments-mobile-heading').evaluate(node => ({ content: node.scrollWidth, width: node.clientWidth }));
+      assert.ok(headingSize.content <= headingSize.width + 1, `date fits at ${scale * 100}%: ${width} ${language} ${mode} ${JSON.stringify(headingSize)}`);
+      for (const control of await page.locator('#appointments-calendar-toolbar button:visible, #appointment-mobile-view').all()) {
+        const target = await control.boundingBox();
+        assert.ok(target.width >= 43.9 && target.height >= 43.9 && target.x >= 0 && target.x + target.width <= width + 1, `scaled touch target: ${JSON.stringify(target)}`);
+      }
+    }
+  }
+  await page.evaluate(() => {
+    document.documentElement.classList.remove('lumin-app-scaled');
+    document.documentElement.style.removeProperty('--lumin-app-scale');
+    document.documentElement.style.removeProperty('--lumin-app-viewport-width');
+  });
   await page.setViewportSize({ width: 390, height: 884 });
   await page.evaluate(() => showFixture('en', 'raised'));
   const attendance = page.locator('#dashboard-attendance-action');

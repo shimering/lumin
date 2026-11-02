@@ -44,6 +44,19 @@ test('schedule labels pair the localized weekday with the displayed Gregorian da
   assert.equal(dates.format('2026-02-29', { weekday: 'long' }), '');
 });
 
+test('compact calendar week ranges retain the month and ending year across boundaries', () => {
+  const context = vm.createContext({ appointmentWeekRangeFormatter: dates.formatter() });
+  vm.runInContext(source('appointmentWeekRangeLabel'), context);
+  for (const [start, end, label] of [
+    [new Date(2026, 10, 7), new Date(2026, 10, 13), '07–13/11/2026'],
+    [new Date(2026, 9, 31), new Date(2026, 10, 6), '31/10–06/11/2026'],
+    [new Date(2026, 11, 26), new Date(2027, 0, 1), '26/12–01/01/2027']
+  ]) {
+    assert.equal(context.appointmentWeekRangeLabel([start, end], true), label);
+    assert.equal(context.appointmentWeekRangeLabel([start, end]), `${dates.format(start)} – ${dates.format(end)}`);
+  }
+});
+
 function clockFixture() {
   let now = new Date(2026, 9, 19, 23, 59, 55).getTime();
   class ClockDate extends Date {
