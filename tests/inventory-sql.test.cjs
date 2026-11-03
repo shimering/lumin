@@ -12,6 +12,7 @@ test('inventory ledger enforces permissions, immutable history, units, idempoten
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017073421_inventory_category_hierarchy.sql'),'utf8'));
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017075131_inventory_item_images.sql'),'utf8'));
   await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261017144330_inventory_organization.sql'),'utf8'));
+  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261103144157_inventory_r2_photos.sql'),'utf8'));
   const actor=async n=>{await db.exec(`reset role;select set_config('test.actor','${n?uuid(n):''}',false);set role authenticated`);};
   let request=1000;
   const write=async(op,payload,id=uuid(request++))=>(await db.query('select public.inventory_write($1,$2,$3) result',[op,JSON.stringify(payload),id])).rows[0].result;
@@ -202,12 +203,17 @@ test('inventory ledger enforces permissions, immutable history, units, idempoten
     await db.query("insert into public.inventory_item_images(item_id,revision,drive_file_id,sha256,mime_type,byte_size,width,height,updated_by) values($1,$2,'private-drive-id',repeat('a',64),'image/webp',100,40,30,$3)",[created.id,uuid(6000),uuid(1)]);
     for(const who of [1,2,3,4,5,6]){await actor(who);const row=await item(created.id);assert.equal(row.image_version,uuid(6000));assert.equal(row.image_width,40);assert.equal(row.drive_file_id,undefined);assert.equal(row.sha256,undefined);assert.equal(row.revision,before.revision);assert.equal((await history()).total,movements);
       await assert.rejects(db.query('select drive_file_id from public.inventory_item_images'),/permission denied/);
+      await assert.rejects(db.query('select r2_key from public.inventory_item_images'),/permission denied/);
       await assert.rejects(db.query('delete from public.inventory_item_images'),/permission denied/);
       await assert.rejects(db.query('select * from public.inventory_image_storage'),/permission denied/);
     }
     await actor(7);assert.equal((await db.query('select revision from public.inventory_item_images')).rows.length,0,'No inventory access sees no metadata');
     await db.exec('reset role;set role anon');await assert.rejects(db.query('select revision from public.inventory_item_images'),/permission denied/);
-    await db.exec('reset role;set role service_role');await db.query('delete from public.inventory_item_images where item_id=$1',[created.id]);
+    await db.exec('reset role');
+    await assert.rejects(db.query('update public.inventory_item_images set drive_file_id=null,r2_key=null where item_id=$1',[created.id]),/inventory_image_location/);
+    await assert.rejects(db.query("update public.inventory_item_images set r2_key='Lumin Clinic/Inventory/someone-else.webp' where item_id=$1",[created.id]),/inventory_image_r2_key/);
+    await db.query("update public.inventory_item_images set drive_file_id=null,r2_key='Lumin Clinic/Inventory/item-'||item_id::text||'-'||revision::text||'.webp' where item_id=$1",[created.id]);
+    await db.exec('set role service_role');await db.query('delete from public.inventory_item_images where item_id=$1',[created.id]);
     await actor(1);assert.equal((await item(created.id)).image_version,null);assert.equal((await item(created.id)).revision,before.revision);
   });
 });

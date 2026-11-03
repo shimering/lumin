@@ -164,7 +164,13 @@ export async function cloudSync(route,request,url,ctx) {
       const target=existing?.drivePath||drivePath(`${folder}/${canonical.split('/').slice(1).join('/')}`);
       links.set(key,{...existing,key,patientId,r2Path:canonical,drivePath:target,seenR2:true});
     }
-    const items=[...links.values()].map(({seenDrive,seenR2,...item})=>item);
+    const inventory=[];
+    for(let offset=0;;offset+=1000) {
+      const page=await h.database(auth.token,`/rest/v1/inventory_item_images?select=item_id,revision&order=item_id&limit=1000&offset=${offset}`,fetcher);
+      for(const image of page)inventory.push({kind:'inventory',itemId:image.item_id,revision:image.revision});
+      if(page.length<1000)break;
+    }
+    const items=[...inventory,...[...links.values()].map(({seenDrive,seenR2,...item})=>item)];
     return {id:crypto.randomUUID(),peerId:pair.peerId,status:items.length?'running':'completed',phase:items.length?'syncing':'finished',progressByFiles:true,items,totalFiles:items.length,completedFiles:0,totalBytes:0,transferredBytes:0,conflicts:[],unassignedFiles,metadataStatus:items.length?'pending':'current',createdAt:new Date().toISOString(),verifiedFiles:0};
   }
   async function info() {
@@ -242,7 +248,13 @@ export async function cloudSync(route,request,url,ctx) {
     const job=(await read(JOB))?.value;if(!job||job.id!==step[1])fail('Sync job not found.',404);
     if(job.status!=='running')return publicJob(job);
     try {
-      const pair=await connection(),item=job.items[job.completedFiles],bases=(await read(BASE))?.value||{},result=await inspect(item,pair,bases);
+      const pair=await connection(),item=job.items[job.completedFiles];
+      if(item.kind==='inventory') {
+        const response=await fetcher(`${globalThis.LuminPublicConfig.supabaseUrl}/functions/v1/inventory-images/${item.itemId}/sync?v=${encodeURIComponent(item.revision)}`,{method:'POST',headers:{Authorization:`Bearer ${auth.token}`},signal:AbortSignal.timeout(100000)});
+        const result=await response.json();if(!response.ok||!result.success)fail(result.error||'Inventory photos could not be synchronized.',response.status,result.code||'inventory_sync_failed');
+        job.transferredBytes+=result.transferredBytes||0;job.totalBytes+=result.transferredBytes||0;job.verifiedFiles++;job.verifiedInventoryPhotos=(job.verifiedInventoryPhotos||0)+1;
+      }else {
+      const bases=(await read(BASE))?.value||{},result=await inspect(item,pair,bases);
       if(result.conflict)job.conflicts.push({path:item.r2Path,kind:result.conflict,item,reviewed:false});
       else if(result.direction==='exception')job.keptDifferences=(job.keptDifferences||0)+1;
       else {
@@ -250,6 +262,7 @@ export async function cloudSync(route,request,url,ctx) {
         if(result.direction==='to_r2')transferred=await copyToR2(item,pair,result);
         else if(result.direction==='to_drive')transferred=await copyToDrive(item,pair,result);
         await remember(item,pair);job.transferredBytes+=transferred;job.totalBytes+=transferred;job.verifiedFiles++;
+      }
       }
       job.completedFiles++;
       if(job.completedFiles===job.totalFiles){job.status=job.conflicts.length?'completed_with_conflicts':'completed';job.phase='finished';job.metadataStatus=job.conflicts.length?'review':job.keptDifferences?'exceptions':'current';job.finishedAt=new Date().toISOString();}

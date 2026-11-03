@@ -6,11 +6,18 @@ function assert(value:unknown,message="Assertion failed"){if(!value)throw Error(
 const image=Uint8Array.from(atob("UklGRjQAAABXRUJQVlA4ICgAAADwAgCdASooAB4APm02l0ikIyIhJWgAgA2JaQAAKUNt8AD++5zAAAAAAA=="),c=>c.charCodeAt(0)).slice(0,60);
 async function setup(){
   const f=await fixture();f.db.tables.inventory_items=[{id:PID,quantity:3,revision:7}];
-  const handle=createInventoryImageHandler(f.config,f.db,f.google.fetch);
+  const r2Objects=new Map<string,Uint8Array>();
+  const handle=createInventoryImageHandler(f.config,f.db,async(input,options={})=>{
+    const url=new URL(String(input));if(!url.pathname.startsWith('/r2/api/inventory-images/'))return f.google.fetch(input,options);
+    assert((options.headers as Record<string,string>).Authorization==='Bearer admin');
+    if(options.method==='POST'){r2Objects.set(url.pathname,new Uint8Array(options.body as Uint8Array));return Response.json({success:true});}
+    if(options.method==='DELETE'){r2Objects.delete(url.pathname);return Response.json({success:true});}
+    return r2Objects.has(url.pathname)?new Response(r2Objects.get(url.pathname)):Response.json({error:'Missing photo'},{status:404});
+  });
   const request=(method:string,token="admin",version="",file:Uint8Array=image,expected="",requestId=crypto.randomUUID())=>{
     const form=new FormData();form.set("image",new File([file as BlobPart],"photo.webp",{type:"image/webp"}));form.set("version",requestId);form.set("expected",expected);
     return handle(new Request(`${f.config.supabaseUrl}/functions/v1/inventory-images/${PID}?v=${version}`,{method,headers:token?{Authorization:`Bearer ${token}`}:{},...(method==='POST'?{body:form}:{})}));
-  };return {...f,request};
+  };return {...f,request,handle,r2Objects};
 }
 Deno.test("inventory photos are private, revision checked, retry safe and separate from patient sync and stock",async()=>{
   const f=await setup(),requestId=crypto.randomUUID();
@@ -48,4 +55,26 @@ Deno.test("photo endpoint rejects unoptimized, oversized and animated payloads b
   assert((await f.request('POST','admin','',animated)).status===400);assert(f.google.files.size===before);
   f.db.tables.google_drive_connection=[];assert((await f.request('POST')).status===409);
   assert(!f.db.tables.inventory_item_images?.length);
+});
+
+Deno.test('inventory photos use active R2 without Drive and sync both directions without changing stock or revisions',async()=>{
+  const f=await setup(),sync=(revision:string)=>f.handle(new Request(`${f.config.supabaseUrl}/functions/v1/inventory-images/${PID}/sync?v=${revision}`,{method:'POST',headers:{Authorization:'Bearer admin'}}));
+  let response=await f.request('POST'),photo=await response.json();
+  const driveId=f.db.tables.inventory_item_images[0].drive_file_id,stock=JSON.stringify(f.db.tables.inventory_items);
+  response=await sync(photo.image_version);assert(response.status===200,await response.clone().text());
+  assert((await response.json()).transferredBytes===image.length);assert(f.db.tables.inventory_item_images[0].r2_key.startsWith('Lumin Clinic/Inventory/item-'));
+  assert(f.db.tables.inventory_item_images[0].drive_file_id===driveId&&f.db.tables.inventory_item_images[0].revision===photo.image_version);
+  const connection=f.db.tables.google_drive_connection;f.db.tables.google_drive_connection=[];
+  f.db.tables.clinic_settings=[{id:1,storage_server_url:new URL('/r2',f.config.appUrl).href}];
+  assert((await f.request('GET','admin',photo.image_version)).status===200,'R2 reads do not need Drive');
+  response=await f.request('POST','admin','',image,photo.image_version);assert(response.status===200,await response.clone().text());photo=await response.json();
+  assert(f.db.tables.inventory_item_images[0].drive_file_id===null,'R2 uploads do not need Drive');assert(f.r2Objects.size===1,'Old R2 photo detached after replacement');
+  assert((await sync(crypto.randomUUID())).status===409,'Stale jobs cannot sync a different photo revision');
+  f.db.tables.google_drive_connection=connection;
+  response=await sync(photo.image_version);assert(response.status===200,await response.clone().text());assert((await response.json()).transferredBytes===image.length);
+  assert(f.db.tables.inventory_item_images[0].drive_file_id&&f.db.tables.inventory_item_images[0].r2_key);
+  response=await sync(photo.image_version);assert((await response.json()).transferredBytes===0,'Verified replicas are idempotent');
+  f.db.tables.clinic_settings[0].storage_server_url='https://local.test';assert((await f.request('GET','admin',photo.image_version)).status===200);
+  assert(JSON.stringify(f.db.tables.inventory_items)===stock,'Photo replication never changes quantities or stock movements');
+  assert((await f.request('DELETE','admin',photo.image_version)).status===200);assert(f.r2Objects.size===0);
 });

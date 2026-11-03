@@ -3,6 +3,7 @@ import '../lumin-public-config.js';
 import {cloudSync} from './r2-cloud-sync.mjs';
 import {readableKey,mediaObject,mediaRows,patientFolder} from './r2-layout.mjs';
 import {caseFold} from '../supabase/functions/google-drive/core.ts';
+import {inventoryImage} from './r2-inventory.mjs';
 
 const config = globalThis.LuminPublicConfig;
 export const MAX_UPLOAD = 64 * 1024 * 1024;
@@ -65,7 +66,7 @@ async function database(token, path, fetcher) {
   if (!response.ok) throw new StorageError(response.status === 401 ? 'Sign in again to access storage.' : 'Could not verify clinic access.',response.status === 401 ? 401 : 503);
   return response.json();
 }
-async function caller(request,url,bucket,fetcher,mediaRead) {
+async function caller(request,url,bucket,fetcher,mediaRead,scope='patients') {
   let token = request.headers.get('Authorization')?.replace(/^Bearer /,'') || request.headers.get('x-lumin-key') || '';
   if (!token && mediaRead) {
     const grant = url.searchParams.get('media') || '';
@@ -80,8 +81,9 @@ async function caller(request,url,bucket,fetcher,mediaRead) {
   if (!user?.id) throw new StorageError('Sign in again to access storage.',401);
   const profiles = await database(token,`/rest/v1/user_profiles?user_id=eq.${uuid(user.id)}&select=active,access_roles(is_admin,role_permissions(page_key,can_view))`,fetcher);
   const profile = profiles[0], role = Array.isArray(profile?.access_roles) ? profile.access_roles[0] : profile?.access_roles;
-  if (!profile?.active || !(role?.is_admin === true || role?.role_permissions?.some(p=>p.page_key === 'patients' && p.can_view === true))) throw new StorageError('You do not have permission to access patient storage.',403);
-  return {token,userId:user.id,admin:role?.is_admin === true};
+  const has=key=>role?.role_permissions?.some(p=>p.page_key===key&&p.can_view===true);
+  if (!profile?.active || !(role?.is_admin === true || has(scope))) throw new StorageError('You do not have permission to access this storage.',403);
+  return {token,userId:user.id,admin:role?.is_admin === true,manageInventory:role?.is_admin===true||has('inventory_manage')};
 }
 async function patientFor(token,id,fetcher) {
   const patients = await database(token,`/rest/v1/patients?id=eq.${uuid(id)}&select=id,name,patient_number`,fetcher);
@@ -99,6 +101,10 @@ async function putDetails(bucket,path,details,etag) {
 }
 async function route(request,url,bucket,fetcher) {
   const path = url.pathname.slice('/r2'.length);
+  if(path.startsWith('/api/inventory-images/')) {
+    const auth=await caller(request,url,bucket,fetcher,false,'inventory');
+    return inventoryImage(request,url,{bucket,auth,database:(token,path)=>database(token,path,fetcher),uuid,StorageError,json,headers:privateHeaders});
+  }
   const download = path.match(/^\/(files|api\/thumbnail)\/(.+)$/);
   const auth = await caller(request,url,bucket,fetcher,Boolean(download && ['GET','HEAD'].includes(request.method)));
   if (path.startsWith('/api/cloud-sync/')) {
@@ -251,7 +257,7 @@ export async function handleR2Request(request,env,fetcher=fetch) {
     if (!env.LUMIN_MEDIA) throw new StorageError('R2 storage is not configured.',503,'not_configured');
     if (request.method === 'OPTIONS') return new Response(null,{status:204,headers:privateHeaders});
     if (request.body) {
-      const maximum = url.pathname === '/r2/api/upload' ? MAX_UPLOAD+1048576 : 256*1024;
+      const maximum = url.pathname === '/r2/api/upload' ? MAX_UPLOAD+1048576 : url.pathname.startsWith('/r2/api/inventory-images/') ? 300*1024 : 256*1024;
       if (Number(request.headers.get('Content-Length')) > maximum) throw new StorageError('Request exceeds the storage limit.',413,'file_too_large');
       let received=0;
       const body = request.body.pipeThrough(new TransformStream({transform(chunk,controller) {

@@ -58,6 +58,23 @@ button in the clinic interface.
 
 ## Access and data
 
+Inventory item photos use the selected clinic storage. With R2 selected, new
+photos are saved privately under `Lumin Clinic/Inventory/item-<item UUID>-<photo revision>.webp`
+(or `.jpg`) without requiring Google Drive. The existing photo service still
+enforces inventory view/manage permissions and the 300 KB optimization limit.
+Supplier-list thumbnails reuse the same image service. Stock balances and
+movements remain in the shared database.
+
+Cloud **Sync now** includes current inventory photos as well as patient files.
+The inventory service verifies each copy against the shared photo revision and
+SHA-256 checksum before recording a second location. Existing manually copied
+Drive images can be adopted at their original filenames after verification.
+Photos with mismatched content remain preserved and stop sync until reviewed;
+inventory replicas never create patient records or alter stock movements.
+Replaced R2 originals are moved into the private recovery area. Apply only
+`supabase/migrations/20261103144157_inventory_r2_photos.sql` and deploy the updated
+`inventory-images` function alongside the Worker when upgrading this feature.
+
 - Every API request verifies the caller with Supabase Auth and checks the
   current active profile and patient-page permission. Patient lookups use the
   caller's token and existing RLS policies; no service-role credentials are used.
@@ -94,7 +111,8 @@ button in the clinic interface.
 
 Deploy the existing Worker with `wrangler deploy --keep-vars`; `wrangler.jsonc`
 contains the bucket binding and `/r2/*` routing. Existing app routes continue to
-use the same Worker. No database migration is required.
+use the same Worker. Patient storage requires no database migration; inventory
+photos require the migration and photo-function deployment listed above.
 
 Run the R2 tests with:
 

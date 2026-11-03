@@ -36,13 +36,16 @@ class Bucket {
 }
 async function fixture(driveFetch) {
   const {handleR2Request} = await import('../workers/r2-storage.mjs');
-  const bucket = new Bucket(), state={active:true,admin:true,patients:true,patientName:'Test patient'}, calls=[];
+  const bucket = new Bucket(), state={active:true,admin:true,patients:true,inventory:false,inventoryManage:false,inventoryImages:[],patientName:'Test patient'}, calls=[];
   const fetcher = async (input,init) => {
     const url = new URL(input); calls.push(url.pathname);
     if (url.pathname.startsWith('/functions/v1/google-drive') && driveFetch) return driveFetch(url,init);
     if (init.headers.Authorization !== `Bearer ${token}`) return Response.json({}, {status:401});
     if (url.pathname === '/auth/v1/user') return Response.json({id:userId});
-    if (url.pathname === '/rest/v1/user_profiles') return Response.json([{active:state.active,access_roles:{is_admin:state.admin,role_permissions:[{page_key:'patients',can_view:state.patients}]}}]);
+    if (url.pathname === '/rest/v1/user_profiles') return Response.json([{active:state.active,access_roles:{is_admin:state.admin,role_permissions:[{page_key:'patients',can_view:state.patients},{page_key:'inventory',can_view:state.inventory},{page_key:'inventory_manage',can_view:state.inventoryManage}]}}]);
+    if (url.pathname === '/rest/v1/inventory_item_images') return Response.json(state.inventoryImages);
+    if (url.pathname === '/rest/v1/inventory_items') return Response.json([{id:patientId}]);
+    if (url.pathname.startsWith('/functions/v1/inventory-images') && driveFetch) return driveFetch(url,init);
     if (url.pathname === '/rest/v1/patients') return Response.json(url.searchParams.get('id') && url.searchParams.get('id') !== `eq.${patientId}` ? [] : [{id:patientId,name:state.patientName,patient_number:1}]);
     throw new Error('Unexpected auth endpoint');
   };
@@ -67,6 +70,26 @@ test('private storage rejects anonymous, invalid, inactive and unauthorized call
   assert.equal((await app.request('/api/health')).status,403);
   app.state.patients=true; assert.equal((await app.request('/api/health')).status,200);
   assert.equal((await app.request('/api/self-test',{method:'POST'})).status,403);
+});
+
+test('inventory R2 photos enforce inventory permissions, immutable revisions and recoverable removal independently of patient access',async()=>{
+  const app=await fixture(),revision=otherId,image=Uint8Array.from(Buffer.from('UklGRjQAAABXRUJQVlA4ICgAAADwAgCdASooAB4APm02l0ikIyIhJWgAgA2JaQAAKUNt8AD++5zAAAAAAA==','base64')).slice(0,60);
+  const path=`/api/inventory-images/${patientId}/${revision}.webp`,key=`Lumin Clinic/Inventory/item-${patientId}-${revision}.webp`;
+  app.state.inventoryImages=[{item_id:patientId,revision,mime_type:'image/webp',byte_size:image.length,width:40,height:30}];
+  app.state.admin=false;assert.equal((await app.request(path)).status,403,'Patient access is insufficient');
+  app.state.patients=false;app.state.inventory=true;
+  assert.equal((await app.request(path,{method:'POST',body:image})).status,403,'Inventory readers cannot write photos');
+  app.state.inventoryManage=true;
+  assert.equal((await app.request(path,{method:'POST',body:image})).status,200);
+  const response=await app.request(path);assert.equal(response.status,200);assert.deepEqual(new Uint8Array(await response.arrayBuffer()),image);
+  assert.equal((await app.request(path,{method:'DELETE'})).status,409,'A current image cannot be detached outside the metadata service');
+  const changed=image.slice();changed[changed.length-1]^=1;
+  assert.equal((await app.request(path,{method:'POST',body:changed})).status,409,'Existing originals cannot be overwritten');
+  app.state.inventoryImages=[];assert.equal((await app.request(path)).status,404,'Only the registered revision is readable');
+  assert.equal((await app.request(path,{method:'DELETE'})).status,200);assert.equal(await app.bucket.get(key),null);
+  const recovery=[...app.bucket.rows.keys()].find(key=>key.startsWith('_recovery/inventory-')&&key.endsWith('/original'));
+  assert.deepEqual(new Uint8Array(await (await app.bucket.get(recovery)).arrayBuffer()),image);
+  assert.equal((await app.request(`/api/inventory-images/${patientId}/${revision}.jpg`,{method:'POST',body:image})).status,400);
 });
 test('upload, tooth assignments, Arabic notes, preview, move and delete preserve patient identity',async()=>{
   const app = await fixture(), file = await upload(app);
@@ -380,4 +403,15 @@ test('a first upload to R2 creates the same readable patient folder in Drive wit
   assert.ok(drive.rows.has('Test_patient/'+tail));
   assert.ok(app.bucket.rows.has('Lumin Clinic/Test_patient/'+tail));
   assert.equal([...app.bucket.rows.keys()].some(key=>key.startsWith('patients/')),false);
+});
+
+test('cloud sync includes inventory photos in the same durable job as patient files',async()=>{
+  const drive=driveFixture();let inventoryCalls=0;
+  const app=await fixture(async(url,init)=>{
+    if(url.pathname.startsWith('/functions/v1/inventory-images/')){inventoryCalls++;assert.equal(init.headers.Authorization,`Bearer ${token}`);assert.equal(url.searchParams.get('v'),otherId);return Response.json({success:true,transferredBytes:60});}
+    return drive.fetcher(url,init);
+  });
+  await drive.add('Test_patient/Panoramic/xray.png','Patient X-ray');
+  app.state.inventoryImages=[{item_id:patientId,revision:otherId}];await pairCloud(app);
+  const job=await synchronize(app);assert.equal(job.status,'completed');assert.equal(job.totalFiles,2);assert.equal(job.verifiedFiles,2);assert.equal(job.verifiedInventoryPhotos,1);assert.equal(inventoryCalls,1);
 });
