@@ -28,7 +28,7 @@ const helpers = [
   'appointmentMinutesAtClientY', 'updateAppointmentRangePreview', 'clearAppointmentRangeGesture', 'beginAppointmentRangeSelection'
 ];
 
-test('appointment patient search opens immediately and only fetches five summaries on typing', { skip: !chromium }, async t => {
+test('appointment patient search opens immediately and shows up to ten summaries on typing', { skip: !chromium }, async t => {
   const fixture = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
@@ -147,12 +147,13 @@ test('appointment patient search opens immediately and only fetches five summari
     await input.fill('A'); await page.clock.runFor(249); assert.equal(await count(), 0);
     await page.clock.runFor(1); assert.equal(await count(), 1);
     assert.equal(await input.getAttribute('aria-busy'), 'true');
-    await respond(0, Array.from({ length: 6 }, (_, i) => patient('p'+i, 'Patient '+i)));
-    await finish(); assert.equal(await options.count(), 5);
+    await respond(0, Array.from({ length: 11 }, (_, i) => patient('p'+i, 'Patient '+i)));
+    await finish(); assert.equal(await options.count(), 10);
     assert.equal(await page.evaluate(() => patients.length), 0);
     assert.equal(await page.evaluate(() => appointmentPatientSearchRecords.get('p0').recordComplete), false);
-    await input.press('ArrowDown'); await input.press('Enter');
-    assert.equal(await input.inputValue(), 'Patient 1');
+    for (let index = 0; index < 9; index++) await input.press('ArrowDown');
+    await input.press('Enter');
+    assert.equal(await input.inputValue(), 'Patient 9');
     assert.equal(await page.locator('#btn-save-appointment').isEnabled(), true);
     await page.locator('#appointment-assigned-user-id').selectOption('');
     assert.equal(await page.locator('#btn-save-appointment').isDisabled(), true);
@@ -160,7 +161,7 @@ test('appointment patient search opens immediately and only fetches five summari
     assert.equal(await page.locator('#btn-save-appointment').isEnabled(), true);
     await input.focus(); await page.clock.runFor(1000); assert.equal(await count(), 1);
     await page.evaluate(() => saveAppointment({preventDefault(){}}));
-    assert.equal(await page.evaluate(() => fixture.inserts[0].payload.patient_id), 'p1');
+    assert.equal(await page.evaluate(() => fixture.inserts[0].payload.patient_id), 'p9');
     assert.equal(await page.evaluate(() => fixture.bulkReads), 0);
   });
   await t.test('late responses cannot replace newer searches or a selected patient', async () => {
@@ -206,7 +207,7 @@ test('appointment patient search opens immediately and only fetches five summari
     await input.fill('');await page.clock.runFor(1000);assert.equal(await count(),before);
     assert.equal(await page.evaluate(()=>fixture.bulkReads),0);
   });
-  await t.test('Android tablet composition fetches five live matches before committing the word', async st => {
+  await t.test('Android tablet composition fetches ten live matches before committing the word', async st => {
     await page.setViewportSize({width:800,height:1280});
     const keyboard=await page.context().newCDPSession(page);
     st.after(()=>keyboard.detach());
@@ -226,8 +227,8 @@ test('appointment patient search opens immediately and only fetches five summari
       await page.clock.runFor(250);assert.equal(await count(),before+2);
       assert.equal(await page.evaluate(index=>fixture.requests[index].signal.aborted,before),true);
       assert.equal(await page.evaluate(index=>fixture.requests[index].query,before+1),second);
-      await respond(before+1,Array.from({length:6},(_,i)=>patient('ime-'+i,second+' '+i)));await finish();
-      assert.equal(await options.count(),5);
+      await respond(before+1,Array.from({length:11},(_,i)=>patient('ime-'+i,second+' '+i)));await finish();
+      assert.equal(await options.count(),10);
       await respond(before,[patient('ime-stale')]);await finish();
       assert.match(await options.first().textContent(),new RegExp(second));
       await input.dispatchEvent('keydown',{key:'Enter',isComposing:true});

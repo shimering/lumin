@@ -137,16 +137,21 @@
       input.addEventListener('input', () => { if (!editing) sync(); });
       input.addEventListener('change', () => { if (!editing) sync(); });
       input.addEventListener('focus', () => { if (!picking) text.focus(); });
+      input.addEventListener('blur', () => { picking = false; });
       input.addEventListener('invalid', event => { event.preventDefault(); text.focus(); text.reportValidity(); });
       button.addEventListener('click', () => {
         if (button.disabled) return;
+        if (document.activeElement === input) input.blur();
         picking = true;
         try {
+          // iPad/iPhone pickers are focus-driven: showPicker can exist but do nothing.
+          // Keep this synchronous with the tap, and retain native focus until blur.
+          input.focus({ preventScroll: true });
           if (typeof input.showPicker === 'function') input.showPicker();
-          else { input.focus(); input.click(); }
+          else input.click();
         } catch (_) {
-          input.focus(); input.click();
-        } finally { picking = false; }
+          input.click();
+        } finally { picking = document.activeElement === input; }
       });
       new MutationObserver(sync).observe(input, { attributes: true, attributeFilter: ['value', 'class', 'hidden', 'disabled', 'readonly', 'required', 'min', 'max', 'step', 'aria-label', 'aria-labelledby', 'aria-describedby'] });
       sync();

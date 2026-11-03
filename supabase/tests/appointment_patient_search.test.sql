@@ -8,9 +8,9 @@ select 'LuminSearchFixture ' || case i
   when 7 then 'O''Reilly'
   when 8 then 'Literal %,(name)'
   else 'Patient ' || i end,
-  '(010) 555-000' || i, 9000000000000 + i,
+  '(010) 555-' || lpad(i::text, 4, '0'), 9000000000000 + i,
   timestamptz '2099-01-01 00:00:00+00' + i * interval '1 minute'
-from generate_series(1, 8) i;
+from generate_series(1, 12) i;
 
 do $$
 declare actor uuid;
@@ -34,9 +34,9 @@ begin
   if private.normalise_appointment_patient_search('أَحْمَد Élodie يحيى')
     <> 'احمد elodie يحيي' then raise exception 'Arabic and accent normalization failed'; end if;
   result := public.search_appointment_patients('luminsearchfixture');
-  if jsonb_array_length(result) <> 5
-    or (result->0->>'patient_number')::bigint <> 9000000000008
-    or (result->4->>'patient_number')::bigint <> 9000000000004 then
+  if jsonb_array_length(result) <> 10
+    or (result->0->>'patient_number')::bigint <> 9000000000012
+    or (result->9->>'patient_number')::bigint <> 9000000000003 then
     raise exception 'Search cap or newest-first ordering failed';
   end if;
   for item in select value from jsonb_array_elements(result) loop
@@ -54,7 +54,7 @@ begin
   result := public.search_appointment_patients('LuminSearchFixture ELODIE');
   if jsonb_array_length(result) <> 1 then raise exception 'Accent and case matching failed'; end if;
   result := public.search_appointment_patients('900000000000');
-  if jsonb_array_length(result) <> 5 then raise exception 'Partial patient numbers failed'; end if;
+  if jsonb_array_length(result) <> 9 then raise exception 'Partial patient numbers failed'; end if;
   result := public.search_appointment_patients('#9000000000001');
   if jsonb_array_length(result) <> 1 then raise exception 'Patient number with # failed'; end if;
   result := public.search_appointment_patients('(010) 555—0001');

@@ -1,4 +1,4 @@
-const LUMIN_CACHE = "lumin-dental-shell-v284";
+const LUMIN_CACHE = "lumin-dental-shell-v285";
 const LUMIN_SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -31,7 +31,7 @@ const LUMIN_SHELL = [
   "/vendor/quill/quill.core-2.0.2.css",
   "/vendor/dompurify/purify-3.4.17.min.js",
   "/assets/fonts/amiri/Amiri-Regular.ttf",
-  "/lumin-dates.js?v=2",
+  "/lumin-dates.js?v=3",
   "/lumin-dates.css?v=1",
   "/lumin-loading.css?v=1",
   "/lumin-theme.css?v=25",

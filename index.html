@@ -71,7 +71,7 @@
   <!-- Precompiled utilities avoid compiling Tailwind in every browser session. -->
   <link rel="stylesheet" href="lumin-app.css" />
   <script src="vendor/lucide.min.js"></script>
-  <script src="lumin-dates.js?v=2"></script>
+  <script src="lumin-dates.js?v=3"></script>
   <link rel="stylesheet" href="lumin-dates.css?v=1" />
   <link rel="stylesheet" href="lumin-loading.css?v=1" />
   <script src="vendor/supabase.js"></script>
@@ -35584,7 +35584,7 @@
         if (!isCurrent()) return;
         if (error) throw error;
         if (!Array.isArray(data)) throw new Error('Invalid patient search response');
-        appointmentPatientMatches = data.slice(0, 5).map(normalisePatientRecord);
+        appointmentPatientMatches = data.slice(0, 10).map(normalisePatientRecord);
         appointmentPatientMatches.forEach(patient => appointmentPatientSearchRecords.set(patient.id, patient));
         appointmentPatientHighlightedIndex = appointmentPatientMatches.length ? 0 : -1;
         appointmentPatientSearchStatus = 'ready';

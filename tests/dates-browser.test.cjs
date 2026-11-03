@@ -2,11 +2,17 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
-const { chromium } = require('playwright');
+const playwright = require('playwright');
 const root = path.resolve(__dirname, '..');
+function launchBrowser() {
+  const engine = process.env.LUMIN_TEST_BROWSER_ENGINE || 'chromium';
+  return playwright[engine].launch({ headless: true,
+    executablePath: process.env.LUMIN_TEST_BROWSER_EXECUTABLE || undefined,
+    channel: engine === 'chromium' ? process.env.LUMIN_TEST_BROWSER_CHANNEL || 'chrome' : undefined });
+}
 
 test('date controls display dd/mm/yyyy, preserve ISO values and validate across devices and languages', async t => {
-  const browser = await chromium.launch({ headless: true, channel: process.env.LUMIN_TEST_BROWSER_CHANNEL || 'chrome' });
+  const browser = await playwright.chromium.launch({ headless: true, channel: process.env.LUMIN_TEST_BROWSER_CHANNEL || 'chrome' });
   t.after(() => browser.close());
   for (const fixture of [
     { width: 390, locale: 'en-US', dir: 'ltr' },
@@ -78,8 +84,50 @@ test('date controls display dd/mm/yyyy, preserve ISO values and validate across 
   });
 });
 
+test('calendar taps retain native focus when showPicker is a no-op, missing, or throws', async t => {
+  const browser = await launchBrowser();
+  t.after(() => browser.close());
+  for (const width of [390, 820, 1440]) for (const dir of ['ltr', 'rtl']) await t.test(`${width}px ${dir}`, async () => {
+    const context = await browser.newContext({ viewport: { width, height: 1000 }, hasTouch: width < 1024 });
+    const page = await context.newPage();
+    await page.setContent(`<html lang="${dir === 'rtl' ? 'ar' : 'en'}" dir="${dir}"><body><form>
+      <label>Date<input id="date" type="date" value="2026-10-05" onchange="window.savedValue=this.value"></label>
+      <label>Date and time<input id="date-time" type="datetime-local" value="2026-10-05T19:30"></label>
+    </form></body></html>`);
+    await page.addStyleTag({ path: path.join(root, 'lumin-dates.css') });
+    await page.addScriptTag({ path: path.join(root, 'lumin-dates.js') });
+    // Windows WebKit falls back to text for datetime-local; Chromium covers it.
+    const ids = await page.locator('#date-time').evaluate(input => input.type === 'datetime-local' ? ['date', 'date-time'] : ['date']);
+    for (const id of ids) for (const mode of ['noop', 'missing', 'throwing']) {
+      await page.evaluate(({ id, mode }) => {
+        const input = document.getElementById(id);
+        window.nativePickerFocus = [];
+        input.addEventListener('focus', () => nativePickerFocus.push(document.activeElement === input), { once: true });
+        input.showPicker = mode === 'missing' ? undefined : () => {
+          if (mode === 'throwing') throw new DOMException('Picker unavailable', 'NotSupportedError');
+        };
+      }, { id, mode });
+      const picker = page.locator(`#${id}`).locator('..').locator('button');
+      if (width < 1024) await picker.tap(); else await picker.click();
+      assert.deepEqual(await page.evaluate(() => nativePickerFocus), [true], `${id}: ${mode} focuses during activation`);
+      await page.locator(`#${id}`).dispatchEvent('focus');
+      assert.equal(await page.evaluate(id => document.activeElement.id === id, id), true, 'native picker retains focus until blur');
+      await page.evaluate(id => {
+        const input = document.getElementById(id);
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input,
+          id === 'date' ? '2026-11-03' : '2026-11-03T10:15');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      }, id);
+      assert.equal(await page.locator(`#${id} + input`).inputValue(), id === 'date' ? '03/11/2026' : '03/11/2026 10:15');
+    }
+    assert.equal(await page.evaluate(() => savedValue), '2026-11-03', 'native selection reaches existing change handlers');
+    await context.close();
+  });
+});
+
 test('the complete app starts with all date controls enhanced and no script errors', async t => {
-  const browser = await chromium.launch({ headless: true, channel: process.env.LUMIN_TEST_BROWSER_CHANNEL || 'chrome' });
+  const browser = await playwright.chromium.launch({ headless: true, channel: process.env.LUMIN_TEST_BROWSER_CHANNEL || 'chrome' });
   t.after(() => browser.close());
   const page = await browser.newPage(), errors = [];
   page.on('pageerror', error => errors.push(error.message));
