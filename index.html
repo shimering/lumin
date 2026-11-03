@@ -87,18 +87,19 @@
   <script src="lumin-inventory.js?v=16"></script>
   <link rel="stylesheet" href="lumin-inventory.css?v=15" />
   <link rel="stylesheet" href="lumin-clinic-management.css?v=4" />
-  <script src="lumin-patient-scans.js?v=7"></script>
+  <script src="lumin-patient-scans.js?v=8"></script>
   <link rel="stylesheet" href="lumin-patient-scans.css?v=4" />
   <link rel="stylesheet" href="lumin-cash-flow.css?v=1" />
-  <script src="lumin-storage-sync.js?v=16"></script>
+  <script src="lumin-storage-sync.js?v=22"></script>
   <script src="lumin-google-drive.js?v=2"></script>
+  <script src="lumin-r2.js?v=3"></script>
   <link rel="stylesheet" href="lumin-google-drive.css?v=1" />
   <link rel="stylesheet" href="lumin-storage-sync.css?v=8" />
   <script src="lumin-modal-gestures.js?v=1"></script>
   <script src="lumin-patient-swipe.js?v=2"></script>
   <script src="lumin-patients.js?v=5"></script>
   <script src="lumin-chart-sync.js?v=2"></script>
-  <script src="lumin-chart-media.js?v=20"></script>
+  <script src="lumin-chart-media.js?v=21"></script>
   <script src="lumin-xray-rotation.js?v=1"></script>
   <script src="lumin-tooth-notes.js?v=3"></script>
   <script src="lumin-chart-appointments.js?v=4"></script>
@@ -27123,6 +27124,7 @@
     } catch (_) {}
 
     async function ensureStorageMediaGrant(config = getStorageServerConfig()) {
+      if (window.LuminR2?.isR2(config.url)) Object.assign(config, await window.LuminR2.ensure());
       if (window.LuminGoogleDrive?.isDrive(config.url)) {
         await window.LuminGoogleDrive.ensure();
         Object.assign(config, window.LuminGoogleDrive.config(config.url));
@@ -27166,6 +27168,7 @@
       storageMediaGrants.clear();
       storagePresetKeys.clear();
       clinicStorageSecretKey = '';
+      window.LuminR2?.reset();
       localStorage.removeItem('lumin_storage_secret_key');
     }
 
@@ -27185,6 +27188,8 @@
       const savedUrl = dbUrl || localStorage.getItem('lumin_storage_server_url') || 'http://localhost:5000';
       const driveConfig = window.LuminGoogleDrive?.config(savedUrl);
       if (driveConfig) return driveConfig;
+      const r2Config = window.LuminR2?.config(savedUrl);
+      if (r2Config) return r2Config;
       const savedKey = dbKey;
       return {
         url: savedUrl.trim().replace(/\/+$/, ''),
@@ -27255,6 +27260,11 @@
         let error = null;
         let transientFailure = true;
         try {
+          if (window.LuminR2?.isR2(config.url)) {
+            config = await window.LuminR2.ensure();
+            check.config = config;
+            storageConnectionConfig = config;
+          }
           if (window.LuminGoogleDrive?.isDrive(config.url)) {
             await window.LuminGoogleDrive.ensure();
             config = getStorageServerConfig();
@@ -27274,7 +27284,7 @@
           }
           transientFailure = false;
           data = await response.json();
-          if (data?.status !== 'online' || data.authConfigured === false || !['Lumin Local Storage Server', 'Lumin Google Drive Storage'].includes(data?.service)) {
+          if (data?.status !== 'online' || data.authConfigured === false || !['Lumin Local Storage Server', 'Lumin Google Drive Storage', 'Lumin Cloudflare R2 Storage'].includes(data?.service)) {
             throw new Error('Invalid storage server health response.');
           }
         } catch (err) {
@@ -27410,19 +27420,21 @@
             list.forEach(preset => { if (preset?.key && preset.key !== 'LuminClinicKey_2026') storagePresetKeys.set(preset.id, preset.key); });
             localStorage.setItem('lumin_storage_server_presets', JSON.stringify(list.map(({key, ...preset}) => preset)));
             const saved = list.filter(preset => preset && typeof preset.id === 'string' && typeof preset.name === 'string' && typeof preset.url === 'string').map(preset => ({ ...preset, key: storagePresetKeys.get(preset.id) || (storageServerUrlsMatch(preset.url, clinicStorageServerUrl) ? clinicStorageSecretKey : '') }));
-            return window.LuminGoogleDrive ? window.LuminGoogleDrive.presets(saved) : saved;
+            const cloudPresets = window.LuminR2 ? window.LuminR2.presets(saved) : saved;
+            return window.LuminGoogleDrive ? window.LuminGoogleDrive.presets(cloudPresets) : cloudPresets;
           }
         }
       } catch (err) {
         console.warn('Could not read storage presets:', err);
       }
       const defaults = DEFAULT_STORAGE_PRESETS.map(preset => ({ ...preset }));
-      return window.LuminGoogleDrive ? window.LuminGoogleDrive.presets(defaults) : defaults;
+      const cloudPresets = window.LuminR2 ? window.LuminR2.presets(defaults) : defaults;
+      return window.LuminGoogleDrive ? window.LuminGoogleDrive.presets(cloudPresets) : cloudPresets;
     }
 
     function saveStorageServerPresets(presets) {
       presets.forEach(preset => { if (preset.key) storagePresetKeys.set(preset.id, preset.key); });
-      localStorage.setItem('lumin_storage_server_presets', JSON.stringify(presets.filter(preset => preset.provider !== 'google-drive').map(({key, ...preset}) => preset)));
+      localStorage.setItem('lumin_storage_server_presets', JSON.stringify(presets.filter(preset => !['google-drive', 'r2'].includes(preset.provider)).map(({key, ...preset}) => preset)));
     }
 
     function normaliseStoragePresetUrl(value) {
@@ -27490,6 +27502,8 @@
           const switching = storagePresetSwitchingId === preset.id;
           const driveCard = window.LuminGoogleDrive?.card(preset, isActive, switching, storageSettingsSaving);
           if (driveCard) return driveCard;
+          const r2Card = window.LuminR2?.card(preset, isActive, switching, storageSettingsSaving);
+          if (r2Card) return r2Card;
           const configured = !!preset.url.trim();
           const idArgument = escapeHtml(JSON.stringify(preset.id));
           const icon = ['server', 'laptop', 'hard-drive'].includes(preset.icon) ? preset.icon : 'server';
@@ -27514,6 +27528,7 @@
       }
       renderStoragePresetConnectionStatus();
       window.LuminGoogleDrive?.render();
+      window.LuminR2?.render();
       syncStoragePresetDialogLabels();
       window.LuminStorageSync?.render();
       if (window.lucide) lucide.createIcons();
@@ -27523,6 +27538,10 @@
       if (!currentUserAccess?.isAdmin || storageSettingsSaving) return false;
       const preset = getStorageServerPresets().find(preset => preset.id === presetId);
       if (!preset?.url) return false;
+      if (preset.provider === 'r2') {
+        if (!await window.LuminR2.test()) return false;
+        Object.assign(preset, window.LuminR2.preset());
+      }
       if (preset.provider === 'google-drive') {
         try {
           const status = await window.LuminGoogleDrive.ensure();
@@ -27659,7 +27678,7 @@
       const urlInput = document.getElementById('settings-storage-url');
       const keyInput = document.getElementById('settings-storage-key');
       if (urlInput && document.activeElement !== urlInput) urlInput.value = config.url;
-      if (keyInput && document.activeElement !== keyInput) keyInput.value = window.LuminGoogleDrive?.isDrive(config.url) ? '' : config.key;
+      if (keyInput && document.activeElement !== keyInput) keyInput.value = window.LuminGoogleDrive?.isDrive(config.url) || window.LuminR2?.isR2(config.url) ? '' : config.key;
       renderStorageServerPresets();
     }
 
@@ -27688,8 +27707,9 @@
         showStorageSettingsMessage(currentUiLanguage === 'ar' ? 'أدخل رابط خادم صحيحاً يبدأ بـ HTTP أو HTTPS.' : 'Enter a valid HTTP or HTTPS server URL.', false);
         return false;
       }
-      const cleanKey = window.LuminGoogleDrive?.isDrive(cleanUrl) ? '' : keyInput.value.trim();
-      if (!window.LuminGoogleDrive?.isDrive(cleanUrl) && (!cleanKey || cleanKey === 'LuminClinicKey_2026')) {
+      const cloudStorage = window.LuminGoogleDrive?.isDrive(cleanUrl) || window.LuminR2?.isR2(cleanUrl);
+      const cleanKey = cloudStorage ? '' : keyInput.value.trim();
+      if (!cloudStorage && (!cleanKey || cleanKey === 'LuminClinicKey_2026')) {
         showStorageSettingsMessage(currentUiLanguage === 'ar' ? 'أدخل مفتاحاً خاصاً بخادم التخزين. المفتاح الافتراضي القديم لم يعد مقبولاً.' : 'Enter the server’s private key. The old default key is no longer accepted.', false);
         return false;
       }
@@ -27761,7 +27781,7 @@
         if (msg) {
           msg.className = 'min-w-0 flex-1 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700';
           msg.textContent = currentUiLanguage === 'ar'
-            ? `تم الاتصال بنجاح بالخادم المحلي (${data.totalPatientFolders} مجلد مرضى).`
+            ? `تم الاتصال بنجاح بموقع التخزين (${data.totalPatientFolders} مجلد مرضى).`
             : `Connected to storage server at ${data.storageRoot} (${data.totalPatientFolders} patient folders).`;
           msg.classList.remove('hidden');
           setTimeout(() => msg.classList.add('hidden'), 5000);
@@ -27802,6 +27822,7 @@
       if (storageLocationLoading) return;
       const config = getStorageServerConfig();
       if (window.LuminGoogleDrive?.isDrive(config.url)) { window.LuminGoogleDrive.render(); return; }
+      if (window.LuminR2?.isR2(config.url)) { window.LuminR2.render(); return; }
       const loadingEl = document.getElementById('storage-location-loading');
       const detailsEl = document.getElementById('storage-location-details');
       const offlineEl = document.getElementById('storage-location-offline');
@@ -28358,13 +28379,14 @@
 
     async function persistPatientMediaDetails(patientId, relativePath, details, config = getStorageServerConfig()) {
       if (!patientId || !relativePath) throw new Error(currentUiLanguage === 'ar' ? 'تعذر تحديد الصورة المحفوظة.' : 'The saved photo could not be identified.');
+      if (window.LuminR2?.isR2(config.url)) Object.assign(config, await window.LuminR2.ensure());
       const patient = getKnownPatient(patientId);
       const response = await fetch(`${config.url}/api/patient/${encodeURIComponent(patientId)}/media-details`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'x-lumin-key': config.key },
         body: JSON.stringify({ relativePath, details, patientName: patient?.name, patientNumber: patient?.patient_number, phone: patient?.phone })
       });
       const data = await response.json();
-      if (!response.ok || !['local', 'google-drive'].includes(data.metadataSource) || !data.details) throw new Error(currentUiLanguage === 'ar'
+      if (!response.ok || !['local', 'google-drive', 'r2'].includes(data.metadataSource) || !data.details) throw new Error(currentUiLanguage === 'ar'
         ? 'تعذر حفظ التفاصيل في موقع التخزين المحدد. تحقق من الاتصال ثم أعد المحاولة.'
         : 'Could not save details on the selected storage. Check its connection, then retry.');
       return data.details;
@@ -28607,7 +28629,7 @@
         const data = await resp.json();
         if (renderToken !== patientMediaRenderToken) return;
         cacheChartPatientMediaResponse(patient.id, data, storageConfig);
-        patientMediaDetailsError = !['local', 'google-drive'].includes(data.metadataSource) || Boolean(data.metadataUnavailable);
+        patientMediaDetailsError = !['local', 'google-drive', 'r2'].includes(data.metadataSource) || Boolean(data.metadataUnavailable);
         currentPatientMediaFiles = (data.files || []).filter(file => file.category !== '3D-Scans' && !/\.zip$/i.test(file.filename || '')).map(file => ({ ...file,
           mediaDetails: patientMediaDetailsError ? null : file.mediaDetails || null }));
         activePatientMediaPatientId = patient.id;
@@ -28620,7 +28642,7 @@
           <div class="rounded-2xl border border-rose-200 bg-rose-50/50 p-8 text-center text-rose-800">
             <i data-lucide="alert-triangle" class="mx-auto h-8 w-8 text-rose-500 mb-2"></i>
             <p class="text-xs font-bold">${currentUiLanguage === 'ar' ? 'تعذر تحميل الوسائط من موقع التخزين المحدد' : 'Could not connect to selected storage'}: ${escapeHtml(err.message)}</p>
-            <p class="mt-1 text-[11px] text-rose-600">${window.LuminGoogleDrive?.isDrive(storageConfig.url) ? (currentUiLanguage === 'ar' ? 'تحقق من اتصال الإنترنت وربط حساب Drive في إعدادات العيادة.' : 'Check the internet connection and the Drive connection in clinic settings.') : (currentUiLanguage === 'ar' ? 'تأكد من تشغيل start-server.bat أو نفق Cloudflare.' : 'Make sure start-server.bat and Cloudflare Tunnel are active on the clinic PC.')}</p>
+            <p class="mt-1 text-[11px] text-rose-600">${window.LuminR2?.isR2(storageConfig.url) ? (currentUiLanguage === 'ar' ? 'تحقق من الاتصال بالإنترنت وأعد تسجيل الدخول إذا لزم الأمر.' : 'Check your internet connection and sign in again if needed.') : window.LuminGoogleDrive?.isDrive(storageConfig.url) ? (currentUiLanguage === 'ar' ? 'تحقق من اتصال الإنترنت وربط حساب Drive في إعدادات العيادة.' : 'Check the internet connection and the Drive connection in clinic settings.') : (currentUiLanguage === 'ar' ? 'تأكد من تشغيل start-server.bat أو نفق Cloudflare.' : 'Make sure start-server.bat and Cloudflare Tunnel are active on the clinic PC.')}</p>
             <button type="button" onclick="renderPatientMedia()" class="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700">
               <i data-lucide="refresh-cw" class="h-3.5 w-3.5"></i> <span>${currentUiLanguage === 'ar' ? 'إعادة المحاولة' : 'Retry'}</span>
             </button>
@@ -28975,6 +28997,7 @@
       if (noteInput?.value) formData.append('note', noteInput.value.trim());
 
       try {
+        if (window.LuminR2?.isR2(storageConfig.url)) Object.assign(storageConfig, await window.LuminR2.ensure());
         const uploadResult = pendingPatientMediaUpload?.file === file && pendingPatientMediaUpload.patientId === patient.id
           ? pendingPatientMediaUpload.result
           : await new Promise((resolve, reject) => {
@@ -29047,6 +29070,7 @@
       const storageConfig = getStorageServerConfig();
       const patientId = activePatientMediaPatientId;
       try {
+        if (window.LuminR2?.isR2(storageConfig.url)) Object.assign(storageConfig, await window.LuminR2.ensure());
         const resp = await fetch(`${storageConfig.url}/api/file`, {
           method: 'DELETE',
           headers: {
@@ -29287,6 +29311,7 @@
     }
 
     async function requestPatientMediaMove(relativePath, targetCategory, storageConfig) {
+      if (window.LuminR2?.isR2(storageConfig.url)) Object.assign(storageConfig, await window.LuminR2.ensure());
       const response = await fetch(`${storageConfig.url}/api/file/move`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-lumin-key': storageConfig.key },

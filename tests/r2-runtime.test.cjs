@@ -1,0 +1,36 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const fs = require('node:fs');
+const {Miniflare,convertV4MiniflareOptions} = require('miniflare');
+const {build} = require('esbuild');
+const patientId='11111111-1111-4111-8111-111111111111',userId='22222222-2222-4222-8222-222222222222';
+const token='header.'+Buffer.from(JSON.stringify({exp:Math.floor(Date.now()/1000)+3600})).toString('base64url')+'.signature';
+test('real Workers runtime and R2 support upload, conditional metadata, range reads and private grants',async t=>{
+  const bundle=await build({stdin:{contents:"import {handleR2Request} from './workers/r2-storage.mjs'; export default {fetch(request,env) { return handleR2Request(request,env); }};",resolveDir:path.resolve(__dirname,'..')},bundle:true,format:'esm',write:false,platform:'browser',plugins:[{name:'surface-test-errors',setup(build) {build.onLoad({filter:/r2-storage\.mjs$/},args=>({contents:fs.readFileSync(args.path,'utf8').replace("return json({error:'Storage could not complete the request. Please retry.',code:'storage_unavailable'},503);",'throw error;'),loader:'js'}));}}]});
+  const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:bundle.outputFiles[0].text,compatibilityDate:'2026-10-09',r2Buckets:['LUMIN_MEDIA'],outboundService:async request=>{
+    const url=new URL(request.url);
+    if (request.headers.get('authorization')!==`Bearer ${token}`) return Response.json({}, {status:401});
+    if (url.pathname==='/auth/v1/user') return Response.json({id:userId});
+    if (url.pathname==='/rest/v1/user_profiles') return Response.json([{active:true,access_roles:{is_admin:true}}]);
+    if (url.pathname==='/rest/v1/patients') return Response.json([{id:patientId,name:'Synthetic test patient',patient_number:1}]);
+    return Response.json({}, {status:404});
+  }}));
+  t.after(()=>mf.dispose());
+  const request=(route,init={})=>mf.dispatchFetch('https://clinic.test/r2'+route,{...init,headers:{'x-lumin-key':token,...init.headers}});
+  assert.equal((await request('/api/health')).status,200);
+  const form=new FormData();form.set('patientId',patientId);form.set('category','Panoramic');form.set('file',new File(['0123456789'],'test.png',{type:'image/png'}));
+  const encoded=new Request('https://clinic.test',{method:'POST',body:form});
+  let response=await request('/api/upload',{method:'POST',headers:{'Content-Type':encoded.headers.get('Content-Type')},body:await encoded.arrayBuffer()});
+  assert.equal(response.status,200,await response.clone().text());const file=await response.json();
+  response=await request(`/api/patient/${patientId}/media-details`,{method:'POST',body:JSON.stringify({relativePath:file.relativePath,details:{note:'Runtime verified',tooth_ids:['8']}})});
+  assert.equal(response.status,200,await response.clone().text());
+  response=await request('/files/'+file.relativePath,{headers:{Range:'bytes=2-5'}});
+  assert.equal(response.status,206,await response.clone().text());assert.equal(await response.text(),'2345');assert.equal(response.headers.get('Content-Range'),'bytes 2-5/10');
+  const grant=await (await request('/api/media-grant',{method:'POST'})).json();
+  response=await mf.dispatchFetch('https://clinic.test/r2/files/'+file.relativePath+'?media='+grant.mediaGrant);
+  assert.equal(response.status,200);assert.equal(await response.text(),'0123456789');
+  const bucket=await mf.getR2Bucket('LUMIN_MEDIA');
+  const metadata=await bucket.list({prefix:'metadata/',include:['customMetadata']});
+  assert.equal(metadata.objects[0].customMetadata.toothIds,'["8"]');
+});

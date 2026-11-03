@@ -32,7 +32,7 @@ function cacheChartPatientMediaResponse(patientId, response, config = getStorage
   const scope = chartMediaCacheScope(config), key = scope + patientId;
   if (chartPatientMediaCache.size >= 12) chartPatientMediaCache.delete(chartPatientMediaCache.keys().next().value);
   chartPatientMediaCache.set(key, {expiresAt: Date.now() + 60000, response: structuredClone(response)});
-  if (chartXrayIndex?.scope === scope && !response.metadataUnavailable && ['local', 'google-drive'].includes(response.metadataSource)) {
+  if (chartXrayIndex?.scope === scope && !response.metadataUnavailable && ['local', 'google-drive', 'r2'].includes(response.metadataSource)) {
     chartXrayIndex.countsByPatient[patientId] = chartMediaCounts(response.files || []);
   }
 }
@@ -78,7 +78,7 @@ async function prefetchChartPatientMedia(patientId) {
 
 async function preloadChartXrayIndex() {
   const config = getStorageServerConfig();
-  if (!config.key || !hasPageAccess('patients') || !window.LuminGoogleDrive?.isDrive(config.url)) return;
+  if (!config.key || !hasPageAccess('patients') || !(window.LuminGoogleDrive?.isDrive(config.url) || window.LuminR2?.isR2(config.url))) return;
   const scope = chartMediaCacheScope(config), epoch = chartMediaCacheEpoch;
   if (chartXrayIndex?.scope === scope && chartXrayIndex.expiresAt > Date.now() + 60000) return;
   if (chartXrayIndexRead?.scope === scope) return chartXrayIndexRead.pending;
@@ -461,7 +461,7 @@ async function loadChartPatientMedia(patientId = activePatientId) {
   const cached = patient && hasPageAccess('patients') ? cachedChartPatientMedia(patientId, config) : null;
   chartPatientMedia.patientId = patientId;
   chartPatientMedia.files = cached?.files || [];
-  chartPatientMedia.detailsError = cached ? !['local', 'google-drive'].includes(cached.metadataSource) || Boolean(cached.metadataUnavailable) : false;
+  chartPatientMedia.detailsError = cached ? !['local', 'google-drive', 'r2'].includes(cached.metadataSource) || Boolean(cached.metadataUnavailable) : false;
   chartPatientMedia.status = cached ? 'ready' : 'loading';
   renderChartMediaPanel();
   if (patientAttachmentState && patientAttachmentState.patientId !== patientId) closePatientAttachmentModal();
@@ -474,7 +474,7 @@ async function loadChartPatientMedia(patientId = activePatientId) {
   try {
     const response = await fetchChartPatientMedia(patient, config);
     if (request !== chartPatientMedia.request || activePatientId !== patient.id) return;
-    chartPatientMedia.detailsError = !['local', 'google-drive'].includes(response.metadataSource) || Boolean(response.metadataUnavailable);
+    chartPatientMedia.detailsError = !['local', 'google-drive', 'r2'].includes(response.metadataSource) || Boolean(response.metadataUnavailable);
     chartPatientMedia.files = (response.files || []).map(file => ({ ...file,
       mediaDetails: chartPatientMedia.detailsError ? null : file.mediaDetails || null }));
     chartPatientMedia.status = 'ready';

@@ -29,21 +29,25 @@
     const saved = selection(), list = presets();
     const first = list.find(p => p.id === saved.coordinator), second = list.find(p => p.id === saved.laptop);
     // A local process owns the durable job when one of the two locations is Drive.
+    if (first?.provider === 'r2') return {coordinator:first,laptop:second};
+    if (second?.provider === 'r2') return {coordinator:second,laptop:first};
     return first?.provider === 'google-drive' ? {coordinator: second, laptop: first} : {coordinator: first, laptop: second};
   }
 
   const drivePair = () => selectedServers().laptop?.provider === 'google-drive';
+  const cloudPair = () => selectedServers().coordinator?.provider === 'r2' && drivePair();
 
   function ready() {
     const { coordinator, laptop } = selectedServers();
     return Boolean(coordinator?.url?.trim() && laptop?.url?.trim()
+      && (coordinator.provider !== 'r2' || laptop.provider === 'google-drive')
       && coordinator.id !== laptop.id && !storageServerUrlsMatch(coordinator.url, laptop.url));
   }
 
   function progress(job) {
     if (!job) return { percent: 0, indeterminate: false };
     const finished = ['completed', 'completed_with_conflicts'].includes(job.status);
-    const ratio = job.totalBytes > 0 ? job.transferredBytes / job.totalBytes
+    const ratio = job.progressByFiles && job.totalFiles > 0 ? job.completedFiles / job.totalFiles : job.totalBytes > 0 ? job.transferredBytes / job.totalBytes
       : job.totalFiles > 0 ? job.completedFiles / job.totalFiles : 0;
     return { percent: finished ? 100 : Math.min(99, Math.max(0, Math.floor(ratio * 100))),
       indeterminate: job.status === 'running' && ['scanning', 'metadata'].includes(job.phase) };
@@ -60,6 +64,7 @@
   function errorText(error) {
     if (!error) return '';
     const msg = error.message || '';
+    if (cloudPair() && error.status && ![401,403].includes(error.status)) return t(msg || 'Cloud sync could not finish. Retry the operation.', 'تعذر إكمال المزامنة السحابية. تحقق من اتصال Google Drive وR2، ثم أعد المحاولة أو راجع الاختلافات المدرجة.');
     const reasons = {
       invalid_clinic_key: t('The clinic key saved for this server does not match its setup app. Edit the saved server and use that computer\'s clinic key.',
         'مفتاح العيادة المحفوظ لهذا الخادم لا يطابق تطبيق الإعداد. عدّل الخادم المحفوظ واستخدم مفتاح العيادة الخاص بذلك الكمبيوتر.'),
@@ -198,7 +203,7 @@
           const { data, error } = sessionResult;
           if (requestSignal.aborted) throw requestSignal.reason;
           if (error || !data?.session?.access_token) throw Object.assign(new Error('Sign in again to synchronize storage.'), { status: 401 });
-          const prefix = drivePair() && server.provider !== 'google-drive' ? 'api/drive-sync' : 'api/sync';
+          const prefix = cloudPair() ? 'api/cloud-sync' : drivePair() && server.provider !== 'google-drive' ? 'api/drive-sync' : 'api/sync';
           const response = await fetch(`${normaliseStoragePresetUrl(server.url)}/${prefix}/${route}`, {
             method, cache: 'no-store', signal: requestSignal,
             headers: { 'x-lumin-key': server.key || '', Authorization: `Bearer ${data.session.access_token}`,
@@ -239,6 +244,7 @@
 
   async function compatibleInfo() {
     const { coordinator, laptop } = selectedServers();
+    if (cloudPair()) return api(coordinator, 'info');
     const info = drivePair() ? await (async () => {
       await window.LuminGoogleDrive.ensure();
       const local = await api(coordinator, 'info');
@@ -265,6 +271,7 @@
         </div>
         <p id="storage-sync-safety" class="storage-sync-note"></p>
         <div class="storage-sync-actions"><button id="storage-sync-pair" type="button" onclick="LuminStorageSync.pair()"><i data-lucide="link" aria-hidden="true"></i><span id="storage-sync-pair-label"></span></button><button id="storage-sync-start" type="button" onclick="LuminStorageSync.start()"><i data-lucide="refresh-cw" aria-hidden="true"></i><span id="storage-sync-start-label"></span></button></div>
+        <div class="storage-sync-actions"><button id="storage-sync-remove-unassigned" type="button" onclick="LuminStorageSync.removeUnassigned()" style="display:none"><i data-lucide="archive" aria-hidden="true"></i><span id="storage-sync-remove-unassigned-label"></span></button></div>
         <div id="storage-sync-progress" class="storage-sync-progress hidden">
           <div class="storage-sync-progress-heading"><span id="storage-sync-phase" role="status" aria-live="polite"></span><span id="storage-sync-percent" dir="ltr"></span></div>
           <div id="storage-sync-bar" class="storage-sync-track" role="progressbar" aria-labelledby="storage-sync-phase" aria-valuemin="0" aria-valuemax="100"><span id="storage-sync-fill"></span></div>
@@ -278,9 +285,11 @@
     panel.dir = t('ltr', 'rtl');
     set('storage-sync-title', t('Sync patient files', 'مزامنة ملفات المرضى'));
     set('storage-sync-description', t('Sync patient files, tooth assignments, notes, and scan settings between exactly two selected locations. A local server must be running for Drive sync.', 'مزامنة ملفات المرضى والأسنان المحددة والملاحظات وإعدادات المسح بين موقعين محددين فقط. يجب تشغيل الخادم المحلي للمزامنة مع Drive.'));
+    if (cloudPair()) set('storage-sync-description', t('Sync Google Drive and R2 directly, including notes, teeth, and scan settings. Keep this screen open while syncing; reopening resumes saved progress. Up to 24 MB per file.', 'مزامنة Google Drive وR2 مباشرةً، مع الملاحظات والأسنان وإعدادات المسح. أبقِ هذه الشاشة مفتوحة أثناء المزامنة؛ يُستأنف التقدم المحفوظ عند فتحها مجدداً. حتى 24 ميجابايت لكل ملف.'));
     set('storage-sync-coordinator-label', t('First storage location', 'موقع التخزين الأول'));
     set('storage-sync-laptop-label', t('Second storage location', 'موقع التخزين الثاني'));
     set('storage-sync-safety', t('Deleted copies wait for your review: delete on both or restore on both. Removed and replaced files are kept in a recovery archive.', 'تنتظر النسخ المحذوفة مراجعتك: الحذف من الجهازين أو الاستعادة عليهما. تُحفظ الملفات المحذوفة والمستبدلة في أرشيف للاستعادة.'));
+    if (cloudPair()) set('storage-sync-safety', t('Conflicting edits and missing copies wait for review. Replaced originals are preserved. Cloud sync never automatically deletes patient files.', 'تنتظر التعديلات المتعارضة والنسخ المفقودة مراجعتك. تُحفظ الأصول المستبدلة. لا تحذف المزامنة السحابية ملفات المرضى تلقائياً.'));
     const saved = selection(), list = presets();
     const options = `<option value="">${t('Choose a saved server', 'اختر خادماً محفوظاً')}</option>` + list.map(p =>
       `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}${!p.url?.trim() ? t(' — URL not set', ' — الرابط غير مُدخل') : ''}</option>`).join('');
@@ -294,6 +303,9 @@
     pairButton.disabled = !ready() || state.busy || activeJob();
     set('storage-sync-pair-label', state.busy ? t('Connecting…', 'جارٍ الاتصال…') : state.paired || state.repairPair ? t('Update pairing', 'تحديث الاقتران') : t('Pair servers', 'اقتران الخادمين'));
     document.getElementById('storage-sync-start').disabled = !ready() || !state.paired || state.busy || activeJob();
+    const removeButton=document.getElementById('storage-sync-remove-unassigned');
+    removeButton.style.display=cloudPair()&&state.job?.unassignedFiles?.length?'':'none';removeButton.disabled=state.busy||activeJob();
+    set('storage-sync-remove-unassigned-label',t('Remove unassigned files','إزالة الملفات غير المرتبطة بمريض'));
     set('storage-sync-start-label', activeJob() ? t('Syncing…', 'جارٍ المزامنة…') : state.job?.status === 'failed' ? t('Retry', 'إعادة المحاولة') : t('Sync now', 'مزامنة الآن'));
     document.getElementById('storage-sync-progress').classList.toggle('hidden', !state.job);
     if (state.job) {
@@ -316,7 +328,7 @@
     }
     const failed = state.job?.status === 'failed';
     const metadataWarning = state.job?.metadataWarning ? errorText(Object.assign(new Error(state.job.metadataWarning), {code:'metadata_unavailable'})) : '';
-    const statusMessage = failed ? errorText(Object.assign(new Error(state.job.error), {status: state.job.errorStatus, code: state.job.errorCode}))
+    let statusMessage = failed ? errorText(Object.assign(new Error(state.job.error), {status: state.job.errorStatus, code: state.job.errorCode}))
       : metadataWarning || (state.job?.metadataStatus === 'current' && !activeJob()
         ? state.job?.conflicts?.some(conflict => !conflict.reviewed)
           ? t('Files synchronized. Review the remaining local annotation or file differences.', 'تمت مزامنة الملفات. راجع الاختلافات المتبقية في البيانات المحلية أو الملفات.')
@@ -327,6 +339,13 @@
         'الخادمان المحددان لديهما اقتران قديم. تحديث الاقتران يعيد توصيل هذين الجهازين ويحافظ على الملفات المخزنة.')
       : state.paired ? drivePair() ? t('Paired. Keep the selected local server running and connected to Drive.', 'تم الاقتران. أبقِ الخادم المحلي المحدد قيد التشغيل ومتصلًا بـ Drive.') : t('Paired. Both computers must be running and reachable.', 'تم الاقتران. يجب تشغيل الجهازين وإمكانية الاتصال بهما.')
       : t('Pair these two servers to enable one-click sync.', 'اقرن الخادمين لتفعيل المزامنة بنقرة واحدة.'));
+    if (cloudPair() && !failed) statusMessage = state.job?.conflicts?.some(c=>!c.reviewed)
+      ? t('Transfers finished. Review the listed differences before syncing again.', 'اكتمل النقل. راجع الاختلافات المدرجة قبل إعادة المزامنة.')
+      : state.job?.metadataStatus === 'exceptions' ? t('Sync finished with differences you chose to keep. Those copies remain separate.', 'اكتملت المزامنة مع اختلافات اخترت الاحتفاظ بها. تظل تلك النسخ منفصلة.')
+      : state.job?.status === 'completed' ? t(`${state.job.verifiedFiles || 0} files verified. Files, notes, teeth, and scan settings match on Google Drive and R2.`, `تم التحقق من ${state.job.verifiedFiles || 0} ملفات. تتطابق الملفات والملاحظات والأسنان وإعدادات المسح على Google Drive وR2.`)
+      : state.paired ? t('Cloud storage paired. No clinic PC is needed. Keep this screen open to sync.', 'تم اقتران التخزين السحابي. لا يلزم تشغيل جهاز العيادة. أبقِ هذه الشاشة مفتوحة للمزامنة.')
+      : t('Pair Google Drive and R2 to enable direct cloud sync.', 'اقرن Google Drive وR2 لتفعيل المزامنة السحابية المباشرة.');
+    if (cloudPair() && state.job?.unassignedFiles?.length) statusMessage += ' ' + t(`${state.job.unassignedFiles.length} older Drive files have no saved patient ID and were left untouched.`, `توجد ${state.job.unassignedFiles.length} ملفات قديمة على Drive دون معرّف مريض محفوظ؛ تُركت دون تعديل.`);
     const message = state.actionError || state.error || statusMessage;
     set('storage-sync-message', message);
     document.getElementById('storage-sync-message').dataset.error = String(Boolean(state.actionError || state.error || failed));
@@ -337,6 +356,11 @@
     state.refreshing = true;
     const epoch = state.epoch, coordinator = selectedServers().coordinator;
     try {
+      if (cloudPair() && state.job?.status === 'running') {
+        const job = await api(coordinator, `jobs/${encodeURIComponent(state.job.id)}/step`, 'POST', undefined, 120000);
+        if (epoch !== state.epoch) return;
+        state.job = job; state.paired = true; state.error = ''; return;
+      }
       const info = await compatibleInfo();
       if (epoch !== state.epoch) return;
       state.paired = info.pair?.role === 'coordinator' && info.pair.peerId === info.peer.nodeId
@@ -346,12 +370,16 @@
         selection().peerId = info.peer.nodeId;
         localStorage.setItem(selectionKey, JSON.stringify(selection()));
       }
-      const result = await api(coordinator, 'jobs/latest');
+      let result = await api(coordinator, 'jobs/latest');
+      if (cloudPair() && result.job?.status === 'running') result = {job:await api(coordinator, `jobs/${encodeURIComponent(result.job.id)}/step`, 'POST', undefined, 120000)};
       if (epoch !== state.epoch) return;
       state.job = !state.paired || (result.job?.peerId && result.job.peerId !== info.peer.nodeId) ? null : result.job;
       state.error = '';
-    } catch (error) { if (epoch === state.epoch) { state.paired = false; state.error = errorText(error); } }
-    finally { state.refreshing = false; render(); }
+    } catch (error) { if (epoch === state.epoch) { if(cloudPair()&&error.status===404)state.job=null;state.paired = false; state.error = errorText(error); } }
+    finally {
+      state.refreshing = false; render();
+      if (cloudPair() && activeJob() && state.paired && !state.error && state.timer !== null && visible()) setTimeout(() => { void refresh(); }, 0);
+    }
   }
 
   async function pair() {
@@ -380,6 +408,16 @@
     finally { state.busy = false; render(); }
   }
 
+  async function removeUnassigned() {
+    if(!admin()||!cloudPair()||state.busy||activeJob()||!state.job?.unassignedFiles?.length)return;
+    const paths=state.job.unassignedFiles.map(file=>file.path);
+    if(!confirm(t(`Remove these ${paths.length} unassigned files from active Google Drive and matching copied R2 folders? Originals remain in the recovery archives.\n\n${paths.join('\n')}`,`إزالة هذه الملفات غير المرتبطة بمريض (${paths.length}) من تخزين Google Drive النشط ونسخها المطابقة في مجلدات R2؟ تبقى الأصول في أرشيفات الاستعادة.\n\n${paths.join('\n')}`)))return;
+    state.busy=true;state.actionError='';render();
+    try{const result=await api(selectedServers().coordinator,'unassigned/delete','POST',{paths},180000);state.job=result.job;}
+    catch(error){state.actionError=errorText(error);}
+    finally{state.busy=false;render();}
+  }
+
   function closeReview() {
     const review = state.review;
     if (!review || review.saving) return;
@@ -393,6 +431,8 @@
   }
 
   function reviewKind(kind) {
+    if (cloudPair() && kind === 'file_too_large') return t('This file exceeds Google Drive sync’s 24 MB limit. Keep the existing copies separate, or use a smaller archive.', 'يتجاوز هذا الملف حد مزامنة Google Drive البالغ 24 ميجابايت. احتفظ بالنسخ الحالية منفصلة أو استخدم ملفاً أصغر.');
+    if (cloudPair() && kind === 'delete_modified') return t('One cloud copy is missing. Restore the remaining copy to both locations, or keep the current difference.', 'إحدى النسختين السحابيتين مفقودة. استعد النسخة المتبقية في الموقعين أو احتفظ بالاختلاف الحالي.');
     return ({path_case: t('The filenames differ in letter case. Choose one version for both servers, or keep both.', 'يختلف اسما الملفين في حالة الأحرف. اختر نسخة واحدة للخادمين أو احتفظ بالنسختين.'),
       both_modified: t('Both computers have different versions. Choose one image for both servers, or keep both versions.', 'توجد نسختان مختلفتان على الجهازين. اختر صورة واحدة للخادمين أو احتفظ بالنسختين.'),
       metadata: t('Both computers have different local annotations. Choose one set of teeth, notes, and scan settings for both servers, or keep a copy of each.', 'توجد بيانات محلية مختلفة على الجهازين. اختر مجموعة أسنان وملاحظات وإعدادات مسح للخادمين أو احتفظ بنسخة من كل مجموعة.'),
@@ -411,8 +451,9 @@
     const disabled = review.saving || !data?.revision || data.reviewed;
     const missingCopies = data?.versions ? ['local', 'remote'].filter(side => !data.versions[side] || data.versions[side].deleted).length : 0;
     const oneMissing = missingCopies === 1, bothMissing = missingCopies === 2;
-    const choices = data ? ['local', 'remote'].filter(side => !data.versions || (data.versions[side] && !data.versions[side].deleted)).map(side => 'keep_' + side) : [];
-    if (oneMissing) choices.push('delete_both');
+    const cloudReview = review.servers.coordinator.provider === 'r2';
+    const choices = data ? ['local', 'remote'].filter(side => (!data.versions || (data.versions[side] && !data.versions[side].deleted)) && (!cloudReview || actions.includes('keep_' + side))).map(side => 'keep_' + side) : [];
+    if (oneMissing && !cloudReview) choices.push('delete_both');
     if (data?.pendingAction && !choices.includes(data.pendingAction)) choices.push(data.pendingAction);
     const updateRequired = data && !data.reviewed && choices.some(action => !actions.includes(action)) && !data.pendingAction;
     const updateMessage = t('These choices need the latest Lumin Storage Setup running on both computers. Update and restart both storage apps, then reload this comparison.',
@@ -420,7 +461,7 @@
     const versions = ['local', 'remote'].map(side => {
       const record = data?.versions?.[side], file = review.files[side];
       const server = side === 'local' ? review.servers.coordinator : review.servers.laptop;
-      const label = side === 'local' ? t('Dedicated PC', 'جهاز العيادة') : t('Laptop', 'اللابتوب');
+      const label = cloudReview ? (side === 'local' ? 'Cloudflare R2' : 'Google Drive') : side === 'local' ? t('Dedicated PC', 'جهاز العيادة') : t('Laptop', 'اللابتوب');
       const name = record?.path || file?.path || data?.path || review.conflict.path;
       const size = record?.size ?? file?.original?.size;
       const image = file?.url && !file.error;
@@ -504,6 +545,7 @@
   async function reviewFile(server, path, preview, signal) {
     return timedRequest(async requestSignal => {
       if (server.provider === 'google-drive') { await window.LuminGoogleDrive.ensure(); server = window.LuminGoogleDrive.preset(); }
+      if (server.provider === 'r2') { await window.LuminR2.ensure(); server = window.LuminR2.preset(); }
       const prefix = preview ? 'api/thumbnail' : 'files';
       const response = await fetch(`${normaliseStoragePresetUrl(server.url)}/${prefix}/${path.split('/').map(encodeURIComponent).join('/')}`, {
         headers: {'x-lumin-key': server.key || ''}, cache: 'no-store', signal: requestSignal
@@ -655,5 +697,5 @@
 
   document.addEventListener('visibilitychange', () => { if (visible()) void refresh(); });
   window.addEventListener('online', () => { if (visible()) void refresh(); });
-  window.LuminStorageSync = { render, open, close, select, pair, start, review };
+  window.LuminStorageSync = { render, open, close, select, pair, start, review, removeUnassigned };
 })();

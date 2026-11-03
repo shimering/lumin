@@ -7,7 +7,9 @@ export function compareText(a: string, b: string) {
   return x.length - y.length;
 }
 export class DriveError extends Error {
-  constructor(message: string, public status = 400, public code = "drive_error") { super(message); }
+  status: number;
+  code: string;
+  constructor(message: string, status = 400, code = "drive_error") { super(message); this.status = status; this.code = code; }
 }
 export const MAX_UPLOAD = 24 * 1024 * 1024;
 export const EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff", "pdf", "dcm", "dicom", "zip"]);

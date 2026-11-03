@@ -67,6 +67,7 @@
       console.warn('3D scan action:', error);
     }
     async request(path, init = {}) {
+      if (window.LuminR2?.isR2(this.storage.url)) Object.assign(this.storage, await window.LuminR2.ensure());
       const response = await fetch(this.storage.url + path, { ...init, signal: this.controller.signal,
         headers: { 'x-lumin-key': this.storage.key, ...init.headers } });
       if (!response.ok) throw new Error('failed'); return response;
@@ -81,7 +82,7 @@
           this.request(`/api/patient/${encodeURIComponent(this.patient.id)}/files?name=${encodeURIComponent(this.patient.name || '')}`).then(r => r.json())
         ]);
         if (!this.alive()) return;
-        if (!['local', 'google-drive'].includes(listing.metadataSource) || listing.metadataUnavailable) throw new Error('serverUpdate');
+        if (!['local', 'google-drive', 'r2'].includes(listing.metadataSource) || listing.metadataUnavailable) throw new Error('serverUpdate');
         this.health = health;
         this.files = (listing.files || []).filter(file => (file.category === '3D-Scans' || file.relativePath?.split('/')[1] === '3D-Scans') && /\.zip$/i.test(file.filename)).map(file => ({ ...file,
           details: file.mediaDetails || {} }));
@@ -285,7 +286,7 @@
         body: JSON.stringify({ relativePath, details, patientName: this.patient.name,
           patientNumber: this.patient.patient_number, phone: this.patient.phone })
       })).json();
-      if (!['local', 'google-drive'].includes(result.metadataSource) || !result.details) throw new Error('serverUpdate');
+      if (!['local', 'google-drive', 'r2'].includes(result.metadataSource) || !result.details) throw new Error('serverUpdate');
       return result.details;
     }
     async action(action, index) {

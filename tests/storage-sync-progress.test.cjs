@@ -450,7 +450,7 @@ test('Storage Server panel pairs once, syncs in one click, restores progress, re
     for(const language of ['en','ar']){
       await page.evaluate(language=>{currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';LuminStorageSync.render()},language);
       assert.equal(await page.locator('#storage-sync-title').textContent(),language==='ar'?'مزامنة ملفات المرضى':'Sync patient files');
-      const bounds=await page.locator('#storage-sync-panel button,#storage-sync-panel select').evaluateAll(elements=>elements.map(el=>{const r=el.getBoundingClientRect();return {h:r.height,w:r.width,left:r.left,right:r.right}}));
+      const bounds=await page.locator('#storage-sync-panel button,#storage-sync-panel select').evaluateAll(elements=>elements.filter(el=>el.getClientRects().length).map(el=>{const r=el.getBoundingClientRect();return {h:r.height,w:r.width,left:r.left,right:r.right}}));
       bounds.forEach(b=>{assert.ok(b.h>=44);assert.ok(b.w>=44);assert.ok(b.left>=0&&b.right<=width+1)});
       assert.equal(await page.locator('#storage-sync-panel').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
     }

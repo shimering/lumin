@@ -1,4 +1,4 @@
-const LUMIN_CACHE = "lumin-dental-shell-v285";
+const LUMIN_CACHE = "lumin-dental-shell-v292";
 const LUMIN_SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -57,7 +57,7 @@ const LUMIN_SHELL = [
   "/lumin-inventory.js?v=16",
   "/lumin-inventory.css?v=15",
   "/lumin-clinic-management.css?v=4",
-  "/lumin-patient-scans.js?v=7",
+  "/lumin-patient-scans.js?v=8",
   "/lumin-patient-scans.css?v=4",
   "/lumin-scan-worker.js",
   "/lumin-scan-viewer.js?v=4",
@@ -69,15 +69,16 @@ const LUMIN_SHELL = [
   "/vendor/fflate/esm/browser.js",
   "/lumin-cash-flow.css?v=1",
   "/lumin-finance-sync.css?v=2",
-  "/lumin-storage-sync.js?v=16",
+  "/lumin-storage-sync.js?v=22",
   "/lumin-storage-sync.css?v=8",
   "/lumin-google-drive.js?v=2",
+  "/lumin-r2.js?v=3",
   "/lumin-google-drive.css?v=1",
   "/lumin-modal-gestures.js?v=1",
   "/lumin-patient-swipe.js?v=2",
   "/lumin-patients.js?v=5",
   "/lumin-chart-sync.js?v=2",
-  "/lumin-chart-media.js?v=20",
+  "/lumin-chart-media.js?v=21",
   "/lumin-xray-rotation.js?v=1",
   "/lumin-xray-rotation.css?v=1",
   "/lumin-tooth-notes.js?v=3",
@@ -155,6 +156,7 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (
     url.origin !== self.location.origin ||
+    url.pathname === "/r2" || url.pathname.startsWith("/r2/") ||
     url.pathname.startsWith("/push/onesignal/") ||
     url.pathname.endsWith("OneSignalSDKWorker.js") ||
     url.pathname.includes("OneSignal")

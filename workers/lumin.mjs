@@ -1,4 +1,5 @@
 import '../lumin-public-config.js';
+import { handleR2Request } from './r2-storage.mjs';
 
 const config = globalThis.LuminPublicConfig;
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -63,6 +64,7 @@ function brandedHtml(html, data, url) {
 
 export async function handleRequest(request, env, fetcher = fetch) {
   const url = new URL(request.url);
+  if (url.pathname === '/r2' || url.pathname.startsWith('/r2/')) return handleR2Request(request,env,fetcher);
   if (['/supplier-list','/supplier-list/','/supplier-list.html'].includes(url.pathname)) {
     if (!['GET','HEAD'].includes(request.method)) return new Response('Method not allowed.',{status:405,headers:{...privateHeaders,Allow:'GET, HEAD'}});
     if (url.pathname !== '/supplier-list.html') {const target=new URL('/supplier-list.html',url);target.search=url.search;return new Response(null,{status:308,headers:{...privateHeaders,Location:target.href}});}
