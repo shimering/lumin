@@ -71,18 +71,56 @@ async function drawerReady(page,scope=card) {
     return drawer && getComputedStyle(drawer).opacity==='1' && Math.abs(drawer.clientHeight-drawer.scrollHeight)<=1;
   },`${scope} .invoice-inline-drawer`);
 }
+async function expandAdjustments(page,scope=card) {
+  const toggle=page.locator(action('adjustments',scope));
+  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+  await page.waitForFunction(selector => getComputedStyle(document.querySelector(selector)).opacity==='1',`${scope} .invoice-adjustments-drawer`);
+}
+async function openAdjustment(page,name,scope=card) {
+  await expandAdjustments(page,scope);
+  await page.locator(action(name,scope)).click();
+  await drawerReady(page,scope);
+}
+
+test('the summary line reveals adjustment controls before a second drawer opens and collapses safely',{skip:!chromium},async t => {
+  const {page,errors}=await fixture(t);
+  assert.equal(await page.locator(action('adjustments')).getAttribute('aria-expanded'),'false');
+  assert.equal(await page.locator(action('discount')).isVisible(),false);
+  assert.equal(await page.locator(action('release')).isVisible(),false);
+  if (process.env.LUMIN_MEDIA_SCREENSHOT_DIR) await page.screenshot({path:path.join(process.env.LUMIN_MEDIA_SCREENSHOT_DIR,'invoice-adjustments-collapsed.png'),fullPage:true});
+  await expandAdjustments(page);
+  assert.equal(await page.locator(action('discount')).isVisible(),true);
+  assert.equal(await page.locator(action('release')).isVisible(),true);
+  assert.equal(await page.locator(`${card} .invoice-inline-drawer`).getAttribute('aria-hidden'),'true');
+  if (process.env.LUMIN_MEDIA_SCREENSHOT_DIR) await page.screenshot({path:path.join(process.env.LUMIN_MEDIA_SCREENSHOT_DIR,'invoice-adjustments-controls.png'),fullPage:true});
+  await openAdjustment(page,'discount');
+  await page.locator(`${card} .invoice-card-icon-button`).press('Escape');
+  assert.equal(await page.locator(action('adjustments')).getAttribute('aria-expanded'),'true');
+  assert.equal(await page.locator(`${card} .invoice-inline-drawer`).getAttribute('aria-hidden'),'true');
+  await openAdjustment(page,'release');
+  await page.locator(action('adjustments')).click();
+  assert.equal(await page.locator(`${card} .invoice-adjustments-drawer`).getAttribute('aria-hidden'),'true');
+  assert.equal(await page.locator(`${card} .invoice-inline-drawer`).getAttribute('aria-hidden'),'true');
+  assert.equal(await page.locator(action('adjustments')).evaluate(node => document.activeElement===node),true);
+  await expandAdjustments(page);
+  assert.equal(await page.locator(`${card} .invoice-inline-drawer`).getAttribute('aria-hidden'),'true');
+  await page.locator(action('release')).press('Escape');
+  assert.equal(await page.locator(action('adjustments')).getAttribute('aria-expanded'),'false');
+  assert.deepEqual(await page.evaluate(() => rpcCalls),[]);
+  assert.deepEqual(errors,[]);
+});
 
 test('discount and release undo independently restore balances using the existing saved actions',{skip:!chromium},async t => {
   const {page,errors}=await fixture(t);
   assert.equal(await page.locator(`${card} [data-invoice-balance]`).textContent(),'EGP 2,000');
-  await page.locator(action('remove-discount')).click();await drawerReady(page);
+  await openAdjustment(page,'remove-discount');
   assert.equal(await page.locator(`${card} [data-invoice-projection]`).textContent(),'EGP 2,300');
   await page.locator(`${card} [type="submit"]`).click();
   await page.waitForFunction(() => refreshes===2);
   assert.equal(await page.locator(action('remove-discount')).count(),0);
   assert.equal(await page.locator(`${card} .is-release strong`).textContent(),'EGP 200');
   assert.equal(await page.locator(`${card} [data-invoice-balance]`).textContent(),'EGP 2,300');
-  await page.locator(action('undo-release')).click();await drawerReady(page);
+  await openAdjustment(page,'undo-release');
   assert.equal(await page.locator(`${card} [data-invoice-projection]`).textContent(),'EGP 2,500');
   await page.locator(`${card} [type="submit"]`).click();await page.waitForFunction(() => refreshes===3);
   assert.deepEqual(await page.evaluate(() => rpcCalls),[
@@ -97,7 +135,7 @@ test('discount and release undo independently restore balances using the existin
 
 test('discount preview validates balance limits; release remains a full-balance action; failures keep the drawer usable',{skip:!chromium},async t => {
   const {page,errors}=await fixture(t);
-  await page.locator(action('discount')).click();await drawerReady(page);
+  await openAdjustment(page,'discount');
   await page.locator(`${card} [data-invoice-value]`).fill('2400');
   assert.equal(await page.locator(`${card} [type="submit"]`).isDisabled(),true);
   await page.locator(`${card} [data-invoice-value]`).fill('600');
@@ -112,11 +150,11 @@ test('discount preview validates balance limits; release remains a full-balance 
   await page.evaluate(() => {failRpc=false;});
   await page.locator(`${card} [type="submit"]`).click();await page.waitForFunction(() => refreshes===2);
   assert.equal(await page.locator(`${card} .is-discount strong`).textContent(),'EGP 600');
-  await page.locator(action('release')).click();await drawerReady(page);
+  await openAdjustment(page,'release');
   assert.equal(await page.locator(`${card} .invoice-release-amount strong`).textContent(),'EGP 1,700');
   await page.locator(`${card} [type="submit"]`).click();await page.waitForFunction(() => refreshes===3);
   assert.equal(await page.locator(`${card} [data-invoice-balance]`).textContent(),'EGP 0');
-  await page.locator(action('undo-release')).click();await drawerReady(page);
+  await openAdjustment(page,'undo-release');
   await page.locator(`${card} [type="submit"]`).click();await page.waitForFunction(() => refreshes===4);
   assert.equal(await page.locator(`${card} [data-invoice-balance]`).textContent(),'EGP 1,700');
   assert.equal(await page.locator(`${card} .is-discount strong`).textContent(),'EGP 600');
@@ -126,7 +164,7 @@ test('discount preview validates balance limits; release remains a full-balance 
 
 test('stale invoices require another review, repeated submissions do not duplicate writes, and payment routing is preserved',{skip:!chromium},async t => {
   const {page,errors}=await fixture(t);
-  await page.locator(action('release')).click();await drawerReady(page);
+  await openAdjustment(page,'release');
   await page.evaluate(() => {fixtureInvoices[0].paidAmount+=100;});
   await page.locator(`${card} [type="submit"]`).click();await page.locator(`${card} [data-invoice-error]`).waitFor();
   assert.equal(await page.evaluate(() => rpcCalls.length),0);
@@ -149,12 +187,14 @@ test('inline cards fit phone, tablet and desktop layouts in English and Arabic, 
     await page.setViewportSize({width,height:1100});
     for (const language of ['en','ar']) {
       await page.evaluate(language => {currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';return renderPatientInvoices();},language);
+      assert.equal(await page.locator(action('discount')).isVisible(),false);
+      await expandAdjustments(page);
       for (const name of ['remove-discount','undo-release']) {
         const target=page.locator(action(name)),bounds=await target.boundingBox();
         assert.ok(bounds.width>=44 && bounds.height>=44,`${width}/${language}/${name} meets touch sizing`);
         assert.equal(await target.evaluate(node => getComputedStyle(node).borderWidth),'0px');
       }
-      await page.locator(action('discount')).click();await drawerReady(page);
+      await openAdjustment(page,'discount');
       const dimensions=await page.evaluate(() => ({overflow:document.documentElement.scrollWidth>innerWidth,drawer:document.querySelector('.invoice-inline-drawer.is-open').getBoundingClientRect().toJSON()}));
       assert.equal(dimensions.overflow,false,`${width}/${language} fits the page`);
       assert.ok(dimensions.drawer.x>=0 && dimensions.drawer.right<=width);

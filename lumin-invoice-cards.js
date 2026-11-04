@@ -79,10 +79,21 @@
       <header class="invoice-card-header"><div class="invoice-card-reference"><strong dir="ltr">${esc(invoiceNumber(invoice.id))}</strong><span>${esc(formatInvoiceDate(invoice.invoiceDate))}</span></div><span class="invoice-card-status invoice-tone-${cancelled ? 'slate' : paid ? 'green' : invoice.paidAmount > 0 ? 'blue' : 'amber'}">${esc(ar() ? translatedStatus[status.label] || status.label : status.label)}</span>${menu}</header>
       <div class="invoice-card-balance"><div><span class="invoice-card-label">${text('Remaining balance','المبلغ المتبقي')}</span><strong class="invoice-card-amount" data-invoice-balance dir="ltr">${esc(formatInvoiceMoney(remaining))}</strong><p>${text('Invoice','الفاتورة')} <b>${esc(formatInvoiceMoney(invoiceTotal(invoice)))}</b><span>·</span>${text('Paid','المدفوع')} <b>${esc(formatInvoiceMoney(invoice.paidAmount))}</b></p></div>
         ${remaining > 0 && !cancelled && canRecordInvoicePayment() ? `<button type="button" class="invoice-card-button invoice-card-pay" data-invoice-action="pay">${icon('wallet-cards')}${text('Record payment','تسجيل دفعة')}</button>` : ''}</div>
-      <div class="invoice-card-adjustments">${adjustmentMarkup(invoice,'discount')}${adjustmentMarkup(invoice,'release')}</div>
+      <button type="button" class="invoice-adjustments-disclosure" data-invoice-action="adjustments" aria-expanded="false" aria-controls="invoice-adjustments-${Number(invoice.id)}"><span class="invoice-adjustments-disclosure-label">${icon('sliders-horizontal')}<span>${text('Discount & release','الخصم والإعفاء')}</span></span><span class="invoice-adjustments-summary">${esc([invoice.manualDiscount > 0 ? text('Discount ','خصم ') + formatInvoiceMoney(invoice.manualDiscount) : '', invoice.releasedAmount > 0 ? text('Released ','إعفاء ') + formatInvoiceMoney(invoice.releasedAmount) : ''].filter(Boolean).join(' · '))}</span>${icon('chevron-down')}</button>
+      <div class="invoice-adjustments-drawer" id="invoice-adjustments-${Number(invoice.id)}" aria-hidden="true" inert><div class="invoice-adjustments-clip">
+        <div class="invoice-card-adjustments">${adjustmentMarkup(invoice,'discount')}${adjustmentMarkup(invoice,'release')}</div>
+        <div class="invoice-inline-drawer" id="invoice-drawer-${Number(invoice.id)}" aria-hidden="true" inert><div class="invoice-inline-clip"><section class="invoice-drawer-panel" role="region" aria-labelledby="invoice-drawer-title-${Number(invoice.id)}"></section></div></div>
+      </div></div>
       ${invoice.loyaltyDiscount > 0 ? `<div class="invoice-card-loyalty">${icon('sparkles')}${text('Loyalty discount','خصم الولاء')} ${esc(formatInvoiceMoney(invoice.loyaltyDiscount))}</div>` : ''}
-      <div class="invoice-inline-drawer" id="invoice-drawer-${Number(invoice.id)}" aria-hidden="true" inert><div class="invoice-inline-clip"><section class="invoice-drawer-panel" role="region" aria-labelledby="invoice-drawer-title-${Number(invoice.id)}"></section></div></div>
       <div class="invoice-treatment-list">${invoice.items.length ? invoice.items.map(item => itemMarkup(item,invoice)).join('') : `<div class="invoice-card-empty">${icon('receipt-text')}<strong>${text('No treatments yet','لا توجد علاجات بعد')}</strong><span>${text('Add a priced treatment from the dental chart.','أضف علاجًا بسعر من مخطط الأسنان.')}</span></div>`}</div></article>`;
+  }
+
+  function setAdjustmentsOpen(card, expanded) {
+    const drawer = card.querySelector('.invoice-adjustments-drawer');
+    card.querySelector('.invoice-adjustments-disclosure').setAttribute('aria-expanded',String(expanded));
+    drawer.classList.toggle('is-open',expanded);
+    drawer.inert = !expanded;
+    drawer.setAttribute('aria-hidden',String(!expanded));
   }
 
   function close(force = false) {
@@ -170,6 +181,7 @@
     if (active?.saving || !invoice || !allowed(kind,invoice)) return;
     if (active?.id === id && active.kind === kind) { close(); return; }
     close();
+    setAdjustmentsOpen(card,true);
     const entry = {id,kind,card,trigger,invoice,session:sessionId(),type:invoice.manualDiscountType || 'amount',value:String(invoice.manualDiscountValue || 0),saving:false,loading:true};
     active = entry;
     const drawer = card.querySelector('.invoice-inline-drawer');
@@ -260,6 +272,13 @@
     if (!invoice) return;
     const action = trigger.dataset.invoiceAction;
     trigger.closest('details')?.removeAttribute('open');
+    if (action === 'adjustments') {
+      const expanded = trigger.getAttribute('aria-expanded') !== 'true';
+      if (!expanded && active?.card === card) close();
+      setAdjustmentsOpen(card,expanded);
+      if (!expanded) trigger.focus({preventScroll:true});
+      return;
+    }
     if (['discount','release','remove-discount','undo-release'].includes(action)) { void open(card,action,trigger); return; }
     if (action === 'close') { close(); return; }
     if (action === 'pay' && canRecordInvoicePayment()) openInvoicePaymentModal(invoice.id,null,trigger);
@@ -292,6 +311,11 @@
     const menu = event.target.closest?.('.invoice-card-menu[open]');
     if (menu) { menu.open = false; menu.querySelector('summary').focus(); event.preventDefault(); }
     else if (active && active.card.contains(event.target)) { close(); event.preventDefault(); }
+    else {
+      const card = event.target.closest?.('[data-invoice-card]');
+      const toggle = card?.querySelector('.invoice-adjustments-disclosure[aria-expanded="true"]');
+      if (toggle) { setAdjustmentsOpen(card,false); toggle.focus({preventScroll:true}); event.preventDefault(); }
+    }
   });
 
   window.LuminInvoiceCards = {
