@@ -27,7 +27,7 @@ function setup(extra = {}) {
     hrDirectoryUsers: [{ userId: 'staff', fullName: 'Staff <name>', active: true, isDoctor: false }, { userId: 'doctor', fullName: 'Doctor', active: true, isDoctor: true }],
     hrUserMetrics: () => ({ salary: 1250.5, paid: false, settings: { attendanceEnabled: true } }),
     showAppointmentNotificationToast() {}, refreshHrDirectory: async () => {}, activeHrDoctorDetailsId: 'doctor',
-    hrDoctorSettlementLoading: false, hrDoctorSelectedCaseIds: new Set(['case-1']), hrDoctorSettlementRangeKey: 'cached',
+    hrDoctorSettlementLoading: false, hrDoctorReleasePending: false, hrDoctorSelectedCaseIds: new Set(['case-1']), hrDoctorSettlementRangeKey: 'cached',
     hrDoctorSettlementRange: () => ({ start: '2026-09-01', end: '2026-09-30' }),
     hrDoctorSettlementMetrics: () => ({ scope: 'cases', payableAmount: 850.25, payableCases: [{ finding_id: 'case-1' }] }),
     loadHrDoctorSettlementCases: async () => {}, renderHrDoctorDetails() {}, alert() {},

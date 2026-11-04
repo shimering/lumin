@@ -843,6 +843,58 @@ body.lumin-raised #app-header button { border: 1px solid ButtonText; }
 }
 
 /* Salary confirmation is also a chairside/mobile payment sheet. */
+.hr-doctor-settlement-filters { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); align-items: end; }
+.hr-doctor-payroll-control {
+  width: 100%; min-height: 44px; min-width: 0; padding: 10px 14px; border: 1px solid #e2e8f0;
+  border-radius: 12px; background: #fff; color: #334155; font-size: 12px; font-weight: 600;
+}
+.hr-doctor-case-action {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; min-width: 44px;
+  padding: 10px 14px; border: 0; border-radius: 12px; background: #f1f5f9; color: #475569;
+  font-size: 12px; font-weight: 600; line-height: 1.5; white-space: nowrap;
+}
+.hr-doctor-case-release { background: #fff7ed; color: #9a3412; }
+.hr-doctor-case-restore { background: #eff6ff; color: #1d4ed8; }
+.hr-doctor-case-action.hidden { display: none; }
+#hr-doctor-pay-salary.hr-doctor-case-action { background: linear-gradient(135deg, #059669, #0d9488); color: #fff; }
+#hr-doctor-pay-salary.hr-doctor-case-action:hover { background: linear-gradient(135deg, #047857, #0f766e); }
+.hr-doctor-case-action, .hr-doctor-payroll-control, .hr-doctor-case-select input {
+  transition: background .15s ease-out, border-color .15s ease-out, transform .15s ease-out;
+}
+.hr-doctor-case-action:hover { background: #e2e8f0; }
+.hr-doctor-case-release:hover { background: #ffedd5; }
+.hr-doctor-case-restore:hover { background: #dbeafe; }
+.hr-doctor-payroll-control:hover { background: #f8fafc; border-color: #cbd5e1; }
+.hr-doctor-case-action:active, .hr-doctor-payroll-control:active, .hr-doctor-case-select:active { transform: scale(.98); }
+.hr-doctor-case-action:focus-visible, .hr-doctor-payroll-control:focus-visible, .hr-doctor-case-select:focus-within {
+  outline: 2px solid #2563eb; outline-offset: 3px;
+}
+.hr-doctor-case-action:disabled, .hr-doctor-payroll-control:disabled, .hr-doctor-case-select:has(input:disabled) {
+  opacity: .5; pointer-events: none;
+}
+.hr-doctor-case-select { display: inline-flex; align-items: center; justify-content: center; gap: 12px; min-height: 44px; min-width: 44px; cursor: pointer; border-radius: 8px; }
+.hr-doctor-case-select:hover { background: #f8fafc; }
+.hr-doctor-case-select-text { display: none; }
+.hr-doctor-payroll-table { text-align: start; }
+.hr-doctor-payroll-table td { min-width: 0; overflow-wrap: anywhere; }
+.hr-doctor-case-released { background: #f8fafc; }
+.hr-doctor-case-released td.text-emerald-700 { color: #64748b; }
+body.lumin-raised .hr-doctor-payroll-control { background: var(--lumin-face); box-shadow: var(--lumin-small-raised); }
+@media (max-width: 767px) {
+  .hr-doctor-settlement-filters { grid-template-columns: minmax(0, 1fr); }
+  .hr-doctor-payroll-scroll { overflow-x: hidden; }
+  .hr-doctor-payroll-table { width: 100%; min-width: 0; }
+  .hr-doctor-payroll-table thead { display: none; }
+  .hr-doctor-payroll-table tbody { display: grid; gap: 16px; padding: 16px; }
+  .hr-doctor-payroll-table tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 16px; border: 1px solid #e2e8f0; border-radius: 16px; background: #fff; }
+  .hr-doctor-payroll-table td { padding: 0; text-align: start; }
+  .hr-doctor-payroll-table td[data-label]::before { display: block; margin-bottom: 8px; content: attr(data-label); font-size: 10px; font-weight: 500; color: #64748b; }
+  .hr-doctor-payroll-table :is(.hr-doctor-case-patient, .hr-doctor-case-procedure, .hr-doctor-case-selection, .hr-doctor-case-actions) { grid-column: 1 / -1; }
+  .hr-doctor-case-select-text { display: inline; }
+  .hr-doctor-case-actions button { width: 100%; white-space: normal; }
+  .hr-doctor-payroll-table .hr-doctor-case-placeholder { display: block; }
+  .hr-doctor-payroll-table .hr-doctor-case-released { background: #f8fafc; }
+}
 .hr-salary-payment-modal {
   position: fixed; inset: 0; z-index: 120; display: flex; align-items: center; justify-content: center;
   padding: max(24px, env(safe-area-inset-top)) 24px; background: rgb(15 23 42 / .4); backdrop-filter: blur(6px);

@@ -4,7 +4,7 @@ const root=path.resolve(__dirname,'..'),model=require('../lumin-supplier-list-mo
 const uuid=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
 async function database(t){
   const db=new PGlite();t.after(()=>db.close());await db.exec(fs.readFileSync(path.join(__dirname,'fixtures/inventory.sql'),'utf8'));
-  for(const file of fs.readdirSync(path.join(root,'supabase/migrations')).filter(name=>/^(20261016203800|20261016213858|20261017061336|20261017063353|20261017073421|20261017075131|20261017144330|20261017162033|20261019054001|20261019061244)_/.test(name)).sort())await db.exec(fs.readFileSync(path.join(root,'supabase/migrations',file),'utf8'));
+  for(const file of fs.readdirSync(path.join(root,'supabase/migrations')).filter(name=>/^(20261016203800|20261016213858|20261017061336|20261017063353|20261017073421|20261017075131|20261017144330|20261017162033|20261019054001|20261019061244|20261104104842)_/.test(name)).sort())await db.exec(fs.readFileSync(path.join(root,'supabase/migrations',file),'utf8'));
   await db.exec("create table public.quotation_settings(id integer primary key,clinic_name text);insert into public.quotation_settings values(1,'Lumin Clinic عيادة لومين');");
   const parent=(await db.query("select id from public.inventory_categories where key='anaesthesia'")).rows[0].id;
   await db.query("insert into public.inventory_categories(id,name,name_ar,parent_id) values($1,'Deep subcategory','تصنيف فرعي عميق',$2)",[uuid(100),parent]);
@@ -51,6 +51,99 @@ test('supplier lists enforce scope, complete candidates, main categories, minima
   assert.equal(await rpc('inventory_supplier_source',{p_token:saved.token},null,'service_role'),null);
 });
 
+test('saved supplier library supports safe edits, deletion, pagination, filtering and permissions',async t=>{
+  const{db,rpc}=await database(t),candidates=await rpc('get_inventory_supplier_candidates',{p_scope:'both'});
+  const createArgs={p_scope:'both',p_items:candidates.slice(0,3).map(({id,revision})=>({id,revision,requested_quantity:1})),p_request_id:uuid(8100),p_language:'en'};
+  const saved=await rpc('create_inventory_supplier_list',createArgs);
+  const before=await rpc('inventory_supplier_source',{p_token:saved.token},null,'service_role');
+  const stock=(await db.query('select id,quantity,revision from public.inventory_items order by id')).rows;
+  const report=await rpc('get_inventory_supplier_lists');assert.equal(report.total,1);assert.equal(report.items[0].item_count,3);assert.ok(!('token' in report.items[0]));assert.ok(!('items' in report.items[0]));
+  const detail=await rpc('get_inventory_supplier_list',{p_id:saved.id});assert.equal(detail.token,saved.token);assert.equal(detail.revision,1);
+  const args={p_id:saved.id,p_revision:1,p_name:'November restock نوفمبر',p_items:[{position:2,requested_quantity:7,name_en:'Forged name',image_data_url:'https://private.test'}],p_request_id:uuid(8101)};
+  const updated=await rpc('save_inventory_supplier_list',args);assert.equal(updated.revision,2);
+  assert.deepEqual(await rpc('save_inventory_supplier_list',args),updated,'Lost responses retry without a second edit');
+  await assert.rejects(rpc('save_inventory_supplier_list',{...args,p_name:'Changed retry'}),/SUPPLIER_REQUEST/);
+  await assert.rejects(rpc('save_inventory_supplier_list',args,3),/SUPPLIER_REQUEST/);
+  const published=await rpc('inventory_supplier_source',{p_token:saved.token},null,'service_role');assert.equal(published.items.length,1);assert.equal(published.items[0].requested_quantity,7);
+  assert.equal(published.items[0].name_en,before.items[1].name_en);assert.equal(published.items[0].image_data_url,before.items[1].image_data_url);
+  assert.equal(published.expires_at,before.expires_at);assert.ok(!('name' in published));
+  const fresh={...args,p_revision:2,p_request_id:uuid(8102),p_items:[{position:1,requested_quantity:1}]};
+  await assert.rejects(rpc('save_inventory_supplier_list',{...fresh,p_revision:1}),/SUPPLIER_STALE/);
+  for(const p_items of [[],[{position:2,requested_quantity:1}],[{position:0,requested_quantity:1}],[{position:1.5,requested_quantity:1}],[{position:1,requested_quantity:1},{position:1,requested_quantity:1}]])await assert.rejects(rpc('save_inventory_supplier_list',{...fresh,p_items}),/SUPPLIER_INPUT/);
+  for(const quantity of [0,1.5,-1,1000001,null,'3'])await assert.rejects(rpc('save_inventory_supplier_list',{...fresh,p_items:[{position:1,requested_quantity:quantity}]}),/SUPPLIER_QUANTITY/);
+  await assert.rejects(rpc('save_inventory_supplier_list',{...fresh,p_name:'x'.repeat(121)}),/SUPPLIER_INPUT/);
+  assert.equal((await rpc('get_inventory_supplier_lists',{p_query:'نوفمبر'})).total,1);
+  assert.equal((await rpc('get_inventory_supplier_lists',{p_query:'%'})).total,0,'Search punctuation is literal');
+  for(const who of [2,5,6,7,8]){
+    await assert.rejects(rpc('get_inventory_supplier_lists',{},who),/INVENTORY_ACCESS/);
+    await assert.rejects(rpc('get_inventory_supplier_list',{p_id:saved.id},who),/INVENTORY_ACCESS/);
+    await assert.rejects(rpc('save_inventory_supplier_list',fresh,who),/INVENTORY_ACCESS/);
+    await assert.rejects(rpc('delete_inventory_supplier_list',{p_id:saved.id,p_revision:2,p_request_id:uuid(8200+who)},who),/INVENTORY_ACCESS/);
+  }
+  for(const name of ['get_inventory_supplier_lists','get_inventory_supplier_list','save_inventory_supplier_list','delete_inventory_supplier_list']){
+    const params=name==='get_inventory_supplier_lists'?{}:name==='get_inventory_supplier_list'?{p_id:saved.id}:name==='save_inventory_supplier_list'?fresh:{p_id:saved.id,p_revision:2,p_request_id:uuid(8300)};
+    await assert.rejects(rpc(name,params,null,'anon'),/permission denied/);
+  }
+  assert.equal((await rpc('get_inventory_supplier_lists',{},4)).total,1,'Receiving staff can manage clinic supplier documents');
+  const deletion={p_id:saved.id,p_revision:2,p_request_id:uuid(8400)};
+  await assert.rejects(rpc('delete_inventory_supplier_list',{...deletion,p_revision:1}),/SUPPLIER_STALE/);
+  const removed=await rpc('delete_inventory_supplier_list',deletion);assert.deepEqual(await rpc('delete_inventory_supplier_list',deletion),removed);
+  assert.equal((await rpc('get_inventory_supplier_lists')).total,0);assert.equal(await rpc('inventory_supplier_source',{p_token:saved.token},null,'service_role'),null);
+  await assert.rejects(rpc('get_inventory_supplier_list',{p_id:saved.id}),/SUPPLIER_MISSING/);
+  await assert.rejects(rpc('save_inventory_supplier_list',fresh),/SUPPLIER_MISSING/);
+  await rpc('create_inventory_supplier_list',createArgs);assert.equal(await rpc('inventory_supplier_source',{p_token:saved.token},null,'service_role'),null,'An old creation retry cannot resurrect a deleted link');
+  assert.deepEqual((await db.query('select id,quantity,revision from public.inventory_items order by id')).rows,stock);
+  await db.exec(`insert into private.inventory_supplier_lists(created_by,request_id,fingerprint,token,language,clinic_name,items,name,created_at,updated_at,expires_at)
+    select '${uuid(1)}',gen_random_uuid(),'seed',replace(gen_random_uuid()::text||gen_random_uuid()::text,'-',''),'en','Clinic','[{"name_en":"Supply","unit":"Box","requested_quantity":1}]',
+      'List '||lpad(n::text,2,'0'),now()-n*interval '1 day',now()-n*interval '1 day',case when n<=3 then now()-interval '1 day' else now()+interval '1 day' end from generate_series(1,23)n;`);
+  const first=await rpc('get_inventory_supplier_lists',{p_sort:'name'}),last=await rpc('get_inventory_supplier_lists',{p_sort:'name',p_page:2});
+  assert.equal(first.total,23);assert.equal(first.items.length,20);assert.equal(first.items[0].name,'List 01');assert.equal(last.items.length,3);
+  assert.equal((await rpc('get_inventory_supplier_lists',{p_status:'expired'})).total,3);assert.equal((await rpc('get_inventory_supplier_lists',{p_status:'active'})).total,20);
+  assert.equal((await rpc('get_inventory_supplier_lists',{p_sort:'oldest'})).items[0].name,'List 23');
+  await assert.rejects(rpc('get_inventory_supplier_lists',{p_page:0}),/SUPPLIER_INPUT/);
+  await assert.rejects(rpc('get_inventory_supplier_lists',{p_status:'deleted'}),/SUPPLIER_INPUT/);
+});
+
+test('saved supplier library can reopen, edit, retry and delete lists across responsive English and Arabic layouts',async t=>{
+  const{db,rpc}=await database(t),candidates=await rpc('get_inventory_supplier_candidates',{p_scope:'both'});
+  const saved=await rpc('create_inventory_supplier_list',{p_scope:'both',p_items:candidates.slice(0,3).map(({id,revision})=>({id,revision,requested_quantity:1})),p_request_id:uuid(9100),p_language:'en'});
+  const browser=await chromium.launch({headless:true,channel:process.env.LUMIN_TEST_BROWSER_CHANNEL||'chrome'});t.after(()=>browser.close());
+  const page=await browser.newPage({viewport:{width:390,height:844},reducedMotion:'reduce'}),errors=[];
+  page.on('pageerror',error=>errors.push(error.message));let dropSave=true;
+  await page.exposeFunction('fixtureRPC',async(name,args)=>{try{const data=await rpc(name,args);if(name==='save_inventory_supplier_list'&&dropSave){dropSave=false;return{error:{message:'Lost response'}};}return{data};}catch(error){return{error:{message:error.message}};}});
+  await page.route('https://supplier-library.test/**',route=>{
+    const url=new URL(route.request().url());
+    if(url.pathname==='/')return route.fulfill({contentType:'text/html',body:`<!doctype html><meta charset=utf-8><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:16px;font-family:Arial}*{box-sizing:border-box}</style><link rel="stylesheet" href="lumin-inventory.css"><button id="open">Supplier lists</button><script>var currentUiLanguage='en',context='actor';var db={rpc:(name,args)=>fixtureRPC(name,args)};</script>${['vendor/lucide.min.js','lumin-dates.js','lumin-supplier-list-model.js','lumin-inventory-supplier.js'].map(file=>`<script src="${file}"></script>`).join('')}<script>document.getElementById('open').onclick=()=>LuminInventorySupplier.openSaved({db,allowed:()=>true,context:()=>context,arabic:()=>currentUiLanguage==='ar',uuid:()=>crypto.randomUUID()});</script>`});
+    const file=path.resolve(root,'.'+url.pathname);if(!file.startsWith(root+path.sep)||!fs.existsSync(file))return route.fulfill({status:404,body:''});
+    return route.fulfill({contentType:file.endsWith('.css')?'text/css':'application/javascript',body:fs.readFileSync(file)});
+  });
+  await page.goto('https://supplier-library.test/');const action=name=>page.locator(`[data-supplier-action="${name}"]`);
+  for(const [width,height,lang]of [[320,720,'en'],[390,844,'ar'],[820,1180,'ar'],[1440,1000,'en']]){
+    await page.setViewportSize({width,height});await page.evaluate(lang=>{currentUiLanguage=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';},lang);
+    await page.locator('#open').click();await page.locator('[data-supplier-list]').waitFor();
+    assert.equal(await page.locator('.inv-supplier-dialog').evaluate(n=>n.scrollWidth>n.clientWidth+1),false);
+    assert.equal(await page.locator('#inventory-supplier-overlay .inv-dialog-body').evaluate(n=>n.scrollWidth>n.clientWidth+1),false);
+    const footer=await page.locator('#inventory-supplier-overlay .inv-dialog-footer').boundingBox();assert.ok(footer.y+footer.height<=height+1);
+    for(const name of ['edit-saved','share-saved','delete-saved']){const b=await action(name).boundingBox();assert.ok(b.height>=44&&b.width>=44);}
+    assert.equal(await action('edit-saved').textContent(),lang==='ar'?'تعديل القائمة':'Edit list');
+    if(process.env.LUMIN_SUPPLIER_SCREENSHOTS){fs.mkdirSync(process.env.LUMIN_SUPPLIER_SCREENSHOTS,{recursive:true});await page.screenshot({path:path.join(process.env.LUMIN_SUPPLIER_SCREENSHOTS,`supplier-library-${width}-${lang}.png`)});}
+    await page.keyboard.press('Escape');assert.equal(await page.locator('#inventory-supplier-overlay').count(),0);
+  }
+  await page.locator('#open').click();await action('share-saved').click();assert.equal(new URL(await page.locator('.inv-supplier-link').inputValue()).searchParams.get('s'),saved.token);await action('library').click();
+  await action('edit-saved').click();await page.locator('[name=supplier-list-name]').fill('November restock نوفمبر');
+  await action('wanted-plus').first().click();await action('remove').last().click();
+  assert.equal(await page.locator('[name=supplier-list-name]').inputValue(),'November restock نوفمبر');
+  await action('save-edit').click();await page.locator('.inv-error').filter({hasText:'Could not save'}).waitFor();
+  assert.equal(await page.locator('[data-supplier-item]').count(),2,'Failed response keeps the edited document');
+  await action('save-edit').click();await page.locator('[data-supplier-list] h4').filter({hasText:'November restock'}).waitFor();
+  const updated=await rpc('get_inventory_supplier_list',{p_id:saved.id});assert.equal(updated.revision,2);assert.equal(updated.items.length,2);assert.equal(updated.items[0].requested_quantity,2);assert.equal(updated.token,saved.token);
+  await page.locator('[name=supplier-search]').fill('No match');await page.waitForFunction(()=>!document.querySelector('[data-supplier-list]')&&!document.querySelector('.inv-supplier-library-loading'));
+  await action('clear-library').click();await action('delete-saved').click();await action('library').click();assert.ok(await rpc('inventory_supplier_source',{p_token:saved.token},null,'service_role'));
+  await action('delete-saved').click();await action('confirm-delete').click();await page.waitForFunction(()=>document.querySelector('.inv-supplier-empty h4')?.textContent==='No supplier lists yet');
+  assert.equal(await rpc('inventory_supplier_source',{p_token:saved.token},null,'service_role'),null);
+  assert.deepEqual(errors,[]);
+});
+
 test('supplier review and shared JPG/link page fit mobile, tablet, desktop, English and Arabic',async t=>{
   const{db,rpc}=await database(t);const downloadsPath=path.join(root,'.wrangler/supplier-review/downloads');fs.mkdirSync(downloadsPath,{recursive:true});const browser=await chromium.launch({headless:true,channel:process.env.LUMIN_TEST_BROWSER_CHANNEL||'chrome',downloadsPath});t.after(()=>browser.close());
   const page=await browser.newPage({viewport:{width:375,height:812},acceptDownloads:true,reducedMotion:'reduce'});page.setDefaultTimeout(8000);
@@ -68,7 +161,7 @@ test('supplier review and shared JPG/link page fit mobile, tablet, desktop, Engl
   const heading=page.locator('.inv-heading');assert.equal(await heading.locator('[data-inv-action=add]').isVisible(),true);assert.equal(await heading.locator('[data-inv-action=choose-receive]').isVisible(),false);
   await heading.locator('[data-inv-action=add]').click();await page.locator('#inventory-overlay [name=name_en]').waitFor();await page.keyboard.press('Escape');
   const supplierAction=name=>page.locator(`[data-supplier-action="${name}"]`);
-  await heading.locator('[data-inv-action=supplier-list]').click();assert.equal(creates,0);await page.locator('[name=supplier-scope][value=both]').check();await supplierAction('review').click();
+  await heading.locator('[data-inv-action=supplier-list]').click();await supplierAction('start').first().click();assert.equal(creates,0);await page.locator('[name=supplier-scope][value=both]').check();await supplierAction('review').click();
   await page.waitForFunction(()=>document.querySelectorAll('[data-supplier-item]').length===47);assert.equal(creates,0,'Review does not publish anything');
   await page.waitForFunction(()=>document.querySelector('[data-supplier-thumb] img')?.naturalWidth===160);
   assert.equal(await page.locator('.inv-supplier-group h4').count(),1);assert.equal(await page.locator('.inv-supplier-group h4').textContent(),'Consumables');
