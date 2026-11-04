@@ -47,7 +47,7 @@ test('staff remains usable during slow/failed payroll; loading and retry work on
     document.getElementById('auth-gate').classList.add('hidden');document.getElementById('app-shell').classList.remove('hidden');
     document.querySelectorAll('main>section').forEach(node=>node.classList.add('hidden'));
     document.getElementById('view-clinic-management').classList.remove('hidden');
-    ['overview','finances','analytics','inventory'].forEach(name=>document.getElementById(name==='overview'?'view-clinic-overview':'view-'+name)?.classList.add('hidden'));
+    ['finances','analytics','inventory'].forEach(name=>document.getElementById('view-'+name)?.classList.add('hidden'));
     document.getElementById('view-hr').classList.remove('hidden');
     document.getElementById('hr-payroll-month').value='2026-10';
   ` });

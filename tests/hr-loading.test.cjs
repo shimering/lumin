@@ -70,7 +70,7 @@ test('payroll failure leaves staff available and a retry can recover', async () 
   assert.equal(ctx.hrDoctorPayrollError, false);
 });
 
-test('overview explicitly requests monthly payroll and overlapping base reads are deduplicated', async () => {
+test('explicit monthly payroll requests and overlapping base reads are deduplicated', async () => {
   const { ctx, calls } = setup();
   const results = await Promise.all([ctx.refreshHrDirectory({ includeDoctorPayroll: true }), ctx.refreshHrDirectory()]);
   assert.deepEqual(results, [true, true]);
