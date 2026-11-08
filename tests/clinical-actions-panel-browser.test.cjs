@@ -158,7 +158,11 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
       assert.deepEqual(await page.evaluate(()=>chartSelectionTargets().map(target=>target.tooth)),['1','2']);
       await page.locator('#chart-apply-operation-button').click();
       assert.equal(await toggle.getAttribute('aria-expanded'),'false','Apply closes the panel after adding the treatment');
-      assert.deepEqual(await page.evaluate(()=>chartSelectionTargets().map(target=>target.tooth)),['1','2'],'Apply preserves selected teeth');
+      assert.deepEqual(await page.evaluate(()=>chartSelectionTargets()),[],'Apply immediately clears every selected tooth and surface');
+      assert.equal(await page.locator('.tooth-card.is-active-tooth').count(),0,'Applied teeth lose their selection highlight');
+      assert.equal(await page.locator('#chart-operation-select').inputValue(),'','Apply clears the selected tooth procedure');
+      assert.equal(await page.locator('[data-clinical-operation][aria-pressed="true"]').count(),0,'Applied procedures lose their selection highlight');
+      assert.equal(await page.locator('#chart-apply-operation-button').isEnabled(),false,'Another tooth operation requires a new selection');
       assert.deepEqual(await page.evaluate(()=>['1','2'].map(id=>getActivePatient().chartState[id].wholeOperations.at(-1).status)),['In','In']);
       await page.evaluate(()=>clearClinicalActionsSelection());
       assert.equal(await toggle.getAttribute('aria-expanded'),'false');
@@ -172,8 +176,12 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
   await page.locator('#chart-apply-operation-button').click();
   assert.equal(await page.locator('#chart-actions-toggle').getAttribute('aria-expanded'),'false','Surface Apply closes the panel');
   assert.equal(await page.evaluate(()=>getActivePatient().chartState['3'].surfaces.center.at(-1).status),'C');
+  assert.deepEqual(await page.evaluate(()=>chartSelectionTargets()),[],'Surface Apply immediately clears the tooth and surface selection');
+  assert.equal(await page.locator('#chart-operation-select').inputValue(),'','Surface Apply also clears the selected procedure');
   assert.equal(await page.locator('#chart-apply-operation-button').isEnabled(),false,'Surface procedures require surfaces after applying');
   await page.locator('#tooth-3-center').click();
+  assert.equal(await page.locator('#chart-apply-operation-button').isEnabled(),false,'Selecting another surface requires choosing a new procedure');
+  await page.locator('[data-clinical-operation="composite"]').click();
   assert.equal(await page.locator('#chart-apply-operation-button').isEnabled(),true);
   await page.evaluate(()=>{chartPatientMedia.collapsed=false;renderChartMediaPanel();});
   assert.equal(await page.locator('#chart-actions-toggle').getAttribute('aria-expanded'),'false','Viewer opens without a competing clinical pane');
@@ -190,6 +198,7 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
   await page.locator('#chart-apply-operation-button').click();
   assert.equal(await page.evaluate(()=>chartMouthFindings(getActivePatient()).length),1);
   assert.equal(await page.locator('#chart-actions-toggle').getAttribute('aria-expanded'),'false','Whole-mouth Apply closes the panel');
+  assert.equal(await page.locator('#chart-operation-select').inputValue(),'','Whole-mouth Apply clears the selected procedure');
   await page.locator('#chart-actions-toggle').click();
   await page.locator('#chart-actions-search').fill('unmatched');
   assert.match(await page.locator('#chart-actions-operations').textContent(),/No matching procedures/);
@@ -205,6 +214,7 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
   await page.evaluate(()=>{missingPatient=true;});
   await page.locator('#chart-apply-operation-button').click();
   assert.equal(await page.locator('#chart-actions-toggle').getAttribute('aria-expanded'),'true','Unsuccessful Apply keeps the panel open');
+  assert.equal(await page.locator('#chart-operation-select').inputValue(),'crown','Unsuccessful Apply retains the procedure for retry');
   assert.equal(await page.evaluate(()=>window.savedCharts.length),savesBeforeFailure);
   await page.evaluate(()=>{missingPatient=false;});
   await page.locator('#chart-apply-operation-button').click();
@@ -382,7 +392,8 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
       assert.equal(await panel.isVisible(),true,'Selecting another tooth reopens the sheet');
       await page.locator('#chart-apply-operation-button').click();
       assert.equal(await panel.isVisible(),false,'Apply removes the panel without a floating bar');
-      assert.equal(await page.evaluate(()=>document.activeElement.dataset.toothCard),'3','Focus returns to the selected tooth');
+      assert.deepEqual(await page.evaluate(()=>chartSelectionTargets()),[],'Mobile Apply clears all selected teeth');
+      assert.equal(await page.evaluate(()=>document.activeElement.dataset.toothCard),'3','Focus returns to the applied tooth without selecting it');
     }
     await page.setViewportSize({width:390,height:844});
     await page.evaluate(()=>{

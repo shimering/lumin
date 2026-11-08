@@ -153,7 +153,7 @@ test('discount preview validates balance limits; release remains a full-balance 
   await openAdjustment(page,'release');
   assert.equal(await page.locator(`${card} .invoice-release-amount strong`).textContent(),'EGP 1,700');
   await page.locator(`${card} [type="submit"]`).click();await page.waitForFunction(() => refreshes===3);
-  assert.equal(await page.locator(`${card} [data-invoice-balance]`).textContent(),'EGP 0');
+  assert.equal(await page.locator(`${card} [data-invoice-balance]`).textContent(),'No balance due');
   await openAdjustment(page,'undo-release');
   await page.locator(`${card} [type="submit"]`).click();await page.waitForFunction(() => refreshes===4);
   assert.equal(await page.locator(`${card} [data-invoice-balance]`).textContent(),'EGP 1,700');
@@ -211,5 +211,55 @@ test('inline cards fit phone, tablet and desktop layouts in English and Arabic, 
   assert.equal(await page.locator(action('remove-discount')).count(),0);
   assert.equal(await page.locator(action('undo-release')).count(),0);
   assert.equal(await page.locator(action('discount')).isDisabled(),true);
+  assert.deepEqual(errors,[]);
+});
+
+test('invoice amounts use semantic colors and settled cards replace the zero hero with a compact summary',{skip:!chromium},async t => {
+  const {page,errors}=await fixture(t);
+  await page.evaluate(() => {
+    const base=structuredClone(fixtureInvoices[1]);
+    fixtureInvoices.push(
+      {...structuredClone(base),id:3,status:'paid',paidAmount:3000},
+      {...structuredClone(base),id:4,paidAmount:1000,releasedAmount:2000,releases:[{id:40,amount:2000}]},
+      {...structuredClone(base),id:5,manualDiscount:3000,manualDiscountValue:3000},
+      {...structuredClone(base),id:6,status:'cancelled'}
+    );
+    return renderPatientInvoices();
+  });
+  const color=selector=>page.locator(selector).first().evaluate(node=>getComputedStyle(node).color);
+  for(const width of [320,390,834,1280]) {
+    await page.setViewportSize({width,height:1100});
+    for(const language of ['en','ar']) {
+      await page.evaluate(language=>{currentUiLanguage=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';return renderPatientInvoices();},language);
+      const paid='#patient-invoices-list [data-invoice-card="3"]';
+      assert.equal(await color(`${card} .invoice-money-remaining`),'rgb(190, 18, 60)');
+      assert.equal(await color(`${card} .invoice-money-paid`),'rgb(4, 120, 87)');
+      assert.equal(await color(`${card} .invoice-money-total`),'rgb(29, 78, 216)');
+      assert.equal(await color(`${card} .invoice-money-discount`),'rgb(124, 58, 237)');
+      assert.equal(await color(`${card} .invoice-money-released`),'rgb(161, 98, 7)');
+      for(const id of [3,4,5]) {
+        const scope=`#patient-invoices-list [data-invoice-card="${id}"]`;
+        assert.equal(await page.locator(`${scope} .invoice-card-amount`).count(),0,'Settled invoices have no zero-balance hero');
+        assert.equal(await page.locator(`${scope} [data-invoice-balance]`).textContent(),language==='ar'?'لا يوجد مبلغ مستحق':'No balance due');
+        assert.equal(await page.locator(action('pay',scope)).count(),0);
+      }
+      assert.equal(await page.locator('[data-invoice-card="4"] .invoice-card-status').textContent(),language==='ar'?'مدفوعة مع إعفاء':'Paid + released');
+      assert.equal(await page.locator('[data-invoice-card="5"] .invoice-card-status').textContent(),language==='ar'?'تمت التسوية بالخصم':'Discounted');
+      assert.equal(await page.locator('[data-invoice-card="6"] .invoice-card-settlement').textContent(),language==='ar'?'ملغاة':'Cancelled');
+      if(process.env.LUMIN_MEDIA_SCREENSHOT_DIR&&(width===1280||width===390||width===320)) {
+        await page.screenshot({path:path.join(process.env.LUMIN_MEDIA_SCREENSHOT_DIR,`invoice-compact-${width}-${language}.png`),fullPage:true});
+        if(width===1280&&language==='en') {
+          await page.locator(paid).screenshot({path:path.join(process.env.LUMIN_MEDIA_SCREENSHOT_DIR,'invoice-paid-redesign.png')});
+          await page.locator(card).screenshot({path:path.join(process.env.LUMIN_MEDIA_SCREENSHOT_DIR,'invoice-balance-redesign.png')});
+        }
+      }
+      const bounds=await page.locator(`${paid} .invoice-card-overview`).boundingBox();
+      assert.ok(bounds.height<=(width<640?180:112),`${width}/${language}: settled summary stays compact (${bounds.height}px)`);
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${width}/${language} has no horizontal overflow`);
+      const trigger=await page.locator(action('adjustments',paid)).boundingBox();
+      assert.ok(trigger.width>=44&&trigger.height>=44);
+    }
+  }
+  assert.deepEqual(await page.evaluate(()=>rpcCalls),[],'Visual changes never write to the financial records');
   assert.deepEqual(errors,[]);
 });

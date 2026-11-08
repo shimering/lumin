@@ -181,8 +181,8 @@ function toggleClinicalActionsPanel() {
   focusClinicalActionsTrigger();
 }
 
-function focusClinicalActionsTrigger() {
-  const tooth = chartSelectionTargets().at(-1)?.tooth;
+function focusClinicalActionsTrigger(preferredTooth = null) {
+  const tooth = preferredTooth || chartSelectionTargets().at(-1)?.tooth;
   const trigger = clinicalActionsIsMobile() && !clinicalActionsPanel.open
     ? tooth && document.querySelector(`[data-tooth-card="${CSS.escape(tooth)}"]`)
     : document.getElementById('chart-actions-toggle');

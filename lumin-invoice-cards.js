@@ -48,7 +48,7 @@
       <div class="invoice-treatment-copy"><div class="invoice-treatment-title"><h5>${esc(item.operationName)}</h5><span class="invoice-item-status invoice-tone-${status.key === 'C' ? 'green' : status.key === 'In' ? 'blue' : 'amber'}">${esc(ar() ? ({C:'مكتمل',In:'قيد التنفيذ',P:'مخطط'}[status.key] || status.label) : status.label)}</span></div>
         <p>${esc([dentition, quadrant.abbreviation, surfaces, item.doctorName].filter(Boolean).join(' · '))}</p>
         <div class="invoice-treatment-notes"><span>${icon('calendar-days')}${esc(formatInvoiceDate(invoice.invoiceDate))}</span>${invoiceDoctorSalaryActionMarkup(item)}</div></div>
-      <div class="invoice-treatment-price"><strong>${esc(formatInvoiceMoney(invoiceItemTotal(item)))}</strong><span>${esc(text('Qty ', 'الكمية ') + item.quantity)}</span></div>
+      <div class="invoice-treatment-price"><strong class="invoice-money-total" dir="ltr">${esc(formatInvoiceMoney(invoiceItemTotal(item)))}</strong><span>${esc(text('Qty ', 'الكمية ') + item.quantity)}</span></div>
       ${actions ? `<details class="invoice-card-menu invoice-item-menu"><summary aria-label="${esc(text('Treatment options', 'خيارات العلاج'))}">${icon('ellipsis-vertical')}</summary><div class="invoice-card-menu-list">${actions}</div></details>` : ''}</article>`;
   }
 
@@ -61,7 +61,7 @@
     const undoLabel = discount ? text('Remove discount', 'إزالة الخصم') : text('Undo latest release', 'التراجع عن آخر إعفاء');
     return `<div class="invoice-adjustment ${discount ? 'is-discount' : 'is-release'}">
       <button type="button" class="invoice-adjustment-toggle" data-invoice-action="${kind}" aria-expanded="false" aria-controls="invoice-drawer-${Number(invoice.id)}" ${editable ? '' : 'disabled'}>
-        <span class="invoice-adjustment-icon">${icon(discount ? 'badge-percent' : 'circle-minus')}</span><span class="invoice-adjustment-copy"><span>${label}</span><strong>${esc(formatInvoiceMoney(amount))}</strong></span>${icon('chevron-down')}</button>
+        <span class="invoice-adjustment-icon">${icon(discount ? 'badge-percent' : 'circle-minus')}</span><span class="invoice-adjustment-copy"><span>${label}</span><strong class="invoice-money-${discount ? 'discount' : 'released'}" dir="ltr">${esc(formatInvoiceMoney(amount))}</strong></span>${icon('chevron-down')}</button>
       ${undo ? `<button type="button" class="invoice-adjustment-undo" data-invoice-action="${discount ? 'remove-discount' : 'undo-release'}" aria-label="${undoLabel}" title="${undoLabel}">${icon('undo-2')}<span>${text('Undo', 'تراجع')}</span></button>` : ''}</div>`;
   }
 
@@ -75,11 +75,20 @@
       ${button('date',text('Edit invoice date','تعديل تاريخ الفاتورة'),'calendar-days')}
       ${button('delete',text('Delete invoice','حذف الفاتورة'),'trash-2', invoice.payments.length || invoice.releases.length || invoice.loyaltyDiscount > 0 ? 'disabled' : '')}</div></details>` : '';
     const translatedStatus = {'Cancelled':'ملغاة','Settled with loyalty':'تمت التسوية بالولاء','Discounted':'تمت التسوية بالخصم','Paid + released':'مدفوعة مع إعفاء','Released':'تم الإعفاء','Partially settled':'تسوية جزئية','Paid':'مدفوعة','Partially paid':'مدفوعة جزئيًا','Unpaid':'غير مدفوعة'};
-    return `<article class="invoice-card" data-refresh-key="${Number(invoice.id)}" data-invoice-card="${Number(invoice.id)}">
+    const adjustments = [
+      invoice.manualDiscount > 0 ? `<span>${text('Discount','خصم')} <b class="invoice-money-discount" dir="ltr">${esc(formatInvoiceMoney(invoice.manualDiscount))}</b></span>` : '',
+      invoice.releasedAmount > 0 ? `<span>${text('Released','إعفاء')} <b class="invoice-money-released" dir="ltr">${esc(formatInvoiceMoney(invoice.releasedAmount))}</b></span>` : '',
+    ].filter(Boolean).join('');
+    return `<article class="invoice-card${paid ? ' is-settled' : ''}${cancelled ? ' is-cancelled' : ''}" data-refresh-key="${Number(invoice.id)}" data-invoice-card="${Number(invoice.id)}">
+      <div class="invoice-card-overview">
       <header class="invoice-card-header"><div class="invoice-card-reference"><strong dir="ltr">${esc(invoiceNumber(invoice.id))}</strong><span>${esc(formatInvoiceDate(invoice.invoiceDate))}</span></div><span class="invoice-card-status invoice-tone-${cancelled ? 'slate' : paid ? 'green' : invoice.paidAmount > 0 ? 'blue' : 'amber'}">${esc(ar() ? translatedStatus[status.label] || status.label : status.label)}</span>${menu}</header>
-      <div class="invoice-card-balance"><div><span class="invoice-card-label">${text('Remaining balance','المبلغ المتبقي')}</span><strong class="invoice-card-amount" data-invoice-balance dir="ltr">${esc(formatInvoiceMoney(remaining))}</strong><p>${text('Invoice','الفاتورة')} <b>${esc(formatInvoiceMoney(invoiceTotal(invoice)))}</b><span>·</span>${text('Paid','المدفوع')} <b>${esc(formatInvoiceMoney(invoice.paidAmount))}</b></p></div>
+      <div class="invoice-card-balance">${paid || cancelled
+        ? `<span class="invoice-card-settlement" data-invoice-balance>${icon(cancelled ? 'circle-minus' : 'circle-check')}${cancelled ? text('Cancelled','ملغاة') : text('No balance due','لا يوجد مبلغ مستحق')}</span>`
+        : `<div class="invoice-card-due"><span class="invoice-card-label">${text('Remaining balance','المبلغ المتبقي')}</span><strong class="invoice-card-amount invoice-money-remaining" data-invoice-balance dir="ltr">${esc(formatInvoiceMoney(remaining))}</strong></div>`}
+        <dl class="invoice-card-totals"><div><dt>${text('Invoice','الفاتورة')}</dt><dd class="invoice-money-total" dir="ltr">${esc(formatInvoiceMoney(invoiceTotal(invoice)))}</dd></div><div><dt>${text('Paid','المدفوع')}</dt><dd class="${invoice.paidAmount > 0 ? 'invoice-money-paid' : 'invoice-money-muted'}" dir="ltr">${esc(formatInvoiceMoney(invoice.paidAmount))}</dd></div></dl>
         ${remaining > 0 && !cancelled && canRecordInvoicePayment() ? `<button type="button" class="invoice-card-button invoice-card-pay" data-invoice-action="pay">${icon('wallet-cards')}${text('Record payment','تسجيل دفعة')}</button>` : ''}</div>
-      <button type="button" class="invoice-adjustments-disclosure" data-invoice-action="adjustments" aria-expanded="false" aria-controls="invoice-adjustments-${Number(invoice.id)}"><span class="invoice-adjustments-disclosure-label">${icon('sliders-horizontal')}<span>${text('Discount & release','الخصم والإعفاء')}</span></span><span class="invoice-adjustments-summary">${esc([invoice.manualDiscount > 0 ? text('Discount ','خصم ') + formatInvoiceMoney(invoice.manualDiscount) : '', invoice.releasedAmount > 0 ? text('Released ','إعفاء ') + formatInvoiceMoney(invoice.releasedAmount) : ''].filter(Boolean).join(' · '))}</span>${icon('chevron-down')}</button>
+      <button type="button" class="invoice-adjustments-disclosure" data-invoice-action="adjustments" aria-expanded="false" aria-controls="invoice-adjustments-${Number(invoice.id)}"><span class="invoice-adjustments-disclosure-label">${icon('sliders-horizontal')}<span>${text('Discount & release','الخصم والإعفاء')}</span></span><span class="invoice-adjustments-summary">${adjustments}</span>${icon('chevron-down')}</button>
+      </div>
       <div class="invoice-adjustments-drawer" id="invoice-adjustments-${Number(invoice.id)}" aria-hidden="true" inert><div class="invoice-adjustments-clip">
         <div class="invoice-card-adjustments">${adjustmentMarkup(invoice,'discount')}${adjustmentMarkup(invoice,'release')}</div>
         <div class="invoice-inline-drawer" id="invoice-drawer-${Number(invoice.id)}" aria-hidden="true" inert><div class="invoice-inline-clip"><section class="invoice-drawer-panel" role="region" aria-labelledby="invoice-drawer-title-${Number(invoice.id)}"></section></div></div>
@@ -127,7 +136,10 @@
   function updatePreview(entry) {
     const result = projection(entry);
     const panel = entry.card.querySelector('.invoice-drawer-panel');
-    panel.querySelector('[data-invoice-projection]').textContent = result.valid || entry.kind !== 'discount' ? formatInvoiceMoney(result.next) : '—';
+    const projectedAmount = panel.querySelector('[data-invoice-projection]');
+    const validProjection = result.valid || entry.kind !== 'discount';
+    projectedAmount.textContent = validProjection ? formatInvoiceMoney(result.next) : '—';
+    projectedAmount.className = validProjection ? result.next > 0 ? 'invoice-money-remaining' : 'invoice-money-paid' : 'invoice-money-muted';
     const input = panel.querySelector('[data-invoice-value]');
     if (input) {
       input.max = entry.type === 'percent' ? String(subtotal(entry.invoice) > 0 ? Math.min(100,result.maximum / subtotal(entry.invoice) * 100) : 100) : String(result.maximum);
@@ -159,8 +171,8 @@
     panel.innerHTML = `${heading(entry)}<p class="invoice-drawer-description">${description}</p>
       <form data-invoice-form><fieldset ${entry.saving ? 'disabled' : ''}>
         ${discount ? `<div class="invoice-discount-fields"><label>${text('Discount type','نوع الخصم')}<select data-invoice-type><option value="amount" ${entry.type === 'amount' ? 'selected' : ''}>${text('Fixed amount (EGP)','مبلغ ثابت (ج.م)')}</option><option value="percent" ${entry.type === 'percent' ? 'selected' : ''}>${text('Percentage (%)','نسبة مئوية (%)')}</option></select></label><label>${text('Discount value','قيمة الخصم')}<span class="invoice-value-field"><input type="number" inputmode="decimal" min="0" step="0.01" value="${esc(entry.value)}" data-invoice-value required aria-describedby="invoice-validation-${entry.id}"><span>${entry.type === 'percent' ? '%' : 'EGP'}</span></span></label></div>`
-          : `<div class="invoice-release-amount"><span>${release ? text('Release amount','مبلغ الإعفاء') : text('Amount restored','المبلغ المستعاد')}</span><strong dir="ltr">${esc(formatInvoiceMoney(amount))}</strong></div>`}
-        ${release && invoice.releases.length ? `<div class="invoice-release-history"><span>${text('Previously released','مبالغ الإعفاء السابقة')}</span>${invoice.releases.map(record => `<div><span>${esc(formatInvoiceDate(record.releaseDate || String(record.createdAt || '').slice(0,10)))}</span><strong>${esc(formatInvoiceMoney(record.amount))}</strong></div>`).join('')}</div>` : ''}
+          : `<div class="invoice-release-amount"><span>${release ? text('Release amount','مبلغ الإعفاء') : text('Amount restored','المبلغ المستعاد')}</span><strong class="invoice-money-${entry.kind === 'remove-discount' ? 'discount' : 'released'}" dir="ltr">${esc(formatInvoiceMoney(amount))}</strong></div>`}
+        ${release && invoice.releases.length ? `<div class="invoice-release-history"><span>${text('Previously released','مبالغ الإعفاء السابقة')}</span>${invoice.releases.map(record => `<div><span>${esc(formatInvoiceDate(record.releaseDate || String(record.createdAt || '').slice(0,10)))}</span><strong class="invoice-money-released" dir="ltr">${esc(formatInvoiceMoney(record.amount))}</strong></div>`).join('')}</div>` : ''}
         <div class="invoice-drawer-projection" aria-live="polite"><span>${text('Remaining after adjustment','المتبقي بعد التعديل')}</span><strong data-invoice-projection dir="ltr"></strong></div>
         <p class="invoice-drawer-error" data-invoice-validation id="invoice-validation-${entry.id}" role="alert" hidden></p><p class="invoice-drawer-error" data-invoice-error role="alert" ${message ? '' : 'hidden'}>${esc(message)}</p>
         <footer class="invoice-drawer-footer"><button type="button" class="invoice-card-button" data-invoice-action="close">${text('Cancel','إلغاء')}</button><button type="submit" class="invoice-card-button invoice-card-confirm">${icon(entry.saving ? 'loader-circle' : discount ? 'check' : release ? 'circle-minus' : 'undo-2')}<span>${entry.saving ? text('Saving…','جارٍ الحفظ…') : confirmLabel}</span></button></footer>

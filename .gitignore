@@ -10,6 +10,8 @@ node_modules/
 .venv/
 storage-server/.lumin-sync/
 **/__pycache__/
+*.zip
+*.txt
 lumin-server-setup/build/
 lumin-server-setup/release/
 lumin-server-setup/review-choice-preview/
@@ -17,6 +19,10 @@ lumin-server-setup/*.zip
 lumin-server-setup/*-test-result.json
 lumin-server-setup/.test-temp/
 lumin-server-setup/.build-cache/
+lumin-server-station/build/
+lumin-server-station/dist/
+lumin-server-station/LuminServerStation/
+lumin-server-station/*.spec
 *.exe
 storage-server/Storage
 storage-server/Storage/
