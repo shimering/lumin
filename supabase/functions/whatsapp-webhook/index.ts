@@ -65,6 +65,69 @@ async function readWebhookBody(request: Request): Promise<string | null> {
   return new TextDecoder("utf-8", {fatal: true}).decode(bytes);
 }
 
+const WHATSAPP_AI_EVENT_MAX_AGE_MS = 15 * 60 * 1000;
+
+function incomingWhatsAppTiming(timestamp: unknown, now = Date.now()) {
+  const seconds = typeof timestamp === "string" || typeof timestamp === "number" ? Number(timestamp) : NaN;
+  const milliseconds = seconds * 1000;
+  const valid = Number.isFinite(milliseconds) && milliseconds > 0 && milliseconds <= 8640000000000000;
+  const age = now - milliseconds;
+  return {
+    sentAt: valid ? new Date(milliseconds).toISOString() : null,
+    fresh: valid && age >= -5 * 60 * 1000 && age <= WHATSAPP_AI_EVENT_MAX_AGE_MS,
+  };
+}
+
+function isWhatsAppAiInput(incoming: any, audioPart: any): boolean {
+  if (incoming.type === "text") return Boolean(String(incoming.text?.body || "").trim());
+  if (incoming.type === "audio" || incoming.type === "voice") return Boolean(audioPart);
+  if (["image", "document", "video"].includes(incoming.type)) {
+    return Boolean(String(incoming[incoming.type]?.caption || "").trim());
+  }
+  return false;
+}
+
+function prepareWhatsAppAiHistory(messages: any[], currentMessageId: string): any[] {
+  return messages.filter((message: any) => {
+    if (message.sender !== "patient" && !["sent", "delivered", "read"].includes(message.status)) return false;
+    if (message.sender === "patient" && message.provider_sent_at && !message.ai_eligible) return false;
+    const content = String(message.content || "").trim();
+    if (!content) return false;
+    if (/^(?:📷 Photo|🎤 Voice Message|\[(?:video|unsupported|sticker|message)\])$/.test(content) &&
+      !(message.id === currentMessageId && message.message_type === "audio")) return false;
+    if (message.sender !== "patient" && (
+      content.includes("أهلاً بك في عيادة لومين لطب الأسنان! 🦷✨") ||
+      content.includes("يوجد لدينا أكثر من ملف مسجل") ||
+      content.includes("ملف مسجل بهذا الرقم في النظام") ||
+      content.includes("ملف مسجل بحساب الواتساب")
+    )) return false;
+    return true;
+  });
+}
+
+async function maySendWhatsAppAiReply(supabase: any, conversationId: string, messageId: string, sentAt: string | null): Promise<boolean> {
+  if (!incomingWhatsAppTiming(sentAt ? Date.parse(sentAt) / 1000 : null).fresh) return false;
+  const [latest, conversation] = await Promise.all([
+    supabase.from("whatsapp_messages")
+      .select("id, sender, status, ai_eligible")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(24),
+    supabase.from("whatsapp_conversations").select("ai_enabled, status").eq("id", conversationId).maybeSingle(),
+  ]);
+  // Fail closed on read errors, staff replies, takeover, or a newer actionable patient message.
+  if (latest.error || conversation.error || !conversation.data) {
+    console.warn("Could not verify WhatsApp AI reply eligibility; skipping dispatch");
+    return false;
+  }
+  if (!conversation.data.ai_enabled || conversation.data.status === "human_needed") return false;
+  const latestRelevant = (latest.data || []).find((message: any) => message.sender === "patient"
+    ? message.ai_eligible === true
+    : ["sent", "delivered", "read"].includes(message.status));
+  return latestRelevant?.id === messageId;
+}
+
 function compileWhatsAppAiInstructions(blocks: unknown, legacyInstructions: unknown): string {
   const compiledBlocks = (Array.isArray(blocks) ? blocks : [])
     .map((block: any, index: number) => {
@@ -102,6 +165,13 @@ function cleanWhatsAppCode(val: string): string {
 function cleanPhone(raw: string): string {
   if (isBsuid(raw)) return String(raw).trim();
   return String(raw || "").replace(/[^\d]/g, "");
+}
+
+// Extract phone number from unstructured text (e.g. notes or patient messages)
+function extractPhoneFromText(text: string): string {
+  if (!text || typeof text !== "string") return "";
+  const match = text.match(/(?:\+?20|0)?1[0125]\d{8}/) || text.match(/\b\d{8,14}\b/);
+  return match ? match[0] : "";
 }
 
 // Format phone for local matching (extract last 9-10 digits)
@@ -1230,6 +1300,10 @@ function buildGeminiTools(doctorNames: string[] = [], visitTypeNames: string[] =
                 type: "STRING",
                 description: "The name of the patient being assigned.",
               },
+              phone: {
+                type: "STRING",
+                description: "Optional phone number associated with the patient profile if different from conversation channel.",
+              },
             },
           },
         },
@@ -1289,6 +1363,10 @@ function buildGeminiTools(doctorNames: string[] = [], visitTypeNames: string[] =
                 type: "STRING",
                 description: "Any extra notes or symptoms provided by the patient",
               },
+              phone: {
+                type: "STRING",
+                description: "Patient mobile phone number (e.g. 01012345678, +201012345678)",
+              },
             },
             required: ["patient_name", "date", "time"],
           },
@@ -1313,13 +1391,38 @@ function buildGeminiTools(doctorNames: string[] = [], visitTypeNames: string[] =
 }
 
 // Execute tool calls against Supabase DB
-async function whatsappPatientIsAllowed(supabase: any, conversation: any, patientId: string): Promise<boolean> {
+async function whatsappPatientIsAllowed(
+  supabase: any,
+  conversation: any,
+  patientId: string,
+  candidatePhone?: string,
+  candidateName?: string
+): Promise<boolean> {
   if (!patientId) return false;
   if (patientId === conversation.patient_id) return true; // Existing staff/sender-authorized link.
-  const matches = isBsuid(conversation.phone)
-    ? await findPatientsByWhatsApp(supabase, conversation.phone)
-    : await findPatientsByPhone(supabase, conversation.phone);
-  return matches.some((patient: any) => patient.id === patientId);
+  const isMasked = isBsuid(conversation.phone);
+  if (!isMasked) {
+    const matches = await findPatientsByPhone(supabase, conversation.phone);
+    return matches.some((patient: any) => patient.id === patientId);
+  }
+  // Masked BSUID conversation:
+  // 1. Direct WhatsApp code link
+  const waMatches = await findPatientsByWhatsApp(supabase, conversation.phone);
+  if (waMatches.some((patient: any) => patient.id === patientId)) return true;
+
+  // 2. Verified identity by phone + name matching
+  const clean = cleanPhone(candidatePhone || "");
+  if (clean && !isBsuid(clean)) {
+    const phoneMatches = await findPatientsByPhone(supabase, clean);
+    const matchedP = phoneMatches.find((p: any) => p.id === patientId);
+    if (matchedP) {
+      const nameToCheck = (candidateName || conversation.patient_name || "").trim();
+      if (nameToCheck && namesMatch(nameToCheck, matchedP.name)) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 async function handleGeminiToolCall(
@@ -1659,7 +1762,11 @@ async function handleGeminiToolCall(
 
   if (name === "lookup_patient") {
     const rawPhone = String(args.phone || "").trim();
-    if (isBsuid(conversation.phone) || !cleanPhone(rawPhone) || getPhoneTail(rawPhone) !== getPhoneTail(conversation.phone)) {
+    if (!cleanPhone(rawPhone)) {
+      return { success: false, found: false, error: "PATIENT_IDENTITY_REQUIRED" };
+    }
+    // If not a BSUID, sender must not search a different phone number
+    if (!isBsuid(conversation.phone) && getPhoneTail(rawPhone) !== getPhoneTail(conversation.phone)) {
       return { success: false, found: false, error: "PATIENT_IDENTITY_REQUIRED" };
     }
     if (!rawPhone) {
@@ -1684,6 +1791,18 @@ async function handleGeminiToolCall(
     if (matches.length === 1) {
       const p = matches[0];
       const previousName = conversation.patient_name;
+
+      // Privacy guard for masked BSUID: If sender hasn't provided a matching name yet, require name confirmation without leaking database name
+      if (isBsuid(conversation.phone) && (!previousName || previousName === "WhatsApp User" || previousName.startsWith("+") || !namesMatch(previousName, p.name))) {
+        return {
+          found: true,
+          count: 1,
+          phone: rawPhone,
+          requires_name_confirmation: true,
+          message: `تم العثور على ملف مسجل برقم الهاتف (${rawPhone}). قاعدة الخصوصية الصارمة: ممنوع منعاً باتاً ذكر أو اقتراح أو إفشاء اسم المريض في الشات! اطلب من العميل اسمه الكامل بشكل طبيعي لتأكيد هويته ("ما هو الاسم الكامل لحجز الموعد؟"). عندما يذكر اسمه، استخدم create_patient أو book_appointment لتأكيد الحجز وربط الملف.`,
+        };
+      }
+
       conversation.patient_id = p.id;
       conversation.patient_name = p.name;
       const updatePayload: any = { patient_id: p.id, patient_name: p.name };
@@ -1724,12 +1843,13 @@ async function handleGeminiToolCall(
   }
 
   if (name === "assign_patient") {
-    const { patient_id, patient_name } = args;
+    const { patient_id, patient_name, phone } = args;
     let targetPatientId = patient_id;
     let targetPatientName = patient_name;
+    const candidatePhone = phone || (!isBsuid(conversation.phone) ? conversation.phone : "");
 
     if (!targetPatientId && targetPatientName) {
-      const matches = await findPatientsByPhone(supabase, conversation.phone);
+      const matches = candidatePhone ? await findPatientsByPhone(supabase, candidatePhone) : [];
       const best = matches
         .map((m: any) => ({ m, score: matchPatientNameScore(targetPatientName, m.name) }))
         .sort((a: any, b: any) => b.score - a.score)[0];
@@ -1743,7 +1863,7 @@ async function handleGeminiToolCall(
       return { success: false, error: "patient_id or valid patient_name is required" };
     }
 
-    if (!(await whatsappPatientIsAllowed(supabase, conversation, targetPatientId))) {
+    if (!(await whatsappPatientIsAllowed(supabase, conversation, targetPatientId, candidatePhone, targetPatientName))) {
       return { success: false, error: "PATIENT_IDENTITY_REQUIRED" };
     }
     const { data: p, error: pErr } = await supabase
@@ -1798,18 +1918,20 @@ async function handleGeminiToolCall(
     if (args.phone && !isBsuid(conversation.phone) && getPhoneTail(args.phone) !== getPhoneTail(conversation.phone)) {
       return { success: false, error: "PATIENT_IDENTITY_REQUIRED" };
     }
-    const rawTargetPhone = args.phone || conversation.phone || "";
+    const rawTargetPhone = args.phone || (!isBsuid(conversation.phone) ? conversation.phone : "") || "";
     const phoneToAssign = isBsuid(rawTargetPhone) ? "" : rawTargetPhone;
 
     // GUARD AGAINST DUPLICATE CREATION:
     // If patient(s) already exist with this phone number, re-use the existing profile!
     const existingMatches = phoneToAssign ? await findPatientsByPhone(supabase, phoneToAssign) : [];
-    if (isBsuid(conversation.phone) && existingMatches.some((patient: any) => patient.id !== conversation.patient_id)) {
-      return { success: false, error: "PATIENT_IDENTITY_REQUIRED" };
-    }
 
     if (existingMatches.length === 1) {
       const existing = existingMatches[0];
+      // For masked BSUID, verify stated patientName matches existing profile before re-using
+      if (isBsuid(conversation.phone) && !namesMatch(patientName, existing.name)) {
+        return { success: false, error: "PATIENT_IDENTITY_REQUIRED" };
+      }
+
       await supabase
         .from("whatsapp_conversations")
         .update({
@@ -1868,6 +1990,8 @@ async function handleGeminiToolCall(
           phone: best.p.phone,
           message: `تم استخدام الملف المسجل مسبقاً للمريض "${best.p.name}" المربوط بهذا الرقم بنجاح دون إنشاء مريض مكرر. المريض لديه ملف فعلي مسجل الآن: لا تسأله عن رقم هاتفه مرة أخرى أبداً، ويمكنك فقط تأكيد رقم هاتفه المسجل معه إذا دعت الحاجة.`,
         };
+      } else if (isBsuid(conversation.phone)) {
+        return { success: false, error: "PATIENT_IDENTITY_REQUIRED" };
       }
     }
 
@@ -1922,18 +2046,21 @@ async function handleGeminiToolCall(
   }
 
   if (name === "book_appointment") {
-    const { patient_name, date, time, doctor_name, visit_type, notes, patient_id } = args;
+    const { patient_name, date, time, doctor_name, visit_type, notes, patient_id, phone } = args;
     const duration = resolveAppointmentDuration(visit_type, customInstructions, Number(args.duration_minutes));
     const appointmentAtIso = localDateTimeToUtcIso(date, time, timeZone);
     const reqStartMs = Date.parse(appointmentAtIso);
     const reqEndMs = reqStartMs + duration * 60 * 1000;
 
+    const rawCandidatePhone = phone || (!isBsuid(conversation.phone) ? conversation.phone : "") || extractPhoneFromText(notes || "");
+    const phoneToSearch = cleanPhone(rawCandidatePhone);
+    let finalPatientName = (patient_name || conversation.patient_name || "").trim();
+
     // 1. Resolve patient: prioritize provided patient_id or conversation.patient_id
     let patientId = patient_id || conversation.patient_id;
-    if (patientId && !(await whatsappPatientIsAllowed(supabase, conversation, patientId))) {
+    if (patientId && !(await whatsappPatientIsAllowed(supabase, conversation, patientId, phoneToSearch, finalPatientName))) {
       return { success: false, error: "PATIENT_IDENTITY_REQUIRED" };
     }
-    let finalPatientName = (patient_name || conversation.patient_name || "").trim();
 
     // If patientId is provided, verify it exists
     if (patientId) {
@@ -1950,107 +2077,122 @@ async function handleGeminiToolCall(
       }
     }
 
-    // Search by phone attached to conversation or args if patientId not yet resolved
-    if (!patientId) {
-      const phoneToSearch = conversation.phone || args.phone || "";
-      if (!isBsuid(phoneToSearch) && phoneToSearch) {
-        const matches = await findPatientsByPhone(supabase, phoneToSearch);
-        if (matches.length === 1) {
-          // Exactly 1 patient attached to this phone: ALWAYS re-use this existing patient
+    // Search by phone if patientId not yet resolved
+    if (!patientId && phoneToSearch && !isBsuid(phoneToSearch)) {
+      const matches = await findPatientsByPhone(supabase, phoneToSearch);
+      if (matches.length === 1) {
+        if (!isBsuid(conversation.phone) || namesMatch(finalPatientName, matches[0].name)) {
           patientId = matches[0].id;
           finalPatientName = matches[0].name || finalPatientName;
-        } else if (matches.length > 1) {
-          // Check if patient_name matches one of the duplicate names using Arabic normalization & scoring
-          const scoredMatches = matches
-            .map((m: any) => ({
-              patient: m,
-              score: Math.max(
-                matchPatientNameScore(finalPatientName, m.name),
-                matchPatientNameScore(conversation.patient_name, m.name)
-              ),
-            }))
-            .sort((a: any, b: any) => b.score - a.score);
+        }
+      } else if (matches.length > 1) {
+        // Check if patient_name matches one of the duplicate names using Arabic normalization & scoring
+        const scoredMatches = matches
+          .map((m: any) => ({
+            patient: m,
+            score: Math.max(
+              matchPatientNameScore(finalPatientName, m.name),
+              matchPatientNameScore(conversation.patient_name, m.name)
+            ),
+          }))
+          .sort((a: any, b: any) => b.score - a.score);
 
-          if (scoredMatches[0] && scoredMatches[0].score >= 60) {
-            patientId = scoredMatches[0].patient.id;
-            finalPatientName = scoredMatches[0].patient.name;
-          } else if (conversation.patient_id && matches.some((m: any) => m.id === conversation.patient_id)) {
-            patientId = conversation.patient_id;
-            const matched = matches.find((m: any) => m.id === conversation.patient_id);
-            finalPatientName = matched?.name || finalPatientName;
-          } else {
-            return {
-              success: false,
-              error: "DUPLICATE_PATIENTS_EXIST",
-              duplicates: matches.map((m: any) => ({ id: m.id, name: m.name })),
-              message: `يوجد أكثر من مريض مسجل بهذا الرقم (${matches.map((m: any) => m.name).join("، ")}). يرجى سؤال المريض عن الاسم المطلوب لتأكيد الحجز، أو استخدام أحد هذه الأسماء المسجلة.`,
-            };
+        if (scoredMatches[0] && scoredMatches[0].score >= 60) {
+          patientId = scoredMatches[0].patient.id;
+          finalPatientName = scoredMatches[0].patient.name;
+        } else if (conversation.patient_id && matches.some((m: any) => m.id === conversation.patient_id)) {
+          patientId = conversation.patient_id;
+          const matched = matches.find((m: any) => m.id === conversation.patient_id);
+          finalPatientName = matched?.name || finalPatientName;
+        } else if (!isBsuid(conversation.phone)) {
+          return {
+            success: false,
+            error: "DUPLICATE_PATIENTS_EXIST",
+            duplicates: matches.map((m: any) => ({ id: m.id, name: m.name })),
+            message: `يوجد أكثر من مريض مسجل بهذا الرقم (${matches.map((m: any) => m.name).join("، ")}). يرجى سؤال المريض عن الاسم المطلوب لتأكيد الحجز، أو استخدام أحد هذه الأسماء المسجلة.`,
+          };
+        }
+      }
+    }
+
+    // If still no patientId, search patients table by name to find existing registered patient
+    if (!patientId && finalPatientName && finalPatientName !== "WhatsApp Patient" && finalPatientName !== "Patient") {
+      const rawFirstWord = finalPatientName.trim().split(/\s+/)[0];
+      const normReq = normalizeArabicName(finalPatientName);
+      const normFirstWord = normReq.split(/\s+/)[0];
+
+      const orParts: string[] = [];
+      if (rawFirstWord) orParts.push(`name.ilike.${rawFirstWord}%`);
+      if (normFirstWord && normFirstWord !== rawFirstWord) orParts.push(`name.ilike.${normFirstWord}%`);
+
+      const { data: nameCandidates } = await supabase
+        .from("patients")
+        .select("id, name, phone")
+        .or(orParts.join(","))
+        .limit(50);
+
+      if (Array.isArray(nameCandidates) && nameCandidates.length > 0) {
+        const scored = nameCandidates
+          .map((c: any) => ({
+            patient: c,
+            score: matchPatientNameScore(finalPatientName, c.name),
+          }))
+          .filter((x: any) => x.score >= 70)
+          .sort((a: any, b: any) => b.score - a.score);
+
+        if (scored.length > 0) {
+          patientId = scored[0].patient.id;
+          finalPatientName = scored[0].patient.name;
+          if (!scored[0].patient.phone && !isBsuid(conversation.phone) && conversation.phone) {
+            await supabase.from("patients").update({ phone: conversation.phone }).eq("id", patientId);
           }
         }
       }
+    }
 
-      // If still no patientId, search patients table by name to find existing registered patient
-      if (!patientId && finalPatientName && finalPatientName !== "WhatsApp Patient" && finalPatientName !== "Patient") {
-        const normReq = normalizeArabicName(finalPatientName);
-        const firstWord = normReq.split(" ")[0];
-        const { data: nameCandidates } = await supabase
-          .from("patients")
-          .select("id, name, phone")
-          .ilike("name", `${firstWord}%`)
-          .limit(10);
+    // ONLY IF ABSOLUTELY NO MATCHING PATIENT WAS FOUND ANYWHERE:
+    if (!patientId) {
+      const effectiveName = finalPatientName || "WhatsApp Patient";
+      const nameParts = effectiveName.split(/\s+/).filter(Boolean);
+      const firstName = nameParts[0] || "Patient";
+      const lastName = nameParts.slice(1).join(" ") || "";
+      const phoneToSave = phoneToSearch || (!isBsuid(conversation.phone) ? conversation.phone : "");
+      const waCode = isBsuid(conversation.phone) ? formatWhatsAppCode(conversation.phone) : null;
+      const { data: newPatient, error: newPatientErr } = await supabase
+        .from("patients")
+        .insert({
+          name: effectiveName,
+          first_name: firstName,
+          last_name: lastName,
+          phone: phoneToSave,
+          whatsapp_code: waCode,
+          chart_state: {},
+        })
+        .select("id, name")
+        .single();
 
-        if (Array.isArray(nameCandidates) && nameCandidates.length > 0) {
-          const scored = nameCandidates
-            .map((c: any) => ({
-              patient: c,
-              score: matchPatientNameScore(finalPatientName, c.name),
-            }))
-            .filter((x: any) => x.score >= 70)
-            .sort((a: any, b: any) => b.score - a.score);
-
-          if (scored.length > 0) {
-            patientId = scored[0].patient.id;
-            finalPatientName = scored[0].patient.name;
-            if (!scored[0].patient.phone && !isBsuid(conversation.phone) && conversation.phone) {
-              await supabase.from("patients").update({ phone: conversation.phone }).eq("id", patientId);
-            }
-          }
-        }
+      if (newPatientErr) {
+        console.error("Failed to create new patient in book_appointment:", newPatientErr);
+      } else if (newPatient) {
+        patientId = newPatient.id;
+        finalPatientName = newPatient.name;
       }
+    }
 
-      // ONLY IF ABSOLUTELY NO MATCHING PATIENT WAS FOUND ANYWHERE:
-      if (!patientId) {
-        const effectiveName = finalPatientName || "WhatsApp Patient";
-        const nameParts = effectiveName.split(/\s+/).filter(Boolean);
-        const firstName = nameParts[0] || "Patient";
-        const lastName = nameParts.slice(1).join(" ") || "";
-        const { data: newPatient, error: newPatientErr } = await supabase
-          .from("patients")
-          .insert({
-            name: effectiveName,
-            first_name: firstName,
-            last_name: lastName,
-            phone: isBsuid(conversation.phone) ? "" : conversation.phone,
-            chart_state: {},
-          })
-          .select("id, name")
-          .single();
+    if (patientId) {
+      await supabase
+        .from("whatsapp_conversations")
+        .update({ patient_id: patientId, patient_name: finalPatientName })
+        .eq("id", conversation.id);
+      conversation.patient_id = patientId;
+      conversation.patient_name = finalPatientName;
 
-        if (newPatientErr) {
-          console.error("Failed to create new patient in book_appointment:", newPatientErr);
-        } else if (newPatient) {
-          patientId = newPatient.id;
-          finalPatientName = newPatient.name;
-        }
-      }
-
-      if (patientId) {
-        await supabase
-          .from("whatsapp_conversations")
-          .update({ patient_id: patientId, patient_name: finalPatientName })
-          .eq("id", conversation.id);
-        conversation.patient_id = patientId;
-        conversation.patient_name = finalPatientName;
+      const waCode = isBsuid(conversation.phone) ? formatWhatsAppCode(conversation.phone) : null;
+      if (waCode) {
+        await savePatientWhatsAppIdentity(supabase, patientId, {
+          whatsapp_code: waCode,
+          phone: phoneToSearch || undefined,
+        });
       }
     } else {
       if (conversation.patient_id !== patientId || conversation.patient_name !== finalPatientName) {
@@ -2707,6 +2849,7 @@ When a customer inquires about booking an appointment, asks about availability, 
 ================================================================================
 
 General Rules:
+0. Respond to the current patient message only. Message timestamps describe when messages were sent; older exchanges are context, not new requests. A media attachment without a question is not a request to repeat booking options. Images, videos and documents are not visible to you: never claim to have inspected them or inferred clinical findings from them.
 1. Speak in the patient's language naturally (Arabic or English). If the patient speaks Arabic or Iraqi/Egyptian dialect, respond in warm, polite Arabic.
 2. Appointment Inquiries & Booking Flow:
    - ALWAYS give the customer the available appointments FIRST for what he asks (the cause of appointment). NEVER ask for their name or phone number before giving the available appointment times!
@@ -2733,8 +2876,10 @@ ${customInstructions ? `Additional clinic instruction sections:\n${customInstruc
 
   for (const msg of conversationHistory) {
     const role = msg.sender === "patient" ? "user" : "model";
-    const text = String(msg.content || (msg.media_url ? "[Media Attachment]" : "")).trim();
-    if (!text) continue;
+    const content = String(msg.content || "").trim();
+    if (!content) continue;
+    const sentAt = msg.provider_sent_at || msg.created_at;
+    const text = sentAt ? `[Message sent at ${sentAt}]\n${content}` : content;
 
     const last = initialContents[initialContents.length - 1];
     if (last && last.role === role) {
@@ -2747,12 +2892,9 @@ ${customInstructions ? `Additional clinic instruction sections:\n${customInstruc
     }
   }
 
-  // Ensure conversation ends with a user turn
+  // Never invent a booking inquiry when there is no current patient turn.
   if (initialContents.length === 0 || initialContents[initialContents.length - 1].role !== "user") {
-    initialContents.push({
-      role: "user",
-      parts: [{ text: "أهلاً بك، أود الاستفسار عن حجز موعد في العيادة." }],
-    });
+    return "";
   }
 
   // If incoming message is an audio voice note, append audio inlineData to user parts
@@ -3216,6 +3358,12 @@ Deno.serve(async (req: Request) => {
             if (Array.isArray(value.statuses)) {
               for (const st of value.statuses) {
                 if (st.id && st.status) {
+                  if (st.status === "failed") {
+                    console.warn("WhatsApp delivery failed:", JSON.stringify({
+                      messageId: st.id,
+                      errors: (st.errors || []).map((error: any) => ({ code: error.code, title: error.title })),
+                    }));
+                  }
                   await supabase
                     .from("whatsapp_messages")
                     .update({ status: st.status })
@@ -3240,7 +3388,17 @@ Deno.serve(async (req: Request) => {
                   continue;
                 }
 
-                const messageId = incoming.id;
+                const messageId = String(incoming.id || "").trim();
+                if (!messageId) continue;
+                const timing = incomingWhatsAppTiming(incoming.timestamp);
+                // Avoid media downloads and all conversation side effects on known replays.
+                // The database trigger also rejects concurrent duplicate inserts atomically.
+                const { data: existingMessage, error: duplicateCheckError } = await supabase
+                  .from("whatsapp_messages").select("id")
+                  .eq("whatsapp_message_id", messageId).eq("sender", "patient").limit(1).maybeSingle();
+                if (duplicateCheckError) throw duplicateCheckError;
+                if (existingMessage) continue;
+                console.log("Incoming WhatsApp event:", JSON.stringify({ messageId, sentAt: timing.sentAt, fresh: timing.fresh, type: incoming.type }));
                 const contact = (value.contacts || []).find((c: any) => c.wa_id === incoming.from || (incoming.from && c.wa_id?.includes(incoming.from))) || value.contacts?.[0] || {};
 
                 let resolvedIdentifier = "";
@@ -3311,7 +3469,7 @@ Deno.serve(async (req: Request) => {
                   mediaUrl = mediaRes.publicUrl;
                 } else if (incoming.type === "document") {
                   messageType = "document";
-                  textContent = incoming.document?.filename || "📄 Document";
+                  textContent = incoming.document?.caption || incoming.document?.filename || "📄 Document";
                   const mediaRes = await processIncomingMedia(
                     supabase,
                     incoming.document?.id,
@@ -3341,10 +3499,14 @@ Deno.serve(async (req: Request) => {
                       },
                     };
                   }
+                } else if (incoming.type === "video") {
+                  textContent = incoming.video?.caption || "[video]";
                 } else {
                   messageType = "text";
                   textContent = `[${incoming.type || "message"}]`;
                 }
+
+                const aiEligible = timing.fresh && isWhatsAppAiInput(incoming, currentAudioPart);
 
                 // 1. Find or create conversation in whatsapp_conversations
                 let { data: conv } = await supabase
@@ -3387,8 +3549,8 @@ Deno.serve(async (req: Request) => {
                       patient_name: patientName,
                       ai_enabled: true,
                       last_message: textContent,
-                      last_message_at: new Date().toISOString(),
-                      unread_count: 1,
+                      last_message_at: timing.sentAt || new Date().toISOString(),
+                      unread_count: 0,
                       status: "active",
                     })
                     .select()
@@ -3400,11 +3562,7 @@ Deno.serve(async (req: Request) => {
                   }
                   conv = newConv;
                 } else {
-                  const updatePayload: any = {
-                    last_message: textContent,
-                    last_message_at: new Date().toISOString(),
-                    unread_count: (conv.unread_count || 0) + 1,
-                  };
+                  const updatePayload: any = {};
 
                   if (!conv.patient_id) {
                     let matchedPatients: any[] = [];
@@ -3426,13 +3584,15 @@ Deno.serve(async (req: Request) => {
                     }
                   }
 
-                  const { data: updatedConv } = await supabase
-                    .from("whatsapp_conversations")
-                    .update(updatePayload)
-                    .eq("id", conv.id)
-                    .select()
-                    .single();
-                  if (updatedConv) conv = updatedConv;
+                  if (Object.keys(updatePayload).length) {
+                    const { data: updatedConv } = await supabase
+                      .from("whatsapp_conversations")
+                      .update(updatePayload)
+                      .eq("id", conv.id)
+                      .select()
+                      .single();
+                    if (updatedConv) conv = updatedConv;
+                  }
                 }
 
                 // 2. Insert incoming message into whatsapp_messages
@@ -3446,6 +3606,8 @@ Deno.serve(async (req: Request) => {
                     message_type: messageType,
                     media_url: mediaUrl,
                     whatsapp_message_id: messageId,
+                    provider_sent_at: timing.sentAt,
+                    ai_eligible: aiEligible,
                     status: "received",
                     reply_to_id: replyToId,
                     reply_to_text: replyToText,
@@ -3456,7 +3618,21 @@ Deno.serve(async (req: Request) => {
 
                 if (msgInsertErr) {
                   console.error("Failed to insert whatsapp message:", msgInsertErr);
+                  throw msgInsertErr;
                 }
+                // Duplicate inserts return no row. Never notify or run AI for them.
+                if (!insertedMsg?.id) continue;
+                // Archive late/invalid-timestamp events without reviving conversations.
+                if (!timing.fresh) continue;
+
+                const { data: refreshedConv, error: refreshError } = await supabase
+                  .from("whatsapp_conversations")
+                  .update({ last_message: textContent, last_message_at: timing.sentAt, unread_count: (conv.unread_count || 0) + 1 })
+                  .eq("id", conv.id)
+                  .or(`last_message_at.is.null,last_message_at.lte.${timing.sentAt}`)
+                  .select().maybeSingle();
+                if (refreshError) throw refreshError;
+                if (refreshedConv) conv = refreshedConv;
 
                 // Dispatch push notification to users whose user type has WhatsApp incoming notifications enabled
                 sendIncomingWhatsAppPushNotification(supabase, {
@@ -3470,7 +3646,7 @@ Deno.serve(async (req: Request) => {
                 });
 
                 // 3. Trigger AI Agent if enabled
-                const isAiActive = settings.enabled && conv.ai_enabled && conv.status !== "human_needed" && settings.geminiApiKey;
+                const isAiActive = aiEligible && settings.enabled && conv.ai_enabled && conv.status !== "human_needed" && settings.geminiApiKey;
 
                 if (isAiActive) {
                   const aiTask = (async () => {
@@ -3478,90 +3654,43 @@ Deno.serve(async (req: Request) => {
                       // Anti-race debounce: brief 1.5s delay to allow rapid consecutive messages to land in DB
                       await new Promise((resolve) => setTimeout(resolve, 1500));
 
-                      // Check if a newer incoming patient message arrived in this conversation
-                      if (insertedMsg?.id) {
-                        const { data: latestCheck } = await supabase
-                          .from("whatsapp_messages")
-                          .select("id")
-                          .eq("conversation_id", conv.id)
-                          .eq("sender", "patient")
-                          .order("created_at", { ascending: false })
-                          .limit(1)
-                          .maybeSingle();
-
-                        if (latestCheck && latestCheck.id !== insertedMsg.id) {
-                          console.log("Superseded by newer incoming message; skipping earlier AI task");
-                          return;
-                        }
-                      }
-
-                      // Check if AI was disabled or taken over by staff while waiting
-                      const { data: convCheck } = await supabase
-                        .from("whatsapp_conversations")
-                        .select("ai_enabled, status")
-                        .eq("id", conv.id)
-                        .maybeSingle();
-
-                      if (convCheck && (!convCheck.ai_enabled || convCheck.status === "human_needed")) {
-                        console.log("AI was muted or taken over by staff; skipping AI task");
+                      if (!(await maySendWhatsAppAiReply(supabase, conv.id, insertedMsg.id, timing.sentAt))) {
+                        console.log("Superseded, stale, or taken over; skipping earlier AI task");
                         return;
                       }
 
-                      const { data: rawHistory } = await supabase
+                      const { data: rawHistory, error: historyError } = await supabase
                         .from("whatsapp_messages")
-                        .select("sender, content, media_url")
+                        .select("id, sender, content, media_url, message_type, status, created_at, provider_sent_at, ai_eligible")
                         .eq("conversation_id", conv.id)
+                        .gte("created_at", new Date(Date.parse(insertedMsg.created_at) - 24 * 60 * 60 * 1000).toISOString())
+                        .lte("created_at", insertedMsg.created_at)
                         .order("created_at", { ascending: false })
-                        .limit(8);
-
-                      const history = (rawHistory || [])
-                        .reverse()
-                        .filter((m: any) => {
-                          const c = String(m.content || "");
-                          if (c.includes("أهلاً بك في عيادة لومين لطب الأسنان! 🦷✨")) return false;
-                          if (c.includes("يوجد لدينا أكثر من ملف مسجل")) return false;
-                          if (c.includes("ملف مسجل بهذا الرقم في النظام")) return false;
-                          if (c.includes("ملف مسجل بحساب الواتساب")) return false;
-                          return true;
-                        });
+                        .order("id", { ascending: false })
+                        .limit(24);
+                      if (historyError) {
+                        console.warn("Could not load WhatsApp AI history; skipping reply");
+                        return;
+                      }
+                      const history = prepareWhatsAppAiHistory((rawHistory || []).reverse(), insertedMsg.id).slice(-8);
+                      if (history[history.length - 1]?.id !== insertedMsg.id) return;
 
                       const aiResponse = await runGeminiAgent(
                         supabase,
                         settings.geminiApiKey,
                         settings.aiInstructions,
                         conv,
-                        history.length > 0 ? history : [{ sender: "patient", content: textContent }],
+                        history,
                         settings.aiModel || "gemini-3.5-flash-lite",
                         currentAudioPart,
                         settings.attendanceTimezone || "Africa/Cairo",
                         settings.aiMaxTurns || 8
                       );
 
-                      // Guard right before dispatch: ensure no newer patient message arrived during generation
-                      if (insertedMsg?.id) {
-                        const { data: latestCheckAfterGen } = await supabase
-                          .from("whatsapp_messages")
-                          .select("id")
-                          .eq("conversation_id", conv.id)
-                          .eq("sender", "patient")
-                          .order("created_at", { ascending: false })
-                          .limit(1)
-                          .maybeSingle();
-
-                        if (latestCheckAfterGen && latestCheckAfterGen.id !== insertedMsg.id) {
-                          console.log("Superseded by newer patient message during generation; skipping obsolete dispatch");
-                          return;
-                        }
-                      }
-
-                      const { data: finalConvCheck } = await supabase
-                        .from("whatsapp_conversations")
-                        .select("ai_enabled, status")
-                        .eq("id", conv.id)
-                        .maybeSingle();
-
-                      if (finalConvCheck && (!finalConvCheck.ai_enabled || finalConvCheck.status === "human_needed")) {
-                        console.log("Conversation taken over by staff during generation; skipping dispatch");
+                      // The same eligibility checks protect normal and error-fallback replies.
+                      if (!String(aiResponse || "").trim() ||
+                        !(await maySendWhatsAppAiReply(supabase, conv.id, insertedMsg.id, timing.sentAt))) {
+                        console.log("Superseded, stale, or taken over during generation; skipping dispatch");
                         return;
                       }
 
@@ -3599,6 +3728,7 @@ Deno.serve(async (req: Request) => {
                     } catch (aiErr: any) {
                       console.error("AI Agent processing error:", aiErr);
                       try {
+                        if (!(await maySendWhatsAppAiReply(supabase, conv.id, insertedMsg.id, timing.sentAt))) return;
                         const fallbackMsg = "أهلاً بك في عيادة لومين لطب الأسنان! 🦷✨ تم استلام رسالتك بنجاح وسيقوم فريق الاستقبال بالتواصل معك والمتابعة في أقرب وقت.";
                         let metaFallbackSend = null;
                         if (settings.phoneId && settings.accessToken) {

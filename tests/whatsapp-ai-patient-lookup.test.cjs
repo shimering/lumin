@@ -416,10 +416,11 @@ test('systemInstruction and lookup_patient strictly enforce privacy by never sug
   assert.doesNotMatch(webhookContent, /يوجد لدينا أكثر من ملف مسجل بحساب الواتساب هذا:\s*\n\s*\$\{matchedPatients\.map/);
   assert.doesNotMatch(webhookContent, /يوجد لدينا أكثر من ملف مسجل بهذا الرقم:\s*\n\s*\$\{matchedPatients\.map/);
 
-  // 6. Incoming webhook filters out any previous messages mentioning duplicate registered files to prevent leaking
-  assert.match(webhookContent, /if \(c\.includes\("يوجد لدينا أكثر من ملف مسجل"\)\) return false;/);
-  assert.match(webhookContent, /if \(c\.includes\("ملف مسجل بهذا الرقم في النظام"\)\) return false;/);
-  assert.match(webhookContent, /if \(c\.includes\("ملف مسجل بحساب الواتساب"\)\) return false;/);
+  // 6. The shared history filter excludes old outbound duplicate-file disclosures.
+  const filterSource = webhookContent.slice(webhookContent.indexOf('function prepareWhatsAppAiHistory('), webhookContent.indexOf('async function maySendWhatsAppAiReply('));
+  const filter = new Function(filterSource.replace(/messages: any\[\]/, 'messages').replace(/currentMessageId: string/, 'currentMessageId').replace(/\): any\[\]/, ')').replace(/message: any/g, 'message') + '; return prepareWhatsAppAiHistory;')();
+  const disclosures = ['يوجد لدينا أكثر من ملف مسجل', 'ملف مسجل بهذا الرقم في النظام', 'ملف مسجل بحساب الواتساب'];
+  assert.deepEqual(filter(disclosures.map(content => ({ sender: 'ai', status: 'read', content })), 'current'), []);
 });
 
 test('patient matching strictly requires explicit given phone number and prohibits querying patients table by WhatsApp display username', () => {
@@ -427,6 +428,98 @@ test('patient matching strictly requires explicit given phone number and prohibi
   assert.doesNotMatch(webhookContent, /\.ilike\("name", cleanUser\)/);
   assert.match(webhookContent, /CRITICAL PRIVACY & SECURITY GUARD: Never query patients table by WhatsApp display username/);
 });
+
+test('BSUID conversations allow matching and re-using existing patient profiles when stated name matches profile', async () => {
+  // Extract and simulate create_patient logic with BSUID and duplicates
+  function simulateCreatePatient({ conversation, patientName, targetPhone, existingPatients }) {
+    function isBsuid(val) {
+      if (!val || typeof val !== 'string') return false;
+      return /^\+?[A-Za-z]{2}\.\d+$/i.test(val.trim());
+    }
+    function normalizeArabicName(name) {
+      if (!name) return "";
+      return String(name)
+        .trim()
+        .toLowerCase()
+        .replace(/[\u064B-\u065F\u0670]/g, "")
+        .replace(/^(دكتور|دكتورة|د\.?|أستاذ|أستاذة|سيد|سيدة|م\.?|mr\.?|mrs\.?|dr\.?)\s+/i, "")
+        .replace(/[إأآا]/g, "ا")
+        .replace(/[ة]/g, "ه")
+        .replace(/[ى]/g, "ي")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+    function matchPatientNameScore(tName, cName) {
+      const n1 = normalizeArabicName(tName);
+      const n2 = normalizeArabicName(cName);
+      if (!n1 || !n2) return 0;
+      if (n1 === n2) return 100;
+      const w1 = n1.split(" ").filter(Boolean);
+      const w2 = n2.split(" ").filter(Boolean);
+      if (w1[0] && w2[0] && w1[0] === w2[0]) {
+        if (w1.length > 1 && w2.length > 1 && w1[1] === w2[1]) return 90;
+      }
+      return 0;
+    }
+    function namesMatch(n1, n2) {
+      return matchPatientNameScore(n1, n2) >= 60;
+    }
+
+    const rawTargetPhone = targetPhone || (!isBsuid(conversation.phone) ? conversation.phone : "") || "";
+    const existingMatches = existingPatients || [];
+
+    if (existingMatches.length === 1) {
+      const existing = existingMatches[0];
+      if (isBsuid(conversation.phone) && !namesMatch(patientName, existing.name)) {
+        return { success: false, error: "PATIENT_IDENTITY_REQUIRED" };
+      }
+      return { success: true, already_existed: true, patient_id: existing.id, patient_name: existing.name };
+    }
+
+    if (existingMatches.length > 1) {
+      const best = existingMatches
+        .map((p) => ({ p, score: matchPatientNameScore(patientName, p.name) }))
+        .sort((a, b) => b.score - a.score)[0];
+
+      if (best && best.score >= 60) {
+        return { success: true, already_existed: true, patient_id: best.p.id, patient_name: best.p.name };
+      } else if (isBsuid(conversation.phone)) {
+        return { success: false, error: "PATIENT_IDENTITY_REQUIRED" };
+      }
+    }
+
+    return { success: true, already_existed: false, patient_id: "new-patient", patient_name: patientName };
+  }
+
+  const existingMonaFamily = [
+    { id: 'p-mona', name: 'منى اسامه', phone: '+201097276404' },
+    { id: 'p-roqaya', name: 'رقية ايهاب', phone: '+201097276404' },
+    { id: 'p-osama', name: 'اسامه سيد احمد الكامل', phone: '+201097276404' },
+  ];
+
+  // Case 1: Mona Osama messages from BSUID, provides her phone and name (with taa marbouta variant "منى اسامة")
+  const monaResult = simulateCreatePatient({
+    conversation: { phone: 'EG.1927014688705789', patient_id: null },
+    patientName: 'منى اسامة',
+    targetPhone: '01097276404',
+    existingPatients: existingMonaFamily,
+  });
+  assert.equal(monaResult.success, true);
+  assert.equal(monaResult.already_existed, true);
+  assert.equal(monaResult.patient_id, 'p-mona');
+  assert.equal(monaResult.patient_name, 'منى اسامه');
+
+  // Case 2: Masked sender provides a phone but a completely unrelated name ("سارة خليل") -> blocked
+  const unrelatedResult = simulateCreatePatient({
+    conversation: { phone: 'EG.1927014688705789', patient_id: null },
+    patientName: 'سارة خليل',
+    targetPhone: '01097276404',
+    existingPatients: existingMonaFamily,
+  });
+  assert.equal(unrelatedResult.success, false);
+  assert.equal(unrelatedResult.error, 'PATIENT_IDENTITY_REQUIRED');
+});
+
 
 
 

@@ -13,12 +13,12 @@ test('incoming webhook captures inserted message id for race protection', () => 
 
 test('aiTask performs anti-race debounce and skips superseded tasks', () => {
   assert.match(webhookContent, /Anti-race debounce/);
-  assert.match(webhookContent, /latestCheck\.id\s*!==\s*insertedMsg\.id/);
-  assert.match(webhookContent, /Superseded by newer incoming message; skipping earlier AI task/);
+  assert.match(webhookContent, /latestRelevant\?\.id === messageId/);
+  assert.match(webhookContent, /Superseded, stale, or taken over; skipping earlier AI task/);
 });
 
 test('aiTask verifies conversation is still active before and after Gemini generation', () => {
-  assert.match(webhookContent, /AI was muted or taken over by staff; skipping AI task/);
-  assert.match(webhookContent, /latestCheckAfterGen\.id\s*!==\s*insertedMsg\.id/);
-  assert.match(webhookContent, /Conversation taken over by staff during generation; skipping dispatch/);
+  assert.match(webhookContent, /!conversation\.data\.ai_enabled \|\| conversation\.data\.status === "human_needed"/);
+  assert.match(webhookContent, /await maySendWhatsAppAiReply\(supabase, conv\.id, insertedMsg\.id, timing\.sentAt\)/);
+  assert.match(webhookContent, /Superseded, stale, or taken over during generation; skipping dispatch/);
 });
