@@ -4066,6 +4066,19 @@
     }
     #patient-query-results-panel > header,
     #patient-query-pagination { flex: 0 0 auto; }
+    @media (min-width: 1024px) and (pointer: coarse) {
+      #patient-query-pagination {
+        padding-block: 0 !important;
+      }
+      #patient-query-pagination [role="group"] > button {
+        width: 44px !important;
+        height: 44px !important;
+      }
+      #patient-query-pagination [role="group"] > button:focus-visible {
+        outline: 2px solid #2563eb;
+        outline-offset: -3px;
+      }
+    }
     #patient-query-results-scroll {
       min-height: 0;
       flex: 1 1 auto;
