@@ -72,6 +72,13 @@ export async function handleRequest(request, env, fetcher = fetch) {
     if (!asset.ok) return new Response('Supplier list unavailable.',{status:503,headers:privateHeaders});
     return new Response(request.method==='HEAD'?null:await asset.text(),{headers:{...privateHeaders,'Content-Type':'text/html; charset=utf-8'}});
   }
+  if (['/patient-whatsapp','/patient-whatsapp/','/patient-whatsapp.html'].includes(url.pathname)) {
+    if (!['GET','HEAD'].includes(request.method)) return new Response('Method not allowed.',{status:405,headers:{...privateHeaders,Allow:'GET, HEAD'}});
+    if (url.pathname !== '/patient-whatsapp.html') {const target=new URL('/patient-whatsapp.html',url);target.search=url.search;return new Response(null,{status:308,headers:{...privateHeaders,Location:target.href}});}
+    const asset=await env.ASSETS.fetch(new Request(new URL('/patient-whatsapp.html',url),{headers:{Accept:'text/html'}}));
+    if (!asset.ok) return new Response('Patient WhatsApp unavailable.',{status:503,headers:privateHeaders});
+    return new Response(request.method==='HEAD'?null:await asset.text(),{headers:{...privateHeaders,'Content-Type':'text/html; charset=utf-8'}});
+  }
   const page = ['/quotation','/quotation/','/quotation.html'].includes(url.pathname);
   const image = url.pathname === '/quotation-logo';
   if (!page && !image) return env.ASSETS.fetch(request);

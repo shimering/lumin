@@ -25,14 +25,35 @@ async function authorizeWhatsAppStaff(request: Request, supabase: any): Promise<
   const { data, error } = await supabase.auth.getUser(authorization.slice(7));
   if (error || !data?.user) return jsonResponse({ error: "Invalid or expired session." }, 401);
   const profile = await supabase.from("user_profiles")
-    .select("active,access_roles(is_admin,role_permissions(page_key,can_view))")
+    .select("active,access_roles(is_admin,whatsapp_notifications,role_permissions(page_key,can_view))")
     .eq("user_id", data.user.id).maybeSingle();
   if (profile.error) return jsonResponse({ error: "Could not verify access." }, 503);
   const role = Array.isArray(profile.data?.access_roles) ? profile.data.access_roles[0] : profile.data?.access_roles;
-  if (!profile.data?.active || !(role?.is_admin === true || role?.role_permissions?.some((p: any) => p.page_key === "whatsapp" && p.can_view === true))) {
+  const hasWhatsAppPermission = Boolean(
+    profile.data?.active && (
+      role?.is_admin === true ||
+      role?.whatsapp_notifications === true ||
+      role?.role_permissions?.some(
+        (p: any) =>
+          (p.page_key === "whatsapp" ||
+           p.page_key === "whatsapp_notifications" ||
+           p.page_key === "appointments") &&
+          p.can_view === true
+      )
+    )
+  );
+  if (!hasWhatsAppPermission) {
     return jsonResponse({ error: "WhatsApp access is required." }, 403);
   }
   return null;
+}
+
+function parseMetaErrorMessage(data: any, fallback: string): string {
+  const code = data?.error?.code;
+  if (code === 131047 || code === 131026) {
+    return "Outside 24-hour customer window. WhatsApp requires an approved template message to re-engage this patient.";
+  }
+  return data?.error?.error_data?.details || data?.error?.message || fallback;
 }
 
 async function verifyMetaSignature(request: Request, raw: string): Promise<boolean> {
@@ -485,7 +506,7 @@ async function sendMetaWhatsAppMessage(
   const data = await res.json();
   if (!res.ok) {
     console.error("Meta Graph API error:", res.status);
-    throw new Error(data?.error?.message || "Failed to send WhatsApp message via Meta API");
+    throw new Error(parseMetaErrorMessage(data, "Failed to send WhatsApp message via Meta API"));
   }
   return data;
 }
@@ -570,7 +591,7 @@ async function sendMetaWhatsAppLocation(
   const data = await res.json();
   if (!res.ok) {
     console.error("Meta Graph API location error:", res.status);
-    throw new Error(data?.error?.message || "Failed to send WhatsApp location via Meta API");
+    throw new Error(parseMetaErrorMessage(data, "Failed to send WhatsApp location via Meta API"));
   }
   return data;
 }
@@ -682,7 +703,7 @@ async function sendMetaWhatsAppAudioMessage(
   const data = await res.json();
   if (!res.ok) {
     console.error("Meta Graph API audio error:", res.status);
-    throw new Error(data?.error?.message || "Failed to send WhatsApp audio message via Meta API");
+    throw new Error(parseMetaErrorMessage(data, "Failed to send WhatsApp audio message via Meta API"));
   }
   return data;
 }
@@ -746,7 +767,7 @@ async function sendMetaWhatsAppTemplate(
   const data = await res.json();
   if (!res.ok) {
     console.error("Meta Graph API template error:", res.status);
-    throw new Error(data?.error?.message || "Failed to send WhatsApp template via Meta API");
+    throw new Error(parseMetaErrorMessage(data, "Failed to send WhatsApp template via Meta API"));
   }
   return data;
 }
@@ -931,6 +952,130 @@ function getClinicNow(timeZone: string = "Africa/Cairo") {
     dayAr,
     display: `${dateStr} (${dayEn} / ${dayAr})`,
   };
+}
+
+// Format time string (HH:mm) into Arabic and English 12-hour format (e.g. "07:00 مساءً" / "07:00 PM")
+function formatTime12h(timeStr: string): { ar: string; en: string; time12: string } {
+  const [hh, mm] = (timeStr || "00:00").split(":").map(Number);
+  const periodEn = hh >= 12 ? "PM" : "AM";
+  const periodAr = hh >= 12 ? "مساءً" : "صباحاً";
+  const h12 = hh % 12 === 0 ? 12 : hh % 12;
+  const timeFormatted = `${String(h12).padStart(2, "0")}:${String(mm || 0).padStart(2, "0")}`;
+  return {
+    time12: `${timeFormatted} ${periodEn}`,
+    en: `${timeFormatted} ${periodEn}`,
+    ar: `${timeFormatted} ${periodAr}`,
+  };
+}
+
+// Fetch upcoming booked appointments for a registered patient within the clinic horizon
+async function fetchPatientUpcomingAppointments(
+  supabase: any,
+  patientId: string,
+  clinicNow: { dateStr: string; minutesOfDay: number },
+  timeZone: string = "Africa/Cairo",
+  daysAhead: number = 14
+): Promise<any[]> {
+  if (!patientId) return [];
+
+  const startUtc = new Date(Date.parse(`${clinicNow.dateStr}T00:00:00Z`) - 24 * 3600 * 1000).toISOString();
+  const endUtc = new Date(Date.parse(`${clinicNow.dateStr}T23:59:59Z`) + (Math.max(daysAhead, 7) + 1) * 24 * 3600 * 1000).toISOString();
+
+  const { data: rawApts, error } = await supabase
+    .from("appointments")
+    .select("id, appointment_at, duration_minutes, status, assigned_user_id, appointment_type, notes")
+    .eq("patient_id", patientId)
+    .neq("status", "Cancelled")
+    .gte("appointment_at", startUtc)
+    .lte("appointment_at", endUtc)
+    .order("appointment_at", { ascending: true });
+
+  if (error || !Array.isArray(rawApts) || rawApts.length === 0) return [];
+
+  const doctorIds = Array.from(new Set(rawApts.map((a: any) => a.assigned_user_id).filter(Boolean)));
+  const doctorMap = new Map<string, string>();
+  if (doctorIds.length > 0) {
+    const { data: doctors } = await supabase
+      .from("user_profiles")
+      .select("user_id, full_name")
+      .in("user_id", doctorIds);
+    (doctors || []).forEach((d: any) => doctorMap.set(d.user_id, d.full_name));
+  }
+
+  const result: any[] = [];
+  for (const apt of rawApts) {
+    const local = parseLocalAppointmentTime(apt.appointment_at, timeZone);
+    if (local.dateStr < clinicNow.dateStr) continue;
+    const duration = Number(apt.duration_minutes) || 60;
+    if (local.dateStr === clinicNow.dateStr && (local.startMin + duration) <= clinicNow.minutesOfDay) {
+      continue;
+    }
+
+    const t12 = formatTime12h(local.timeStr);
+    const dayAr = WEEKDAY_NAMES_AR[local.dayOfWeek] || "";
+    const dayEn = WEEKDAY_NAMES_EN[local.dayOfWeek] || "";
+    const rawDocName = doctorMap.get(apt.assigned_user_id) || "";
+    const docClean = rawDocName ? rawDocName.replace(/^(dr\.?|د\.?|دكتور|دكتورة)\s+/i, "").trim() : "";
+    const doctorDisplay = docClean ? `Dr. ${docClean}` : "General Clinic";
+    const doctorAr = docClean ? `د. ${docClean}` : "العيادة العامة";
+
+    let relativeLabel = "";
+    if (local.dateStr === clinicNow.dateStr) {
+      relativeLabel = " [اليوم / Today]";
+    } else {
+      const targetTime = Date.parse(`${local.dateStr}T12:00:00Z`);
+      const todayTime = Date.parse(`${clinicNow.dateStr}T12:00:00Z`);
+      const diffDays = Math.round((targetTime - todayTime) / (24 * 3600 * 1000));
+      if (diffDays === 1) {
+        relativeLabel = " [غداً / Tomorrow]";
+      } else if (diffDays > 1) {
+        relativeLabel = ` [بعد ${diffDays} أيام / In ${diffDays} days]`;
+      }
+    }
+
+    result.push({
+      id: apt.id,
+      date: local.dateStr,
+      time24: local.timeStr,
+      time12: t12.time12,
+      timeAr: t12.ar,
+      timeEn: t12.en,
+      dayAr,
+      dayEn,
+      relativeLabel,
+      doctor: doctorDisplay,
+      doctorAr,
+      doctor_name: docClean || doctorDisplay,
+      visit_type: apt.appointment_type || "Check-up",
+      status: apt.status || "Scheduled",
+      duration_minutes: duration,
+      duration_formatted: duration === 60 ? "ساعة واحدة (1 hour)" : `${duration} دقيقة (${duration} mins)`,
+      notes: apt.notes || "",
+    });
+  }
+
+  return result;
+}
+
+// Format patient upcoming appointments into concise, high-visibility reference for Gemini prompt
+function formatUpcomingAppointmentsForPrompt(appointments: any[]): string {
+  if (!appointments || appointments.length === 0) {
+    return `- UPCOMING REGISTERED APPOINTMENTS FOR THIS PATIENT (Directly from Clinic Calendar):
+  * No upcoming booked appointments found in the clinic calendar for this patient in the upcoming days.`;
+  }
+
+  const lines = appointments.map((apt, index) => {
+    return `  ${index + 1}. Appointment ID: ${apt.id}
+     - Date: ${apt.date} (${apt.dayAr} / ${apt.dayEn})${apt.relativeLabel}
+     - Time: ${apt.timeAr} / ${apt.timeEn} (24-hour: ${apt.time24})
+     - Doctor: ${apt.doctor} (${apt.doctorAr})
+     - Service / Visit Type: ${apt.visit_type}
+     - Status: ${apt.status}
+     - Duration: ${apt.duration_formatted}${apt.notes ? `\n     - Notes: ${apt.notes}` : ""}`;
+  });
+
+  return `- UPCOMING REGISTERED APPOINTMENTS FOR THIS PATIENT (Directly from Clinic Calendar):
+${lines.join("\n")}`;
 }
 
 // Send OneSignal push notification to all subscribed clinic staff and doctors
@@ -1273,6 +1418,45 @@ function buildGeminiTools(doctorNames: string[] = [], visitTypeNames: string[] =
           },
         },
         {
+          name: "get_patient_appointments",
+          description: "Retrieve existing and upcoming booked appointments for the patient to verify or confirm their booking details (date, exact time, doctor, visit type, and status). ALWAYS call this tool (or refer to the patient's upcoming appointments in context) when the patient asks to confirm their appointment, asks what time their appointment is ('الساعة كام', 'تأكيد الميعاد'), or inquires about an existing booking.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              patient_id: {
+                type: "STRING",
+                description: "Optional ID of the patient. If omitted, uses the currently identified patient profile for this conversation.",
+              },
+              date: {
+                type: "STRING",
+                description: "Optional specific date in YYYY-MM-DD format (e.g. tomorrow's date or a requested day) to check appointments for.",
+              },
+              days_ahead: {
+                type: "INTEGER",
+                description: "Optional number of days ahead to scan (1 to 14, default 7).",
+              },
+            },
+          },
+        },
+        {
+          name: "confirm_patient_appointment",
+          description: "Confirm an existing booked appointment for a patient when they explicitly state they want to confirm it (e.g. 'كنت باكد المعاد', 'تأكيد الحجز', 'أؤكد حضوري', 'Confirm my appointment'). Updates the appointment status to 'Confirmed' in the clinic calendar so clinic staff know the patient will attend.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              appointment_id: {
+                type: "STRING",
+                description: "The ID of the existing appointment to confirm.",
+              },
+              notes: {
+                type: "STRING",
+                description: "Optional confirmation note (e.g. 'Confirmed by patient via WhatsApp').",
+              },
+            },
+            required: ["appointment_id"],
+          },
+        },
+        {
           name: "lookup_patient",
           description: "Search clinic database for existing registered patient(s) ONLY by a mobile phone number explicitly given by the patient in the chat. STRICT PRIVACY RULE: NEVER suggest or reveal patient names from the database to the customer. Returns matching patient record if found, or alerts if duplicate records exist under this number.",
           parameters: {
@@ -1433,6 +1617,7 @@ async function handleGeminiToolCall(
   customInstructions: string = ""
 ): Promise<any> {
   const { name, args } = call;
+  const clinicNow = getClinicNow(timeZone);
 
   if (name === "check_available_slots") {
     const rawTargetDate = String(args.date || "").trim();
@@ -1451,7 +1636,6 @@ async function handleGeminiToolCall(
       Number(args.duration_minutes)
     );
     const daysAhead = Math.min(Math.max(Number(args.days_ahead) || 1, 1), 7);
-    const clinicNow = getClinicNow(timeZone);
 
     // Fetch active doctors and their HR staff settings (weekly_schedule) in parallel
     const [{ data: activeDoctors }, { data: staffSettings }] = await Promise.all([
@@ -1760,6 +1944,136 @@ async function handleGeminiToolCall(
     };
   }
 
+  if (name === "get_patient_appointments") {
+    let targetPatientId = args.patient_id || conversation.patient_id;
+    if (!targetPatientId) {
+      if (conversation.phone && !isBsuid(conversation.phone)) {
+        const matches = await findPatientsByPhone(supabase, conversation.phone);
+        if (matches.length === 1) targetPatientId = matches[0].id;
+      } else if (conversation.phone && isBsuid(conversation.phone)) {
+        const matches = await findPatientsByWhatsApp(supabase, conversation.phone, conversation.patient_name);
+        if (matches.length === 1) targetPatientId = matches[0].id;
+      }
+    }
+
+    if (!targetPatientId) {
+      return {
+        success: false,
+        found: false,
+        error: "PATIENT_NOT_IDENTIFIED",
+        message: "لم يتم التعرف على ملف المريض بعد. يرجى تزويدنا بالاسم الكريم ورقم الهاتف للتحقق من المواعيد.",
+      };
+    }
+
+    const isAllowed = await whatsappPatientIsAllowed(supabase, conversation, targetPatientId);
+    if (!isAllowed) {
+      return { success: false, found: false, error: "PATIENT_IDENTITY_REQUIRED", message: "هذا الملف غير مرتبط بالمحادثة الحالية." };
+    }
+
+    const daysAhead = Number(args.days_ahead) || 7;
+    const filterDate = args.date ? String(args.date).trim() : null;
+    const allApts = await fetchPatientUpcomingAppointments(supabase, targetPatientId, clinicNow, timeZone, Math.max(daysAhead, 7));
+
+    const filtered = filterDate
+      ? allApts.filter((a: any) => a.date === filterDate)
+      : allApts;
+
+    if (filtered.length === 0) {
+      return {
+        success: true,
+        found: false,
+        patient_id: targetPatientId,
+        patient_name: conversation.patient_name,
+        date_checked: filterDate || `Next ${daysAhead} days`,
+        appointments: [],
+        message: filterDate
+          ? `لا توجد مواعيد مسجلة لهذا المريض في تاريخ ${filterDate}.`
+          : `لا توجد مواعيد قادمة مسجلة لهذا المريض خلال الأيام القادمة.`,
+      };
+    }
+
+    return {
+      success: true,
+      found: true,
+      patient_id: targetPatientId,
+      patient_name: conversation.patient_name,
+      count: filtered.length,
+      appointments: filtered,
+      message: `تم العثور على ${filtered.length} موعد مسجل للمريض.`,
+    };
+  }
+
+  if (name === "confirm_patient_appointment") {
+    const { appointment_id, notes } = args;
+    if (!appointment_id) {
+      return { success: false, error: "appointment_id is required" };
+    }
+
+    const { data: apt, error: fetchErr } = await supabase
+      .from("appointments")
+      .select("id, patient_id, appointment_at, duration_minutes, status, assigned_user_id, appointment_type, notes")
+      .eq("id", appointment_id)
+      .maybeSingle();
+
+    if (fetchErr || !apt) {
+      return { success: false, error: "APPOINTMENT_NOT_FOUND", message: "لم يتم العثور على الموعد المطلوب." };
+    }
+
+    const isAllowed = await whatsappPatientIsAllowed(supabase, conversation, apt.patient_id);
+    if (!isAllowed) {
+      return { success: false, error: "PATIENT_IDENTITY_REQUIRED", message: "هذا الموعد غير مصرح له في هذه المحادثة." };
+    }
+
+    const updatePayload: any = {
+      status: "Confirmed",
+      updated_at: new Date().toISOString(),
+    };
+    if (notes) {
+      updatePayload.notes = apt.notes ? `${apt.notes} | ${notes}` : notes;
+    }
+
+    const { error: updateErr } = await supabase
+      .from("appointments")
+      .update(updatePayload)
+      .eq("id", appointment_id);
+
+    if (updateErr) {
+      return { success: false, error: updateErr.message };
+    }
+
+    const local = parseLocalAppointmentTime(apt.appointment_at, timeZone);
+    const t12 = formatTime12h(local.timeStr);
+    const dayAr = WEEKDAY_NAMES_AR[local.dayOfWeek] || "";
+    const dayEn = WEEKDAY_NAMES_EN[local.dayOfWeek] || "";
+
+    let docName = "General Clinic";
+    if (apt.assigned_user_id) {
+      const { data: docUser } = await supabase
+        .from("user_profiles")
+        .select("full_name")
+        .eq("user_id", apt.assigned_user_id)
+        .maybeSingle();
+      if (docUser?.full_name) {
+        const clean = docUser.full_name.replace(/^(dr\.?|د\.?|دكتور|دكتورة)\s+/i, "").trim();
+        docName = `Dr. ${clean}`;
+      }
+    }
+
+    return {
+      success: true,
+      confirmed: true,
+      appointment_id: apt.id,
+      date: local.dateStr,
+      time: local.timeStr,
+      time_12h: t12.ar,
+      day: `${dayAr} / ${dayEn}`,
+      doctor: docName,
+      visit_type: apt.appointment_type || "Check-up",
+      status: "Confirmed",
+      message: "تم تأكيد الموعد بنجاح وتحديث حالته في جدول مواعيد العيادة إلى Confirmed.",
+    };
+  }
+
   if (name === "lookup_patient") {
     const rawPhone = String(args.phone || "").trim();
     if (!cleanPhone(rawPhone)) {
@@ -1825,10 +2139,13 @@ async function handleGeminiToolCall(
         phone: rawPhone,
       });
 
+      const upcomingApts = await fetchPatientUpcomingAppointments(supabase, p.id, clinicNow, timeZone);
+
       return {
         found: true,
         count: 1,
         patient: { id: p.id, name: p.name, phone: p.phone, patient_number: p.patient_number, whatsapp_username: waUser, whatsapp_code: waCode },
+        upcoming_appointments: upcomingApts,
         message: `تم جلب ملف المريض بنجاح: الاسم "${p.name}" (معرّف المريض: ${p.id}). تم ربط المحادثة وحفظ اسم مستخدم واتساب وكود واتساب بملف المريض. رقم الهاتف المرتبط بملفه هو: "${p.phone || rawPhone}". المريض لديه ملف فعلي مسجل الآن: لا تسأله عن رقم هاتفه مرة أخرى أبداً، ويمكنك فقط تأكيد رقم الهاتف المرتبط بملفه معه إذا دعت الحاجة. رحب بالمريض باسمه وأكد هويته واستخدم ملفه للحجز مباشرة عبر book_appointment دون استدعاء create_patient.`,
       };
     }
@@ -1900,11 +2217,14 @@ async function handleGeminiToolCall(
       whatsapp_code: waCode,
     });
 
+    const upcomingApts = await fetchPatientUpcomingAppointments(supabase, p.id, clinicNow, timeZone);
+
     return {
       success: true,
       patient_id: p.id,
       patient_name: finalName,
       phone: p.phone,
+      upcoming_appointments: upcomingApts,
       message: `تم تعيين وربط المحادثة بنجاح بالملف المسجل للمريض "${finalName}" (رقم الهاتف المرتبط بملفه: "${p.phone || conversation.phone || "على الملف"}"). المريض لديه ملف فعلي مسجل الآن: لا تسأله عن رقم هاتفه مرة أخرى أبداً، ويمكنك فقط تأكيد رقم الهاتف المرتبط بملفه معه إذا دعت الحاجة.`,
     };
   }
@@ -1949,12 +2269,15 @@ async function handleGeminiToolCall(
         phone: phoneToAssign,
       });
 
+      const upcomingApts = await fetchPatientUpcomingAppointments(supabase, existing.id, clinicNow, timeZone);
+
       return {
         success: true,
         already_existed: true,
         patient_id: existing.id,
         patient_name: existing.name,
         phone: existing.phone,
+        upcoming_appointments: upcomingApts,
         message: `تم استخدام الملف المسجل مسبقاً للمريض "${existing.name}" المربوط بهذا الرقم بنجاح دون إنشاء مريض مكرر. المريض لديه ملف فعلي مسجل الآن: لا تسأله عن رقم هاتفه مرة أخرى أبداً، ويمكنك فقط تأكيد رقم هاتفه المسجل معه إذا دعت الحاجة.`,
       };
     }
@@ -1982,12 +2305,15 @@ async function handleGeminiToolCall(
           phone: phoneToAssign,
         });
 
+        const upcomingApts = await fetchPatientUpcomingAppointments(supabase, best.p.id, clinicNow, timeZone);
+
         return {
           success: true,
           already_existed: true,
           patient_id: best.p.id,
           patient_name: best.p.name,
           phone: best.p.phone,
+          upcoming_appointments: upcomingApts,
           message: `تم استخدام الملف المسجل مسبقاً للمريض "${best.p.name}" المربوط بهذا الرقم بنجاح دون إنشاء مريض مكرر. المريض لديه ملف فعلي مسجل الآن: لا تسأله عن رقم هاتفه مرة أخرى أبداً، ويمكنك فقط تأكيد رقم هاتفه المسجل معه إذا دعت الحاجة.`,
         };
       } else if (isBsuid(conversation.phone)) {
@@ -2613,6 +2939,9 @@ async function runGeminiAgent(
       await supabase.from("patients").update({ phone: rawProfilePhone }).eq("id", p.id);
     }
     const registeredPhone = rawProfilePhone ? (rawProfilePhone.startsWith("+") ? rawProfilePhone : `+${rawProfilePhone}`) : "";
+    const upcomingAppointments = await fetchPatientUpcomingAppointments(supabase, p.id, clinicNow, timeZone);
+    const upcomingAppointmentsStr = formatUpcomingAppointmentsForPrompt(upcomingAppointments);
+
     patientContextSection = isMaskedBsuid
       ? `PATIENT CONTEXT - REGISTERED PATIENT FOUND FOR WHATSAPP ACCOUNT ${formatWhatsAppCode(conversation?.phone)}:
 - Status: This chat is with an EXISTING PATIENT WHO HAS AN ACTUAL REGISTERED PROFILE.
@@ -2621,13 +2950,21 @@ async function runGeminiAgent(
 - Phone associated with profile: ${registeredPhone || "Not provided yet (masked WhatsApp account)"}
 - WhatsApp Username: "${p.whatsapp_username || conversation?.patient_name || "N/A"}"
 - WhatsApp Code: "${p.whatsapp_code || formatWhatsAppCode(conversation.phone)}"
+${upcomingAppointmentsStr}
 
 MANDATORY RULES FOR PATIENT WITH AN ACTUAL PROFILE:
 1. Address the patient warmly by their fetched name (e.g. "أهلاً بكِ أستاذ/ة ${p.name}! نورتِ عيادة لومين.").
 2. By default, use this patient profile (ID: ${p.id}) for any appointments.
 3. ${registeredPhone ? `Their mobile number is already on file (${registeredPhone}), so do NOT ask for their phone number again; you may confirm this phone number if needed.` : `Their mobile number is not yet in their file. If they wish to book an appointment, politely ask for their mobile phone number to complete their file.`}
 4. If the patient explicitly states they are contacting on behalf of someone else or a new family member:
-   Ask for that person's full name, and ONLY THEN call \`create_patient\` to register them.`
+   Ask for that person's full name, and ONLY THEN call \`create_patient\` to register them.
+5. APPOINTMENT CONFIRMATIONS & EXISTING APPOINTMENT INQUIRIES:
+   - If the patient asks to confirm their appointment, asks what time their appointment is, or asks about an existing booking (e.g. "كنت باكد المعاد هو بكره الساعه كام"):
+     * Check their UPCOMING REGISTERED APPOINTMENTS above (or call \`get_patient_appointments\`).
+     * DO NOT treat this as a request to book a new appointment! NEVER call \`check_available_slots\` to offer new vacant slots or alternative days when they already have an appointment on file.
+     * Confirm their existing appointment details warmly and clearly (date, exact time in 12-hour format e.g. 07:00 مساءً / 7:00 PM, doctor name, and service).
+     * If they are confirming attendance, call \`confirm_patient_appointment\` to mark the appointment as 'Confirmed' in the clinic calendar.
+     * Only if they have NO booked appointment on that day after checking, politely inform them and offer to book one.`
       : `PATIENT CONTEXT - REGISTERED PATIENT FOUND FOR PHONE +${conversation?.phone}:
 - Status: This chat is with an EXISTING PATIENT WHO HAS AN ACTUAL REGISTERED PROFILE.
 - Fetched Patient Name: "${p.name}"
@@ -2635,6 +2972,7 @@ MANDATORY RULES FOR PATIENT WITH AN ACTUAL PROFILE:
 - Phone associated with profile: ${registeredPhone || "Known from active chat"}
 - WhatsApp Username: "${p.whatsapp_username || conversation?.patient_name || "N/A"}"
 - WhatsApp Code: "${p.whatsapp_code || "N/A"}"
+${upcomingAppointmentsStr}
 
 MANDATORY RULES FOR PATIENT WITH AN ACTUAL PROFILE:
 1. Address the patient warmly by their fetched name (e.g. "أهلاً بكِ أستاذ/ة ${p.name}! نورتِ عيادة لومين.").
@@ -2644,7 +2982,14 @@ MANDATORY RULES FOR PATIENT WITH AN ACTUAL PROFILE:
    - CONFIRMATION ALLOWED: You MAY confirm with him the phone number associated with his profile if helpful (e.g. "هل رقم التواصل المسجل لدينا هو ${registeredPhone || conversation?.phone}؟" or "الموعد مسجل لرقم هاتفك المسجل ${registeredPhone || conversation?.phone}" / "We have confirmed your booking under your registered contact number ${registeredPhone || conversation?.phone}"). But DO NOT ask him to give, type, or provide his phone number again.
    - Schedule appointments and answer inquiries directly using their existing profile without requesting phone details.
 4. If the patient explicitly states they are contacting on behalf of someone else or a new family member:
-   Ask for that person's full name, and ONLY THEN call \`create_patient\` to register them.`;
+   Ask for that person's full name, and ONLY THEN call \`create_patient\` to register them.
+5. APPOINTMENT CONFIRMATIONS & EXISTING APPOINTMENT INQUIRIES:
+   - If the patient asks to confirm their appointment, asks what time their appointment is, or asks about an existing booking (e.g. "كنت باكد المعاد هو بكره الساعه كام"):
+     * Check their UPCOMING REGISTERED APPOINTMENTS above (or call \`get_patient_appointments\`).
+     * DO NOT treat this as a request to book a new appointment! NEVER call \`check_available_slots\` to offer new vacant slots or alternative days when they already have an appointment on file.
+     * Confirm their existing appointment details warmly and clearly (date, exact time in 12-hour format e.g. 07:00 مساءً / 7:00 PM, doctor name, and service).
+     * If they are confirming attendance, call \`confirm_patient_appointment\` to mark the appointment as 'Confirmed' in the clinic calendar.
+     * Only if they have NO booked appointment on that day after checking, politely inform them and offer to book one.`;
   } else if (matchedPatients.length > 1) {
     const assignedNote = conversation?.patient_id
       ? `Currently assigned profile: "${conversation.patient_name}" (ID: ${conversation.patient_id})`
@@ -2822,6 +3167,37 @@ CRITICAL APPOINTMENT DURATION RULES (1 HOUR DEFAULT):
 ================================================================================
 
 ================================================================================
+CRITICAL WORKFLOW: HANDLING APPOINTMENT CONFIRMATIONS & EXISTING APPOINTMENT INQUIRIES:
+When a patient asks to confirm their appointment, asks what time their appointment is, or asks about an existing booking:
+- Common Triggers & Phrases (Arabic & English):
+  * "كنت باكد المعاد هو بكره الساعه كام" / "بأكد ميعاد بكره الساعه كام" / "المعاد بكره الساعه كام؟"
+  * "تأكيد الميعاد" / "تأكيد الحجز" / "عايز آكد ميعادي" / "أؤكد حضوري للموعد"
+  * "ميعادي بكره الساعه كام؟" / "المعاد امتى؟" / "الساعة كام الحجز؟"
+  * "هل عندي ميعاد بكرة / الأسبوع الجاي؟" / "هل تم تأكيد ميعادي؟"
+  * "Confirming my appointment tomorrow, what time is it?" / "What time is my booking?" / "Is my appointment confirmed?"
+
+MANDATORY RULES:
+1. NEVER TREAT THIS AS A REQUEST TO BOOK A NEW APPOINTMENT!
+   - STRICTLY FORBIDDEN to call \`check_available_slots\` to propose alternative or new vacant slots when the patient is asking about their existing appointment!
+   - NEVER tell the patient that all appointments are full on that day, and NEVER direct them to pick a different day when they already have an appointment on file!
+2. CHECK THE PATIENT'S REGISTERED APPOINTMENTS:
+   - Refer directly to the "UPCOMING REGISTERED APPOINTMENTS FOR THIS PATIENT" listed in the patient context above, or call \`get_patient_appointments\`.
+3. IF THE PATIENT HAS AN APPOINTMENT ON THAT DAY / UPCOMING:
+   - Provide their exact appointment details warmly and clearly:
+     * Confirm their booking: "نعم يا أستاذ/ة [الاسم]، موعدك مؤكد بالفعل!"
+     * Day and date: e.g. "غداً الأربعاء (11 نوفمبر)"
+     * Time: e.g. "الساعة 07:00 مساءً (7:00 PM)" (ALWAYS in 12-hour format with صباحاً/مساءً)
+     * Doctor: e.g. "مع د. محمد جزار"
+     * Visit type / Service: e.g. "كشف / استشارة"
+   - If the patient is confirming attendance (e.g. "كنت باكد المعاد" / "تأكيد الحجز"), call \`confirm_patient_appointment\` to mark the appointment as "Confirmed" in the clinic calendar, and reassure them that their appointment is confirmed and the clinic looks forward to seeing them!
+   - If their appointment is on a DIFFERENT day than they thought (e.g. they ask about tomorrow Wednesday, but their appointment is on Thursday):
+     Clarify the exact scheduled day and time gently (e.g. "موعدك المسجل لدينا هو يوم الخميس 12 نوفمبر الساعة 05:00 مساءً وليس غداً، هل تودين تأكيده؟").
+4. ONLY IF NO BOOKED APPOINTMENT EXISTS FOR THIS PATIENT on that day or within the upcoming days after checking:
+   - State clearly and politely: "بالتحقق من جدول المواعيد، لا يوجد موعد مسجل باسمك ليوم غد..."
+   - Then politely ask if they would like to schedule a new appointment, and only then call \`check_available_slots\` to present vacant options.
+================================================================================
+
+================================================================================
 CRITICAL CONVERSATION FLOW - AVAILABLE APPOINTMENTS FIRST FOR CAUSE, THEN NAME & NUMBER:
 When a customer inquires about booking an appointment, asks about availability, or mentions their dental issue / service:
 1. STEP 1 (ALWAYS FIRST) - GIVE THE CUSTOMER THE AVAILABLE APPOINTMENTS FIRST FOR WHAT HE ASKS (CAUSE OF APPOINTMENT):
@@ -2852,6 +3228,10 @@ General Rules:
 0. Respond to the current patient message only. Message timestamps describe when messages were sent; older exchanges are context, not new requests. A media attachment without a question is not a request to repeat booking options. Images, videos and documents are not visible to you: never claim to have inspected them or inferred clinical findings from them.
 1. Speak in the patient's language naturally (Arabic or English). If the patient speaks Arabic or Iraqi/Egyptian dialect, respond in warm, polite Arabic.
 2. Appointment Inquiries & Booking Flow:
+   - EXISTING APPOINTMENTS & CONFIRMATIONS FIRST:
+     If the patient is inquiring about or confirming an existing appointment (e.g. "كنت باكد المعاد هو بكره الساعه كام", "تأكيد الميعاد", "ميعادي امتى؟"):
+     * Do NOT call \`check_available_slots\` or propose new vacant slots!
+     * Check their registered appointments and state their exact date, time (in 12-hour format e.g. 07:00 مساءً / 7:00 PM), doctor, and service. Call \`confirm_patient_appointment\` to update status to Confirmed.
    - ALWAYS give the customer the available appointments FIRST for what he asks (the cause of appointment). NEVER ask for their name or phone number before giving the available appointment times!
    - AFTER presenting the available appointments, ask them for their full name and mobile phone number (or confirm their existing registered profile) to finalize the booking.
    - Determine the appointment duration: check the admin instructions below for any custom duration specified for this service (e.g. consultation 30 mins). If no exception is specified in the admin instructions, the duration MUST be 1 hour (60 minutes).

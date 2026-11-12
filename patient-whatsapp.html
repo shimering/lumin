@@ -1,0 +1,2733 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+  <meta name="robots" content="noindex, nofollow, noarchive"/>
+  <meta name="referrer" content="no-referrer"/>
+  <title>Patient WhatsApp Messenger · Lumin</title>
+  <link rel="icon" href="favicon.svg"/>
+  <script src="vendor/lucide.min.js"></script>
+  <script src="vendor/supabase.js"></script>
+  <script src="lumin-public-config.js"></script>
+  <style>
+    /* ==========================================================================
+       LUMIN CLINICAL DESIGN SYSTEM - DISCRETE WHATSAPP MESSENGER
+       Strict compliance with Lumin UI/UX guidelines:
+       - No uncompiled Tailwind border opacity (Zero black borders rule)
+       - Clean surface elevation & layering
+       - Apple/Linear clinical aesthetic
+       - Translucent emerald green highlighting for checked rows
+       - Responsive & touch-friendly (>=44px touch targets)
+       ========================================================================== */
+    :root {
+      --lumin-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --lumin-surface: #f8fafc;
+      --lumin-face: #ffffff;
+      --lumin-border: #e2e8f0;
+      --lumin-border-subtle: #f1f5f9;
+      --lumin-text-main: #0f172a;
+      --lumin-text-muted: #64748b;
+      --lumin-text-dim: #94a3b8;
+      --lumin-primary: #2563eb;
+      --lumin-primary-hover: #1d4ed8;
+      --lumin-primary-tint: #eff6ff;
+      --lumin-whatsapp: #10b981;
+      --lumin-whatsapp-hover: #059669;
+      --lumin-whatsapp-tint: rgba(16, 185, 129, 0.12);
+      --lumin-row-checked: rgba(16, 185, 129, 0.16);
+      --lumin-row-checked-hover: rgba(16, 185, 129, 0.24);
+      --lumin-row-checked-border: #10b981;
+      --lumin-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+      --lumin-shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.06);
+      --lumin-shadow-lg: 0 12px 32px -4px rgba(0, 0, 0, 0.1);
+      --lumin-radius-sm: 8px;
+      --lumin-radius-md: 12px;
+      --lumin-radius-lg: 16px;
+      --lumin-radius-full: 9999px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      font-family: var(--lumin-font);
+      background-color: var(--lumin-surface);
+      color: var(--lumin-text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      touch-action: pan-x pan-y;
+    }
+
+    /* Top Title Bar */
+    .title-bar {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--lumin-border);
+      padding: 0 24px;
+      height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .title-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .brand-mark {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--lumin-radius-md);
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
+    }
+
+    .brand-text h1 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--lumin-text-main);
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+    }
+
+    .brand-sync {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--lumin-text-muted);
+      margin-top: 2px;
+    }
+
+    .sync-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #94a3b8;
+      display: inline-block;
+      transition: background-color 0.3s ease;
+    }
+
+    .sync-dot.connected {
+      background-color: #10b981;
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+    }
+
+    .sync-dot.syncing {
+      background-color: #f59e0b;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.1); }
+    }
+
+    /* Title Bar Center / Template Tools */
+    .title-center {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      max-width: 640px;
+      justify-content: center;
+    }
+
+    .template-picker-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--lumin-surface);
+      border: 1px solid var(--lumin-border);
+      padding: 4px 8px 4px 12px;
+      border-radius: var(--lumin-radius-md);
+      width: 100%;
+      max-width: 440px;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .template-picker-container:focus-within {
+      border-color: var(--lumin-primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+      background: #ffffff;
+    }
+
+    .template-picker-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--lumin-text-muted);
+      white-space: nowrap;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .template-select {
+      background: transparent;
+      border: none;
+      outline: none;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--lumin-text-main);
+      width: 100%;
+      cursor: pointer;
+      text-overflow: ellipsis;
+      font-family: inherit;
+    }
+
+    .template-select option {
+      background-color: #ffffff;
+      color: var(--lumin-text-main);
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 16px;
+      height: 40px;
+      min-height: 40px;
+      border-radius: var(--lumin-radius-md);
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+      border: none;
+      outline: none;
+      text-decoration: none;
+      user-select: none;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+    }
+
+    .btn-primary {
+      background: var(--lumin-primary);
+      color: #ffffff;
+      box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
+    }
+
+    .btn-primary:hover {
+      background: var(--lumin-primary-hover);
+    }
+
+    .btn-secondary {
+      background: #ffffff;
+      color: var(--lumin-text-main);
+      border: 1px solid var(--lumin-border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--lumin-surface);
+      border-color: #cbd5e1;
+    }
+
+    .btn-emerald {
+      background: #ecfdf5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+    }
+
+    .btn-emerald:hover {
+      background: #d1fae5;
+    }
+
+    .btn-reset {
+      background: #fff1f2;
+      color: #be123c;
+      border: 1px solid #fecdd3;
+    }
+
+    .btn-reset:hover {
+      background: #ffe4e6;
+      border-color: #fda4af;
+    }
+
+    .btn-icon {
+      width: 40px;
+      height: 40px;
+      min-height: 40px;
+      padding: 0;
+      border-radius: var(--lumin-radius-md);
+      background: #ffffff;
+      border: 1px solid var(--lumin-border);
+      color: var(--lumin-text-muted);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+
+    .btn-icon:hover {
+      background: var(--lumin-surface);
+      color: var(--lumin-text-main);
+      border-color: #cbd5e1;
+    }
+
+    .title-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    /* Main Container */
+    .app-main {
+      flex: 1;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px 20px 48px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Toolbar Card */
+    .toolbar-card {
+      background: var(--lumin-face);
+      border: 1px solid var(--lumin-border);
+      border-radius: var(--lumin-radius-lg);
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      box-shadow: var(--lumin-shadow-sm);
+    }
+
+    .toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+      min-width: 280px;
+    }
+
+    .search-input-wrap {
+      position: relative;
+      flex: 1;
+      max-width: 360px;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--lumin-text-dim);
+      pointer-events: none;
+      width: 16px;
+      height: 16px;
+    }
+
+    .search-input {
+      width: 100%;
+      height: 38px;
+      padding: 0 12px 0 36px;
+      background: var(--lumin-surface);
+      border: 1px solid var(--lumin-border);
+      border-radius: var(--lumin-radius-md);
+      font-size: 13px;
+      color: var(--lumin-text-main);
+      font-family: inherit;
+      outline: none;
+      transition: all 0.15s ease;
+    }
+
+    .search-input:focus {
+      background: #ffffff;
+      border-color: var(--lumin-primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    .checked-count-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: var(--lumin-radius-full);
+      background: #ecfdf5;
+      color: #047857;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .page-size-selector {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--lumin-text-muted);
+      font-weight: 500;
+    }
+
+    .page-size-select {
+      height: 38px;
+      padding: 0 10px;
+      background: var(--lumin-surface);
+      border: 1px solid var(--lumin-border);
+      border-radius: var(--lumin-radius-md);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--lumin-text-main);
+      font-family: inherit;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .page-size-select:focus {
+      border-color: var(--lumin-primary);
+    }
+
+    /* Table Surface Card */
+    .table-card {
+      background: var(--lumin-face);
+      border: 1px solid var(--lumin-border);
+      border-radius: var(--lumin-radius-lg);
+      overflow: hidden;
+      box-shadow: var(--lumin-shadow-sm);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .patient-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    .patient-table th {
+      background: #f8fafc;
+      color: var(--lumin-text-muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--lumin-border);
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    .patient-table td {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--lumin-border-subtle);
+      color: var(--lumin-text-main);
+      vertical-align: middle;
+    }
+
+    /* Checkbox Column */
+    .col-checkbox {
+      width: 52px;
+      text-align: center;
+      padding-left: 20px !important;
+      padding-right: 8px !important;
+    }
+
+    .checkbox-custom {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #cbd5e1;
+      border-radius: 6px;
+      outline: none;
+      cursor: pointer;
+      display: inline-grid;
+      place-content: center;
+      background-color: #ffffff;
+      transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+      vertical-align: middle;
+      position: relative;
+    }
+
+    .checkbox-custom:hover {
+      border-color: #94a3b8;
+    }
+
+    .checkbox-custom:checked {
+      background-color: #10b981;
+      border-color: #10b981;
+    }
+
+    .checkbox-custom:checked::after {
+      content: "";
+      width: 6px;
+      height: 10px;
+      border: solid #ffffff;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+      margin-top: -2px;
+    }
+
+    .checkbox-custom:focus-visible {
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+    }
+
+    /* CRITICAL REQUIREMENT: Translucent green row on check */
+    tr.patient-row {
+      transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      cursor: default;
+    }
+
+    tr.patient-row:hover {
+      background-color: #f8fafc;
+    }
+
+    tr.patient-row.row-checked {
+      background-color: var(--lumin-row-checked) !important;
+    }
+
+    tr.patient-row.row-checked td {
+      background-color: var(--lumin-row-checked) !important;
+      border-bottom-color: rgba(16, 185, 129, 0.22);
+    }
+
+    tr.patient-row.row-checked:hover,
+    tr.patient-row.row-checked:hover td {
+      background-color: var(--lumin-row-checked-hover) !important;
+    }
+
+    /* Name & Phone Styling */
+    .patient-name-cell {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .patient-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #f1f5f9;
+      color: var(--lumin-text-muted);
+      font-weight: 700;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    tr.patient-row.row-checked .patient-avatar {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .patient-name-text {
+      font-weight: 600;
+      color: var(--lumin-text-main);
+      font-size: 14px;
+      letter-spacing: -0.01em;
+    }
+
+    .patient-phone-link {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 13px;
+      color: var(--lumin-text-muted);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: color 0.15s ease;
+    }
+
+    .patient-phone-link:hover {
+      color: var(--lumin-primary);
+    }
+
+    /* WhatsApp Action Button */
+    .whatsapp-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 18px;
+      height: 38px;
+      min-height: 38px;
+      border-radius: var(--lumin-radius-full);
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 700;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
+      transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+      white-space: nowrap;
+    }
+
+    .whatsapp-btn:hover {
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.38);
+      transform: translateY(-1px);
+      filter: brightness(1.04);
+    }
+
+    .whatsapp-btn:active {
+      transform: scale(0.98);
+    }
+
+    /* Pagination Footer */
+    .pagination-bar {
+      padding: 14px 20px;
+      background: var(--lumin-face);
+      border-top: 1px solid var(--lumin-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .pagination-info {
+      font-size: 13px;
+      color: var(--lumin-text-muted);
+      font-weight: 500;
+    }
+
+    .pagination-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .page-nav-btn {
+      width: 36px;
+      height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--lumin-radius-sm);
+      background: #ffffff;
+      border: 1px solid var(--lumin-border);
+      color: var(--lumin-text-main);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+
+    .page-nav-btn:hover:not(:disabled) {
+      background: var(--lumin-surface);
+      border-color: #cbd5e1;
+    }
+
+    .page-nav-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .page-current-display {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--lumin-text-main);
+      padding: 0 10px;
+    }
+
+    /* Empty & Loading States */
+    .table-empty-state {
+      padding: 64px 24px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--lumin-text-muted);
+    }
+
+    .empty-icon-circle {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #f1f5f9;
+      color: var(--lumin-text-dim);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .table-empty-state h3 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--lumin-text-main);
+    }
+
+    .table-empty-state p {
+      font-size: 13px;
+      max-width: 380px;
+      line-height: 1.5;
+    }
+
+    /* Side Panel / Drawer */
+    .drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 50;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    .drawer-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .drawer-panel {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 480px;
+      max-width: 95vw;
+      background: #ffffff;
+      z-index: 51;
+      box-shadow: -10px 0 30px rgba(0, 0, 0, 0.15);
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .drawer-panel.open {
+      transform: translateX(0);
+    }
+
+    .drawer-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--lumin-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .drawer-title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .drawer-icon-box {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--lumin-radius-sm);
+      background: var(--lumin-primary-tint);
+      color: var(--lumin-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .drawer-title-group h2 {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--lumin-text-main);
+      letter-spacing: -0.01em;
+    }
+
+    .drawer-close-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--lumin-radius-sm);
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--lumin-text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+
+    .drawer-close-btn:hover {
+      background: var(--lumin-surface);
+      color: var(--lumin-text-main);
+    }
+
+    .drawer-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .form-label {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--lumin-text-muted);
+    }
+
+    .form-input {
+      width: 100%;
+      height: 42px;
+      padding: 0 14px;
+      background: var(--lumin-surface);
+      border: 1px solid var(--lumin-border);
+      border-radius: var(--lumin-radius-md);
+      font-size: 14px;
+      color: var(--lumin-text-main);
+      font-family: inherit;
+      outline: none;
+      transition: all 0.15s ease;
+    }
+
+    .form-input:focus {
+      background: #ffffff;
+      border-color: var(--lumin-primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    /* Variable Insertion Chips */
+    .variable-section {
+      background: #f8fafc;
+      border: 1px solid var(--lumin-border);
+      border-radius: var(--lumin-radius-md);
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .variable-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .variable-help {
+      font-size: 11px;
+      color: var(--lumin-text-dim);
+    }
+
+    .variable-chips-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .variable-pill-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: var(--lumin-radius-full);
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .variable-pill-btn:hover {
+      background: #dbeafe;
+      border-color: #93c5fd;
+      transform: translateY(-1px);
+    }
+
+    .variable-pill-btn:active {
+      transform: scale(0.96);
+    }
+
+    .emoji-pill {
+      font-size: 15px;
+      padding: 4px 10px;
+      min-width: 36px;
+      justify-content: center;
+      background: #ffffff;
+      border-color: var(--lumin-border);
+      color: var(--lumin-text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+    }
+
+    .emoji-pill:hover {
+      background: #f1f5f9;
+      border-color: #cbd5e1;
+    }
+
+    .form-textarea {
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--lumin-surface);
+      border: 1px solid var(--lumin-border);
+      border-radius: var(--lumin-radius-md);
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--lumin-text-main);
+      font-family: inherit;
+      resize: vertical;
+      min-height: 120px;
+      outline: none;
+      transition: all 0.15s ease;
+    }
+
+    .form-textarea:focus {
+      background: #ffffff;
+      border-color: var(--lumin-primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    /* Message Live Preview */
+    .preview-card {
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      border-radius: var(--lumin-radius-md);
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .preview-header {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #047857;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .preview-text {
+      font-size: 13px;
+      line-height: 1.5;
+      color: #064e3b;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .drawer-footer {
+      padding: 18px 24px;
+      border-top: 1px solid var(--lumin-border);
+      background: #fafafa;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    /* Saved Templates Sub-list */
+    .saved-templates-section {
+      border-top: 1px solid var(--lumin-border);
+      padding-top: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .saved-templates-header {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--lumin-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .saved-template-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 14px;
+      background: #ffffff;
+      border: 1px solid var(--lumin-border);
+      border-radius: var(--lumin-radius-md);
+      transition: all 0.15s ease;
+    }
+
+    .saved-template-item:hover {
+      border-color: #cbd5e1;
+      background: var(--lumin-surface);
+    }
+
+    .saved-template-info {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .saved-template-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--lumin-text-main);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .saved-template-preview-sub {
+      font-size: 11px;
+      color: var(--lumin-text-dim);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 2px;
+    }
+
+    .saved-template-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-xs {
+      padding: 4px 8px;
+      font-size: 11px;
+      height: 28px;
+      min-height: 28px;
+      border-radius: 6px;
+    }
+
+    /* Toast Notifications */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 60;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .toast-item {
+      pointer-events: auto;
+      background: #1e293b;
+      color: #ffffff;
+      padding: 12px 18px;
+      border-radius: var(--lumin-radius-md);
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: var(--lumin-shadow-lg);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: toastSlide 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes toastSlide {
+      from { transform: translateY(16px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* Sign In Modal */
+    .auth-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 55;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .auth-modal.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .auth-modal-card {
+      background: #ffffff;
+      border-radius: var(--lumin-radius-lg);
+      border: 1px solid var(--lumin-border);
+      box-shadow: var(--lumin-shadow-lg);
+      width: 100%;
+      max-width: 420px;
+      overflow: hidden;
+      transform: translateY(10px) scale(0.98);
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .auth-modal.open .auth-modal-card {
+      transform: translateY(0) scale(1);
+    }
+
+    .auth-modal-header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--lumin-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: #f8fafc;
+    }
+
+    .auth-modal-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .auth-modal-title h3 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--lumin-text-main);
+    }
+
+    .auth-modal-body {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .title-bar {
+        padding: 0 16px;
+        height: auto;
+        min-height: 64px;
+        flex-wrap: wrap;
+        padding-top: 10px;
+        padding-bottom: 10px;
+      }
+      .title-center {
+        order: 3;
+        width: 100%;
+        max-width: 100%;
+      }
+      .app-main {
+        padding: 16px 12px 36px;
+      }
+      .toolbar-card {
+        padding: 12px;
+      }
+      .drawer-panel {
+        width: 100vw;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Title Bar -->
+  <header class="title-bar">
+    <div class="title-brand">
+      <div class="brand-mark">
+        <i data-lucide="message-square" class="w-5 h-5"></i>
+      </div>
+      <div class="brand-text">
+        <h1>Patient WhatsApp</h1>
+        <div class="brand-sync" id="syncStatusBadge" role="button" tabindex="0" title="Click to sign in or reconnect" style="cursor: pointer;">
+          <span class="sync-dot" id="syncDot"></span>
+          <span id="syncText">Connecting...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center: WhatsApp Message Picker & Insert Button -->
+    <div class="title-center">
+      <div class="template-picker-container" title="Select message template">
+        <span class="template-picker-label">Message:</span>
+        <select id="messagePicker" class="template-select" aria-label="WhatsApp Message Template">
+          <!-- Populated by JS -->
+        </select>
+      </div>
+
+      <!-- Insert Button (opens side panel) -->
+      <button type="button" id="openDrawerBtn" class="btn btn-secondary" title="Create or edit message template">
+        <i data-lucide="plus" class="w-4 h-4"></i>
+        <span>Insert</span>
+      </button>
+    </div>
+
+    <!-- Right: Reset Checkboxes & Refresh -->
+    <div class="title-actions">
+      <!-- Reset All Checkboxes Button -->
+      <button type="button" id="resetCheckboxesBtn" class="btn btn-reset" title="Uncheck all rows">
+        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+        <span>Reset Checkboxes</span>
+      </button>
+
+      <!-- Sign In / Sign Out Button -->
+      <button type="button" id="authBtn" class="btn btn-secondary" title="Account status">
+        <i data-lucide="user" class="w-4 h-4"></i>
+        <span id="authBtnText">Sign In</span>
+      </button>
+
+      <!-- Manual Refresh Button -->
+      <button type="button" id="manualRefreshBtn" class="btn-icon" title="Refresh patient database">
+        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main View -->
+  <main class="app-main">
+
+    <!-- Controls / Filters Toolbar -->
+    <section class="toolbar-card">
+      <div class="toolbar-left">
+        <div class="search-input-wrap">
+          <i data-lucide="search" class="search-icon"></i>
+          <input type="text" id="patientSearchInput" class="search-input" placeholder="Search by patient name or phone..."/>
+        </div>
+        <div class="checked-count-badge" id="checkedCountBadge">
+          <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i>
+          <span id="checkedCountText">0 checked</span>
+        </div>
+      </div>
+
+      <div class="toolbar-right">
+        <!-- Target platform selector: Web vs App vs Auto (Fixes wa.me emoji corruption) -->
+        <div class="page-size-selector">
+          <label for="targetPlatformSelect">Open in:</label>
+          <select id="targetPlatformSelect" class="page-size-select" title="Choose whether to open in WhatsApp Web or WhatsApp App">
+            <option value="auto" selected>Auto (Web on PC, App on Mobile)</option>
+            <option value="web">WhatsApp Web (Direct)</option>
+            <option value="app">WhatsApp App (Desktop / Mobile)</option>
+          </select>
+        </div>
+
+        <!-- Page size dropdown: loads 1 or 20 or 50 patients per page -->
+        <div class="page-size-selector">
+          <label for="pageSizeSelect">Show per page:</label>
+          <select id="pageSizeSelect" class="page-size-select">
+            <option value="1">1</option>
+            <option value="20" selected>20</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="all">All</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- Patients Database Table Card -->
+    <section class="table-card">
+      <div class="table-container">
+        <table class="patient-table">
+          <thead>
+            <tr>
+              <th class="col-checkbox">
+                <input type="checkbox" id="selectAllPageCheckbox" class="checkbox-custom" title="Select all on current page"/>
+              </th>
+              <th>Patient Name</th>
+              <th>Phone Number</th>
+              <th style="width: 140px; text-align: center;">WhatsApp</th>
+            </tr>
+          </thead>
+          <tbody id="patientsTableBody">
+            <!-- Dynamically populated -->
+          </tbody>
+        </table>
+
+        <!-- Empty state placeholder -->
+        <div id="tableEmptyState" class="table-empty-state" style="display: none;">
+          <div class="empty-icon-circle">
+            <i data-lucide="users" class="w-6 h-6"></i>
+          </div>
+          <h3>No patients found</h3>
+          <p id="emptyStateMsg">No patient records found in database or matching your search filter.</p>
+        </div>
+      </div>
+
+      <!-- Pagination Footer -->
+      <footer class="pagination-bar">
+        <div class="pagination-info" id="paginationInfo">
+          Showing 0–0 of 0 patients
+        </div>
+        <div class="pagination-actions">
+          <button type="button" id="firstPageBtn" class="page-nav-btn" title="First Page">
+            <i data-lucide="chevrons-left" class="w-4 h-4"></i>
+          </button>
+          <button type="button" id="prevPageBtn" class="page-nav-btn" title="Previous Page">
+            <i data-lucide="chevron-left" class="w-4 h-4"></i>
+          </button>
+          <span class="page-current-display" id="pageCurrentDisplay">Page 1 of 1</span>
+          <button type="button" id="nextPageBtn" class="page-nav-btn" title="Next Page">
+            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+          </button>
+          <button type="button" id="lastPageBtn" class="page-nav-btn" title="Last Page">
+            <i data-lucide="chevrons-right" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </footer>
+    </section>
+
+  </main>
+
+  <!-- Side Panel Drawer for Message Template Editing -->
+  <div class="drawer-backdrop" id="drawerBackdrop"></div>
+  <aside class="drawer-panel" id="drawerPanel" aria-hidden="true">
+    <div class="drawer-header">
+      <div class="drawer-title-group">
+        <div class="drawer-icon-box">
+          <i data-lucide="file-text" class="w-5 h-5"></i>
+        </div>
+        <h2>Message Template</h2>
+      </div>
+      <button type="button" class="drawer-close-btn" id="closeDrawerBtn" aria-label="Close">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <div class="drawer-body">
+      <!-- Template Title input -->
+      <div class="form-group">
+        <label for="templateTitleInput" class="form-label">Template Title</label>
+        <input type="text" id="templateTitleInput" class="form-input" placeholder="e.g. Follow-up Reminder" required maxlength="80"/>
+      </div>
+
+      <!-- Variable Insertion Toolbar -->
+      <div class="variable-section">
+        <div class="variable-header">
+          <span class="form-label">Insert Variable</span>
+          <span class="variable-help">Inserts at current cursor</span>
+        </div>
+        <div class="variable-chips-container">
+          <!-- Required Patient Name variable button -->
+          <button type="button" class="variable-pill-btn" id="varPatientNameBtn" title="Insert patient name variable">
+            <i data-lucide="user" class="w-3.5 h-3.5"></i>
+            <span>{{patient_name}}</span>
+          </button>
+          <button type="button" class="variable-pill-btn" id="varClinicNameBtn" title="Insert clinic name">
+            <i data-lucide="building" class="w-3.5 h-3.5"></i>
+            <span>{{clinic_name}}</span>
+          </button>
+          <button type="button" class="variable-pill-btn" id="varDateBtn" title="Insert today's date">
+            <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+            <span>{{today_date}}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Emoji Insertion Toolbar -->
+      <div class="variable-section" style="margin-top: -6px;">
+        <div class="variable-header">
+          <span class="form-label">Insert Emojis</span>
+          <span class="variable-help">Click to add emoji</span>
+        </div>
+        <div class="variable-chips-container" id="emojiChipsContainer">
+          <button type="button" class="variable-pill-btn emoji-pill" data-emoji="✨" title="Sparkles">✨</button>
+          <button type="button" class="variable-pill-btn emoji-pill" data-emoji="👋" title="Waving Hand">👋</button>
+          <button type="button" class="variable-pill-btn emoji-pill" data-emoji="🦷" title="Tooth">🦷</button>
+          <button type="button" class="variable-pill-btn emoji-pill" data-emoji="💎" title="Diamond">💎</button>
+          <button type="button" class="variable-pill-btn emoji-pill" data-emoji="🌟" title="Star">🌟</button>
+          <button type="button" class="variable-pill-btn emoji-pill" data-emoji="🎁" title="Gift">🎁</button>
+          <button type="button" class="variable-pill-btn emoji-pill" data-emoji="📍" title="Location">📍</button>
+          <button type="button" class="variable-pill-btn emoji-pill" data-emoji="📅" title="Calendar">📅</button>
+          <button type="button" class="variable-pill-btn emoji-pill" data-emoji="📞" title="Phone">📞</button>
+          <button type="button" class="variable-pill-btn emoji-pill" data-emoji="✅" title="Checkmark">✅</button>
+          <button type="button" class="variable-pill-btn emoji-pill" data-emoji="🔹" title="Bullet">🔹</button>
+        </div>
+      </div>
+
+      <!-- Template Body Textarea -->
+      <div class="form-group">
+        <label for="templateBodyInput" class="form-label">Message Body</label>
+        <textarea id="templateBodyInput" class="form-textarea" placeholder="Write your WhatsApp message here... Click {{patient_name}} above to insert the patient's name automatically."></textarea>
+      </div>
+
+      <!-- Live Preview -->
+      <div class="preview-card">
+        <div class="preview-header">
+          <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+          <span>Live Message Preview (Sample Patient)</span>
+        </div>
+        <div class="preview-text" id="templateLivePreview">
+          Message preview will appear here...
+        </div>
+      </div>
+
+      <!-- Saved Templates Section -->
+      <div class="saved-templates-section">
+        <div class="saved-templates-header">Saved Templates</div>
+        <div id="savedTemplatesList" style="display: flex; flex-direction: column; gap: 8px;">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
+
+    <div class="drawer-footer">
+      <button type="button" id="cancelDrawerBtn" class="btn btn-secondary">Cancel</button>
+      <button type="button" id="saveTemplateBtn" class="btn btn-primary">
+        <i data-lucide="check" class="w-4 h-4"></i>
+        <span>Save Template</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Sign In Dialog Modal -->
+  <div class="drawer-backdrop" id="authModalBackdrop"></div>
+  <div class="auth-modal" id="authModal" aria-hidden="true">
+    <div class="auth-modal-card">
+      <div class="auth-modal-header">
+        <div class="auth-modal-title">
+          <div class="brand-mark" style="width: 34px; height: 34px; border-radius: 8px;">
+            <i data-lucide="lock" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3>Sign in to Lumin</h3>
+            <p style="font-size: 11px; color: var(--lumin-text-muted); font-weight: 500;">Connect to clinic database & sync checked patients</p>
+          </div>
+        </div>
+        <button type="button" class="drawer-close-btn" id="closeAuthModalBtn" aria-label="Close">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <form id="authModalForm" class="auth-modal-body">
+        <div class="form-group">
+          <label for="authEmailInput" class="form-label">Email or Login Name</label>
+          <input type="text" id="authEmailInput" class="form-input" placeholder="e.g. admin or staff@lumin.com" required autocomplete="username"/>
+        </div>
+        <div class="form-group">
+          <label for="authPasswordInput" class="form-label">Password</label>
+          <input type="password" id="authPasswordInput" class="form-input" placeholder="••••••••" required autocomplete="current-password"/>
+        </div>
+        <div id="authModalError" style="font-size: 12px; color: #be123c; background: #fff1f2; padding: 8px 12px; border-radius: 6px; border: 1px solid #fecdd3; display: none;"></div>
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px;">
+          <button type="button" id="cancelAuthModalBtn" class="btn btn-secondary">Cancel</button>
+          <button type="submit" id="submitAuthModalBtn" class="btn btn-primary">
+            <i data-lucide="log-in" class="w-4 h-4"></i>
+            <span>Sign In</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Application Logic -->
+  <script>
+    (function () {
+      'use strict';
+
+      // =====================================================================
+      // STATE MANAGEMENT
+      // =====================================================================
+      let allPatients = [];
+      let filteredPatients = [];
+      let checkedPatientIds = new Set();
+      let currentPage = 1;
+      let pageSize = 20; // Default 20, options: 1, 20, 50, 100, all
+      let activeTemplateId = null;
+      let templates = [];
+      let realtimeSubscription = null;
+      let supabaseClient = null;
+      let targetPlatform = 'auto'; // 'auto', 'web', 'app'
+
+      const STORAGE_KEYS = {
+        CHECKED_IDS: 'lumin_discrete_checked_patient_ids',
+        TEMPLATES: 'lumin_discrete_whatsapp_templates',
+        ACTIVE_TEMPLATE: 'lumin_discrete_active_template_id',
+        PAGE_SIZE: 'lumin_discrete_page_size',
+        CACHE_PATIENTS: 'lumin_discrete_cached_patients',
+        TARGET_PLATFORM: 'lumin_discrete_target_platform'
+      };
+
+      // Default Starter Templates
+      const DEFAULT_TEMPLATES = [
+        {
+          id: 'tpl_followup',
+          title: 'Follow-up Reminder',
+          body: 'مرحباً {{patient_name}} 👋\nنتمنى أن تكون بأفضل حال بعد زيارتك لعيادة Lumin. نود الاطمئنان عليك والتأكد من راحتك. لا تتردد في مراسلتنا إذا كان لديك أي استفسار.'
+        },
+        {
+          id: 'tpl_appointment',
+          title: 'Appointment Reminder',
+          body: 'عزيزي {{patient_name}}، نود تذكيرك بموعدك القادم في عيادة Lumin. يرجى تأكيد حضورك بالرد على هذه الرسالة.'
+        },
+        {
+          id: 'tpl_checkup',
+          title: 'Routine Check-up',
+          body: 'أهلاً بك {{patient_name}} 🦷\nمرت عدة أشهر منذ زيارتك الأخيرة. نوصي بحجز فحص دوري للحفاظ على ابتسامتك وصحة أسنانك!'
+        },
+        {
+          id: 'tpl_direct',
+          title: 'Direct Chat (Empty)',
+          body: ''
+        }
+      ];
+
+      // =====================================================================
+      // DOM ELEMENTS
+      // =====================================================================
+      const elements = {
+        messagePicker: document.getElementById('messagePicker'),
+        openDrawerBtn: document.getElementById('openDrawerBtn'),
+        resetCheckboxesBtn: document.getElementById('resetCheckboxesBtn'),
+        manualRefreshBtn: document.getElementById('manualRefreshBtn'),
+        patientSearchInput: document.getElementById('patientSearchInput'),
+        pageSizeSelect: document.getElementById('pageSizeSelect'),
+        targetPlatformSelect: document.getElementById('targetPlatformSelect'),
+        checkedCountText: document.getElementById('checkedCountText'),
+        patientsTableBody: document.getElementById('patientsTableBody'),
+        tableEmptyState: document.getElementById('tableEmptyState'),
+        emptyStateMsg: document.getElementById('emptyStateMsg'),
+        selectAllPageCheckbox: document.getElementById('selectAllPageCheckbox'),
+        paginationInfo: document.getElementById('paginationInfo'),
+        pageCurrentDisplay: document.getElementById('pageCurrentDisplay'),
+        firstPageBtn: document.getElementById('firstPageBtn'),
+        prevPageBtn: document.getElementById('prevPageBtn'),
+        nextPageBtn: document.getElementById('nextPageBtn'),
+        lastPageBtn: document.getElementById('lastPageBtn'),
+        drawerBackdrop: document.getElementById('drawerBackdrop'),
+        drawerPanel: document.getElementById('drawerPanel'),
+        closeDrawerBtn: document.getElementById('closeDrawerBtn'),
+        cancelDrawerBtn: document.getElementById('cancelDrawerBtn'),
+        saveTemplateBtn: document.getElementById('saveTemplateBtn'),
+        templateTitleInput: document.getElementById('templateTitleInput'),
+        templateBodyInput: document.getElementById('templateBodyInput'),
+        templateLivePreview: document.getElementById('templateLivePreview'),
+        savedTemplatesList: document.getElementById('savedTemplatesList'),
+        varPatientNameBtn: document.getElementById('varPatientNameBtn'),
+        varClinicNameBtn: document.getElementById('varClinicNameBtn'),
+        varDateBtn: document.getElementById('varDateBtn'),
+        syncDot: document.getElementById('syncDot'),
+        syncText: document.getElementById('syncText'),
+        syncStatusBadge: document.getElementById('syncStatusBadge'),
+        authBtn: document.getElementById('authBtn'),
+        authBtnText: document.getElementById('authBtnText'),
+        authModal: document.getElementById('authModal'),
+        authModalBackdrop: document.getElementById('authModalBackdrop'),
+        closeAuthModalBtn: document.getElementById('closeAuthModalBtn'),
+        cancelAuthModalBtn: document.getElementById('cancelAuthModalBtn'),
+        authModalForm: document.getElementById('authModalForm'),
+        authEmailInput: document.getElementById('authEmailInput'),
+        authPasswordInput: document.getElementById('authPasswordInput'),
+        authModalError: document.getElementById('authModalError'),
+        submitAuthModalBtn: document.getElementById('submitAuthModalBtn'),
+        toastContainer: document.getElementById('toastContainer')
+      };
+
+      // Refresh icons helper
+      function refreshIcons() {
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons();
+        }
+      }
+
+      // =====================================================================
+      // TOAST NOTIFICATIONS
+      // =====================================================================
+      function showToast(message, iconName = 'info') {
+        const toast = document.createElement('div');
+        toast.className = 'toast-item';
+        toast.innerHTML = `<i data-lucide="${iconName}" class="w-4 h-4"></i><span>${escapeHtml(message)}</span>`;
+        elements.toastContainer.appendChild(toast);
+        refreshIcons();
+        setTimeout(() => {
+          toast.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+          toast.style.opacity = '0';
+          toast.style.transform = 'translateY(10px)';
+          setTimeout(() => toast.remove(), 300);
+        }, 3200);
+      }
+
+      function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, c => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;'
+        }[c]));
+      }
+
+      // =====================================================================
+      // PHONE NUMBER & WHATSAPP LOGIC
+      // =====================================================================
+      function normaliseWhatsAppPhone(phone) {
+        let digits = String(phone || '').replace(/\D/g, '');
+        if (digits.startsWith('00')) digits = digits.slice(2);
+        // Egyptian phone logic: 010..., 011..., 012..., 015... (11 digits)
+        if (digits.length === 11 && digits.startsWith('0')) {
+          digits = '20' + digits.slice(1);
+        } else if (digits.length === 10 && digits.startsWith('1')) {
+          digits = '20' + digits;
+        }
+        return digits;
+      }
+
+      function formatDisplayPhone(phone) {
+        if (!phone) return '—';
+        const clean = normaliseWhatsAppPhone(phone);
+        if (clean.startsWith('20') && clean.length === 12) {
+          return `+20 ${clean.slice(2, 5)} ${clean.slice(5, 8)} ${clean.slice(8)}`;
+        }
+        return phone;
+      }
+
+      function resolveTemplateText(templateBody, patient) {
+        if (!templateBody) return '';
+        const name = (patient?.name || `${patient?.first_name || ''} ${patient?.last_name || ''}`).trim() || 'Patient';
+        const date = new Date().toLocaleDateString('ar-EG');
+        return templateBody
+          .replace(/\{\{\s*patient_name\s*\}\}/gi, name)
+          .replace(/\{\{\s*name\s*\}\}/gi, name)
+          .replace(/\[\s*patient_name\s*\]/gi, name)
+          .replace(/\{\{\s*clinic_name\s*\}\}/gi, 'Lumin Dental Clinic')
+          .replace(/\{\{\s*today_date\s*\}\}/gi, date);
+      }
+
+      function isMobileOrTablet() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+          (navigator.maxTouchPoints > 2 && /Macintosh/i.test(navigator.userAgent));
+      }
+
+      function getWhatsAppUrl(patient) {
+        const phone = normaliseWhatsAppPhone(patient.phone || patient.secondary_phone);
+        if (!phone) return null;
+        const currentTemplate = templates.find(t => t.id === activeTemplateId) || templates[0];
+        const text = resolveTemplateText(currentTemplate ? currentTemplate.body : '', patient);
+        const encodedText = text ? encodeURIComponent(text) : '';
+
+        // Target platform resolution:
+        // 'web': Direct to WhatsApp Web (best for desktop browsers; fixes wa.me 302 redirect emoji corruption bug)
+        // 'app': Direct to WhatsApp API / universal endpoint (best for mobile devices; also fixes wa.me emoji bug)
+        // 'auto': Web on desktop/laptop, App on phone/tablet
+        let mode = targetPlatform;
+        if (!mode || mode === 'auto') {
+          mode = isMobileOrTablet() ? 'app' : 'web';
+        }
+
+        if (mode === 'web') {
+          return `https://web.whatsapp.com/send/?phone=${phone}${encodedText ? '&text=' + encodedText : ''}`;
+        } else {
+          return `https://api.whatsapp.com/send/?phone=${phone}${encodedText ? '&text=' + encodedText : ''}`;
+        }
+      }
+
+      // =====================================================================
+      // TEMPLATES MANAGEMENT & SIDE PANEL
+      // =====================================================================
+      function loadTemplates() {
+        try {
+          const stored = localStorage.getItem(STORAGE_KEYS.TEMPLATES);
+          if (stored) {
+            templates = JSON.parse(stored);
+          }
+        } catch (_) {}
+        if (!Array.isArray(templates) || templates.length === 0) {
+          templates = [...DEFAULT_TEMPLATES];
+          saveTemplates();
+        }
+
+        const storedActive = localStorage.getItem(STORAGE_KEYS.ACTIVE_TEMPLATE);
+        if (storedActive && templates.some(t => t.id === storedActive)) {
+          activeTemplateId = storedActive;
+        } else {
+          activeTemplateId = templates[0]?.id || null;
+        }
+
+        renderTemplatePicker();
+        renderSavedTemplatesList();
+      }
+
+      function saveTemplates() {
+        try {
+          localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(templates));
+          if (activeTemplateId) {
+            localStorage.setItem(STORAGE_KEYS.ACTIVE_TEMPLATE, activeTemplateId);
+          }
+        } catch (_) {}
+      }
+
+      function renderTemplatePicker() {
+        elements.messagePicker.innerHTML = templates.map(t => `
+          <option value="${escapeHtml(t.id)}" ${t.id === activeTemplateId ? 'selected' : ''}>
+            ${escapeHtml(t.title || 'Untitled')}
+          </option>
+        `).join('');
+      }
+
+      function renderSavedTemplatesList() {
+        elements.savedTemplatesList.innerHTML = templates.map(t => `
+          <div class="saved-template-item">
+            <div class="saved-template-info">
+              <div class="saved-template-name">${escapeHtml(t.title || 'Untitled')}</div>
+              <div class="saved-template-preview-sub">${escapeHtml(t.body || 'No text')}</div>
+            </div>
+            <div class="saved-template-actions">
+              <button type="button" class="btn btn-secondary btn-xs" onclick="window.useTemplate('${escapeHtml(t.id)}')">Use</button>
+              <button type="button" class="btn btn-secondary btn-xs" onclick="window.editTemplate('${escapeHtml(t.id)}')">Edit</button>
+              ${templates.length > 1 ? `<button type="button" class="btn btn-reset btn-xs" onclick="window.deleteTemplate('${escapeHtml(t.id)}')">Delete</button>` : ''}
+            </div>
+          </div>
+        `).join('');
+      }
+
+      window.useTemplate = function (id) {
+        activeTemplateId = id;
+        saveTemplates();
+        renderTemplatePicker();
+        closeDrawer();
+        renderCurrentPage();
+        showToast('Active message template updated');
+      };
+
+      window.editTemplate = function (id) {
+        const tpl = templates.find(t => t.id === id);
+        if (!tpl) return;
+        elements.templateTitleInput.value = tpl.title;
+        elements.templateBodyInput.value = tpl.body;
+        updateDrawerPreview();
+        elements.templateBodyInput.focus();
+      };
+
+      window.deleteTemplate = function (id) {
+        if (!confirm('Are you sure you want to delete this template?')) return;
+        templates = templates.filter(t => t.id !== id);
+        if (activeTemplateId === id) {
+          activeTemplateId = templates[0]?.id || null;
+        }
+        saveTemplates();
+        renderTemplatePicker();
+        renderSavedTemplatesList();
+        renderCurrentPage();
+        showToast('Template deleted');
+      };
+
+      function openDrawer() {
+        elements.drawerBackdrop.classList.add('open');
+        elements.drawerPanel.classList.add('open');
+        elements.drawerPanel.setAttribute('aria-hidden', 'false');
+        const active = templates.find(t => t.id === activeTemplateId);
+        if (active) {
+          elements.templateTitleInput.value = active.title;
+          elements.templateBodyInput.value = active.body;
+        } else {
+          elements.templateTitleInput.value = '';
+          elements.templateBodyInput.value = '';
+        }
+        updateDrawerPreview();
+        elements.templateTitleInput.focus();
+        refreshIcons();
+      }
+
+      function closeDrawer() {
+        elements.drawerBackdrop.classList.remove('open');
+        elements.drawerPanel.classList.remove('open');
+        elements.drawerPanel.setAttribute('aria-hidden', 'true');
+      }
+
+      function updateDrawerPreview() {
+        const body = elements.templateBodyInput.value;
+        const samplePatient = { name: 'أحمد محمد (Ahmed Mohamed)' };
+        const preview = resolveTemplateText(body, samplePatient);
+        elements.templateLivePreview.textContent = preview || 'Message preview will appear here...';
+      }
+
+      function insertVariableIntoBody(variableTag) {
+        const textarea = elements.templateBodyInput;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = textarea.value;
+        textarea.value = text.substring(0, start) + variableTag + text.substring(end);
+        textarea.selectionStart = textarea.selectionEnd = start + variableTag.length;
+        textarea.focus();
+        updateDrawerPreview();
+      }
+
+      function saveCurrentTemplate() {
+        const title = elements.templateTitleInput.value.trim();
+        const body = elements.templateBodyInput.value;
+        if (!title) {
+          alert('Please enter a template title.');
+          elements.templateTitleInput.focus();
+          return;
+        }
+
+        const existingIndex = templates.findIndex(t => t.id === activeTemplateId);
+        if (existingIndex >= 0) {
+          templates[existingIndex].title = title;
+          templates[existingIndex].body = body;
+        } else {
+          const newId = 'tpl_' + Date.now();
+          templates.unshift({ id: newId, title, body });
+          activeTemplateId = newId;
+        }
+
+        saveTemplates();
+        renderTemplatePicker();
+        renderSavedTemplatesList();
+        closeDrawer();
+        renderCurrentPage();
+        showToast(`Template "${title}" saved!`, 'check');
+      }
+
+      // =====================================================================
+      // CHECKBOX & TRANSLUCENT GREEN ROW LOGIC (DUAL-LAYER PERSISTENCE)
+      // Layer 1: Instant local storage cache (loads instantly on start)
+      // Layer 2: Live Supabase database sync (persists across logouts & devices)
+      // =====================================================================
+      function loadCheckedState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEYS.CHECKED_IDS);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              checkedPatientIds = new Set(parsed.map(String));
+            }
+          }
+        } catch (_) {
+          checkedPatientIds = new Set();
+        }
+        updateCheckedBadge();
+      }
+
+      function saveCheckedState() {
+        try {
+          localStorage.setItem(STORAGE_KEYS.CHECKED_IDS, JSON.stringify([...checkedPatientIds]));
+        } catch (_) {}
+        updateCheckedBadge();
+      }
+
+      function updateCheckedBadge() {
+        const count = checkedPatientIds.size;
+        elements.checkedCountText.textContent = `${count} checked`;
+      }
+
+      async function togglePatientChecked(patientId, isChecked) {
+        if (!patientId) return;
+        const pid = String(patientId).trim();
+        if (isChecked) {
+          checkedPatientIds.add(pid);
+        } else {
+          checkedPatientIds.delete(pid);
+        }
+
+        const pObj = allPatients.find(p => String(p.id).trim() === pid);
+        if (pObj) {
+          pObj.whatsapp_checked = Boolean(isChecked);
+          pObj.whatsapp_checked_at = isChecked ? new Date().toISOString() : null;
+        }
+
+        saveCheckedState();
+        updateRowVisualState(pid, isChecked);
+        syncSelectAllPageCheckbox();
+
+        // Persist to Supabase database in background if real UUID patient
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pid);
+        if (isUUID) {
+          try {
+            const db = getSupabase();
+            if (db) {
+              const res = await db.rpc('set_patient_whatsapp_checked', {
+                p_patient_id: pid,
+                p_checked: Boolean(isChecked)
+              });
+              if (res && res.error) {
+                console.warn('RPC set_patient_whatsapp_checked notice:', res.error);
+                // Secondary fallback attempt
+                await db.from('patients').update({
+                  whatsapp_checked: Boolean(isChecked),
+                  whatsapp_checked_at: isChecked ? new Date().toISOString() : null
+                }).eq('id', pid);
+              }
+            }
+          } catch (err) {
+            console.warn('Supabase set_patient_whatsapp_checked notice:', err);
+          }
+        }
+      }
+
+      function updateRowVisualState(patientId, isChecked) {
+        const row = document.getElementById(`patient-row-${patientId}`);
+        if (!row) return;
+        const checkbox = row.querySelector('.patient-row-checkbox');
+        if (checkbox) checkbox.checked = isChecked;
+        if (isChecked) {
+          row.classList.add('row-checked');
+        } else {
+          row.classList.remove('row-checked');
+        }
+      }
+
+      async function resetAllCheckboxes() {
+        if (checkedPatientIds.size === 0) {
+          showToast('No checkboxes are checked.');
+          return;
+        }
+        const count = checkedPatientIds.size;
+        checkedPatientIds.clear();
+        allPatients.forEach(p => {
+          p.whatsapp_checked = false;
+          p.whatsapp_checked_at = null;
+        });
+        saveCheckedState();
+
+        // Uncheck all rows currently rendered
+        document.querySelectorAll('tr.patient-row').forEach(row => {
+          row.classList.remove('row-checked');
+          const cb = row.querySelector('.patient-row-checkbox');
+          if (cb) cb.checked = false;
+        });
+
+        elements.selectAllPageCheckbox.checked = false;
+        showToast(`Reset ${count} checked patient${count === 1 ? '' : 's'}.`, 'rotate-ccw');
+
+        // Persist reset to Supabase database
+        try {
+          const db = getSupabase();
+          if (db) {
+            await db.rpc('reset_all_patients_whatsapp_checked');
+          }
+        } catch (err) {
+          console.warn('Supabase reset_all_patients_whatsapp_checked notice:', err);
+        }
+      }
+
+      // =====================================================================
+      // PAGINATION & TABLE RENDERING
+      // =====================================================================
+      function applyFilter() {
+        const query = elements.patientSearchInput.value.trim().toLowerCase();
+        if (!query) {
+          filteredPatients = [...allPatients];
+        } else {
+          filteredPatients = allPatients.filter(p => {
+            const name = (p.name || `${p.first_name || ''} ${p.last_name || ''}`).toLowerCase();
+            const phone = String(p.phone || '').toLowerCase();
+            const secPhone = String(p.secondary_phone || '').toLowerCase();
+            return name.includes(query) || phone.includes(query) || secPhone.includes(query);
+          });
+        }
+        currentPage = 1;
+        renderCurrentPage();
+      }
+
+      function getTotalPages() {
+        if (pageSize === 'all') return 1;
+        return Math.max(1, Math.ceil(filteredPatients.length / pageSize));
+      }
+
+      function getPageSlice() {
+        if (pageSize === 'all') return filteredPatients;
+        const start = (currentPage - 1) * pageSize;
+        return filteredPatients.slice(start, start + pageSize);
+      }
+
+      function renderCurrentPage() {
+        const total = filteredPatients.length;
+        const totalPages = getTotalPages();
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        const slice = getPageSlice();
+
+        if (total === 0) {
+          elements.patientsTableBody.innerHTML = '';
+          elements.tableEmptyState.style.display = 'flex';
+          elements.paginationInfo.textContent = 'Showing 0 of 0 patients';
+          elements.pageCurrentDisplay.textContent = 'Page 0 of 0';
+          elements.firstPageBtn.disabled = true;
+          elements.prevPageBtn.disabled = true;
+          elements.nextPageBtn.disabled = true;
+          elements.lastPageBtn.disabled = true;
+          elements.selectAllPageCheckbox.checked = false;
+          elements.selectAllPageCheckbox.disabled = true;
+          return;
+        }
+
+        elements.tableEmptyState.style.display = 'none';
+        elements.selectAllPageCheckbox.disabled = false;
+
+        const startIdx = pageSize === 'all' ? 1 : (currentPage - 1) * pageSize + 1;
+        const endIdx = pageSize === 'all' ? total : Math.min(currentPage * pageSize, total);
+        elements.paginationInfo.textContent = `Showing ${startIdx}–${endIdx} of ${total} patients`;
+        elements.pageCurrentDisplay.textContent = `Page ${currentPage} of ${totalPages}`;
+
+        elements.firstPageBtn.disabled = currentPage === 1;
+        elements.prevPageBtn.disabled = currentPage === 1;
+        elements.nextPageBtn.disabled = currentPage === totalPages;
+        elements.lastPageBtn.disabled = currentPage === totalPages;
+
+        // Render rows
+        elements.patientsTableBody.innerHTML = slice.map(patient => {
+          const pid = String(patient.id);
+          const isChecked = checkedPatientIds.has(pid) || patient.whatsapp_checked === true;
+          if (patient.whatsapp_checked === true && !checkedPatientIds.has(pid)) {
+            checkedPatientIds.add(pid);
+          }
+          const name = (patient.name || `${patient.first_name || ''} ${patient.last_name || ''}`).trim() || 'Unnamed Patient';
+          const initial = name.charAt(0).toUpperCase() || 'P';
+          const phone = patient.phone || patient.secondary_phone || '';
+          const displayPhone = formatDisplayPhone(phone);
+          const waUrl = getWhatsAppUrl(patient);
+
+          return `
+            <tr id="patient-row-${escapeHtml(patient.id)}" class="patient-row ${isChecked ? 'row-checked' : ''}" data-id="${escapeHtml(patient.id)}">
+              <td class="col-checkbox">
+                <input type="checkbox" class="checkbox-custom patient-row-checkbox" data-id="${escapeHtml(patient.id)}" ${isChecked ? 'checked' : ''}/>
+              </td>
+              <td>
+                <div class="patient-name-cell">
+                  <div class="patient-avatar">${escapeHtml(initial)}</div>
+                  <span class="patient-name-text">${escapeHtml(name)}</span>
+                </div>
+              </td>
+              <td>
+                ${phone ? `<a href="tel:${escapeHtml(phone)}" class="patient-phone-link"><i data-lucide="phone" class="w-3.5 h-3.5"></i>${escapeHtml(displayPhone)}</a>` : '<span style="color: #94a3b8;">No phone</span>'}
+              </td>
+              <td style="text-align: center;">
+                ${waUrl ? `
+                  <a href="${escapeHtml(waUrl)}" target="_blank" rel="noopener noreferrer" class="whatsapp-btn" data-patient-id="${escapeHtml(patient.id)}">
+                    <i data-lucide="message-circle" class="w-4 h-4"></i>
+                    <span>Chat</span>
+                  </a>
+                ` : `
+                  <button type="button" class="whatsapp-btn" style="opacity: 0.4; cursor: not-allowed;" disabled title="No valid phone number">
+                    <i data-lucide="message-circle" class="w-4 h-4"></i>
+                    <span>Chat</span>
+                  </button>
+                `}
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        syncSelectAllPageCheckbox();
+        refreshIcons();
+      }
+
+      function syncSelectAllPageCheckbox() {
+        const slice = getPageSlice();
+        if (slice.length === 0) {
+          elements.selectAllPageCheckbox.checked = false;
+          return;
+        }
+        const allChecked = slice.every(p => checkedPatientIds.has(String(p.id)) || p.whatsapp_checked === true);
+        elements.selectAllPageCheckbox.checked = allChecked;
+      }
+
+      async function toggleSelectAllOnPage(checked) {
+        const slice = getPageSlice();
+        const promises = [];
+        const db = getSupabase();
+        slice.forEach(p => {
+          const pid = String(p.id);
+          if (checked) {
+            checkedPatientIds.add(pid);
+          } else {
+            checkedPatientIds.delete(pid);
+          }
+          p.whatsapp_checked = Boolean(checked);
+          p.whatsapp_checked_at = checked ? new Date().toISOString() : null;
+          updateRowVisualState(pid, checked);
+
+          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pid);
+          if (isUUID && db) {
+            promises.push(db.rpc('set_patient_whatsapp_checked', {
+              p_patient_id: pid,
+              p_checked: Boolean(checked)
+            }));
+          }
+        });
+        saveCheckedState();
+        if (promises.length > 0) {
+          try { await Promise.allSettled(promises); } catch (_) {}
+        }
+      }
+
+      // =====================================================================
+      // SUPABASE REALTIME & DATABASE SYNC
+      // =====================================================================
+      function getSupabase() {
+        if (supabaseClient) return supabaseClient;
+        const config = window.LuminPublicConfig || {
+          supabaseUrl: 'https://pqbayjkypzfxvnksgwwf.supabase.co',
+          supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxYmF5amt5cHpmeHZua3Nnd3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkxMjI4NzAsImV4cCI6MjEwNDY5ODg3MH0.e5tPe3PKUiFiS_ZnXcpDF9CRtGtp_B1oZsK37phOQ8Q'
+        };
+        if (window.supabase && typeof window.supabase.createClient === 'function') {
+          supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+            auth: {
+              persistSession: true,
+              autoRefreshToken: true,
+              detectSessionInUrl: false,
+              storage: window.localStorage
+            }
+          });
+        }
+        return supabaseClient;
+      }
+
+      function updateSyncStatus(status, text) {
+        elements.syncDot.className = 'sync-dot ' + status;
+        elements.syncText.textContent = text;
+      }
+
+      async function fetchPatientsFromDatabase(isManual = false) {
+        const db = getSupabase();
+        if (!db) {
+          updateSyncStatus('', 'Offline (No client)');
+          return;
+        }
+
+        updateSyncStatus('syncing', isManual ? 'Refreshing...' : 'Syncing database...');
+        try {
+          const batchSize = 1000;
+          const allFetched = [];
+          let fetchError = null;
+
+          // Supabase PostgREST has a server-side limit of 1,000 rows per request.
+          // Loop through ranges until all patients in the database are fetched.
+          for (let page = 0; page < 100; page += 1) { // Supports up to 100,000 patients
+            const from = page * batchSize;
+            const to = from + batchSize - 1;
+            const result = await db
+              .from('patients')
+              .select('id, name, first_name, last_name, phone, secondary_phone, created_at, whatsapp_checked, whatsapp_checked_at')
+              .order('created_at', { ascending: false })
+              .range(from, to);
+
+            if (result.error) {
+              fetchError = result.error;
+              break;
+            }
+
+            const batch = result.data || [];
+            allFetched.push(...batch);
+
+            // If this batch returned fewer than 1,000 rows, we have reached the end
+            if (batch.length < batchSize) {
+              break;
+            }
+          }
+
+          if (fetchError) {
+            console.warn('Supabase patients fetch notice:', fetchError.message);
+            // Fallback to local cache if DB error (e.g. unauthenticated session)
+            if (allPatients.length === 0) {
+              loadLocalCachedPatients();
+            }
+            updateSyncStatus('', 'Database ready (cached)');
+            updateAuthUi();
+            return;
+          }
+
+          if (allFetched.length > 0) {
+            const previousCount = allPatients.length;
+            allPatients = allFetched;
+
+            // Two-way merge:
+            // 1. Any patient checked on server -> add to local checkedPatientIds
+            // 2. Any patient already checked locally in checkedPatientIds -> preserve flag & schedule push
+            const needServerPush = [];
+            allFetched.forEach(p => {
+              const pid = String(p.id).trim();
+              if (p.whatsapp_checked === true) {
+                checkedPatientIds.add(pid);
+              } else if (checkedPatientIds.has(pid)) {
+                p.whatsapp_checked = true;
+                needServerPush.push(pid);
+              }
+            });
+            saveCheckedState();
+
+            // Push any locally checked patients up to Supabase database in background
+            if (needServerPush.length > 0 && db) {
+              needServerPush.forEach(pid => {
+                const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pid);
+                if (isUUID) {
+                  db.rpc('set_patient_whatsapp_checked', { p_patient_id: pid, p_checked: true }).catch(() => {});
+                }
+              });
+            }
+
+            // Cache locally
+            try {
+              localStorage.setItem(STORAGE_KEYS.CACHE_PATIENTS, JSON.stringify(allFetched));
+            } catch (_) {}
+
+            applyFilter();
+            updateSyncStatus('connected', `Live (${allPatients.length} patients)`);
+            updateAuthUi();
+
+            if (isManual) {
+              showToast(`Synced ${allPatients.length} patients from database.`, 'check');
+            } else if (previousCount > 0 && allPatients.length > previousCount) {
+              const diff = allPatients.length - previousCount;
+              showToast(`✨ ${diff} new patient${diff === 1 ? '' : 's'} added to database!`, 'sparkles');
+            }
+          } else {
+            // Check if user has an authenticated session with Supabase
+            let hasSession = false;
+            try {
+              const { data: sessionData } = await db.auth.getSession();
+              hasSession = Boolean(sessionData?.session);
+            } catch (_) {}
+
+            if (hasSession) {
+              allPatients = [];
+              applyFilter();
+              updateSyncStatus('connected', 'Live (0 patients)');
+            } else {
+              // In unauthenticated mode, keep cached / demo patients intact - NEVER wipe them!
+              if (allPatients.length === 0) {
+                loadLocalCachedPatients();
+              }
+              updateSyncStatus('', `Cached (${allPatients.length} patients) · Sign in to sync`);
+            }
+            updateAuthUi();
+          }
+        } catch (err) {
+          console.error('Fetch patients failed:', err);
+          updateSyncStatus('', 'Sync paused');
+        }
+      }
+
+      function loadLocalCachedPatients() {
+        try {
+          const cached = localStorage.getItem(STORAGE_KEYS.CACHE_PATIENTS);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              allPatients = parsed;
+              parsed.forEach(p => {
+                const pid = String(p.id).trim();
+                if (p.whatsapp_checked === true) {
+                  checkedPatientIds.add(pid);
+                } else if (checkedPatientIds.has(pid)) {
+                  p.whatsapp_checked = true;
+                }
+              });
+              saveCheckedState();
+              applyFilter();
+              updateSyncStatus('connected', `Cached (${allPatients.length} patients)`);
+              return;
+            }
+          }
+        } catch (_) {}
+
+        // Fallback demo data if opened for the first time completely offline
+        if (allPatients.length === 0) {
+          allPatients = [
+            { id: 'demo-1', name: 'أحمد محمود العبد', phone: '01001234567', created_at: new Date().toISOString() },
+            { id: 'demo-2', name: 'سارة خالد النجار', phone: '01123456789', created_at: new Date().toISOString() },
+            { id: 'demo-3', name: 'محمد عبد الله حسن', phone: '01234567890', created_at: new Date().toISOString() },
+            { id: 'demo-4', name: 'Dr. Karim El-Sayed', phone: '01555555555', created_at: new Date().toISOString() },
+            { id: 'demo-5', name: 'مريم طارق إبراهيم', phone: '01099887766', created_at: new Date().toISOString() }
+          ];
+          applyFilter();
+          updateSyncStatus('', 'Sample Data');
+        }
+      }
+
+      function setupRealtimeListener() {
+        const db = getSupabase();
+
+        // Also expose helper for direct event dispatch / cross-tab broadcast
+        window.addPatientRecord = function (newRecord) {
+          if (!newRecord || !newRecord.id) return;
+          if (!allPatients.some(p => p.id === newRecord.id)) {
+            allPatients.unshift(newRecord);
+            if (newRecord.whatsapp_checked) {
+              checkedPatientIds.add(String(newRecord.id));
+              saveCheckedState();
+            }
+            applyFilter();
+            showToast(`✨ New patient added: ${newRecord.name || 'New Patient'}`, 'sparkles');
+          }
+        };
+        window.addEventListener('test-add-patient', e => {
+          if (e.detail) window.addPatientRecord(e.detail);
+        });
+
+        if (!db) return;
+
+        try {
+          if (realtimeSubscription) {
+            db.removeChannel(realtimeSubscription);
+          }
+
+          realtimeSubscription = db
+            .channel('discrete-patient-whatsapp-' + Date.now())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'patients' }, payload => {
+              console.log('Realtime postgres_changes on patients:', payload);
+              if (payload.eventType === 'INSERT') {
+                const newRecord = payload.new;
+                if (!allPatients.some(p => p.id === newRecord.id)) {
+                  allPatients.unshift(newRecord);
+                  if (newRecord.whatsapp_checked) {
+                    checkedPatientIds.add(String(newRecord.id));
+                    saveCheckedState();
+                  }
+                  applyFilter();
+                  showToast(`✨ New patient added: ${newRecord.name || 'New Patient'}`, 'sparkles');
+                }
+              } else if (payload.eventType === 'UPDATE') {
+                const updated = payload.new;
+                const idx = allPatients.findIndex(p => p.id === updated.id);
+                if (idx >= 0) {
+                  const prevChecked = allPatients[idx].whatsapp_checked;
+                  allPatients[idx] = { ...allPatients[idx], ...updated };
+
+                  // Only change checked state if whatsapp_checked was explicitly present in update payload and changed
+                  if (updated.whatsapp_checked !== undefined && updated.whatsapp_checked !== null && updated.whatsapp_checked !== prevChecked) {
+                    const pid = String(updated.id).trim();
+                    if (updated.whatsapp_checked) {
+                      checkedPatientIds.add(pid);
+                    } else {
+                      checkedPatientIds.delete(pid);
+                    }
+                    saveCheckedState();
+                    updateRowVisualState(pid, Boolean(updated.whatsapp_checked));
+                    syncSelectAllPageCheckbox();
+                  }
+                  applyFilter();
+                }
+              } else if (payload.eventType === 'DELETE') {
+                const deleted = payload.old;
+                allPatients = allPatients.filter(p => p.id !== deleted.id);
+                checkedPatientIds.delete(String(deleted.id).trim());
+                saveCheckedState();
+                applyFilter();
+              }
+            })
+            .subscribe(status => {
+              if (status === 'SUBSCRIBED') {
+                updateSyncStatus('connected', `Live updates active (${allPatients.length} patients)`);
+              } else if (status === 'CLOSED') {
+                updateSyncStatus('', 'Live updates offline');
+              }
+            });
+        } catch (e) {
+          console.warn('Realtime subscription setup notice:', e);
+        }
+      }
+
+      // =====================================================================
+      // AUTHENTICATION MODAL & CLINIC SESSION MANAGEMENT
+      // =====================================================================
+      async function updateAuthUi() {
+        const db = getSupabase();
+        let session = null;
+        if (db && db.auth) {
+          try {
+            const { data } = await db.auth.getSession();
+            session = data?.session || null;
+          } catch (_) {}
+        }
+
+        if (session && session.user) {
+          const userEmail = session.user.email || 'Staff';
+          const userName = session.user.user_metadata?.name || session.user.user_metadata?.full_name || userEmail.split('@')[0];
+          if (elements.authBtn) {
+            elements.authBtn.classList.remove('btn-secondary');
+            elements.authBtn.classList.add('btn-primary');
+            elements.authBtn.title = `Signed in as ${userEmail} (Click to Sign Out)`;
+          }
+          if (elements.authBtnText) {
+            elements.authBtnText.textContent = userName;
+          }
+        } else {
+          if (elements.authBtn) {
+            elements.authBtn.classList.remove('btn-primary');
+            elements.authBtn.classList.add('btn-secondary');
+            elements.authBtn.title = 'Sign in to sync with clinic database';
+          }
+          if (elements.authBtnText) {
+            elements.authBtnText.textContent = 'Sign In';
+          }
+        }
+      }
+
+      function openAuthModal() {
+        if (!elements.authModal) return;
+        if (elements.authModalError) {
+          elements.authModalError.style.display = 'none';
+          elements.authModalError.textContent = '';
+        }
+        if (elements.authModalBackdrop) elements.authModalBackdrop.classList.add('open');
+        elements.authModal.classList.add('open');
+        elements.authModal.setAttribute('aria-hidden', 'false');
+        if (elements.authEmailInput) {
+          elements.authEmailInput.value = '';
+          elements.authEmailInput.focus();
+        }
+        if (elements.authPasswordInput) {
+          elements.authPasswordInput.value = '';
+        }
+        refreshIcons();
+      }
+
+      function closeAuthModal() {
+        if (elements.authModalBackdrop) elements.authModalBackdrop.classList.remove('open');
+        if (elements.authModal) {
+          elements.authModal.classList.remove('open');
+          elements.authModal.setAttribute('aria-hidden', 'true');
+        }
+      }
+
+      async function performSignIn(identifier, password) {
+        const db = getSupabase();
+        if (!db) throw new Error('Database client not available');
+
+        // 1. Try user-login edge function first (supports clinic username / login name)
+        try {
+          const { data: loginData, error: loginError } = await db.functions.invoke('user-login', {
+            body: { identifier, password }
+          });
+          if (!loginError && loginData?.access_token && loginData?.refresh_token) {
+            const { data, error: sessionError } = await db.auth.setSession({
+              access_token: loginData.access_token,
+              refresh_token: loginData.refresh_token
+            });
+            if (!sessionError && data?.session) {
+              return data.session;
+            }
+          }
+        } catch (_) {}
+
+        // 2. Direct signInWithPassword fallback (email or domain suffix)
+        const email = identifier.includes('@') ? identifier : `${identifier}@lumin.com`;
+        const { data, error } = await db.auth.signInWithPassword({
+          email,
+          password
+        });
+        if (error) throw error;
+        return data.session;
+      }
+
+      async function performSignOut() {
+        const db = getSupabase();
+        if (!db) return;
+        try {
+          await db.auth.signOut({ scope: 'local' });
+        } catch (err) {
+          console.warn('Sign out notice:', err);
+        }
+      }
+
+      // =====================================================================
+      // EVENT LISTENERS & INITIALIZATION
+      // =====================================================================
+      function initEventListeners() {
+        // Message picker select
+        elements.messagePicker.addEventListener('change', e => {
+          activeTemplateId = e.target.value;
+          saveTemplates();
+          renderCurrentPage();
+          showToast('Active message template changed');
+        });
+
+        // Insert / Manage Template drawer button
+        elements.openDrawerBtn.addEventListener('click', openDrawer);
+        elements.closeDrawerBtn.addEventListener('click', closeDrawer);
+        elements.cancelDrawerBtn.addEventListener('click', closeDrawer);
+        elements.drawerBackdrop.addEventListener('click', closeDrawer);
+
+        // Variable buttons
+        elements.varPatientNameBtn.addEventListener('click', () => insertVariableIntoBody('{{patient_name}}'));
+        elements.varClinicNameBtn.addEventListener('click', () => insertVariableIntoBody('{{clinic_name}}'));
+        elements.varDateBtn.addEventListener('click', () => insertVariableIntoBody('{{today_date}}'));
+
+        // Emoji buttons
+        const emojiContainer = document.getElementById('emojiChipsContainer');
+        if (emojiContainer) {
+          emojiContainer.addEventListener('click', e => {
+            const btn = e.target.closest('.emoji-pill');
+            if (btn) {
+              const emoji = btn.getAttribute('data-emoji');
+              if (emoji) insertVariableIntoBody(emoji);
+            }
+          });
+        }
+
+        // Realtime drawer preview
+        elements.templateBodyInput.addEventListener('input', updateDrawerPreview);
+
+        // Save template
+        elements.saveTemplateBtn.addEventListener('click', saveCurrentTemplate);
+
+        // Reset all checkboxes button
+        elements.resetCheckboxesBtn.addEventListener('click', resetAllCheckboxes);
+
+        // Manual refresh button
+        elements.manualRefreshBtn.addEventListener('click', () => {
+          elements.manualRefreshBtn.style.transform = 'rotate(360deg)';
+          elements.manualRefreshBtn.style.transition = 'transform 0.6s ease';
+          setTimeout(() => { elements.manualRefreshBtn.style.transform = ''; elements.manualRefreshBtn.style.transition = ''; }, 600);
+          fetchPatientsFromDatabase(true);
+        });
+
+        // Search input
+        elements.patientSearchInput.addEventListener('input', applyFilter);
+
+        // Page size selector
+        elements.pageSizeSelect.addEventListener('change', e => {
+          const val = e.target.value;
+          pageSize = val === 'all' ? 'all' : parseInt(val, 10);
+          currentPage = 1;
+          try {
+            localStorage.setItem(STORAGE_KEYS.PAGE_SIZE, String(val));
+          } catch (_) {}
+          renderCurrentPage();
+        });
+
+        // Target platform selector (Web vs App vs Auto)
+        if (elements.targetPlatformSelect) {
+          elements.targetPlatformSelect.addEventListener('change', e => {
+            targetPlatform = e.target.value;
+            try {
+              localStorage.setItem(STORAGE_KEYS.TARGET_PLATFORM, targetPlatform);
+            } catch (_) {}
+            renderCurrentPage();
+            showToast(targetPlatform === 'web' ? 'Opening in WhatsApp Web (Direct)' : targetPlatform === 'app' ? 'Opening in WhatsApp App' : 'Opening in Auto mode');
+          });
+        }
+
+        // Select all on current page checkbox
+        elements.selectAllPageCheckbox.addEventListener('change', e => {
+          toggleSelectAllOnPage(e.target.checked);
+        });
+
+        // Pagination buttons
+        elements.firstPageBtn.addEventListener('click', () => { currentPage = 1; renderCurrentPage(); });
+        elements.prevPageBtn.addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderCurrentPage(); } });
+        elements.nextPageBtn.addEventListener('click', () => { if (currentPage < getTotalPages()) { currentPage++; renderCurrentPage(); } });
+        elements.lastPageBtn.addEventListener('click', () => { currentPage = getTotalPages(); renderCurrentPage(); });
+
+        // Event delegation for table clicks (row click & checkbox toggle)
+        elements.patientsTableBody.addEventListener('change', e => {
+          if (e.target.classList.contains('patient-row-checkbox')) {
+            const patientId = e.target.getAttribute('data-id');
+            togglePatientChecked(patientId, e.target.checked);
+          }
+        });
+
+        elements.patientsTableBody.addEventListener('click', e => {
+          // If clicking WhatsApp button, automatically mark patient checked & copy message to clipboard as backup
+          const waLink = e.target.closest('.whatsapp-btn');
+          if (waLink) {
+            const patientId = waLink.getAttribute('data-patient-id');
+            if (patientId) {
+              togglePatientChecked(patientId, true);
+              const patient = allPatients.find(p => String(p.id) === String(patientId));
+              if (patient) {
+                const currentTemplate = templates.find(t => t.id === activeTemplateId) || templates[0];
+                const text = resolveTemplateText(currentTemplate ? currentTemplate.body : '', patient);
+                if (text && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                  navigator.clipboard.writeText(text).catch(() => {});
+                }
+              }
+              showToast('Opening WhatsApp... (Message copied to clipboard)', 'check');
+            }
+            return;
+          }
+
+          // If clicking anywhere on row (excluding phone link and checkbox itself), toggle checkbox
+          if (e.target.closest('.patient-phone-link') || e.target.classList.contains('patient-row-checkbox')) {
+            return;
+          }
+          const row = e.target.closest('.patient-row');
+          if (row) {
+            const patientId = row.getAttribute('data-id');
+            const isCurrentlyChecked = checkedPatientIds.has(patientId);
+            togglePatientChecked(patientId, !isCurrentlyChecked);
+          }
+        });
+
+        // Check for updates on window focus
+        window.addEventListener('focus', () => {
+          fetchPatientsFromDatabase(false);
+        });
+
+        // Auth Modal & Account actions
+        if (elements.authBtn) {
+          elements.authBtn.addEventListener('click', async () => {
+            const db = getSupabase();
+            let session = null;
+            if (db && db.auth) {
+              try {
+                const { data } = await db.auth.getSession();
+                session = data?.session || null;
+              } catch (_) {}
+            }
+
+            if (session) {
+              const confirmed = confirm('Do you want to sign out? Your checked patients will remain cached on this device.');
+              if (confirmed) {
+                await performSignOut();
+                await updateAuthUi();
+                updateSyncStatus('', `Cached (${allPatients.length} patients) · Signed out`);
+                showToast('Signed out. Local cache preserved.');
+              }
+            } else {
+              openAuthModal();
+            }
+          });
+        }
+
+        if (elements.syncStatusBadge) {
+          elements.syncStatusBadge.addEventListener('click', async () => {
+            const db = getSupabase();
+            let session = null;
+            if (db && db.auth) {
+              try {
+                const { data } = await db.auth.getSession();
+                session = data?.session || null;
+              } catch (_) {}
+            }
+            if (!session) {
+              openAuthModal();
+            } else {
+              fetchPatientsFromDatabase(true);
+            }
+          });
+        }
+
+        if (elements.closeAuthModalBtn) {
+          elements.closeAuthModalBtn.addEventListener('click', closeAuthModal);
+        }
+        if (elements.cancelAuthModalBtn) {
+          elements.cancelAuthModalBtn.addEventListener('click', closeAuthModal);
+        }
+        if (elements.authModalBackdrop) {
+          elements.authModalBackdrop.addEventListener('click', closeAuthModal);
+        }
+
+        if (elements.authModalForm) {
+          elements.authModalForm.addEventListener('submit', async e => {
+            e.preventDefault();
+            const identifier = elements.authEmailInput.value.trim();
+            const password = elements.authPasswordInput.value;
+            if (!identifier || !password) return;
+
+            elements.authModalError.style.display = 'none';
+            elements.submitAuthModalBtn.disabled = true;
+            elements.submitAuthModalBtn.innerHTML = '<span>Signing in...</span>';
+
+            try {
+              await performSignIn(identifier, password);
+              closeAuthModal();
+              showToast('Signed in successfully!', 'check');
+              await updateAuthUi();
+              await fetchPatientsFromDatabase(true);
+            } catch (err) {
+              console.error('Sign in failed:', err);
+              elements.authModalError.textContent = err.message || 'Invalid login credentials.';
+              elements.authModalError.style.display = 'block';
+            } finally {
+              elements.submitAuthModalBtn.disabled = false;
+              elements.submitAuthModalBtn.innerHTML = '<i data-lucide="log-in" class="w-4 h-4"></i><span>Sign In</span>';
+              refreshIcons();
+            }
+          });
+        }
+
+        // Esc key closes drawer and auth modal
+        window.addEventListener('keydown', e => {
+          if (e.key === 'Escape') {
+            if (elements.drawerPanel && elements.drawerPanel.classList.contains('open')) closeDrawer();
+            if (elements.authModal && elements.authModal.classList.contains('open')) closeAuthModal();
+          }
+        });
+      }
+
+      // =====================================================================
+      // INIT
+      // =====================================================================
+      function init() {
+        // Restore saved page size if exists
+        try {
+          const savedSize = localStorage.getItem(STORAGE_KEYS.PAGE_SIZE);
+          if (savedSize) {
+            elements.pageSizeSelect.value = savedSize;
+            pageSize = savedSize === 'all' ? 'all' : parseInt(savedSize, 10);
+          }
+        } catch (_) {}
+
+        // Restore saved target platform if exists
+        try {
+          const savedPlatform = localStorage.getItem(STORAGE_KEYS.TARGET_PLATFORM);
+          if (savedPlatform && ['auto', 'web', 'app'].includes(savedPlatform)) {
+            targetPlatform = savedPlatform;
+            if (elements.targetPlatformSelect) {
+              elements.targetPlatformSelect.value = savedPlatform;
+            }
+          }
+        } catch (_) {}
+
+        loadTemplates();
+        loadCheckedState();
+        initEventListeners();
+        loadLocalCachedPatients();
+        updateAuthUi();
+        fetchPatientsFromDatabase(false);
+        setupRealtimeListener();
+        refreshIcons();
+      }
+
+      // Start on DOMContentLoaded
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+
+    })();
+  </script>
+</body>
+</html>

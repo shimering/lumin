@@ -37,3 +37,6 @@ supabase/*
 supabase/functions/appointment-push/
 supabase/functions/google-calendar/
 integrations/baytna/supabase/.temp/
+
+tmp/
+lumin-messenger-site/

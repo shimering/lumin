@@ -8443,6 +8443,17 @@
                 </button>
               </div>
 
+              <!-- 24-Hour Customer Window Warning Bar -->
+              <div id="whatsapp-window-warning" class="hidden items-center justify-between gap-2 rounded-xl bg-amber-50 px-3.5 py-2 text-xs text-amber-800 border border-amber-200 transition mb-1.5 w-full max-w-full">
+                <div class="flex items-center gap-2 min-w-0">
+                  <i data-lucide="clock" class="h-4 w-4 shrink-0 text-amber-600"></i>
+                  <span id="whatsapp-window-warning-text" class="truncate font-medium"></span>
+                </div>
+                <button type="button" onclick="openWhatsAppChatTemplatePicker(this)" class="shrink-0 font-bold underline text-amber-900 hover:text-amber-700">
+                  <span id="whatsapp-window-warning-action"></span>
+                </button>
+              </div>
+
               <!-- Floating Minimalist WhatsApp Chat Capsule -->
               <form id="whatsapp-reply-form" onsubmit="sendWhatsAppManualReply(event)" class="relative flex items-center gap-1.5 sm:gap-2 w-full max-w-full rounded-full border border-slate-200 bg-white px-2 sm:px-3 py-1.5 shadow-sm transition-all focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20">
                 <!-- Template Picker Button -->
@@ -24984,7 +24995,8 @@
             }
           });
           if (error || !data?.success) {
-            throw new Error(error?.message || data?.error || 'Failed to dispatch WhatsApp message via Cloud API');
+            const detail = await extractFunctionErrorMessage(error, data?.error || 'Failed to dispatch WhatsApp message via Cloud API');
+            throw new Error(detail);
           }
           showAppointmentNotificationToast(
             currentUiLanguage === 'ar' ? 'تم الإرسال بنجاح' : 'Sent Successfully',
@@ -34755,7 +34767,8 @@
             }
           });
           if (error || !data?.success) {
-            throw new Error(error?.message || data?.error || 'Failed to dispatch WhatsApp message via Cloud API');
+            const detail = await extractFunctionErrorMessage(error, data?.error || 'Failed to dispatch WhatsApp message via Cloud API');
+            throw new Error(detail);
           }
           showAppointmentNotificationToast(
             currentUiLanguage === 'ar' ? 'تم الإرسال بنجاح' : 'Sent Successfully',
@@ -34967,7 +34980,8 @@
           });
 
           if (error || !data?.success) {
-            throw new Error(error?.message || data?.error || 'Failed to dispatch WhatsApp message via Cloud API');
+            const detail = await extractFunctionErrorMessage(error, data?.error || 'Failed to dispatch WhatsApp message via Cloud API');
+            throw new Error(detail);
           }
 
           showAppointmentNotificationToast(
@@ -38881,7 +38895,10 @@
             emoji: newReaction
           }
         });
-        if (error) throw error;
+        if (error) {
+          const detail = await extractFunctionErrorMessage(error);
+          throw new Error(detail);
+        }
       } catch (err) {
         console.error('Failed to send reaction:', err);
         if (msg) {
@@ -40070,10 +40087,60 @@
       initWhatsAppSwipeGestures();
       initWhatsAppMessageActions();
       positionWhatsAppMessageMenu();
+      updateWhatsAppWindowWarning();
 
       if (scrollToBottom) {
         container.scrollTop = container.scrollHeight;
       }
+    }
+
+    function updateWhatsAppWindowWarning() {
+      const warning = document.getElementById('whatsapp-window-warning');
+      const text = document.getElementById('whatsapp-window-warning-text');
+      const action = document.getElementById('whatsapp-window-warning-action');
+      if (!warning || !text || !action) return;
+
+      const isAr = currentUiLanguage === 'ar';
+      let patientMsgTime = null;
+      for (let i = whatsappMessages.length - 1; i >= 0; i--) {
+        if (whatsappMessages[i].sender === 'patient') {
+          const t = new Date(whatsappMessages[i].created_at).getTime();
+          if (!Number.isNaN(t)) {
+            patientMsgTime = t;
+            break;
+          }
+        }
+      }
+
+      const isOutsideWindow = patientMsgTime ? ((Date.now() - patientMsgTime) > (24 * 60 * 60 * 1000)) : false;
+      if (isOutsideWindow) {
+        warning.classList.remove('hidden');
+        warning.classList.add('flex');
+        text.textContent = isAr
+          ? 'مرت أكثر من 24 ساعة على آخر رسالة من المريض. يجب إرسال قالب معتمد لإعادة فتح المحادثة.'
+          : 'Over 24h since patient last messaged. An approved template is required to reopen.';
+        action.textContent = isAr ? 'إرسال قالب' : 'Use Template';
+      } else {
+        warning.classList.add('hidden');
+        warning.classList.remove('flex');
+      }
+    }
+
+    async function extractFunctionErrorMessage(error, defaultMsg = 'Unknown error') {
+      if (!error) return defaultMsg;
+      if (error.context && typeof error.context.json === 'function') {
+        try {
+          const body = await error.context.clone().json();
+          if (body?.error) return body.error;
+          if (body?.message) return body.message;
+        } catch (_) {
+          try {
+            const text = await error.context.clone().text();
+            if (text) return text;
+          } catch (_) {}
+        }
+      }
+      return error.message || defaultMsg;
     }
 
     async function sendWhatsAppManualReply(event) {
@@ -40126,7 +40193,10 @@
           body: payload
         });
 
-        if (error) throw error;
+        if (error) {
+          const detail = await extractFunctionErrorMessage(error);
+          throw new Error(detail);
+        }
 
         if (data?.message) {
           whatsappMessages = mergeWhatsAppMessages(whatsappMessages, data.message);
@@ -40142,7 +40212,8 @@
         }
       } catch (err) {
         console.error('Failed to send reply:', err);
-        alert(currentUiLanguage === 'ar' ? 'فشل إرسال الرسالة: ' + (err.message || 'خطأ غير معروف') : 'Failed to send message: ' + (err.message || 'Unknown error'));
+        const errMsg = await extractFunctionErrorMessage(err, currentUiLanguage === 'ar' ? 'خطأ غير معروف' : 'Unknown error');
+        alert(currentUiLanguage === 'ar' ? 'فشل إرسال الرسالة: ' + errMsg : 'Failed to send message: ' + errMsg);
         input.value = content;
         autoResizeWhatsAppInput(input);
         if (replyingMessage) {
@@ -40309,7 +40380,10 @@
         }
 
         const { data, error } = await db.functions.invoke('whatsapp-webhook', { body: payload });
-        if (error) throw error;
+        if (error) {
+          const detail = await extractFunctionErrorMessage(error);
+          throw new Error(detail);
+        }
 
         if (data?.message) {
           whatsappMessages = mergeWhatsAppMessages(whatsappMessages, data.message);
@@ -40326,7 +40400,8 @@
         closeWhatsAppLocationSheet();
       } catch (error) {
         console.error('Failed to send WhatsApp location:', error);
-        setWhatsAppLocationStatus(currentUiLanguage === 'ar' ? `فشل إرسال الموقع: ${error.message || 'خطأ غير معروف'}` : `Failed to send location: ${error.message || 'Unknown error'}`, 'error');
+        const errMsg = await extractFunctionErrorMessage(error, currentUiLanguage === 'ar' ? 'خطأ غير معروف' : 'Unknown error');
+        setWhatsAppLocationStatus(currentUiLanguage === 'ar' ? `فشل إرسال الموقع: ${errMsg}` : `Failed to send location: ${errMsg}`, 'error');
       } finally {
         if (submitButton) submitButton.disabled = false;
         if (submitText) submitText.textContent = labels.send;
@@ -40524,7 +40599,10 @@
           }
         });
 
-        if (error) throw error;
+        if (error) {
+          const detail = await extractFunctionErrorMessage(error);
+          throw new Error(detail);
+        }
 
         if (data?.message) {
           whatsappMessages = mergeWhatsAppMessages(whatsappMessages, data.message);
@@ -40540,7 +40618,8 @@
         }
       } catch (err) {
         console.error('Failed to send voice recording:', err);
-        alert(currentUiLanguage === 'ar' ? 'فشل إرسال التسجيل الصوتي: ' + (err.message || 'خطأ غير معروف') : 'Failed to send voice note: ' + (err.message || 'Unknown error'));
+        const errMsg = await extractFunctionErrorMessage(err, currentUiLanguage === 'ar' ? 'خطأ غير معروف' : 'Unknown error');
+        alert(currentUiLanguage === 'ar' ? 'فشل إرسال التسجيل الصوتي: ' + errMsg : 'Failed to send voice note: ' + errMsg);
       } finally {
         resetWhatsAppVoiceRecordingUI();
       }
@@ -41789,7 +41868,10 @@
           body: { action: 'list_templates' }
         });
 
-        if (error) throw error;
+        if (error) {
+          const detail = await extractFunctionErrorMessage(error);
+          throw new Error(detail);
+        }
         if (data?.error) throw new Error(data.error);
 
         liveMetaTemplatesList = Array.isArray(data?.templates) ? data.templates : [];
@@ -42053,14 +42135,8 @@
         });
 
         if (error) {
-          let errMsg = error.message;
-          try {
-            if (error.context) {
-              const body = await error.context.json();
-              if (body?.error) errMsg = body.error;
-            }
-          } catch (_) {}
-          throw new Error(errMsg);
+          const detail = await extractFunctionErrorMessage(error);
+          throw new Error(detail);
         }
 
         if (data?.success === false || data?.error) {
