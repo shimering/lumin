@@ -28,15 +28,33 @@ test('Patient WhatsApp Discrete Page - Complete Functionality Suite', async () =
     const resetCheckboxesBtn = page.locator('#resetCheckboxesBtn');
     assert.equal(await resetCheckboxesBtn.isVisible(), true, 'Reset checkboxes button must be visible in title bar');
 
-    // 3. Verify Table Columns (Only Checkbox, Name, Phone, WhatsApp)
+    // 3. Verify Table Columns (Checkbox, #, Name, Phone, WhatsApp)
     const tableHeaders = await page.locator('.patient-table th').allTextContents();
     const cleanHeaders = tableHeaders.map(h => h.trim()).filter(Boolean);
-    assert.deepEqual(cleanHeaders, ['Patient Name', 'Phone Number', 'WhatsApp'], 'Columns must be only Checkbox, Name, Phone, WhatsApp');
+    assert.deepEqual(cleanHeaders, ['#', 'Patient Name', 'Phone Number', 'WhatsApp'], 'Columns must be Checkbox, #, Name, Phone, WhatsApp');
 
     // Verify rows exist
     const rows = page.locator('.patient-table tbody tr.patient-row');
     const rowCount = await rows.count();
     assert.ok(rowCount > 0, 'Table should render patient rows');
+
+    // Verify patient number badges exist and are formatted
+    const numberBadges = page.locator('.patient-table tbody tr.patient-row .patient-number-badge');
+    const badgeCount = await numberBadges.count();
+    assert.equal(badgeCount, rowCount, 'Every patient row must render a patient number badge');
+    const firstNumber = await numberBadges.first().textContent();
+    assert.match(firstNumber, /^#\d+$/, 'Badge must format number as #... (e.g. #1 or #5)');
+
+    // Verify search by patient number
+    const searchInput = page.locator('#patientSearchInput');
+    await searchInput.fill('#2');
+    await page.waitForTimeout(200);
+    const searchMatch = await page.locator('.patient-table tbody tr.patient-row').count();
+    assert.ok(searchMatch >= 1, 'Search by #2 should match patient #2');
+    const matchedNumber = await page.locator('.patient-table tbody tr.patient-row .patient-number-badge').first().textContent();
+    assert.equal(matchedNumber, '#2', 'Search result badge must be #2');
+    await searchInput.fill('');
+    await page.waitForTimeout(200);
 
     // 4. Test Checkbox & Translucent Green Row
     const firstRow = rows.first();

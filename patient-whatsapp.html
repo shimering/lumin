@@ -471,6 +471,62 @@
       padding-right: 8px !important;
     }
 
+    /* Patient Number Column & Badges */
+    .col-number {
+      width: 78px;
+      min-width: 68px;
+      text-align: center;
+      padding-left: 6px !important;
+      padding-right: 12px !important;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .th-sort-wrapper {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      cursor: pointer;
+    }
+
+    .sortable-th {
+      cursor: pointer;
+      user-select: none;
+      transition: color 0.15s ease;
+    }
+
+    .sortable-th:hover {
+      color: var(--lumin-text-main);
+    }
+
+    .sort-icon {
+      transition: transform 0.2s ease, color 0.15s ease;
+      vertical-align: middle;
+    }
+
+    .patient-number-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12px;
+      font-weight: 700;
+      color: #2563eb;
+      background-color: #eff6ff;
+      padding: 3px 8px;
+      border-radius: 6px;
+      letter-spacing: -0.01em;
+      min-width: 44px;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+
+    /* Seamless emerald green sync when row is checked */
+    tr.patient-row.row-checked .patient-number-badge {
+      background-color: #d1fae5;
+      color: #065f46;
+    }
+
     .checkbox-custom {
       appearance: none;
       -webkit-appearance: none;
@@ -1227,7 +1283,7 @@
       <div class="toolbar-left">
         <div class="search-input-wrap">
           <i data-lucide="search" class="search-icon"></i>
-          <input type="text" id="patientSearchInput" class="search-input" placeholder="Search by patient name or phone..."/>
+          <input type="text" id="patientSearchInput" class="search-input" placeholder="Search by patient name, number (#), or phone..."/>
         </div>
         <div class="checked-count-badge" id="checkedCountBadge">
           <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i>
@@ -1269,7 +1325,18 @@
               <th class="col-checkbox">
                 <input type="checkbox" id="selectAllPageCheckbox" class="checkbox-custom" title="Select all on current page"/>
               </th>
-              <th>Patient Name</th>
+              <th class="col-number sortable-th" id="sortNumberHeader" title="Sort by patient number">
+                <div class="th-sort-wrapper">
+                  <span>#</span>
+                  <i data-lucide="arrow-down" class="w-3.5 h-3.5 sort-icon text-blue-600" id="sortNumberIcon"></i>
+                </div>
+              </th>
+              <th class="sortable-th" id="sortNameHeader" title="Sort by patient name">
+                <div class="th-sort-wrapper" style="justify-content: flex-start;">
+                  <span>Patient Name</span>
+                  <i data-lucide="chevrons-up-down" class="w-3.5 h-3.5 sort-icon text-slate-300" id="sortNameIcon"></i>
+                </div>
+              </th>
               <th>Phone Number</th>
               <th style="width: 140px; text-align: center;">WhatsApp</th>
             </tr>
@@ -1347,6 +1414,10 @@
           <button type="button" class="variable-pill-btn" id="varPatientNameBtn" title="Insert patient name variable">
             <i data-lucide="user" class="w-3.5 h-3.5"></i>
             <span>{{patient_name}}</span>
+          </button>
+          <button type="button" class="variable-pill-btn" id="varNumberBtn" title="Insert patient number (#)">
+            <i data-lucide="hash" class="w-3.5 h-3.5"></i>
+            <span>{{patient_number}}</span>
           </button>
           <button type="button" class="variable-pill-btn" id="varClinicNameBtn" title="Insert clinic name">
             <i data-lucide="building" class="w-3.5 h-3.5"></i>
@@ -1541,8 +1612,11 @@
         templateLivePreview: document.getElementById('templateLivePreview'),
         savedTemplatesList: document.getElementById('savedTemplatesList'),
         varPatientNameBtn: document.getElementById('varPatientNameBtn'),
+        varNumberBtn: document.getElementById('varNumberBtn'),
         varClinicNameBtn: document.getElementById('varClinicNameBtn'),
         varDateBtn: document.getElementById('varDateBtn'),
+        sortNumberHeader: document.getElementById('sortNumberHeader'),
+        sortNameHeader: document.getElementById('sortNameHeader'),
         syncDot: document.getElementById('syncDot'),
         syncText: document.getElementById('syncText'),
         syncStatusBadge: document.getElementById('syncStatusBadge'),
@@ -1618,14 +1692,36 @@
         return phone;
       }
 
+      function formatPatientNumber(patientOrNumber) {
+        if (!patientOrNumber) return '#—';
+        let val = null;
+        if (typeof patientOrNumber === 'object') {
+          val = patientOrNumber.patient_number ?? patientOrNumber.patientNumber ?? patientOrNumber.legacy_patient_id ?? patientOrNumber.legacyPatientId;
+        } else {
+          val = patientOrNumber;
+        }
+        if (val !== null && val !== undefined && val !== '') {
+          const parsed = parseInt(String(val).replace(/\D/g, ''), 10);
+          if (!Number.isNaN(parsed) && parsed > 0) {
+            return `#${parsed}`;
+          }
+        }
+        return '#—';
+      }
+
       function resolveTemplateText(templateBody, patient) {
         if (!templateBody) return '';
         const name = (patient?.name || `${patient?.first_name || ''} ${patient?.last_name || ''}`).trim() || 'Patient';
         const date = new Date().toLocaleDateString('ar-EG');
+        const number = formatPatientNumber(patient);
+        const rawNum = String(patient?.patient_number ?? patient?.patientNumber ?? '');
         return templateBody
           .replace(/\{\{\s*patient_name\s*\}\}/gi, name)
           .replace(/\{\{\s*name\s*\}\}/gi, name)
           .replace(/\[\s*patient_name\s*\]/gi, name)
+          .replace(/\{\{\s*patient_number\s*\}\}/gi, number)
+          .replace(/\{\{\s*number\s*\}\}/gi, rawNum || number)
+          .replace(/\[\s*patient_number\s*\]/gi, number)
           .replace(/\{\{\s*clinic_name\s*\}\}/gi, 'Lumin Dental Clinic')
           .replace(/\{\{\s*today_date\s*\}\}/gi, date);
       }
@@ -1773,7 +1869,7 @@
 
       function updateDrawerPreview() {
         const body = elements.templateBodyInput.value;
-        const samplePatient = { name: 'أحمد محمد (Ahmed Mohamed)' };
+        const samplePatient = { patient_number: 2627, name: 'أحمد محمد (Ahmed Mohamed)' };
         const preview = resolveTemplateText(body, samplePatient);
         elements.templateLivePreview.textContent = preview || 'Message preview will appear here...';
       }
@@ -1939,18 +2035,91 @@
       }
 
       // =====================================================================
-      // PAGINATION & TABLE RENDERING
+      // PAGINATION, SORTING & TABLE RENDERING
       // =====================================================================
+      let currentSort = { field: 'number', direction: 'desc' }; // Default: Newest patient numbers first (matching database created_at desc)
+
+      function sortPatientsList() {
+        allPatients.sort((a, b) => {
+          if (currentSort.field === 'number') {
+            const numA = Number(a.patient_number ?? a.patientNumber ?? a.legacy_patient_id ?? 0);
+            const numB = Number(b.patient_number ?? b.patientNumber ?? b.legacy_patient_id ?? 0);
+            return currentSort.direction === 'asc' ? (numA - numB) : (numB - numA);
+          } else if (currentSort.field === 'name') {
+            const nameA = String(a.name || `${a.first_name || ''} ${a.last_name || ''}`).trim();
+            const nameB = String(b.name || `${b.first_name || ''} ${b.last_name || ''}`).trim();
+            return currentSort.direction === 'asc'
+              ? nameA.localeCompare(nameB, ['ar', 'en'])
+              : nameB.localeCompare(nameA, ['ar', 'en']);
+          }
+          return 0;
+        });
+        updateSortHeadersUi();
+      }
+
+      function toggleSort(field) {
+        if (currentSort.field === field) {
+          currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+        } else {
+          currentSort.field = field;
+          currentSort.direction = field === 'number' ? 'desc' : 'asc';
+        }
+        sortPatientsList();
+        applyFilter();
+        const label = field === 'number' ? 'Patient number' : 'Patient name';
+        const dirLabel = currentSort.direction === 'asc' ? 'ascending' : 'descending';
+        showToast(`Sorted by ${label} (${dirLabel})`);
+      }
+
+      function updateSortHeadersUi() {
+        const numHeader = document.getElementById('sortNumberHeader');
+        const nameHeader = document.getElementById('sortNameHeader');
+        const numIcon = document.getElementById('sortNumberIcon');
+        const nameIcon = document.getElementById('sortNameIcon');
+
+        if (numHeader && numIcon) {
+          if (currentSort.field === 'number') {
+            numHeader.classList.add('active-sort');
+            numIcon.setAttribute('data-lucide', currentSort.direction === 'asc' ? 'arrow-up' : 'arrow-down');
+            numIcon.classList.remove('text-slate-300');
+            numIcon.classList.add('text-blue-600');
+          } else {
+            numHeader.classList.remove('active-sort');
+            numIcon.setAttribute('data-lucide', 'chevrons-up-down');
+            numIcon.classList.add('text-slate-300');
+            numIcon.classList.remove('text-blue-600');
+          }
+        }
+
+        if (nameHeader && nameIcon) {
+          if (currentSort.field === 'name') {
+            nameHeader.classList.add('active-sort');
+            nameIcon.setAttribute('data-lucide', currentSort.direction === 'asc' ? 'arrow-up' : 'arrow-down');
+            nameIcon.classList.remove('text-slate-300');
+            nameIcon.classList.add('text-blue-600');
+          } else {
+            nameHeader.classList.remove('active-sort');
+            nameIcon.setAttribute('data-lucide', 'chevrons-up-down');
+            nameIcon.classList.add('text-slate-300');
+            nameIcon.classList.remove('text-blue-600');
+          }
+        }
+      }
+
       function applyFilter() {
         const query = elements.patientSearchInput.value.trim().toLowerCase();
         if (!query) {
           filteredPatients = [...allPatients];
         } else {
+          const numQuery = query.replace(/^#/, '').trim();
           filteredPatients = allPatients.filter(p => {
             const name = (p.name || `${p.first_name || ''} ${p.last_name || ''}`).toLowerCase();
             const phone = String(p.phone || '').toLowerCase();
             const secPhone = String(p.secondary_phone || '').toLowerCase();
-            return name.includes(query) || phone.includes(query) || secPhone.includes(query);
+            const pNum = String(p.patient_number ?? p.patientNumber ?? '');
+            const legacyNum = String(p.legacy_patient_id ?? p.legacyPatientId ?? '');
+            const matchNumber = Boolean(numQuery && (pNum === numQuery || pNum.startsWith(numQuery) || legacyNum === numQuery));
+            return name.includes(query) || phone.includes(query) || secPhone.includes(query) || matchNumber;
           });
         }
         currentPage = 1;
@@ -2010,6 +2179,7 @@
           if (patient.whatsapp_checked === true && !checkedPatientIds.has(pid)) {
             checkedPatientIds.add(pid);
           }
+          const patientNumber = formatPatientNumber(patient);
           const name = (patient.name || `${patient.first_name || ''} ${patient.last_name || ''}`).trim() || 'Unnamed Patient';
           const initial = name.charAt(0).toUpperCase() || 'P';
           const phone = patient.phone || patient.secondary_phone || '';
@@ -2020,6 +2190,9 @@
             <tr id="patient-row-${escapeHtml(patient.id)}" class="patient-row ${isChecked ? 'row-checked' : ''}" data-id="${escapeHtml(patient.id)}">
               <td class="col-checkbox">
                 <input type="checkbox" class="checkbox-custom patient-row-checkbox" data-id="${escapeHtml(patient.id)}" ${isChecked ? 'checked' : ''}/>
+              </td>
+              <td class="col-number">
+                <span class="patient-number-badge">${escapeHtml(patientNumber)}</span>
               </td>
               <td>
                 <div class="patient-name-cell">
@@ -2137,8 +2310,8 @@
             const to = from + batchSize - 1;
             const result = await db
               .from('patients')
-              .select('id, name, first_name, last_name, phone, secondary_phone, created_at, whatsapp_checked, whatsapp_checked_at')
-              .order('created_at', { ascending: false })
+              .select('id, patient_number, legacy_patient_id, name, first_name, last_name, phone, secondary_phone, created_at, whatsapp_checked, whatsapp_checked_at')
+              .order('patient_number', { ascending: false })
               .range(from, to);
 
             if (result.error) {
@@ -2200,6 +2373,7 @@
               localStorage.setItem(STORAGE_KEYS.CACHE_PATIENTS, JSON.stringify(allFetched));
             } catch (_) {}
 
+            sortPatientsList();
             applyFilter();
             updateSyncStatus('connected', `Live (${allPatients.length} patients)`);
             updateAuthUi();
@@ -2253,6 +2427,7 @@
                 }
               });
               saveCheckedState();
+              sortPatientsList();
               applyFilter();
               updateSyncStatus('connected', `Cached (${allPatients.length} patients)`);
               return;
@@ -2263,12 +2438,13 @@
         // Fallback demo data if opened for the first time completely offline
         if (allPatients.length === 0) {
           allPatients = [
-            { id: 'demo-1', name: 'أحمد محمود العبد', phone: '01001234567', created_at: new Date().toISOString() },
-            { id: 'demo-2', name: 'سارة خالد النجار', phone: '01123456789', created_at: new Date().toISOString() },
-            { id: 'demo-3', name: 'محمد عبد الله حسن', phone: '01234567890', created_at: new Date().toISOString() },
-            { id: 'demo-4', name: 'Dr. Karim El-Sayed', phone: '01555555555', created_at: new Date().toISOString() },
-            { id: 'demo-5', name: 'مريم طارق إبراهيم', phone: '01099887766', created_at: new Date().toISOString() }
+            { id: 'demo-1', patient_number: 1, name: 'أحمد محمود العبد', phone: '01001234567', created_at: new Date().toISOString() },
+            { id: 'demo-2', patient_number: 2, name: 'سارة خالد النجار', phone: '01123456789', created_at: new Date().toISOString() },
+            { id: 'demo-3', patient_number: 3, name: 'محمد عبد الله حسن', phone: '01234567890', created_at: new Date().toISOString() },
+            { id: 'demo-4', patient_number: 4, name: 'Dr. Karim El-Sayed', phone: '01555555555', created_at: new Date().toISOString() },
+            { id: 'demo-5', patient_number: 5, name: 'مريم طارق إبراهيم', phone: '01099887766', created_at: new Date().toISOString() }
           ];
+          sortPatientsList();
           applyFilter();
           updateSyncStatus('', 'Sample Data');
         }
@@ -2480,8 +2656,19 @@
 
         // Variable buttons
         elements.varPatientNameBtn.addEventListener('click', () => insertVariableIntoBody('{{patient_name}}'));
+        if (elements.varNumberBtn) {
+          elements.varNumberBtn.addEventListener('click', () => insertVariableIntoBody('{{patient_number}}'));
+        }
         elements.varClinicNameBtn.addEventListener('click', () => insertVariableIntoBody('{{clinic_name}}'));
         elements.varDateBtn.addEventListener('click', () => insertVariableIntoBody('{{today_date}}'));
+
+        // Sorting column headers
+        if (elements.sortNumberHeader) {
+          elements.sortNumberHeader.addEventListener('click', () => toggleSort('number'));
+        }
+        if (elements.sortNameHeader) {
+          elements.sortNameHeader.addEventListener('click', () => toggleSort('name'));
+        }
 
         // Emoji buttons
         const emojiContainer = document.getElementById('emojiChipsContainer');
