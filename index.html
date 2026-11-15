@@ -1709,6 +1709,22 @@
       opacity: 0.78;
       pointer-events: none;
     }
+    .clinical-odontogram-stage .odontogram-surface-view.is-extraction .odontogram-surface-outline {
+      fill: none;
+      pointer-events: none;
+    }
+    .clinical-odontogram-stage .odontogram-surface-view.is-extraction :is(.odontogram-surface-outline, .surface-poly, .odontogram-fissure) {
+      stroke: var(--operation-status-color);
+      stroke-opacity: 0.32;
+    }
+    .clinical-odontogram-stage .odontogram-surface-view.is-extraction .surface-poly {
+      opacity: 1;
+      fill-opacity: 0.16;
+    }
+    .clinical-odontogram-stage .odontogram-surface-view.is-extraction .surface-poly:is(:hover, .surface-selected) {
+      stroke: #2563eb;
+      stroke-opacity: 1;
+    }
     .clinical-odontogram-stage .tooth-number-badge {
       width: 100%;
       height: 2rem;
@@ -31240,6 +31256,12 @@
       if (card) card.classList.toggle('has-charted-finding', chartToothHasFinding(patient, id));
 
       // 1. Occlusal Matrix Coloring
+      const surfaceMap = card?.querySelector('[data-tooth-matrix]');
+      if (surfaceMap) {
+        const isExtraction = ['missing', 'extraction_planned'].includes(wholeVisualCode);
+        surfaceMap.classList.toggle('is-extraction', isExtraction);
+        surfaceMap.style.setProperty('--operation-status-color', isExtraction ? operationStatusDefinition(surfaceWholeFinding.status).color : '');
+      }
       CHART_SURFACES.forEach(s => {
         const poly = document.getElementById(`tooth-${id}-${s}`);
         if (!poly) return;
