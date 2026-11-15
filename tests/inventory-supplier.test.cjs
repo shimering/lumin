@@ -4,7 +4,7 @@ const root=path.resolve(__dirname,'..'),model=require('../lumin-supplier-list-mo
 const uuid=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
 async function database(t){
   const db=new PGlite();t.after(()=>db.close());await db.exec(fs.readFileSync(path.join(__dirname,'fixtures/inventory.sql'),'utf8'));
-  for(const file of fs.readdirSync(path.join(root,'supabase/migrations')).filter(name=>/^(20261016203800|20261016213858|20261017061336|20261017063353|20261017073421|20261017075131|20261017144330|20261017162033|20261019054001|20261019061244|20261104104842)_/.test(name)).sort())await db.exec(fs.readFileSync(path.join(root,'supabase/migrations',file),'utf8'));
+  for(const file of fs.readdirSync(path.join(root,'supabase/migrations')).filter(name=>/^(20261016203800|20261016213858|20261017061336|20261017063353|20261017073421|20261017075131|20261017144330|20261017162033|20261019054001|20261019061244|20261104104842|20261115110014)_/.test(name)).sort())await db.exec(fs.readFileSync(path.join(root,'supabase/migrations',file),'utf8'));
   await db.exec("create table public.quotation_settings(id integer primary key,clinic_name text);insert into public.quotation_settings values(1,'Lumin Clinic عيادة لومين');");
   const parent=(await db.query("select id from public.inventory_categories where key='anaesthesia'")).rows[0].id;
   await db.query("insert into public.inventory_categories(id,name,name_ar,parent_id) values($1,'Deep subcategory','تصنيف فرعي عميق',$2)",[uuid(100),parent]);
@@ -104,6 +104,37 @@ test('saved supplier library supports safe edits, deletion, pagination, filterin
   await assert.rejects(rpc('get_inventory_supplier_lists',{p_status:'deleted'}),/SUPPLIER_INPUT/);
 });
 
+test('legacy supplier lists accept new inventory snapshots and keep their original shared link',async t=>{
+  const{db,rpc}=await database(t);
+  const catalog=await rpc('get_inventory_supplier_candidates',{p_scope:'all'});
+  const original=catalog.find(item=>item.id===uuid(1001));
+  const healthy=catalog.find(item=>item.id===uuid(2000));
+  const jpeg='data:image/jpeg;base64,/9j/4P/Z';
+  const line=(item,quantity)=>({id:item.id,revision:item.revision,image_version:item.image_version,requested_quantity:quantity});
+  const saved=await rpc('create_inventory_supplier_list',{
+    p_scope:'both',p_items:[{...line(original,2),image_data_url:jpeg}],p_request_id:uuid(8900),p_language:'en'
+  });
+  await db.query("update private.inventory_supplier_lists set items=jsonb_build_array((items->0)-'inventory_item_id') where id=$1",[saved.id]);
+  const before=await rpc('inventory_supplier_source',{p_token:saved.token},null,'service_role');
+  const args={p_id:saved.id,p_revision:1,p_name:'Reorder',p_request_id:uuid(8901)};
+  const addition={...line(healthy,5),name_en:'Forged name'};
+  const edit={...args,p_items:[{position:1,requested_quantity:3},addition]};
+  await assert.rejects(rpc('save_inventory_supplier_list',{...args,p_items:[line(original,1)]}),/SUPPLIER_DUPLICATE/);
+  await assert.rejects(rpc('save_inventory_supplier_list',{...args,p_items:[addition,addition]}),/SUPPLIER_INPUT/);
+  await assert.rejects(rpc('save_inventory_supplier_list',{...args,p_items:[{...addition,revision:healthy.revision+1}]}),/SUPPLIER_ITEM_STALE/);
+  await assert.rejects(rpc('save_inventory_supplier_list',{...args,p_items:[{...addition,image_version:uuid(9999)}]}),/SUPPLIER_ITEM_STALE/);
+  await assert.rejects(rpc('save_inventory_supplier_list',edit,2),/INVENTORY_ACCESS/);
+  const written=await rpc('save_inventory_supplier_list',edit,4);
+  assert.deepEqual(await rpc('save_inventory_supplier_list',edit,4),written);
+  const after=await rpc('inventory_supplier_source',{p_token:saved.token},null,'service_role');
+  assert.equal(after.expires_at,before.expires_at);
+  assert.deepEqual(after.items[0],{...before.items[0],requested_quantity:3});
+  assert.equal(after.items[1].name_en,'Healthy item');
+  assert.equal(after.items[1].requested_quantity,5);
+  assert.ok(!('inventory_item_id' in after.items[1]));
+  assert.equal(Number((await db.query('select quantity from public.inventory_items where id=$1',[healthy.id])).rows[0].quantity),20);
+});
+
 test('saved supplier library can reopen, edit, retry and delete lists across responsive English and Arabic layouts',async t=>{
   const{db,rpc}=await database(t),candidates=await rpc('get_inventory_supplier_candidates',{p_scope:'both'});
   const saved=await rpc('create_inventory_supplier_list',{p_scope:'both',p_items:candidates.slice(0,3).map(({id,revision})=>({id,revision,requested_quantity:1})),p_request_id:uuid(9100),p_language:'en'});
@@ -127,16 +158,33 @@ test('saved supplier library can reopen, edit, retry and delete lists across res
     for(const name of ['edit-saved','share-saved','delete-saved']){const b=await action(name).boundingBox();assert.ok(b.height>=44&&b.width>=44);}
     assert.equal(await action('edit-saved').textContent(),lang==='ar'?'تعديل القائمة':'Edit list');
     if(process.env.LUMIN_SUPPLIER_SCREENSHOTS){fs.mkdirSync(process.env.LUMIN_SUPPLIER_SCREENSHOTS,{recursive:true});await page.screenshot({path:path.join(process.env.LUMIN_SUPPLIER_SCREENSHOTS,`supplier-library-${width}-${lang}.png`)});}
+    await action('edit-saved').click();
+    await action('pick-items').click();
+    await page.locator('[name=supplier-item-search]').fill(lang==='ar'?'صنف 17':'Supply 17');
+    const addButton=action('add-item').first();
+    assert.equal(await addButton.textContent(),lang==='ar'?'إضافة':'Add');
+    const addBounds=await addButton.boundingBox();
+    assert.ok(addBounds.height>=44&&addBounds.width>=44);
+    assert.equal(await page.locator('#inventory-supplier-overlay .inv-dialog-body').evaluate(n=>n.scrollWidth>n.clientWidth+1),false);
     await page.keyboard.press('Escape');assert.equal(await page.locator('#inventory-supplier-overlay').count(),0);
   }
   await page.locator('#open').click();await action('share-saved').click();assert.equal(new URL(await page.locator('.inv-supplier-link').inputValue()).searchParams.get('s'),saved.token);await action('library').click();
   await action('edit-saved').click();await page.locator('[name=supplier-list-name]').fill('November restock نوفمبر');
   await action('wanted-plus').first().click();await action('remove').last().click();
+  await action('pick-items').click();
+  const itemSearch=page.locator('[name=supplier-item-search]');
+  await itemSearch.fill('Supply 00');
+  await page.getByRole('heading',{name:'No matching items'}).waitFor();
+  await itemSearch.fill('Healthy');
+  await page.getByRole('button',{name:'Add: Healthy item'}).click();
+  assert.equal(await page.getByRole('button',{name:'Add: Healthy item'}).count(),0);
+  await action('finish-picking').click();
+  await page.getByRole('spinbutton',{name:'Quantity wanted: Healthy item'}).fill('6');
   assert.equal(await page.locator('[name=supplier-list-name]').inputValue(),'November restock نوفمبر');
   await action('save-edit').click();await page.locator('.inv-error').filter({hasText:'Could not save'}).waitFor();
-  assert.equal(await page.locator('[data-supplier-item]').count(),2,'Failed response keeps the edited document');
+  assert.equal(await page.locator('[data-supplier-item]').count(),3,'Failed response keeps the edited document');
   await action('save-edit').click();await page.locator('[data-supplier-list] h4').filter({hasText:'November restock'}).waitFor();
-  const updated=await rpc('get_inventory_supplier_list',{p_id:saved.id});assert.equal(updated.revision,2);assert.equal(updated.items.length,2);assert.equal(updated.items[0].requested_quantity,2);assert.equal(updated.token,saved.token);
+  const updated=await rpc('get_inventory_supplier_list',{p_id:saved.id});assert.equal(updated.revision,2);assert.equal(updated.items.length,3);assert.equal(updated.items[0].requested_quantity,2);assert.equal(updated.items.find(item=>item.name_en==='Healthy item').requested_quantity,6);assert.equal(updated.token,saved.token);
   await page.locator('[name=supplier-search]').fill('No match');await page.waitForFunction(()=>!document.querySelector('[data-supplier-list]')&&!document.querySelector('.inv-supplier-library-loading'));
   await action('clear-library').click();await action('delete-saved').click();await action('library').click();assert.ok(await rpc('inventory_supplier_source',{p_token:saved.token},null,'service_role'));
   await action('delete-saved').click();await action('confirm-delete').click();await page.waitForFunction(()=>document.querySelector('.inv-supplier-empty h4')?.textContent==='No supplier lists yet');

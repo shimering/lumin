@@ -23,6 +23,9 @@ body.inventory-supplier-open { overflow:hidden; }
 .inv-supplier-group li>div { min-width:0; overflow-wrap:anywhere; }
 .inv-supplier-group strong { font-size:14px; line-height:1.6; font-weight:500; }
 .inv-supplier-group small { display:block; margin-top:4px; font-size:12px; line-height:1.6; color:var(--inv-muted); }
+.inv-supplier-picker li { grid-template-columns:minmax(0,1fr) auto; }
+.inv-supplier-picker li>.inv-button { background:#eff6ff; color:#1d4ed8; }
+.inv-supplier-picker li>.inv-button:hover { background:#dbeafe; }
 .inv-supplier-item-heading { display:flex; align-items:center; gap:12px; min-width:0; }
 .inv-supplier-item-heading strong { min-width:0; overflow-wrap:anywhere; }
 .inv-supplier-thumb { display:grid; place-items:center; width:44px; height:44px; flex:0 0 44px; border:0; border-radius:10px; overflow:hidden; background:var(--inv-inner); color:#94a3b8; }

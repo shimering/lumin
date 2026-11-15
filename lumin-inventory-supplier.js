@@ -17,9 +17,9 @@
     const source=model().thumbnail(s.thumbnails.get(item.id));photo.classList.toggle('inv-supplier-thumb-loading',Boolean(item.image_version&&!source&&!s.photoErrors.has(item.id)));
     if(source){const image=document.createElement('img');image.src=source;image.alt=model().name(item,language());image.width=image.height=44;photo.replaceChildren(image);}
   }
-  async function loadPhotos(s){
+  async function loadPhotos(s,items=s.items){
     if(s.photoRead)return s.photoRead;
-    const queue=s.items.filter(item=>item.image_version&&!s.thumbnails.has(item.id));
+    const queue=items.filter(item=>item.image_version&&!s.thumbnails.has(item.id));
     const run=async()=>{while(queue.length&&current(s)){const item=queue.shift();try{const photo=await host.LuminInventoryImages.thumbnail(item);if(current(s)){s.thumbnails.set(item.id,photo);s.photoErrors.delete(item.id);}}catch(_){if(current(s))s.photoErrors.add(item.id);}paintPhoto(s,item);}};
     s.photoRead=Promise.all(Array.from({length:Math.min(4,queue.length)},run));
     try{await s.photoRead;}finally{s.photoRead=null;}
@@ -65,7 +65,7 @@
       else if(mode==='delete-saved')s.step='delete';
       else{
         s.editing=true;s.step='review';s.listName=data.name||'';s.removed=new Set();s.photoErrors=new Set();
-        s.items=data.items.map((item,index)=>({...item,id:String(index+1)}));
+        s.items=data.items.map((item,index)=>({...item,id:String(index+1),position:index+1}));
         s.quantities=new Map(s.items.map(item=>[item.id,item.requested_quantity??1]));
         s.thumbnails=new Map(s.items.map(item=>[item.id,model().thumbnail(item.image_data_url)]));
       }
@@ -73,9 +73,70 @@
     finally{if(current(s)){s.busy=false;render();document.getElementById('supplier-dialog-title')?.focus();}else checkAccess();}
   }
   function writeError(error){
+    if(/SUPPLIER_PHOTO/.test(error?.message||''))return t('Some item photos could not load. Try saving again.','تعذر تحميل بعض صور الأصناف. حاول الحفظ مجدداً.');
+    if(/INVENTORY_SUPPLIER_ITEM_STALE/.test(error?.message||''))return t('An added item changed in inventory. Remove it and add it again before saving.','تغيّر أحد الأصناف المضافة في المخزون. أزله وأضفه مجدداً قبل الحفظ.');
+    if(/INVENTORY_SUPPLIER_DUPLICATE/.test(error?.message||''))return t('An added item is already on this list. Remove the duplicate before saving.','أحد الأصناف المضافة موجود بالفعل في القائمة. أزل الصنف المكرر قبل الحفظ.');
     if(/INVENTORY_SUPPLIER_STALE/.test(error?.message||''))return t('This list changed in another session. Cancel and reopen it before saving.','تغيرت هذه القائمة في جلسة أخرى. ألغِ العملية وأعد فتحها قبل الحفظ.');
     if(/INVENTORY_SUPPLIER_MISSING/.test(error?.message||''))return t('This list was deleted. Return to the saved lists.','تم حذف هذه القائمة. ارجع إلى القوائم المحفوظة.');
     return t('Could not save the change. Your edits are kept; try again.','تعذر حفظ التغيير. تم الاحتفاظ بتعديلاتك؛ حاول مجدداً.');
+  }
+  function inventorySelection(s,item){
+    return {
+      id:item.id,revision:item.revision,requested_quantity:Number(s.quantities.get(item.id)??1),
+      image_version:item.image_version||null,image_data_url:s.thumbnails.get(item.id)||''
+    };
+  }
+  async function openItemPicker(){
+    const s=session;
+    s.step='pick';s.pickerQuery='';s.pickerLimit=20;s.catalog=[];s.busy=true;s.error='';render();
+    try{
+      const {data,error}=await s.deps.db.rpc('get_inventory_supplier_candidates',{p_scope:'all'});
+      if(!current(s))return;
+      if(error||!Array.isArray(data))throw error||Error('Invalid inventory response');
+      s.catalog=data;
+    }catch(_){
+      if(current(s))s.error=t('Could not load inventory items.','تعذر تحميل أصناف المخزون.');
+    }finally{
+      if(current(s)){
+        s.busy=false;render();
+        document.querySelector('[name="supplier-item-search"]:not(:disabled)')?.focus();
+      }else checkAccess();
+    }
+  }
+  const itemNameKey=item=>JSON.stringify([item.name_en||'',item.name_ar||'']);
+  function pickerBody(s){
+    const locale=language();
+    const sourceIds=new Set(s.items.filter(item=>item.position||!s.removed.has(item.id)).map(item=>item.inventory_item_id||item.id));
+    const legacyNames=new Set(s.items.filter(item=>item.position&&!item.inventory_item_id).map(itemNameKey));
+    const query=s.pickerQuery.trim().toLocaleLowerCase(locale);
+    const matches=s.catalog.filter(item=>!sourceIds.has(item.id)&&!legacyNames.has(itemNameKey(item))&&
+      [item.name_en,item.name_ar,item.category_name,item.category_name_ar].some(value=>value?.toLocaleLowerCase(locale).includes(query)));
+    const search=`<label class="inv-field inv-supplier-name"><span>${t('Search inventory','البحث في المخزون')}</span><input type="search" name="supplier-item-search" class="inv-control" maxlength="120" value="${e(s.pickerQuery)}" placeholder="${t('Item name or category','اسم الصنف أو التصنيف')}" ${s.busy||s.error?'disabled':''}></label>`;
+    if(s.busy)return `${search}<div class="inv-supplier-library-loading" role="status" aria-label="${t('Loading inventory','جار تحميل المخزون')}"><div class="inv-skeleton"></div><div class="inv-skeleton"></div></div>`;
+    if(s.error)return `${search}${button('pick-items',t('Try again','حاول مجدداً'),'refresh-cw')}`;
+    if(!matches.length)return `${search}<div class="inv-empty inv-supplier-empty">${icon('package-search')}<h4>${query?t('No matching items','لا توجد أصناف مطابقة'):t('No more items to add','لا توجد أصناف أخرى لإضافتها')}</h4>${query?button('clear-item-search',t('Clear search','مسح البحث'),'x'):''}</div>`;
+    const rows=matches.slice(0,s.pickerLimit).map(item=>{
+      const name=model().name(item,locale);
+      return `<li><div><strong><bdi>${e(name)}</bdi></strong><small><bdi>${e(model().category(item,locale))}</bdi> · <bdi>${e(model().unit(item.unit,locale))}</bdi></small></div>${button('add-item',t('Add','إضافة'),'plus','',false,`data-id="${e(item.id)}" aria-label="${e(t('Add','إضافة')+': '+name)}"`)}</li>`;
+    }).join('');
+    return `${search}<section class="inv-supplier-group inv-supplier-picker"><ul>${rows}</ul></section>${matches.length>s.pickerLimit?button('more-items',t('Show more items','عرض المزيد من الأصناف'),'chevron-down'):''}`;
+  }
+  function addInventoryItem(s,id){
+    const item=s.catalog.find(item=>item.id===id);
+    if(!item)return;
+    const index=s.items.findIndex(entry=>entry.id===id);
+    if(index<0){
+      s.items.push(item);s.quantities.set(id,1);
+    }else{
+      if(!s.removed.has(id))return;
+      s.items[index]=item;s.thumbnails.delete(id);s.photoErrors.delete(id);s.removed.delete(id);
+    }
+    s.requestId=null;
+    const scroll=document.querySelector('#inventory-supplier-overlay .inv-dialog-body').scrollTop;
+    render();bodyReplaceScroll(scroll);
+    if(!document.activeElement?.matches('[data-supplier-action="add-item"]')){
+      document.querySelector('[name="supplier-item-search"]')?.focus({preventScroll:true});
+    }
   }
   async function saveEdited(){
     const s=session;if(!s||!s.editing||s.busy||!selected().length)return;
@@ -85,7 +146,16 @@
     }
     s.requestId ||= s.deps.uuid();s.busy=true;s.saving=true;s.error='';render();let saved=false;
     try{
-      const {error}=await s.deps.db.rpc('save_inventory_supplier_list',{p_id:s.document.id,p_revision:s.document.revision,p_name:s.listName,p_items:selected().map(item=>({position:Number(item.id),requested_quantity:Number(s.quantities.get(item.id)??1)})),p_request_id:s.requestId});
+      const items=selected(),additions=items.filter(item=>!item.position);
+      await loadPhotos(s,additions);
+      if(!current(s))return;
+      if(additions.some(item=>item.image_version&&!s.thumbnails.has(item.id)))throw Error('SUPPLIER_PHOTO');
+      const lines=items.map(item=>item.position
+        ?{position:item.position,requested_quantity:Number(s.quantities.get(item.id)??1)}
+        :inventorySelection(s,item));
+      const {error}=await s.deps.db.rpc('save_inventory_supplier_list',{
+        p_id:s.document.id,p_revision:s.document.revision,p_name:s.listName,p_items:lines,p_request_id:s.requestId
+      });
       if(!current(s))return;if(error)throw error;saved=true;s.notice=t('Supplier list updated. The shared link now shows your changes.','تم تحديث قائمة المورد. يعرض الرابط المشترك تعديلاتك الآن.');
     }catch(error){if(current(s))s.error=writeError(error);}
     finally{if(current(s)){s.busy=false;s.saving=false;if(saved)await loadLibrary();else render();document.getElementById('supplier-dialog-title')?.focus();}else checkAccess();}
@@ -103,7 +173,7 @@
     const s=session,overlay=document.getElementById('inventory-supplier-overlay'),active=document.activeElement?.dataset.supplierAction;
     const focusWasInside=overlay.contains(document.activeElement);
     const field=document.activeElement?.name,caret=document.activeElement?.selectionStart;
-    const title=s.step==='library'?t('Supplier lists','قوائم الموردين'):s.step==='delete'?t('Delete supplier list','حذف قائمة المورد'):s.step==='scope'?t('Create supplier list','إنشاء قائمة المورد'):s.step==='share'?t('Supplier page is ready','صفحة المورد جاهزة'):s.editing?t('Edit supplier list','تعديل قائمة المورد'):t('Review supplier list','مراجعة قائمة المورد');
+    const title=s.step==='library'?t('Supplier lists','قوائم الموردين'):s.step==='delete'?t('Delete supplier list','حذف قائمة المورد'):s.step==='scope'?t('Create supplier list','إنشاء قائمة المورد'):s.step==='share'?t('Supplier page is ready','صفحة المورد جاهزة'):s.step==='pick'?t('Add inventory items','إضافة أصناف من المخزون'):s.editing?t('Edit supplier list','تعديل قائمة المورد'):t('Review supplier list','مراجعة قائمة المورد');
     let body='',footer='';
     if(s.step==='library'){
       body=libraryBody(s);
@@ -114,10 +184,16 @@
     }else if(s.step==='scope'){
       body=`<p class="inv-supplier-intro">${t('Choose which items to include. You can remove items before creating the page.','اختر الأصناف المراد تضمينها. يمكنك إزالة أصناف قبل إنشاء الصفحة.')}</p><fieldset class="inv-supplier-options"><legend class="inv-visually-hidden">${t('Stock status','حالة المخزون')}</legend>${[['out','Out of stock only','الأصناف النافدة فقط','Recorded quantity is zero.','الأصناف التي كميتها المسجلة صفر.'],['low','Low stock only','المخزون المنخفض فقط','Above zero and at or below the minimum.','الكمية أكبر من صفر وعند الحد الأدنى أو أقل.'],['both','Low & out of stock','المخزون المنخفض والنافد','All items that need restocking.','كل الأصناف التي تحتاج إلى إعادة توفير.']].map(([value,en,ar,help,helpAr])=>`<label class="inv-supplier-option"><input type="radio" name="supplier-scope" value="${value}" ${s.scope===value?'checked':''}><span><strong>${t(en,ar)}</strong><small>${t(help,helpAr)}</small></span></label>`).join('')}</fieldset>`;
       footer=button(s.fromLibrary?'library':'close',t('Cancel','إلغاء'),'x')+button('review',t('Review items','مراجعة الأصناف'),'list-checks','inv-primary',s.busy);
+    }else if(s.step==='pick'){
+      body=pickerBody(s);
+      const count=new Intl.NumberFormat(language()).format(selected().length);
+      footer=`<span class="inv-caption" role="status">${count} ${t('items selected','أصناف محددة')}</span>`+
+        button('finish-picking',t('Review list','مراجعة القائمة'),'list-checks','inv-primary',s.busy);
     }else if(s.step==='review'){
       const items=selected(),locale=language(),format=value=>value==null?'—':new Intl.NumberFormat(locale,{maximumFractionDigits:3}).format(value);
       const editName=s.editing?`<label class="inv-field inv-supplier-name"><span>${t('List name','اسم القائمة')}</span><input name="supplier-list-name" class="inv-control" maxlength="120" value="${e(s.listName)}" placeholder="${e(s.document.reference)}"></label>`:'';
-      body=s.busy&&!s.saving?`<p class="inv-supplier-intro" role="status">${t('Loading all matching items…','جار تحميل كل الأصناف المطابقة…')}</p><div class="inv-skeleton"></div><div class="inv-skeleton"></div><div class="inv-skeleton"></div>`:`<p class="inv-supplier-intro">${s.editing?t('Update the name, quantities or included items. Saving updates the existing shared link.','عدّل الاسم أو الكميات أو الأصناف المدرجة. يؤدي الحفظ إلى تحديث الرابط المشترك الحالي.'):t('Remove anything you do not need. Only the remaining items will appear on the supplier page.','أزل ما لا تحتاجه. ستظهر الأصناف المتبقية فقط في صفحة المورد.')}</p>${editName}<div class="inv-supplier-summary" role="status">${format(items.length)} ${t('items selected','أصناف محددة')}${s.removed.size?button('restore',t('Restore removed items','استعادة الأصناف المزالة'),'rotate-ccw'):''}</div>${items.length?model().groups(items,locale).map(group=>`<section class="inv-supplier-group"><h4>${icon('folder-open')}<bdi>${e(group.label)}</bdi></h4><ul>${group.items.map(item=>`<li data-supplier-item="${e(item.id)}"><div><strong><bdi>${e(model().name(item,locale))}</bdi></strong><small>${s.editing?e(model().unit(item.unit,locale)||'—'):`${t('Stock','المخزون')}: ${format(item.quantity)} · ${t('Minimum','الحد الأدنى')}: ${format(item.minimum)}${item.unit?' · '+e(model().unit(item.unit,locale)):''}`}</small></div><button type="button" class="inv-icon-button inv-supplier-remove" data-supplier-action="remove" data-id="${e(item.id)}" aria-label="${e(t('Remove from list','إزالة من القائمة')+': '+model().name(item,locale))}">${icon('x')}</button></li>`).join('')}</ul></section>`).join(''):`<div class="inv-empty inv-supplier-empty">${icon('package-check')}<h4>${t('No items to include','لا توجد أصناف لتضمينها')}</h4><p>${s.removed.size?t('Restore items or choose another stock status.','استعد الأصناف أو اختر حالة مخزون أخرى.'):t('There are no matching items. Choose another stock status.','لا توجد أصناف مطابقة. اختر حالة مخزون أخرى.')}</p>${button(s.removed.size?'restore':'back',s.removed.size?t('Restore items','استعادة الأصناف'):t('Choose stock status','اختيار حالة المخزون'),'arrow-left')}</div>`}<p class="inv-caption">${s.editing?t('The saved item names, units and photos are kept. The link expiry date stays the same.','تُحفظ أسماء الأصناف ووحداتها وصورها. يبقى تاريخ انتهاء صلاحية الرابط كما هو.'):t('The shared page shows names, stock units and main categories. It is a saved list, valid for 30 days.','تُظهر الصفحة المشتركة الأسماء ووحدات المخزون والتصنيفات الرئيسية. وهي قائمة محفوظة صالحة لمدة ٣٠ يوماً.')}</p>`;
+      const addItems=s.editing?button('pick-items',t('Add items','إضافة أصناف'),'list-plus'):'';
+      body=s.busy&&!s.saving?`<p class="inv-supplier-intro" role="status">${t('Loading all matching items…','جار تحميل كل الأصناف المطابقة…')}</p><div class="inv-skeleton"></div><div class="inv-skeleton"></div><div class="inv-skeleton"></div>`:`<p class="inv-supplier-intro">${s.editing?t('Update the name, quantities or included items. Saving updates the existing shared link.','عدّل الاسم أو الكميات أو الأصناف المدرجة. يؤدي الحفظ إلى تحديث الرابط المشترك الحالي.'):t('Remove anything you do not need. Only the remaining items will appear on the supplier page.','أزل ما لا تحتاجه. ستظهر الأصناف المتبقية فقط في صفحة المورد.')}</p>${editName}<div class="inv-supplier-summary" role="status">${format(items.length)} ${t('items selected','أصناف محددة')}${addItems}${s.removed.size?button('restore',t('Restore removed items','استعادة الأصناف المزالة'),'rotate-ccw'):''}</div>${items.length?model().groups(items,locale).map(group=>`<section class="inv-supplier-group"><h4>${icon('folder-open')}<bdi>${e(group.label)}</bdi></h4><ul>${group.items.map(item=>`<li data-supplier-item="${e(item.id)}"><div><strong><bdi>${e(model().name(item,locale))}</bdi></strong><small>${s.editing?e(model().unit(item.unit,locale)||'—'):`${t('Stock','المخزون')}: ${format(item.quantity)} · ${t('Minimum','الحد الأدنى')}: ${format(item.minimum)}${item.unit?' · '+e(model().unit(item.unit,locale)):''}`}</small></div><button type="button" class="inv-icon-button inv-supplier-remove" data-supplier-action="remove" data-id="${e(item.id)}" aria-label="${e(t('Remove from list','إزالة من القائمة')+': '+model().name(item,locale))}">${icon('x')}</button></li>`).join('')}</ul></section>`).join(''):`<div class="inv-empty inv-supplier-empty">${icon('package-check')}<h4>${t('No items to include','لا توجد أصناف لتضمينها')}</h4><p>${s.removed.size?(s.editing?t('Add inventory items or restore removed items.','أضف أصنافاً من المخزون أو استعد الأصناف المزالة.'):t('Restore items or choose another stock status.','استعد الأصناف أو اختر حالة مخزون أخرى.')):t('There are no matching items. Choose another stock status.','لا توجد أصناف مطابقة. اختر حالة مخزون أخرى.')}</p>${button(s.removed.size?'restore':'back',s.removed.size?t('Restore items','استعادة الأصناف'):t('Choose stock status','اختيار حالة المخزون'),'arrow-left')}</div>`}<p class="inv-caption">${s.editing?t('The saved item names, units and photos are kept. The link expiry date stays the same.','تُحفظ أسماء الأصناف ووحداتها وصورها. يبقى تاريخ انتهاء صلاحية الرابط كما هو.'):t('The shared page shows names, stock units and main categories. It is a saved list, valid for 30 days.','تُظهر الصفحة المشتركة الأسماء ووحدات المخزون والتصنيفات الرئيسية. وهي قائمة محفوظة صالحة لمدة ٣٠ يوماً.')}</p>`;
       footer=button(s.editing?'library':'back',s.editing?t('Cancel','إلغاء'):t('Back','رجوع'),'arrow-left','',s.busy)+button(s.editing?'save-edit':'create',s.editing?t('Save changes','حفظ التغييرات'):t('Create supplier page','إنشاء صفحة المورد'),s.editing?'save':'file-plus-2','inv-primary',s.busy||!items.length);
     }else{
       body=`<div class="inv-supplier-ready">${icon('circle-check')}<h4>${t('Ready to share with your supplier','جاهزة للمشاركة مع المورد')}</h4><p>${t('This page contains only the items you reviewed. The link expires on','تحتوي هذه الصفحة على الأصناف التي راجعتها فقط. تنتهي صلاحية الرابط في')} ${e(LuminDates.format(s.saved.expires_at))}</p></div><label class="inv-field"><span>${t('Supplier page link','رابط صفحة المورد')}</span><input class="inv-control inv-supplier-link" readonly dir="ltr" value="${e(s.url)}" aria-label="${t('Supplier page link','رابط صفحة المورد')}"></label><div class="inv-supplier-share-actions">${button('copy',t('Copy link','نسخ الرابط'),'copy','inv-primary')}<a class="inv-button" href="${e(s.url)}" target="_blank" rel="noopener noreferrer">${icon('external-link')}<span>${t('Open page','فتح الصفحة')}</span></a>${navigator.share?button('share',t('Share','مشاركة'),'share-2'):''}</div><p class="inv-caption" role="status" data-supplier-notice>${e(s.notice||'')}</p>`;
@@ -135,7 +211,7 @@
     if(s.saving){const label=overlay.querySelector('[data-supplier-action="create"] span,[data-supplier-action="save-edit"] span,[data-supplier-action="confirm-delete"] span');if(label)label.textContent=t('Saving…','جار الحفظ…');}
     if(host.lucide)host.lucide.createIcons();
     if(active)overlay.querySelector(`[data-supplier-action="${active}"]:not(:disabled)`)?.focus({preventScroll:true});
-    if(field==='supplier-search'){const search=overlay.querySelector('[name="supplier-search"]');if(search){search.focus({preventScroll:true});if(caret!=null)search.setSelectionRange(caret,caret);}}
+    if(field==='supplier-search'||field==='supplier-item-search'){const search=overlay.querySelector(`[name="${field}"]`);if(search){search.focus({preventScroll:true});if(caret!=null)search.setSelectionRange(caret,caret);}}
     if(focusWasInside&&!overlay.contains(document.activeElement))document.getElementById('supplier-dialog-title')?.focus({preventScroll:true});
   }
   async function review(){
@@ -152,7 +228,7 @@
     s.requestId ||= s.deps.uuid();s.busy=true;s.saving=true;s.error='';render();
     try{
       await loadPhotos(s);if(!current(s))return;if(selected().some(item=>item.image_version&&!s.thumbnails.has(item.id)))throw Error('SUPPLIER_PHOTO');
-      const {data,error}=await s.deps.db.rpc('create_inventory_supplier_list',{p_scope:s.scope,p_items:selected().map(item=>({id:item.id,revision:item.revision,requested_quantity:Number(s.quantities.get(item.id)??1),image_version:item.image_version||null,image_data_url:s.thumbnails.get(item.id)||''})),p_request_id:s.requestId,p_language:language()});
+      const {data,error}=await s.deps.db.rpc('create_inventory_supplier_list',{p_scope:s.scope,p_items:selected().map(item=>inventorySelection(s,item)),p_request_id:s.requestId,p_language:language()});
       if(!current(s))return;if(error)throw error;if(!/^[a-f0-9]{64}$/.test(data?.token)||!Number.isFinite(Date.parse(data.expires_at)))throw Error('invalid');
       s.saved=data;s.url=supplierUrl(data.token);s.step='share';
     }catch(error){if(current(s))s.error=/SUPPLIER_PHOTO/.test(error?.message||'')?t('Some item photos could not load. Try again to include them.','تعذر تحميل بعض صور الأصناف. حاول مجدداً لتضمينها.'):/INVENTORY_SUPPLIER_STALE/.test(error?.message||'')?t('Stock or photos changed since your review. Go back and review the items again.','تغير المخزون أو الصور منذ المراجعة. ارجع وراجع الأصناف مرة أخرى.'):t('Could not create the page. Your selection is kept; try again.','تعذر إنشاء الصفحة. تم الاحتفاظ باختيارك؛ حاول مجدداً.');}
@@ -168,6 +244,22 @@
     if(name==='clear-library'){s.query='';s.status='all';s.page=1;await loadLibrary();return;}
     if(name==='library-prev'||name==='library-next'){s.page+=name==='library-next'?1:-1;await loadLibrary();return;}
     if(['edit-saved','share-saved','delete-saved'].includes(name)){await openSavedDocument(target.dataset.id,name);return;}
+    if(name==='pick-items'){await openItemPicker();return;}
+    if(name==='finish-picking'){
+      s.step='review';s.error='';render();
+      document.querySelector('[data-supplier-action="pick-items"]')?.focus();return;
+    }
+    if(name==='add-item'){addInventoryItem(s,target.dataset.id);return;}
+    if(name==='more-items'){
+      const scroll=document.querySelector('#inventory-supplier-overlay .inv-dialog-body').scrollTop;
+      const next=s.pickerLimit;
+      s.pickerLimit+=20;render();bodyReplaceScroll(scroll);
+      document.querySelectorAll('[data-supplier-action="add-item"]')[next]?.focus();return;
+    }
+    if(name==='clear-item-search'){
+      s.pickerQuery='';s.pickerLimit=20;render();
+      document.querySelector('[name="supplier-item-search"]')?.focus();return;
+    }
     if(name==='save-edit'){await saveEdited();return;}
     if(name==='confirm-delete'){await deleteSaved();return;}
     if(name==='back'){s.step='scope';s.error='';s.requestId=null;render();return;}
@@ -188,6 +280,10 @@
     session={deps,context:deps.context(),focus:document.activeElement,step:view,fromLibrary:view==='library',editing:false,page:1,query:'',status:'all',sort:'newest',libraryToken:0,report:null,scope:'both',items:[],removed:new Set(),quantities:new Map(),thumbnails:new Map(),photoErrors:new Set(),photoRead:null,busy:false,saving:false,error:''};
     const overlay=document.createElement('div');overlay.id='inventory-supplier-overlay';overlay.className='inv-overlay';document.body.appendChild(overlay);document.body.classList.add('inventory-supplier-open');
     overlay.addEventListener('click',event=>{if(event.target===overlay)close();else void action(event);});
+    overlay.addEventListener('input',event=>{
+      if(session?.step!=='pick'||event.target.name!=='supplier-item-search')return;
+      session.pickerQuery=event.target.value;session.pickerLimit=20;render();
+    });
     overlay.addEventListener('change',event=>{if(!session||session.saving)return;if(event.target.name==='supplier-scope')session.scope=event.target.value;if(event.target.name==='supplier-status'||event.target.name==='supplier-sort'){session[event.target.name==='supplier-status'?'status':'sort']=event.target.value;session.page=1;void loadLibrary();}});
     overlay.addEventListener('input',event=>{if(!session||session.saving)return;if(event.target.name==='supplier-search'){session.query=event.target.value;session.page=1;clearTimeout(session.searchTimer);session.searchTimer=setTimeout(()=>{if(session?.step==='library')void loadLibrary();},250);}if(event.target.name==='supplier-list-name'){session.listName=event.target.value;session.requestId=null;}if(event.target.name==='supplier-quantity'&&session){const input=event.target,value=Number(input.value),group=input.closest('.inv-supplier-stepper');session.quantities.set(input.dataset.id,input.value);session.requestId=null;input.setCustomValidity('');group.querySelector('[data-supplier-action="wanted-minus"]').disabled=value<=1;group.querySelector('[data-supplier-action="wanted-plus"]').disabled=value>=1000000;}});
     overlay.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close();}if(event.key==='Tab'){const nodes=[...overlay.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),a[href]')].filter(node=>node.getClientRects().length);if(!nodes.length){event.preventDefault();document.getElementById('supplier-dialog-title')?.focus();return;}const first=nodes[0],last=nodes.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}}});
