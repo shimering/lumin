@@ -1680,10 +1680,16 @@
       opacity: 0.4;
       pointer-events: none;
     }
-    .odontogram-surface-view[data-occlusal-condition="missing"] .occlusal-crown { opacity: 0.2; }
-    .odontogram-surface-view[data-occlusal-condition="missing"] .occlusal-crown-tint { opacity: 0.16; }
+    .odontogram-surface-view:is([data-occlusal-condition="missing"], [data-occlusal-condition="extraction_planned"]) .occlusal-crown-art {
+      opacity: 0.3;
+    }
+    .odontogram-surface-view:is([data-occlusal-condition="missing"], [data-occlusal-condition="extraction_planned"]) .occlusal-crown {
+      filter: grayscale(1);
+    }
+    .odontogram-surface-view:is([data-occlusal-condition="missing"], [data-occlusal-condition="extraction_planned"]) .occlusal-crown-tint {
+      opacity: 0.66;
+    }
     .odontogram-surface-view[data-occlusal-condition="unerupted"] .occlusal-crown { opacity: 0.45; }
-    .odontogram-surface-view[data-occlusal-condition="extraction_planned"] .occlusal-crown { opacity: 0.6; }
     .odontogram-surface-view .surface-poly {
       fill: var(--operation-status-color, transparent);
       fill-opacity: 0.46;
@@ -19083,9 +19089,11 @@
               <image id="${crownId}" href="assets/teeth-occlusal/${family}.png" x="${imageX}" y="${imageY}" width="${width}" height="${height}"${transform}></image>
               <mask id="${maskId}" mask-type="alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><use href="#${crownId}"></use></mask>
             </defs>
-            <use class="occlusal-crown" href="#${crownId}" aria-hidden="true" pointer-events="none"></use>
+            <g class="occlusal-crown-art" aria-hidden="true" pointer-events="none">
+              <use class="occlusal-crown" href="#${crownId}"></use>
+              <rect class="occlusal-crown-tint" width="100" height="100" mask="url(#${maskId})"></rect>
+            </g>
             <g mask="url(#${maskId})">
-              <rect class="occlusal-crown-tint" width="100" height="100" aria-hidden="true"></rect>
               ${['top', 'bottom', 'left', 'right', 'center'].map(surfacePath).join('')}
             </g>
           </svg>
