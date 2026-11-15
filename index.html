@@ -1675,55 +1675,34 @@
       height: 100% !important;
       overflow: visible;
     }
-    .clinical-odontogram-stage .odontogram-surface-outline {
-      fill: #fffaf0;
-      stroke: #d0ad73;
-      stroke-width: 1.45;
-    }
-    .clinical-odontogram-stage .surface-poly {
-      fill: #fffaf0;
-      stroke: #d5b781;
-      stroke-width: 0.9;
-      filter: none;
-    }
-    .clinical-odontogram-stage .surface-poly:hover {
-      opacity: 1;
-      stroke: #2563eb;
-      stroke-width: 1.7;
-      filter: none;
-    }
-    .clinical-odontogram-stage .surface-poly.operation-status-p { fill: #dc2626 !important; stroke: #b91c1c; }
-    .clinical-odontogram-stage .surface-poly.operation-status-in { fill: #2563eb !important; stroke: #1d4ed8; }
-    .clinical-odontogram-stage .surface-poly.operation-status-c { fill: #16a34a !important; stroke: #15803d; }
-    .clinical-odontogram-stage .surface-poly.operation-status-e { fill: #111827 !important; stroke: #020617; }
-    .clinical-odontogram-stage .surface-poly.surface-selected {
-      stroke: #2563eb !important;
-      stroke-width: 2.35 !important;
-      filter: drop-shadow(0 0 2px rgba(37, 99, 235, 0.5)) !important;
-    }
-    .clinical-odontogram-stage .odontogram-fissure {
-      fill: none;
-      stroke: #d0ad73;
-      stroke-width: 1.05;
-      stroke-linecap: round;
-      opacity: 0.78;
+    .odontogram-surface-view .occlusal-crown-tint {
+      fill: var(--occlusal-status-color, transparent);
+      opacity: 0.4;
       pointer-events: none;
     }
-    .clinical-odontogram-stage .odontogram-surface-view.is-extraction .odontogram-surface-outline {
-      fill: none;
-      pointer-events: none;
+    .odontogram-surface-view[data-occlusal-condition="missing"] .occlusal-crown { opacity: 0.2; }
+    .odontogram-surface-view[data-occlusal-condition="missing"] .occlusal-crown-tint { opacity: 0.16; }
+    .odontogram-surface-view[data-occlusal-condition="unerupted"] .occlusal-crown { opacity: 0.45; }
+    .odontogram-surface-view[data-occlusal-condition="extraction_planned"] .occlusal-crown { opacity: 0.6; }
+    .odontogram-surface-view .surface-poly {
+      fill: var(--operation-status-color, transparent);
+      fill-opacity: 0.46;
+      stroke: none;
+      stroke-width: 1.4;
+      stroke-linejoin: round;
+      vector-effect: non-scaling-stroke;
+      pointer-events: fill;
     }
-    .clinical-odontogram-stage .odontogram-surface-view.is-extraction :is(.odontogram-surface-outline, .surface-poly, .odontogram-fissure) {
-      stroke: var(--operation-status-color);
-      stroke-opacity: 0.32;
-    }
-    .clinical-odontogram-stage .odontogram-surface-view.is-extraction .surface-poly {
-      opacity: 1;
-      fill-opacity: 0.16;
-    }
-    .clinical-odontogram-stage .odontogram-surface-view.is-extraction .surface-poly:is(:hover, .surface-selected) {
+    .odontogram-surface-view .surface-poly.surface-selected {
       stroke: #2563eb;
-      stroke-opacity: 1;
+      filter: none !important;
+    }
+    @media (hover: hover) {
+      .odontogram-surface-view .surface-poly:hover {
+        opacity: 1;
+        stroke: #2563eb;
+        filter: none;
+      }
     }
     .clinical-odontogram-stage .tooth-number-badge {
       width: 100%;
@@ -19048,47 +19027,67 @@
       return LuminToothAnatomy.photo(toothId, slotNumber, showRootsAnatomy);
     }
 
+    const OCCLUSAL_CROWNS = {
+      molar: { width: 84, ratio: 156 / 153, corners: [[28, 29], [72, 27], [76, 70], [27, 74]] },
+      premolar: { width: 57, ratio: 102 / 148, corners: [[25, 40], [77, 37], [77, 64], [24, 65]] },
+      canine: { width: 65, ratio: 140 / 147, corners: [[23, 47], [77, 47], [67, 61], [32, 61]] },
+      incisor: { width: 67, ratio: 179 / 74, corners: [[15, 46], [85, 46], [82, 63], [18, 63]] }
+    };
+
+    function occlusalSurfacePaths([topLeft, topRight, bottomRight, bottomLeft]) {
+      const dx = (topRight[0] - topLeft[0]) * 0.22;
+      const dy = (bottomLeft[1] - topLeft[1]) * 0.22;
+      const offset = ([x, y], horizontal, vertical) => [x + horizontal, y + vertical];
+      // Each neighboring surface shares its curved boundary with the center.
+      const sides = [
+        [topLeft, offset(topLeft, dx, -dy), offset(topRight, -dx, -dy), topRight],
+        [topRight, offset(topRight, dx, dy), offset(bottomRight, dx, -dy), bottomRight],
+        [bottomRight, offset(bottomRight, -dx, dy), offset(bottomLeft, dx, dy), bottomLeft],
+        [bottomLeft, offset(bottomLeft, -dx, -dy), offset(topLeft, -dx, dy), topLeft]
+      ];
+      const curve = ([, ...points]) => 'C' + points.map(point => point.map(value => value.toFixed(1)).join(',')).join(' ');
+      const outer = [[0, 0], [100, 0], [100, 100], [0, 100]];
+      const paths = { center: `M${topLeft} ${sides.map(curve).join(' ')} Z` };
+      ['top', 'right', 'bottom', 'left'].forEach((surface, index) => {
+        const reversed = [...sides[index]].reverse();
+        paths[surface] = `M${outer[index]} L${outer[(index + 1) % outer.length]} L${reversed[0]} ${curve(reversed)} Z`;
+      });
+      return paths;
+    }
+
     function generateSurfaceMapSVG(toothId, slotNumber) {
       const id = String(toothId);
-      const type = getAnatomyType(id, slotNumber);
-      const isMolar = type.includes('molar');
-      const isPremolar = type.includes('premolar');
-      const paths = isMolar ? {
-        outline: 'M18 5 Q50 -1 82 5 Q98 18 95 50 Q98 82 82 95 Q50 101 18 95 Q2 82 5 50 Q2 18 18 5 Z',
-        top: 'M18 5 Q50 -1 82 5 Q91 13 92 25 L70 35 Q50 26 30 35 L8 25 Q9 13 18 5 Z',
-        bottom: 'M30 65 Q50 74 70 65 L92 75 Q91 87 82 95 Q50 101 18 95 Q9 87 8 75 Z',
-        left: 'M8 25 L30 35 Q25 50 30 65 L8 75 Q2 50 8 25 Z',
-        right: 'M70 35 L92 25 Q98 50 92 75 L70 65 Q75 50 70 35 Z',
-        center: 'M30 35 Q50 26 70 35 Q75 50 70 65 Q50 74 30 65 Q25 50 30 35 Z',
-        fissure: 'M36 43 Q50 37 64 43 M35 57 Q50 63 65 57 M50 37 L50 63'
-      } : isPremolar ? {
-        outline: 'M27 4 Q50 -2 73 4 Q91 15 90 50 Q91 85 73 96 Q50 102 27 96 Q9 85 10 50 Q9 15 27 4 Z',
-        top: 'M27 4 Q50 -2 73 4 Q83 12 86 26 L67 36 Q50 27 33 36 L14 26 Q17 12 27 4 Z',
-        bottom: 'M33 64 Q50 73 67 64 L86 74 Q83 88 73 96 Q50 102 27 96 Q17 88 14 74 Z',
-        left: 'M14 26 L33 36 Q29 50 33 64 L14 74 Q9 50 14 26 Z',
-        right: 'M67 36 L86 26 Q91 50 86 74 L67 64 Q71 50 67 36 Z',
-        center: 'M33 36 Q50 27 67 36 Q71 50 67 64 Q50 73 33 64 Q29 50 33 36 Z',
-        fissure: 'M39 41 Q50 47 61 41 M39 59 Q50 53 61 59 M50 35 L50 65'
-      } : {
-        outline: 'M31 3 Q50 -1 69 3 Q83 14 82 50 Q83 86 69 97 Q50 101 31 97 Q17 86 18 50 Q17 14 31 3 Z',
-        top: 'M31 3 Q50 -1 69 3 Q77 11 78 27 L63 37 Q50 30 37 37 L22 27 Q23 11 31 3 Z',
-        bottom: 'M37 63 Q50 70 63 63 L78 73 Q77 89 69 97 Q50 101 31 97 Q23 89 22 73 Z',
-        left: 'M22 27 L37 37 Q34 50 37 63 L22 73 Q17 50 22 27 Z',
-        right: 'M63 37 L78 27 Q83 50 78 73 L63 63 Q66 50 63 37 Z',
-        center: 'M37 37 Q50 30 63 37 Q66 50 63 63 Q50 70 37 63 Q34 50 37 37 Z',
-        fissure: 'M40 42 Q50 47 60 42 M50 37 L50 63'
+      const family = getAnatomyType(id, slotNumber).split('-').at(-1);
+      const { width, ratio, corners } = OCCLUSAL_CROWNS[family];
+      const height = width / ratio;
+      const imageX = (100 - width) / 2;
+      const imageY = (100 - height) / 2;
+      const mirror = !isPatientRightChartTooth(id);
+      const positionedCorners = (mirror ? [corners[1], corners[0], corners[3], corners[2]] : corners)
+        .map(([x, y]) => [imageX + (mirror ? 100 - x : x) * width / 100, imageY + y * height / 100]);
+      const paths = occlusalSurfacePaths(positionedCorners);
+      const crownId = `occlusal-crown-${id}`;
+      const maskId = `occlusal-mask-${id}`;
+      const transform = mirror ? ' transform="translate(100 0) scale(-1 1)"' : '';
+      const arabicNames = { B: 'شدقي', L: 'لساني', M: 'أنسي', D: 'بعيد', O: 'إطباقي', I: 'قاطعي' };
+      const surfacePath = surface => {
+        const label = currentUiLanguage === 'ar'
+          ? `السطح ${arabicNames[surfaceAbbreviation(id, surface)]} · ${chartToothLabel(id)}`
+          : `${surfaceClinicalName(id, surface)} surface of ${chartToothLabel(id)}`;
+        return `<path id="tooth-${id}-${surface}" data-tooth="${id}" data-slot="${slotNumber}" data-surface="${surface}" aria-label="${escapeHtml(label)}" role="button" d="${paths[surface]}" class="surface-poly surface-healthy"></path>`;
       };
-      const surfacePath = (surface, path) => `<path id="tooth-${id}-${surface}" data-tooth="${id}" data-slot="${slotNumber}" data-surface="${surface}" aria-label="${escapeHtml(surfaceClinicalName(id, surface))} surface of ${escapeHtml(chartToothLabel(id))}" role="button" d="${path}" class="surface-poly surface-healthy"></path>`;
       return `
         <div class="odontogram-surface-view relative z-10 select-none" style="width:56px;height:56px;min-width:56px;touch-action:manipulation" data-tooth-matrix="${id}">
-          <svg viewBox="0 0 100 100" class="overflow-visible" style="display:block;width:56px;height:56px;overflow:visible;pointer-events:auto">
-            <path d="${paths.outline}" class="odontogram-surface-outline"></path>
-            ${surfacePath('top', paths.top)}
-            ${surfacePath('bottom', paths.bottom)}
-            ${surfacePath('left', paths.left)}
-            ${surfacePath('right', paths.right)}
-            ${surfacePath('center', paths.center)}
-            <path d="${paths.fissure}" class="odontogram-fissure"></path>
+          <svg viewBox="0 0 100 100" style="display:block;width:100%;height:100%">
+            <defs>
+              <image id="${crownId}" href="assets/teeth-occlusal/${family}.png" x="${imageX}" y="${imageY}" width="${width}" height="${height}"${transform}></image>
+              <mask id="${maskId}" mask-type="alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><use href="#${crownId}"></use></mask>
+            </defs>
+            <use class="occlusal-crown" href="#${crownId}" aria-hidden="true" pointer-events="none"></use>
+            <g mask="url(#${maskId})">
+              <rect class="occlusal-crown-tint" width="100" height="100" aria-hidden="true"></rect>
+              ${['top', 'bottom', 'left', 'right', 'center'].map(surfacePath).join('')}
+            </g>
           </svg>
         </div>`;
     }
@@ -31258,26 +31257,22 @@
       // 1. Occlusal Matrix Coloring
       const surfaceMap = card?.querySelector('[data-tooth-matrix]');
       if (surfaceMap) {
-        const isExtraction = ['missing', 'extraction_planned'].includes(wholeVisualCode);
-        surfaceMap.classList.toggle('is-extraction', isExtraction);
-        surfaceMap.style.setProperty('--operation-status-color', isExtraction ? operationStatusDefinition(surfaceWholeFinding.status).color : '');
+        surfaceMap.dataset.occlusalCondition = wholeVisualCode;
+        surfaceMap.style.setProperty('--occlusal-status-color', surfaceWholeFinding
+          ? operationStatusDefinition(surfaceWholeFinding.status).color
+          : '');
       }
+      const selectedSurfaces = chartSelectionTargets().find(target => target.tooth === id)?.surfaces || [];
       CHART_SURFACES.forEach(s => {
         const poly = document.getElementById(`tooth-${id}-${s}`);
         if (!poly) return;
-        
-        let extraClass = '';
-        const selectedTarget = chartSelectionTargets().find(target => target.tooth === id);
-        if (selectedTarget?.surfaces.includes(s)) {
-          extraClass = ' surface-selected';
-        }
+        const selected = selectedSurfaces.includes(s);
         const surfaceFinding = latestChartSurfaceFinding(toothData.surfaces?.[s]);
         const surfaceVisualCode = dentalOperationVisualCode(surfaceFinding.code, 'surface');
-        const visualCondition = wholeSurfaceStatuses.has(wholeVisualCode) ? wholeVisualCode : surfaceVisualCode;
-        const operationStatus = wholeSurfaceStatuses.has(wholeVisualCode) ? surfaceWholeFinding.status : surfaceFinding.status;
-        const hasOperation = wholeSurfaceStatuses.has(wholeVisualCode) || !['healthy', 'none'].includes(surfaceFinding.code);
-        const statusClass = hasOperation ? ` ${operationStatusClass(operationStatus)}` : '';
-        poly.setAttribute('class', `surface-poly surface-${visualCondition}${statusClass}${extraClass}`);
+        const hasSurfaceOperation = !surfaceWholeFinding && !['healthy', 'none'].includes(surfaceFinding.code);
+        const statusClass = hasSurfaceOperation ? ` ${operationStatusClass(surfaceFinding.status)}` : '';
+        poly.setAttribute('class', `surface-poly surface-${surfaceVisualCode}${statusClass}${selected ? ' surface-selected' : ''}`);
+        poly.setAttribute('aria-pressed', String(selected));
       });
 
       // 2. Simplified anatomical tooth and treatment overlays
