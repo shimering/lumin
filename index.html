@@ -31243,8 +31243,7 @@
     }
 
     function chartFindingRepresentsExtraction(finding) {
-      return finding?.visualCode === 'missing'
-        || (finding?.visualCode === 'extraction_planned' && ['E', 'C'].includes(finding.status));
+      return finding?.visualCode === 'missing' || finding?.visualCode === 'extraction_planned';
     }
 
     function chartPonticCrownFinding(wholeFindings, crownVisualCodes) {

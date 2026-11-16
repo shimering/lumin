@@ -105,7 +105,7 @@ test('extracted teeth show a pontic only for a crown planned later than the extr
 
   const simpleExtraction = { ...extraction, code: 'simple_extraction' };
   const zirconiumCrown = { ...later, code: 'zirconium_crown' };
-  for (const status of ['E', 'C']) {
+  for (const status of ['P', 'In', 'E', 'C']) {
     render([zirconiumCrown, { ...simpleExtraction, status }]);
     assert.equal(card['data-pontic'], true);
     assert.equal(surfaceMap.dataset.occlusalCondition, 'pontic');
@@ -113,8 +113,8 @@ test('extracted teeth show a pontic only for a crown planned later than the extr
     assert.equal(toothPhoto.style.opacity, '0.22');
   }
   for (const findings of [
-    [zirconiumCrown, { ...simpleExtraction, status: 'P' }],
-    [zirconiumCrown, { ...simpleExtraction, status: 'In' }],
+    [{ ...zirconiumCrown, createdAt: earlier.createdAt }, { ...simpleExtraction, status: 'P' }],
+    [zirconiumCrown, { ...simpleExtraction, status: 'P', createdAt: zirconiumCrown.createdAt }],
     [{ ...zirconiumCrown, createdAt: earlier.createdAt }, simpleExtraction]
   ]) {
     render(findings);
