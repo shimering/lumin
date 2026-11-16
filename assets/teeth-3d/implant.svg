@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 76">
+  <defs>
+    <linearGradient id="collar">
+      <stop stop-color="#526477"/>
+      <stop offset=".25" stop-color="#a8b9c9"/>
+      <stop offset=".45" stop-color="#e2e9ef"/>
+      <stop offset=".65" stop-color="#acbfce"/>
+      <stop offset="1" stop-color="#5a6d81"/>
+    </linearGradient>
+    <linearGradient id="body">
+      <stop stop-color="#45576b"/>
+      <stop offset=".35" stop-color="#99adbf"/>
+      <stop offset=".62" stop-color="#c7d2de"/>
+      <stop offset="1" stop-color="#4e6176"/>
+    </linearGradient>
+    <linearGradient id="tip" x2="0" y2="1">
+      <stop stop-color="#e4ebf0" stop-opacity=".58"/>
+      <stop offset="1" stop-color="#72879a" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="threads">
+      <stop stop-color="#607287"/>
+      <stop offset=".35" stop-color="#c5d1dc"/>
+      <stop offset=".51" stop-color="#f1f5f9"/>
+      <stop offset=".75" stop-color="#b1c1d0"/>
+      <stop offset="1" stop-color="#687c8f"/>
+    </linearGradient>
+  </defs>
+  <path d="M9.3 11C9.7 6.8 12.4 3.2 16 3.2s6.3 3.6 6.7 7.8l3.8 46.8H5.5Z" fill="url(#body)"/>
+  <path d="M11 13c.3-3.4 2.1-7.8 5-7.8s4.7 4.4 5 7.8l1.2 16H9.8Z" fill="url(#tip)"/>
+  <path fill="url(#threads)" d="
+    M10.3 11c3-.3 7.8-2 11.1-3l.8 3.1c-3.1 1.4-8.2 3-12.6 3.5Z
+    M9 20.7c4.7-.6 9.4-2.8 14.2-4.4l.8 3.2c-4.7 2-9.5 4.1-15.7 4.9Z
+    M8.3 30.2c4.7-.6 10.3-3 15.8-5.1l.9 3.4c-5.5 2.3-11.2 4.6-17.6 5.4Z
+    M7.6 39.8c6-.9 11.8-3.3 17.6-5.6l.8 3.5c-5.8 2.6-12 5-19.2 6Z
+    M6.9 49.5c6.5-1.1 12.7-3.7 19.1-6.2l.9 3.6c-6.1 2.8-13.1 5.4-20.9 6.6Z
+    M6.1 58.6c7.1-1 14-3.6 20.7-6.4l.8 3.6c-6.8 3-14.3 5.8-22.4 7Z"/>
+  <rect x="4.5" y="58" width="23" height="10.2" rx="2.1" fill="url(#collar)"/>
+  <ellipse cx="16" cy="68" rx="10.4" ry="2.6" fill="url(#body)"/>
+  <ellipse cx="16" cy="68.1" rx="5.1" ry="1.1" fill="#435569"/>
+</svg>

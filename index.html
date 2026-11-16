@@ -119,7 +119,7 @@
   <script src="lumin-whatsapp-actions.js?v=2"></script>
   <script src="lumin-quotation-model.js?v=1"></script>
   <script src="lumin-dental-i18n.js?v=1"></script>
-  <script src="lumin-tooth-anatomy.js?v=2"></script>
+  <script src="lumin-tooth-anatomy.js?v=4"></script>
   <script src="lumin-quotation-view.js?v=5"></script>
   <script src="lumin-quotations.js?v=6"></script>
   <script src="vendor/quill/quill-2.0.2.js"></script>
@@ -133,7 +133,7 @@
   <script src="lumin-consent-print.js?v=7"></script>
   <script src="lumin-consents.js?v=13"></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-  <link rel="stylesheet" href="lumin-tooth-images.css?v=1" />
+  <link rel="stylesheet" href="lumin-tooth-images.css?v=3" />
   
   <style>
     /* Lock viewport pinch-zoom on document root while retaining full native single-finger scrolling */
@@ -1680,6 +1680,13 @@
       opacity: 0.4;
       pointer-events: none;
     }
+    .odontogram-surface-view .pontic-arms {
+      display: none;
+      fill: color-mix(in srgb, var(--occlusal-status-color) 48%, #c9c4b9);
+    }
+    .odontogram-surface-view[data-occlusal-condition="pontic"] .pontic-arms {
+      display: inline;
+    }
     .odontogram-surface-view:is([data-occlusal-condition="missing"], [data-occlusal-condition="extraction_planned"]) .occlusal-crown-art {
       opacity: 0.3;
     }
@@ -1731,14 +1738,6 @@
     .clinical-odontogram-stage .tooth-card.is-primary-tooth .tooth-number-badge {
       color: #4f46e5;
       background: transparent;
-    }
-    .clinical-odontogram-stage .photo-implant {
-      width: 0.9rem;
-      height: 3.1rem;
-      border: 1.5px solid var(--operation-status-color);
-      border-radius: 0.15rem 0.15rem 0.45rem 0.45rem;
-      background: repeating-linear-gradient(180deg, transparent 0 5px, var(--operation-status-color) 5px 6.5px);
-      box-shadow: none;
     }
     .clinical-odontogram-stage .photo-bracket {
       border-color: var(--operation-status-color);
@@ -5429,7 +5428,7 @@
   <link rel="stylesheet" href="lumin-chart-appointments.css?v=1" />
   <link rel="stylesheet" href="lumin-clinical-actions.css?v=8" />
   <link rel="stylesheet" href="lumin-media-teeth.css?v=1" />
-  <link rel="stylesheet" href="lumin-quotations.css?v=6" />
+  <link rel="stylesheet" href="lumin-quotations.css?v=7" />
   <link rel="stylesheet" href="lumin-consents.css?v=7" />
   <link rel="stylesheet" href="vendor/quill/quill.core-2.0.2.css" />
   <link rel="stylesheet" href="lumin-consent-editor.css?v=9" />
@@ -19030,7 +19029,7 @@
     }
 
     function generateRealisticToothPhoto(toothId, slotNumber) {
-      return LuminToothAnatomy.photo(toothId, slotNumber, showRootsAnatomy);
+      return LuminToothAnatomy.photo(toothId, slotNumber, showRootsAnatomy, true);
     }
 
     const OCCLUSAL_CROWNS = {
@@ -19090,6 +19089,10 @@
               <mask id="${maskId}" mask-type="alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><use href="#${crownId}"></use></mask>
             </defs>
             <g class="occlusal-crown-art" aria-hidden="true" pointer-events="none">
+              <g class="pontic-arms">
+                <rect x="${imageX - 6}" y="39" width="17" height="22" rx="6"></rect>
+                <rect x="${imageX + width - 11}" y="39" width="17" height="22" rx="6"></rect>
+              </g>
               <use class="occlusal-crown" href="#${crownId}"></use>
               <rect class="occlusal-crown-tint" width="100" height="100" mask="url(#${maskId})"></rect>
             </g>
@@ -31255,7 +31258,10 @@
       }));
       const latestWholeFinding = visualCodes => [...wholeFindings].reverse().find(finding => visualCodes.includes(finding.visualCode)) || null;
       const structureFinding = latestWholeFinding(['missing', 'implant', 'impacted', 'unerupted', 'extraction_planned']);
-      const restorationFinding = latestWholeFinding(['crown', 'ceramic_crown', 'zirconia_crown', 'temporary_crown', 'bridge', 'veneer']);
+      const crownVisualCodes = ['crown', 'ceramic_crown', 'zirconia_crown', 'temporary_crown', 'bridge'];
+      const restorationFinding = latestWholeFinding([...crownVisualCodes, 'veneer']);
+      const ponticFinding = structureFinding?.visualCode === 'missing' ? latestWholeFinding(crownVisualCodes) : null;
+      const ponticStatus = ponticFinding ? operationStatusDefinition(ponticFinding.status) : null;
       const rctFinding = latestWholeFinding(['rct']);
       const bracketFinding = latestWholeFinding(['bracket']);
       const surfaceWholeFinding = structureFinding && wholeSurfaceStatuses.has(structureFinding.visualCode) ? structureFinding : restorationFinding;
@@ -31264,11 +31270,14 @@
 
       // 1. Occlusal Matrix Coloring
       const surfaceMap = card?.querySelector('[data-tooth-matrix]');
+      card?.toggleAttribute('data-pontic', Boolean(ponticStatus));
+      card?.style.setProperty('--pontic-status-color', ponticStatus?.color || '');
       if (surfaceMap) {
-        surfaceMap.dataset.occlusalCondition = wholeVisualCode;
-        surfaceMap.style.setProperty('--occlusal-status-color', surfaceWholeFinding
+        surfaceMap.dataset.occlusalCondition = ponticStatus ? 'pontic' : wholeVisualCode;
+        const surfaceStatusColor = ponticStatus?.color || (surfaceWholeFinding
           ? operationStatusDefinition(surfaceWholeFinding.status).color
           : '');
+        surfaceMap.style.setProperty('--occlusal-status-color', surfaceStatusColor);
       }
       const selectedSurfaces = chartSelectionTargets().find(target => target.tooth === id)?.surfaces || [];
       CHART_SURFACES.forEach(s => {
@@ -31325,12 +31334,16 @@
       const structureVisualCode = structureFinding?.visualCode || 'none';
       const structureStatus = structureFinding ? operationStatusDefinition(structureFinding.status) : null;
       if (structureVisualCode === 'missing') {
-        anatomyGroup.style.opacity = '0.15';
-        if (toothPhoto) toothPhoto.style.filter = 'grayscale(1)';
+        if (ponticStatus && toothPhoto) {
+          toothPhoto.style.opacity = '0.22';
+        } else {
+          anatomyGroup.style.opacity = '0.15';
+          if (toothPhoto) toothPhoto.style.filter = 'grayscale(1)';
+        }
         anatomyOverlay.innerHTML = `<span class="text-2xl font-black drop-shadow-md" style="color:${structureStatus.color}">×</span>`;
       } else if (structureVisualCode === 'implant') {
         if (toothPhoto) toothPhoto.style.opacity = '0.08';
-        anatomyOverlay.innerHTML = `<span class="photo-implant" style="--operation-status-color:${structureStatus.color}"></span>`;
+        anatomyOverlay.innerHTML = `<span class="photo-implant" style="--operation-status-color:${structureStatus.color}" aria-hidden="true"></span>`;
       } else if (structureVisualCode === 'impacted') {
         anatomyGroup.style.transform = 'rotate(25deg) scale(0.9)';
         if (toothPhoto) toothPhoto.style.filter = operationStatusPhotoFilter(structureFinding.status);

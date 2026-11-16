@@ -143,7 +143,7 @@
         </g>`;
 
       return `
-        <div id="anatomy-wrapper-${id}" class="anatomy-wrapper odontogram-anatomy relative select-none ${showRootsAnatomy ? '' : 'hidden'} pointer-events-none" style="width:${isPrimary ? '44px' : '48px'};height:78px;min-width:${isPrimary ? '44px' : '48px'}">
+        <div id="anatomy-wrapper-${id}" class="anatomy-wrapper odontogram-anatomy relative select-none ${isUpper ? '' : 'is-lower-anatomy'} ${showRootsAnatomy ? '' : 'hidden'} pointer-events-none" style="width:${isPrimary ? '44px' : '48px'};height:78px;min-width:${isPrimary ? '44px' : '48px'}">
           <svg viewBox="0 0 64 92" class="clinical-tooth-svg overflow-visible" style="display:block;width:100%;height:100%;overflow:visible" aria-hidden="true">
             <g id="anatomy-group-${id}">
               <g transform="${mirrorTransform}">${rootSVG}${crownSVG}</g>
@@ -169,7 +169,7 @@
       return 'incisor';
     }
 
-    function generateRealisticToothPhoto(toothId, slotNumber, showRootsAnatomy = true) {
+    function generateRealisticToothPhoto(toothId, slotNumber, showRootsAnatomy = true, includePonticLayer = false) {
       const id = String(toothId);
       const slot = Number(slotNumber || SLOT_BY_PRIMARY_TOOTH[id] || id);
       const anatomyType = getAnatomyType(id, slot);
@@ -183,14 +183,33 @@
         isPatientRight ? 'is-mirrored-photo' : '',
         isPrimary ? 'is-primary-photo' : ''
       ].filter(Boolean).join(' ');
+      // Trace the crown at the gumline in the native (crown-up) photo coordinates.
+      const crownMask = {
+        molar: 'M0 0H256V148H214C201 148 202 180 156 180C133 180 121 172 91 173C60 174 49 147 37 144H0Z',
+        premolar: 'M0 0H256V133H180C165 132 164 149 142 147C122 145 109 134 79 138H0Z',
+        canine: 'M0 0H256V130H176C158 133 151 158 126 157C106 156 96 146 86 134H0Z',
+        incisor: 'M0 0H256V141H181C165 141 170 167 132 168C94 169 92 155 80 143H0Z'
+      }[family];
       const rootCanalCount = family === 'molar' ? 3 : family === 'premolar' ? 2 : 1;
       const rootCanalMarkup = Array.from({ length: rootCanalCount }, (_, index) => `<span class="rct-canal canal-${index + 1}"></span>`).join('');
       return `
-        <div id="anatomy-wrapper-${id}" class="anatomy-wrapper odontogram-anatomy relative select-none ${showRootsAnatomy ? '' : 'hidden'} pointer-events-none" style="width:${isPrimary ? '44px' : '48px'};height:78px;min-width:${isPrimary ? '44px' : '48px'}">
+        <div id="anatomy-wrapper-${id}" class="anatomy-wrapper odontogram-anatomy relative select-none ${isUpper ? '' : 'is-lower-anatomy'} ${showRootsAnatomy ? '' : 'hidden'} pointer-events-none" style="width:${isPrimary ? '44px' : '48px'};height:78px;min-width:${isPrimary ? '44px' : '48px'}">
           <div id="anatomy-group-${id}" class="absolute inset-0">
             <div class="tooth-photo-stage">
               <img id="tooth-photo-${id}" src="${TOOTH_PHOTO_ASSETS[family]}" alt="" aria-hidden="true" draggable="false" class="${photoClasses}" />
               <img id="tooth-crown-overlay-${id}" src="${TOOTH_PHOTO_ASSETS[family]}" alt="" aria-hidden="true" draggable="false" class="${photoClasses} tooth-crown-color-overlay" />
+              ${includePonticLayer ? `<svg class="${photoClasses} tooth-pontic-photo" viewBox="0 0 256 384" aria-hidden="true">
+                <defs>
+                  <clipPath id="pontic-crown-clip-${id}"><path d="${crownMask}"></path></clipPath>
+                  <filter id="pontic-crown-tint-${id}" color-interpolation-filters="sRGB">
+                    <feFlood flood-opacity="0.38" result="tint" class="pontic-crown-color"></feFlood>
+                    <feComposite in="tint" in2="SourceGraphic" operator="atop"></feComposite>
+                  </filter>
+                </defs>
+                <g clip-path="url(#pontic-crown-clip-${id})">
+                  <image href="${TOOTH_PHOTO_ASSETS[family]}" width="256" height="384" filter="url(#pontic-crown-tint-${id})"></image>
+                </g>
+              </svg>` : ''}
               <div id="rct-layer-${id}" class="hidden photo-rct-mask family-${family} ${isUpper ? 'is-upper' : 'is-lower'} ${isPrimary ? 'is-primary-rct' : ''}">
                 <span class="rct-pulp-chamber"></span>${rootCanalMarkup}
               </div>

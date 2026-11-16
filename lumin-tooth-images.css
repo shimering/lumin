@@ -30,6 +30,16 @@
   mask-image: linear-gradient(to bottom, #000 0 38%, rgba(0, 0, 0, 0.92) 42%, transparent 49%);
   transition: filter 0.18s ease, opacity 0.18s ease;
 }
+.tooth-pontic-photo {
+  display: none;
+  pointer-events: none;
+}
+.tooth-card[data-pontic] .tooth-pontic-photo {
+  display: block;
+}
+.pontic-crown-color {
+  flood-color: var(--pontic-status-color);
+}
 .photo-rct-mask {
   --operation-status-color: #000000;
   --operation-status-soft: rgba(0, 0, 0, 0.22);
@@ -89,13 +99,36 @@
 .photo-rct-mask.family-premolar .rct-pulp-chamber { width: 25%; }
 .photo-rct-mask.family-molar .rct-pulp-chamber { width: 40%; }
 .photo-implant {
+  --implant-image: url("assets/teeth-3d/implant.svg");
+  position: relative;
   display: block;
-  width: 1.35rem;
-  height: 3.25rem;
-  border-radius: 0.35rem 0.35rem 45% 45%;
-  background: repeating-linear-gradient(180deg, #e2e8f0 0 6px, var(--operation-status-color, #000000) 6px 8px), linear-gradient(90deg, var(--operation-status-color, #000000), #f8fafc 45%, var(--operation-status-color, #000000));
-  border: 1px solid var(--operation-status-color, #000000);
-  box-shadow: 0 5px 9px rgba(15, 23, 42, 0.25);
+  height: min(88%, 3.75rem);
+  aspect-ratio: 32 / 76;
+  background: var(--implant-image) center / contain no-repeat;
+  isolation: isolate;
+  filter: drop-shadow(0 1px 1px rgba(51, 65, 85, 0.22));
+}
+.is-lower-anatomy .photo-implant {
+  transform: scaleY(-1);
+}
+.photo-implant::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--operation-status-color, #000000);
+  opacity: 0.36;
+  mix-blend-mode: multiply;
+  -webkit-mask: var(--implant-image) center / contain no-repeat;
+  mask: var(--implant-image) center / contain no-repeat;
+}
+.photo-implant::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 84%;
+  inset-inline: 16%;
+  height: 5%;
+  border-radius: 0 0 45% 45%;
+  background: var(--operation-status-color, #000000);
 }
 .photo-bracket {
   display: block;
