@@ -1675,6 +1675,9 @@
       height: 100% !important;
       overflow: visible;
     }
+    .odontogram-surface-view.is-lower-occlusal > svg {
+      transform: scaleY(-1);
+    }
     .odontogram-surface-view .occlusal-crown-tint {
       fill: var(--occlusal-status-color, transparent);
       opacity: 0.4;
@@ -19063,6 +19066,7 @@
     function generateSurfaceMapSVG(toothId, slotNumber) {
       const id = String(toothId);
       const family = getAnatomyType(id, slotNumber).split('-').at(-1);
+      const archClass = slotNumber >= 17 ? ' is-lower-occlusal' : '';
       const { width, ratio, corners } = OCCLUSAL_CROWNS[family];
       const height = width / ratio;
       const imageX = (100 - width) / 2;
@@ -19083,7 +19087,7 @@
         return `<path id="tooth-${id}-${surface}" data-tooth="${id}" data-slot="${slotNumber}" data-surface="${surface}" aria-label="${escapeHtml(label)}" role="button" d="${paths[surface]}" class="surface-poly surface-healthy"></path>`;
       };
       return `
-        <div class="odontogram-surface-view relative z-10 select-none" style="width:56px;height:56px;min-width:56px;touch-action:manipulation" data-tooth-matrix="${id}">
+        <div class="odontogram-surface-view${archClass} relative z-10 select-none" style="width:56px;height:56px;min-width:56px;touch-action:manipulation" data-tooth-matrix="${id}">
           <svg viewBox="0 0 100 100" style="display:block;width:100%;height:100%">
             <defs>
               <image id="${crownId}" href="assets/teeth-occlusal/${family}.png" x="${imageX}" y="${imageY}" width="${width}" height="${height}"${imageFit}${transform}></image>
