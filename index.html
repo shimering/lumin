@@ -31242,9 +31242,14 @@
       saveActivePatientChart();
     }
 
+    function chartFindingRepresentsExtraction(finding) {
+      return finding?.visualCode === 'missing'
+        || (finding?.visualCode === 'extraction_planned' && ['E', 'C'].includes(finding.status));
+    }
+
     function chartPonticCrownFinding(wholeFindings, crownVisualCodes) {
       const extractionDate = Math.max(...wholeFindings
-        .filter(finding => finding.visualCode === 'missing')
+        .filter(chartFindingRepresentsExtraction)
         .map(finding => chartFindingCreatedAtTimestamp(finding.createdAt)));
       if (!Number.isFinite(extractionDate)) return null;
 
@@ -31278,7 +31283,9 @@
       const structureFinding = latestWholeFinding(['missing', 'implant', 'impacted', 'unerupted', 'extraction_planned']);
       const crownVisualCodes = ['crown', 'ceramic_crown', 'zirconia_crown', 'temporary_crown', 'bridge'];
       const restorationFinding = latestWholeFinding([...crownVisualCodes, 'veneer']);
-      const ponticFinding = structureFinding?.visualCode === 'missing' ? chartPonticCrownFinding(wholeFindings, crownVisualCodes) : null;
+      const ponticFinding = chartFindingRepresentsExtraction(structureFinding)
+        ? chartPonticCrownFinding(wholeFindings, crownVisualCodes)
+        : null;
       const ponticStatus = ponticFinding ? operationStatusDefinition(ponticFinding.status) : null;
       const rctFinding = latestWholeFinding(['rct']);
       const bracketFinding = latestWholeFinding(['bracket']);
@@ -31349,7 +31356,7 @@
         rootBody.setAttribute('stroke', '#d0ad73');
       }
 
-      const structureVisualCode = structureFinding?.visualCode || 'none';
+      const structureVisualCode = ponticStatus ? 'missing' : (structureFinding?.visualCode || 'none');
       const structureStatus = structureFinding ? operationStatusDefinition(structureFinding.status) : null;
       if (structureVisualCode === 'missing') {
         if (ponticStatus && toothPhoto) {
