@@ -31242,6 +31242,24 @@
       saveActivePatientChart();
     }
 
+    function chartPonticCrownFinding(wholeFindings, crownVisualCodes) {
+      const extractionDate = Math.max(...wholeFindings
+        .filter(finding => finding.visualCode === 'missing')
+        .map(finding => chartFindingCreatedAtTimestamp(finding.createdAt)));
+      if (!Number.isFinite(extractionDate)) return null;
+
+      let crown = null;
+      let crownDate = extractionDate;
+      for (const finding of wholeFindings) {
+        if (!crownVisualCodes.includes(finding.visualCode)) continue;
+        const planningDate = chartFindingCreatedAtTimestamp(finding.createdAt);
+        if (planningDate <= extractionDate || planningDate < crownDate) continue;
+        crown = finding;
+        crownDate = planningDate;
+      }
+      return crown;
+    }
+
     // Refresh Tooth Graphics
     function renderToothVisuals(toothId) {
       const id = String(toothId);
@@ -31260,7 +31278,7 @@
       const structureFinding = latestWholeFinding(['missing', 'implant', 'impacted', 'unerupted', 'extraction_planned']);
       const crownVisualCodes = ['crown', 'ceramic_crown', 'zirconia_crown', 'temporary_crown', 'bridge'];
       const restorationFinding = latestWholeFinding([...crownVisualCodes, 'veneer']);
-      const ponticFinding = structureFinding?.visualCode === 'missing' ? latestWholeFinding(crownVisualCodes) : null;
+      const ponticFinding = structureFinding?.visualCode === 'missing' ? chartPonticCrownFinding(wholeFindings, crownVisualCodes) : null;
       const ponticStatus = ponticFinding ? operationStatusDefinition(ponticFinding.status) : null;
       const rctFinding = latestWholeFinding(['rct']);
       const bracketFinding = latestWholeFinding(['bracket']);
