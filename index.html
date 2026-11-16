@@ -19036,7 +19036,7 @@
       molar: { width: 84, ratio: 156 / 153, corners: [[28, 29], [72, 27], [76, 70], [27, 74]] },
       premolar: { width: 57, ratio: 102 / 148, corners: [[25, 40], [77, 37], [77, 64], [24, 65]] },
       canine: { width: 65, ratio: 140 / 147, corners: [[23, 47], [77, 47], [67, 61], [32, 61]] },
-      incisor: { width: 67, ratio: 179 / 74, corners: [[15, 46], [85, 46], [82, 63], [18, 63]] }
+      incisor: { width: 67, ratio: 1.8, corners: [[15, 46], [85, 46], [82, 63], [18, 63]] }
     };
 
     function occlusalSurfacePaths([topLeft, topRight, bottomRight, bottomLeft]) {
@@ -19074,6 +19074,7 @@
       const crownId = `occlusal-crown-${id}`;
       const maskId = `occlusal-mask-${id}`;
       const transform = mirror ? ' transform="translate(100 0) scale(-1 1)"' : '';
+      const imageFit = family === 'incisor' ? ' preserveAspectRatio="none"' : '';
       const arabicNames = { B: 'شدقي', L: 'لساني', M: 'أنسي', D: 'بعيد', O: 'إطباقي', I: 'قاطعي' };
       const surfacePath = surface => {
         const label = currentUiLanguage === 'ar'
@@ -19085,7 +19086,7 @@
         <div class="odontogram-surface-view relative z-10 select-none" style="width:56px;height:56px;min-width:56px;touch-action:manipulation" data-tooth-matrix="${id}">
           <svg viewBox="0 0 100 100" style="display:block;width:100%;height:100%">
             <defs>
-              <image id="${crownId}" href="assets/teeth-occlusal/${family}.png" x="${imageX}" y="${imageY}" width="${width}" height="${height}"${transform}></image>
+              <image id="${crownId}" href="assets/teeth-occlusal/${family}.png" x="${imageX}" y="${imageY}" width="${width}" height="${height}"${imageFit}${transform}></image>
               <mask id="${maskId}" mask-type="alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><use href="#${crownId}"></use></mask>
             </defs>
             <g class="occlusal-crown-art" aria-hidden="true" pointer-events="none">
