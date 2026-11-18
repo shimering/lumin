@@ -15,34 +15,15 @@ test('Gemma chart drafts require every operation to use supported Palmer teeth a
   assert.deepEqual(voiceCatalogOptions('crown', [crown, { ...crown, active: false }, { ...crown, trackImplantProgress: true }]), [crown]);
 });
 
-test('chart voice Worker verifies access and forwards only the command to the configured HTTPS bridge', async () => {
-  const { handleChartVoice } = await import('../workers/chart-voice.mjs');
-  const origin = 'https://lumin.example';
-  const request = (body, headers = {}) => new Request(origin + '/api/chart-voice', {
-    method: 'POST',
-    headers: { Origin: origin, 'Content-Type': 'application/json', Authorization: 'Bearer staff-session', ...headers },
-    body: JSON.stringify(body)
-  });
-  const env = { GEMMA_BRIDGE_URL: 'https://bridge.example/gemma-bridge/', GEMMA_BRIDGE_TOKEN: 'bridge-secret' };
-  const authorize = async (incoming, _fetcher, scope) => {
-    assert.equal(scope, 'chart');
-    assert.equal(incoming.headers.get('Authorization'), 'Bearer staff-session');
-  };
-  const denied = async () => { throw Object.assign(new Error(), { status: 403 }); };
-  const never = () => assert.fail('Bridge must not receive the command');
-  assert.equal((await handleChartVoice(request({ prompt: 'sample' }), env, never, denied)).status, 403);
-  assert.equal((await handleChartVoice(request({ prompt: 'sample' }, { Origin: 'https://elsewhere.example' }), env, never, authorize)).status, 403);
-  assert.equal((await handleChartVoice(request({ prompt: 'x'.repeat(2001) }), env, never, authorize)).status, 400);
-  assert.equal((await handleChartVoice(request({ prompt: 'sample' }), {}, never, authorize)).status, 503);
-  const lines = '{"text":"draft"}\n{"done":true}\n';
-  const upstream = async (url, options) => {
-    assert.equal(url.href, 'https://bridge.example/gemma-bridge/api/chart');
-    assert.equal(options.headers.Authorization, 'Bearer bridge-secret');
-    assert.deepEqual(JSON.parse(options.body), { prompt: 'sample' });
-    return new Response(lines, { headers: { 'Content-Type': 'application/x-ndjson' } });
-  };
-  const forwarded = await handleChartVoice(request({ prompt: 'sample', patientId: 'omitted' }), env, upstream, authorize);
-  assert.equal(forwarded.status, 200);
-  assert.equal(forwarded.headers.get('Cache-Control'), 'private, no-store');
-  assert.equal(await forwarded.text(), lines);
+test('spoken confirmation accepts explicit answers without treating mixed speech as approval', async () => {
+  const { voiceReply } = await import('../lumin-chart-voice.mjs');
+  for (const phrase of ['Confirm.', 'Yes, confirm!', '“yes”', 'أكّد', 'أيوه.']) {
+    assert.equal(voiceReply(phrase), 'confirm', phrase);
+  }
+  for (const phrase of ['Cancel.', 'No, cancel!', 'لا', 'مش موافق']) {
+    assert.equal(voiceReply(phrase), 'cancel', phrase);
+  }
+  for (const phrase of ['Do you confirm?', 'Yes, but not that tooth', 'Do not confirm', 'No, yes', '[unclear]', '']) {
+    assert.equal(voiceReply(phrase), null, phrase);
+  }
 });

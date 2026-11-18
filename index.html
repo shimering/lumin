@@ -100,7 +100,7 @@
   <script src="lumin-patient-swipe.js?v=2"></script>
   <script src="lumin-patients.js?v=5"></script>
   <script src="lumin-chart-sync.js?v=2"></script>
-  <link rel="stylesheet" href="lumin-chart-voice.css?v=1" />
+  <link rel="stylesheet" href="lumin-chart-voice.css?v=2" />
   <script src="lumin-chart-media.js?v=21"></script>
   <script src="lumin-xray-rotation.js?v=1"></script>
   <script src="lumin-tooth-notes.js?v=3"></script>
@@ -6783,21 +6783,37 @@
                 <span data-en="Voice charting" data-ar="الإدخال الصوتي للمخطط">Voice charting</span>
               </button>
               <div id="chart-voice-panel" data-voice-panel hidden>
-                <p data-en="Online Gemma 4 processes the command. Say the tooth, procedure and status. Leave out patient names and identifiers."
-                   data-ar="يعالج Gemma 4 الأمر عبر الإنترنت. اذكر السن والإجراء والحالة دون أسماء المرضى أو بياناتهم التعريفية."></p>
-                <form data-voice-command>
-                  <label class="chart-voice-command-label">
-                    <span data-en="Chart command" data-ar="أمر المخطط">Chart command</span>
-                    <input name="command" type="text" dir="auto" maxlength="2000" autocomplete="off" />
-                  </label>
-                  <button type="submit" name="interpret" data-en="Interpret" data-ar="تفسير">Interpret</button>
+                <div class="chart-voice-model">
+                  <div>
+                    <strong data-en="Gemma 4 on this device" data-ar="Gemma 4 على هذا الجهاز">Gemma 4 on this device</strong>
+                    <p data-voice-model-status role="status"></p>
+                    <progress data-voice-progress max="100" value="0" hidden
+                      aria-label="Gemma model download progress / تقدّم تنزيل نموذج Gemma"></progress>
+                  </div>
+                  <div class="chart-voice-actions">
+                    <button type="button" data-voice-download>Download model · 2.4 GB</button>
+                    <button type="button" data-voice-remove hidden data-en="Delete model" data-ar="حذف النموذج">Delete model</button>
+                  </div>
+                </div>
+                <p data-en="Say the tooth, procedure, status and surfaces. Recordings are interpreted on this device."
+                   data-ar="اذكر السن والإجراء والحالة والأسطح. تُفسَّر التسجيلات على هذا الجهاز."></p>
+                <div class="chart-voice-actions">
                   <button type="button" data-voice-record>Record command</button>
-                </form>
+                  <label class="chart-voice-spoken">
+                    <input type="checkbox" data-voice-spoken checked />
+                    <span data-en="Spoken confirmation" data-ar="التأكيد الصوتي">Spoken confirmation</span>
+                  </label>
+                </div>
                 <p data-voice-status role="status" dir="auto"></p>
                 <p data-voice-heard dir="auto" hidden></p>
                 <form data-voice-review hidden>
                   <ul data-voice-rows></ul>
-                  <button type="submit" data-voice-add data-en="Add to chart" data-ar="إضافة إلى المخطط">Add to chart</button>
+                  <p data-voice-connection hidden data-en="Reconnect to save this draft to the shared chart." data-ar="اتصل بالإنترنت لحفظ المسودة في المخطط المشترك."></p>
+                  <div class="chart-voice-actions">
+                    <button type="button" data-voice-read hidden data-en="Read draft aloud" data-ar="اقرأ المسودة بصوت عالٍ">Read draft aloud</button>
+                    <button type="button" data-voice-reply hidden>Say confirm or cancel</button>
+                    <button type="submit" data-voice-add data-en="Add to chart" data-ar="إضافة إلى المخطط">Add to chart</button>
+                  </div>
                 </form>
                 <div class="chart-voice-footer mt-2">
                   <button type="button" data-voice-close data-en="Close" data-ar="إغلاق">Close</button>
@@ -31286,12 +31302,11 @@
     }
 
     async function initChartVoice() {
-      const { bindChartVoice, voiceCatalogOptions } = await import('./lumin-chart-voice.mjs?v=1');
+      const { bindChartVoice, voiceCatalogOptions } = await import('./lumin-chart-voice.mjs?v=2');
       const root = document.getElementById('chart-voice');
       chartVoiceControl = bindChartVoice(root, {
         context: chartVoiceContext,
         catalog: () => dentalOperations,
-        token: async () => (await db.auth.getSession()).data?.session?.access_token,
         apply: (entries, context) => applyChartVoiceDraft(entries, context, voiceCatalogOptions),
         language: () => currentUiLanguage,
         surfaceNames: tooth => Object.keys(chartVoiceSurfaceMap(tooth))

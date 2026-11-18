@@ -1,5 +1,6 @@
 import { encodeWav } from './lumin-chart-voice-wav.mjs';
 import { createVoiceActivityDetector } from './lumin-chart-voice-activity.mjs';
+import { createLocalChartEngine, modelBytes } from './lumin-chart-voice-model.mjs';
 
 const surfaces = {
   mesial: ['Mesial', 'أنسي'], distal: ['Distal', 'بعيد'], occlusal: ['Occlusal', 'إطباقي'],
@@ -42,46 +43,38 @@ export function voiceCatalogOptions(procedure, catalog) {
     && !op.isOrthoPackage && !op.isImplantProcedure && !op.trackImplantProgress);
 }
 
-async function readDraft(response) {
-  if (!response.ok) throw new Error((await response.json().catch(() => null))?.error || 'unavailable');
-  const stream = response.body.pipeThrough(new TextDecoderStream()).getReader();
-  let pending = '', raw = '', complete = false;
-  try {
-    while (!complete) {
-      const { value, done } = await stream.read();
-      if (done) break;
-      const lines = (pending + value).split('\n');
-      pending = lines.pop();
-      for (const line of lines.filter(line => line.trim())) {
-        const event = JSON.parse(line);
-        if (event.error) throw new Error('unavailable');
-        if (typeof event.text === 'string') raw += event.text;
-        if (event.done === true) complete = true;
-      }
-      if (raw.length + pending.length > 20000) throw new Error('draft');
-    }
-    if (!complete) throw new Error('unavailable');
-    return parseVoiceDraft(raw);
-  } finally {
-    await stream.cancel().catch(() => {});
-  }
+export function voiceReply(text) {
+  const phrase = text.normalize('NFKC').toLowerCase().trim()
+    .replace(/[ً-ٟـ]/gu, '').replace(/[أإآ]/gu, 'ا')
+    .replace(/^[“"«]+|[.!؟?،。…“”"»]+$/gu, '').trim().replace(/\s+/gu, ' ');
+  if (['confirm', 'yes', 'yes confirm', 'yes, confirm', 'اكد', 'احفظ', 'موافق', 'نعم', 'ايوه'].includes(phrase)) return 'confirm';
+  if (['cancel', 'no', 'no cancel', 'no, cancel', 'الغ', 'الغي', 'الغاء', 'لا', 'لأ', 'مش موافق'].includes(phrase)) return 'cancel';
+  return null;
 }
 
 const messages = {
-  access: ['Sign in again with chart access.', 'سجّل الدخول مرة أخرى بحساب لديه صلاحية المخطط.'],
-  unconfigured: ['Online Gemma is not configured for Lumin yet.', 'لم يُفعّل Gemma عبر الإنترنت في Lumin بعد.'],
-  unavailable: ['Gemma is unavailable. Try again shortly.', 'Gemma غير متاح. حاول مرة أخرى بعد قليل.'],
-  busy: ['Gemma is busy. Try again shortly.', 'Gemma مشغول. حاول مرة أخرى بعد قليل.'],
-  input: ['Enter a short command or record it again.', 'اكتب أمراً قصيراً أو أعد تسجيله.'],
+  unavailable: ['Gemma could not run on this device. Try again.', 'تعذّر تشغيل Gemma على هذا الجهاز. حاول مرة أخرى.'],
+  missing: ['Download the model to use voice charting.', 'نزّل النموذج لاستخدام الإدخال الصوتي.'],
+  otherTab: ['Gemma is busy in another Lumin tab.', 'يعمل Gemma في علامة تبويب أخرى من Lumin.'],
+  unsupported: ['On-device Gemma needs a browser with WebGPU and site storage.', 'يتطلب Gemma على الجهاز متصفحاً يدعم WebGPU وتخزين الموقع.'],
+  storage: ['There is not enough space to save the model. Free storage and resume.', 'المساحة المتاحة لا تكفي لحفظ النموذج. حرّر مساحة ثم استأنف التنزيل.'],
+  download: ['Model setup stopped. Check your connection and resume.', 'توقف إعداد النموذج. تحقّق من الاتصال ثم استأنف.'],
+  sample: ['Gemma could not verify the sample command on this device. Try setup again.', 'تعذّر التحقق من الأمر التجريبي على هذا الجهاز. أعد المحاولة.'],
   draft: ['Gemma could not interpret the full command. Try one tooth and procedure at a time.', 'تعذّر فهم الأمر بالكامل. جرّب ذكر سن وإجراء واحد في كل مرة.']
 };
 
-export function bindChartVoice(root, { context, catalog, token, apply, language, surfaceNames, fetcher = fetch }) {
+export function bindChartVoice(root, { context, catalog, apply, language, surfaceNames, engine = createLocalChartEngine() }) {
   const panel = root.querySelector('[data-voice-panel]');
   const open = root.querySelector('[data-voice-open]');
-  const form = root.querySelector('[data-voice-command]');
-  const input = form.elements.command;
   const record = root.querySelector('[data-voice-record]');
+  const voiceToggle = root.querySelector('[data-voice-spoken]');
+  const read = root.querySelector('[data-voice-read]');
+  const reply = root.querySelector('[data-voice-reply]');
+  const download = root.querySelector('[data-voice-download]');
+  const remove = root.querySelector('[data-voice-remove]');
+  const progress = root.querySelector('[data-voice-progress]');
+  const modelStatus = root.querySelector('[data-voice-model-status]');
+  const connection = root.querySelector('[data-voice-connection]');
   const status = root.querySelector('[data-voice-status]');
   const heard = root.querySelector('[data-voice-heard]');
   const review = root.querySelector('[data-voice-review]');
@@ -89,6 +82,11 @@ export function bindChartVoice(root, { context, catalog, token, apply, language,
   const rows = root.querySelector('[data-voice-rows]');
   let owner, work, recording, draft = [];
   let saving = false;
+  let model = { supported: true, ready: false, bytes: 0 }, modelWork, modelRevision = 0;
+  let modelMessage;
+  let speech, speechTimeout, readbackReady = false, heardLanguage;
+  const speechPreference = 'lumin-chart-voice-spoken';
+  try { voiceToggle.checked = localStorage.getItem(speechPreference) !== 'off'; } catch (_) {}
   const tr = ([en, ar]) => language() === 'ar' ? ar : en;
   const tell = (en, ar) => { status.textContent = tr([en, ar]); };
   const valid = () => owner && owner === context();
@@ -96,21 +94,131 @@ export function bindChartVoice(root, { context, catalog, token, apply, language,
   function translate() {
     panel.dir = language() === 'ar' ? 'rtl' : 'ltr';
     for (const label of root.querySelectorAll('[data-en]')) label.textContent = tr([label.dataset.en, label.dataset.ar]);
-    input.placeholder = tr(['Plan an occlusal composite on upper right six', 'خطط لحشو كومبوزيت إطباقي للسن السادس فوق يمين']);
   }
 
   function controls() {
-    record.textContent = recording
+    record.textContent = recording && !recording.confirmation
       ? tr(['Stop recording', 'إيقاف التسجيل']) : tr(['Record command', 'تسجيل أمر']);
-    record.disabled = Boolean(work && !recording);
-    input.disabled = form.elements.interpret.disabled = Boolean(work);
+    reply.textContent = recording?.confirmation
+      ? tr(['Stop recording', 'إيقاف التسجيل']) : tr(['Say confirm or cancel', 'قل أكّد أو ألغِ']);
+    record.disabled = !model.ready || Boolean(speech || (work && (!recording || recording.confirmation)));
+    voiceToggle.disabled = Boolean(work);
     open.disabled = !context() || saving;
-    for (const field of rows.querySelectorAll('select, input')) field.disabled = saving;
-    add.disabled = Boolean(work) || !draft.length || draft.some(row => !row.read());
+    const ready = draft.length > 0 && draft.every(row => row.read());
+    for (const field of rows.querySelectorAll('select, input')) field.disabled = Boolean(work);
+    read.hidden = reply.hidden = !voiceToggle.checked;
+    read.disabled = !ready || Boolean(work);
+    reply.disabled = !model.ready || !ready || !readbackReady || Boolean(speech || (work && !recording?.confirmation));
+    add.disabled = Boolean(work || speech) || !ready || navigator.onLine === false;
+    connection.hidden = !(ready && navigator.onLine === false);
     review.hidden = draft.length === 0;
+    modelControls();
+  }
+
+  function modelControls() {
+    const busy = modelWork?.kind === 'download';
+    download.hidden = !model.supported || (model.ready && !busy);
+    download.disabled = Boolean(work || (modelWork && (!busy || modelWork.controller.signal.aborted))
+      || (!busy && navigator.onLine === false));
+    download.textContent = busy ? tr(['Pause setup', 'إيقاف الإعداد مؤقتاً'])
+      : model.bytes === modelBytes ? tr(['Finish setup', 'إكمال الإعداد'])
+        : model.bytes ? tr(['Resume download', 'استئناف التنزيل'])
+          : tr(['Download model · 2.4 GB', 'تنزيل النموذج · ٢٫٤ غيغابايت']);
+    remove.hidden = !(model.ready || model.hasFiles);
+    remove.disabled = Boolean(work || modelWork);
+    modelStatus.textContent = tr(modelMessage || (!model.supported ? messages.unsupported
+      : model.ready ? ['Model ready on this device', 'النموذج جاهز على هذا الجهاز']
+        : navigator.onLine === false ? ['Connect to download the model.', 'اتصل بالإنترنت لتنزيل النموذج.']
+          : model.bytes ? ['Partial download saved on this device', 'حُفظ الجزء المنزّل على هذا الجهاز']
+            : ['Download once per device to use voice charting offline.', 'نزّل النموذج مرة واحدة على كل جهاز لاستخدام الإدخال الصوتي دون اتصال.']));
+  }
+
+  async function refreshModel() {
+    const revision = ++modelRevision;
+    try {
+      const stored = await engine.info();
+      if (revision === modelRevision) model = stored;
+    } catch (_) {
+      if (revision === modelRevision) model = { supported: false, ready: false, bytes: 0 };
+    }
+    controls();
+  }
+
+  download.onclick = async () => {
+    if (modelWork?.kind === 'download') {
+      modelWork.controller.abort();
+      modelMessage = ['Pausing setup…', 'جارٍ إيقاف الإعداد مؤقتاً…'];
+      controls();
+      return;
+    }
+    if (modelWork || work || model.ready || !model.supported) return;
+    const controller = new AbortController();
+    modelWork = { kind: 'download', controller };
+    modelMessage = ['Preparing model setup…', 'جارٍ تجهيز إعداد النموذج…'];
+    controls();
+    try {
+      await engine.download({
+        signal: controller.signal,
+        acceptsSample(raw) {
+          let operations;
+          try { operations = parseVoiceDraft(raw).operations; } catch (_) { return false; }
+          return operations?.length === 1 && operations[0].tooth === 'UR6'
+            && operations[0].procedure === 'composite' && operations[0].status === 'planned';
+        },
+        report(stage, bytes) {
+          if (controller.signal.aborted) return;
+          progress.hidden = stage === 'runtime';
+          if (progress.hidden) {
+            modelMessage = ['Downloading the Gemma runtime…', 'جارٍ تنزيل ملفات تشغيل Gemma…'];
+          } else {
+            progress.value = Math.floor(bytes / modelBytes * 100);
+            modelMessage = stage === 'verify' ? ['Checking Gemma on this device…', 'جارٍ اختبار Gemma على هذا الجهاز…']
+              : [`Downloading model · ${progress.value}%`, `جارٍ تنزيل النموذج · ${progress.value}٪`];
+          }
+          modelControls();
+        }
+      });
+      modelMessage = null;
+    } catch (error) {
+      modelMessage = controller.signal.aborted ? ['Setup paused. Resume whenever you’re ready.', 'توقف الإعداد مؤقتاً. يمكنك الاستئناف لاحقاً.']
+        : (Object.hasOwn(messages, error.message) ? messages[error.message] : messages.download);
+    } finally {
+      await refreshModel();
+      progress.hidden = true;
+      modelWork = null;
+      controls();
+    }
+  };
+
+  remove.onclick = async () => {
+    if (modelWork || work || !model.hasFiles) return;
+    if (!window.confirm(tr(['Delete the Gemma model from this device?', 'هل تريد حذف نموذج Gemma من هذا الجهاز؟']))) return;
+    modelWork = { kind: 'delete' };
+    modelMessage = ['Deleting the model…', 'جارٍ حذف النموذج…'];
+    controls();
+    try {
+      await engine.remove();
+      modelMessage = ['Model deleted from this device.', 'حُذف النموذج من هذا الجهاز.'];
+    } catch (error) {
+      modelMessage = error.message === 'otherTab' ? messages.otherTab
+        : ['Could not delete the model. Close other Lumin tabs and retry.', 'تعذّر حذف النموذج. أغلق علامات تبويب Lumin الأخرى وحاول مجدداً.'];
+    } finally {
+      await refreshModel();
+      modelWork = null;
+      controls();
+    }
+  };
+
+  function stopSpeech() {
+    if (!speech) return;
+    speech = null;
+    clearTimeout(speechTimeout);
+    window.speechSynthesis?.cancel();
   }
 
   function clearDraft() {
+    stopSpeech();
+    readbackReady = false;
     draft = [];
     rows.replaceChildren();
     heard.textContent = '';
@@ -138,7 +246,7 @@ export function bindChartVoice(root, { context, catalog, token, apply, language,
     stopCapture();
     panel.hidden = true;
     open.setAttribute('aria-expanded', 'false');
-    input.value = status.textContent = '';
+    status.textContent = '';
     clearDraft();
     if (restoreFocus) open.focus();
   }
@@ -150,7 +258,7 @@ export function bindChartVoice(root, { context, catalog, token, apply, language,
     select.append(new Option(tr(['Choose…', 'اختر…']), ''));
     for (const [value, text] of options) select.append(new Option(text, value));
     select.value = initial || '';
-    select.addEventListener('change', controls);
+    select.addEventListener('change', draftEdited);
     label.append(select);
     holder.append(label);
     return select;
@@ -180,7 +288,7 @@ export function bindChartVoice(root, { context, catalog, token, apply, language,
           const checkbox = document.createElement('input');
           checkbox.type = 'checkbox';
           checkbox.checked = op.surfaces.every(surface => supported.includes(surface)) && op.surfaces.includes(name);
-          checkbox.addEventListener('change', controls);
+          checkbox.addEventListener('change', draftEdited);
           selected.set(name, checkbox);
           label.append(checkbox, tr(surfaces[name]));
           group.append(label);
@@ -200,6 +308,15 @@ export function bindChartVoice(root, { context, catalog, token, apply, language,
       }
       rows.append(row);
       return {
+        summary() {
+          const tooth = op.tooth;
+          const arabic = heardLanguage === 'ar';
+          const quadrant = { UR: ['upper right', 'فوق يمين'], UL: ['upper left', 'فوق شمال'],
+            LR: ['lower right', 'تحت يمين'], LL: ['lower left', 'تحت شمال'] }[tooth.slice(0, 2)];
+          const toothName = arabic ? `السن ${tooth[2]} ${quadrant[1]}` : `${quadrant[0]} ${tooth[2]}`;
+          const names = [...selected].filter(([, box]) => box.checked).map(([name]) => surfaces[name][arabic ? 1 : 0]);
+          return [toothName, procedure.selectedOptions[0].text, Object.values(statuses).find(item => item[2] === state.value)[arabic ? 1 : 0], ...names].join(', ');
+        },
         read() {
           const chosen = [...selected].filter(([, checkbox]) => checkbox.checked).map(([name]) => name);
           if (!procedure.value || !state.value || !supported.length || (op.procedure === 'composite' && !chosen.length)
@@ -210,26 +327,74 @@ export function bindChartVoice(root, { context, catalog, token, apply, language,
     });
     tell('Review the procedures before adding them.', 'راجع الإجراءات قبل إضافتها.');
     controls();
+    if (voiceToggle.checked && draft.every(row => row.read())) readBack();
   }
 
-  async function submit(command) {
+  function draftEdited() {
+    stopSpeech();
+    readbackReady = false;
+    controls();
+  }
+
+  function readBack() {
+    if (!valid() || !voiceToggle.checked || work || !draft.length || draft.some(row => !row.read())) return;
+    stopSpeech();
+    readbackReady = false;
+    const synth = window.speechSynthesis;
+    const locale = heardLanguage === 'ar' ? 'ar' : 'en';
+    const voices = synth?.getVoices().filter(voice => voice.localService && voice.lang.toLowerCase().split(/[-_]/)[0] === locale) || [];
+    const speaker = voices.find(voice => voice.lang.toLowerCase() === 'ar-eg') || voices[0];
+    const done = (spoken) => {
+      speech = null;
+      clearTimeout(speechTimeout);
+      readbackReady = true;
+      if (spoken) tell('Tap Say confirm or cancel, then speak your answer.', 'اضغط على قل أكّد أو ألغِ ثم انطق إجابتك.');
+      else tell('Read the draft on screen. A matching on-device voice could not play.', 'راجع المسودة على الشاشة. تعذّر تشغيل صوت محلي مناسب.');
+      controls();
+    };
+    if (!speaker || !window.SpeechSynthesisUtterance) { done(false); return; }
+    const summaries = draft.map(row => row.summary()).join('. ');
+    const question = locale === 'ar' ? 'هل تؤكد إضافة هذه الإجراءات؟' : 'Do you confirm adding these procedures?';
+    const utterance = speech = new SpeechSynthesisUtterance(summaries + '. ' + question);
+    utterance.voice = speaker;
+    utterance.lang = speaker.lang;
+    utterance.onend = () => { if (speech === utterance) done(true); };
+    utterance.onerror = () => { if (speech === utterance) done(false); };
+    speechTimeout = setTimeout(() => {
+      if (speech !== utterance) return;
+      stopSpeech();
+      done(false);
+    }, 90000);
+    tell('Reading the draft aloud…', 'جارٍ قراءة المسودة بصوت عالٍ…');
+    controls();
+    try { synth.speak(utterance); }
+    catch (_) { done(false); }
+  }
+
+  async function submit(blob, confirmation) {
     if (work || !valid()) return;
-    clearDraft();
+    if (!confirmation) clearDraft();
     const controller = work = new AbortController();
-    tell('Gemma is interpreting the command…', 'يفسّر Gemma الأمر…');
+    if (confirmation) tell('Checking your reply…', 'جارٍ التحقق من إجابتك…');
+    else tell('Gemma is interpreting on this device…', 'يفسّر Gemma الأمر على هذا الجهاز…');
     controls();
     try {
-      const authorization = await token();
-      if (!authorization) throw new Error('access');
+      const raw = await engine.interpret({ blob, confirmation }, controller.signal);
       if (!valid() || controller.signal.aborted) return;
-      const response = await fetcher('/api/chart-voice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authorization },
-        body: JSON.stringify(command),
-        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(120000)])
-      });
-      const result = await readDraft(response);
-      if (!valid() || controller.signal.aborted) return;
+      work = null;
+      if (confirmation) {
+        const answer = voiceReply(raw);
+        if (answer === 'cancel') {
+          clearDraft();
+          tell('Draft cancelled.', 'أُلغيت المسودة.');
+        } else if (answer !== 'confirm') {
+          tell('Say only confirm or cancel, or use the button below.', 'قل أكّد أو ألغِ فقط، أو استخدم الزر أدناه.');
+        } else await save();
+        controls();
+        return;
+      }
+      const result = parseVoiceDraft(raw);
+      heardLanguage = /\p{Script=Arabic}/u.test(result.heard) ? 'ar' : 'en';
       heard.textContent = result.heard;
       heard.hidden = !result.heard;
       if (result.message) status.textContent = result.message;
@@ -238,7 +403,8 @@ export function bindChartVoice(root, { context, catalog, token, apply, language,
       if (!valid() || controller.signal.aborted) return;
       status.textContent = tr(Object.hasOwn(messages, error.message) ? messages[error.message] : messages.unavailable);
     } finally {
-      if (work === controller) { work = null; controls(); }
+      if (work === controller) work = null;
+      controls();
     }
   }
 
@@ -262,12 +428,8 @@ export function bindChartVoice(root, { context, catalog, token, apply, language,
         tell('No clear audio. Try recording again.', 'الصوت غير واضح. جرّب التسجيل مرة أخرى.');
         return;
       }
-      const bytes = new Uint8Array(await wav.blob.arrayBuffer());
-      let binary = '';
-      for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
-      if (controller.signal.aborted || !valid()) return;
       work = null;
-      return void submit({ audio: btoa(binary) });
+      return void submit(wav.blob, input.confirmation);
     } catch (_) {
       if (valid() && !controller.signal.aborted) tell('Recording interrupted. Try again.', 'انقطع التسجيل. حاول مرة أخرى.');
     } finally {
@@ -276,11 +438,11 @@ export function bindChartVoice(root, { context, catalog, token, apply, language,
     }
   }
 
-  async function start() {
-    if (work || !valid()) return;
-    clearDraft();
+  async function start(confirmation = false) {
+    if (work || speech || !model.ready || !valid() || (confirmation && !readbackReady)) return;
+    if (!confirmation) clearDraft();
     if (!window.AudioContext || !navigator.mediaDevices?.getUserMedia) {
-      tell('Microphone recording requires a supported browser on HTTPS. You can type the command.', 'يتطلب التسجيل متصفحاً يدعم الميكروفون عبر HTTPS. يمكنك كتابة الأمر.');
+      tell('Recording requires a supported browser on HTTPS.', 'يتطلب التسجيل متصفحاً يدعم الميكروفون عبر HTTPS.');
       return;
     }
     const controller = work = new AbortController();
@@ -288,14 +450,14 @@ export function bindChartVoice(root, { context, catalog, token, apply, language,
     tell('Waiting for microphone access…', 'في انتظار إذن الميكروفون…');
     controls();
     try {
-      active = { audio: new AudioContext(), chunks: [] };
+      active = { audio: new AudioContext(), chunks: [], confirmation };
       const resume = active.audio.resume();
       void resume.catch(() => {});
       controller.signal.addEventListener('abort', () => release(active), { once: true });
       active.stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
       if (!valid() || controller.signal.aborted || document.hidden) return;
       await resume;
-      await active.audio.audioWorklet.addModule('/lumin-chart-voice-worklet.js');
+      await engine.loadRecorder(active.audio);
       if (!valid() || controller.signal.aborted || document.hidden) return;
       const detect = createVoiceActivityDetector(active.audio.sampleRate);
       const source = active.audio.createMediaStreamSource(active.stream);
@@ -320,12 +482,13 @@ export function bindChartVoice(root, { context, catalog, token, apply, language,
       }, { once: true });
       source.connect(active.node).connect(active.audio.destination);
       recording = active;
-      active.timer = setTimeout(() => void finish(active), 15000);
-      tell('Recording. Stops after three seconds of silence.', 'جارٍ التسجيل. يتوقف بعد ثلاث ثوانٍ من الصمت.');
+      active.timer = setTimeout(() => void finish(active), confirmation ? 8000 : 15000);
+      if (confirmation) tell('Listening. Say confirm or cancel.', 'أستمع إليك. قل أكّد أو ألغِ.');
+      else tell('Recording. Stops after three seconds of silence.', 'جارٍ التسجيل. يتوقف بعد ثلاث ثوانٍ من الصمت.');
     } catch (_) {
       if (valid() && !controller.signal.aborted) {
-        tell('Could not start the microphone. Check this site’s microphone permission or type the command.',
-          'تعذّر تشغيل الميكروفون. تحقّق من إذن الموقع أو اكتب الأمر.');
+        tell('Could not start the microphone. Check this site’s microphone permission.',
+          'تعذّر تشغيل الميكروفون. تحقّق من إذن الموقع.');
       }
     } finally {
       if (!active || recording !== active) {
@@ -343,17 +506,29 @@ export function bindChartVoice(root, { context, catalog, token, apply, language,
     translate();
     panel.hidden = false;
     open.setAttribute('aria-expanded', 'true');
-    input.focus();
+    open.focus();
+    void refreshModel();
   });
   root.querySelector('[data-voice-close]').onclick = () => close(true);
-  record.onclick = () => recording ? void finish(recording) : void start();
-  form.onsubmit = event => {
-    event.preventDefault();
-    if (input.value.trim()) void submit({ prompt: input.value.trim() });
+  record.onclick = () => recording ? void finish(recording) : void start(false);
+  reply.onclick = () => recording ? void finish(recording) : void start(true);
+  read.onclick = () => readBack();
+  voiceToggle.onchange = () => {
+    try { localStorage.setItem(speechPreference, voiceToggle.checked ? 'on' : 'off'); } catch (_) {}
+    draftEdited();
+    if (voiceToggle.checked) readBack();
   };
   review.onsubmit = async event => {
     event.preventDefault();
+    await save();
+  };
+
+  async function save() {
     if (work || !valid()) return;
+    if (navigator.onLine === false) {
+      tell('Confirmation received. Reconnect and tap Add to chart to save.', 'تم التأكيد. اتصل بالإنترنت واضغط إضافة إلى المخطط للحفظ.');
+      return;
+    }
     const entries = draft.map(row => row.read());
     if (!entries.length || entries.some(entry => !entry)) return;
     const controller = work = new AbortController();
@@ -364,7 +539,6 @@ export function bindChartVoice(root, { context, catalog, token, apply, language,
       if (!await apply(entries, owner)) throw new Error('save');
       if (!valid() || controller.signal.aborted) return;
       clearDraft();
-      input.value = '';
       tell('Procedures added to the chart.', 'أُضيفت الإجراءات إلى المخطط.');
     } catch (_) {
       if (valid() && !controller.signal.aborted) tell('Could not save these procedures. Review the chart and try again.',
@@ -374,7 +548,7 @@ export function bindChartVoice(root, { context, catalog, token, apply, language,
       if (work === controller) work = null;
       controls();
     }
-  };
+  }
   document.addEventListener('visibilitychange', () => {
     if (document.hidden && recording) {
       work?.abort();
@@ -385,6 +559,12 @@ export function bindChartVoice(root, { context, catalog, token, apply, language,
     }
   });
   window.addEventListener('pagehide', () => close());
+  window.addEventListener('online', controls);
+  window.addEventListener('offline', controls);
+  engine.subscribe(() => {
+    if (!modelWork) modelMessage = null;
+    void refreshModel();
+  });
   translate();
   controls();
   return { sync() {

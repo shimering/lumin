@@ -1,7 +1,9 @@
-# Online voice charting
+# On-device voice charting
 
-Lumin's **Voice charting** control uses the Gemma Voice pilot's online Gemma 4 E2B bridge. Configure the Lumin Cloudflare Worker with the pilot's existing HTTPS bridge base URL via `GEMMA_BRIDGE_URL` and its bearer token via the Worker secret `GEMMA_BRIDGE_TOKEN`. The base URL ends at the bridge prefix, such as `https://host.example/gemma-bridge`. Lumin appends `/api/chart`. Keep the bridge and its Gemma model service running.
+Open a patient’s **Dental Chart → Voice charting** and choose **Download model · 2.4 GB**. Gemma 4 E2B requires a compatible WebGPU browser and enough site storage. Setup downloads the runtime and model to this browser and verifies a sample command. An interrupted model download can resume. **Delete model** removes this model and its runtime cache from the device.
 
-With chart access, open a test patient's dental chart and submit a typed or recorded command such as “Plan an occlusal composite on upper right six and seven.” Verify that both permanent teeth appear in the review. Select the matching clinic catalog procedure, check the status and surfaces, then add the procedures to the chart. Try a bare tooth number to verify that Gemma asks for the quadrant. This first version supports composite restorations, root canals, crowns and extractions from the active clinic catalog.
+Select **Record command** and say the tooth, procedure, status, and any surfaces. Gemma stops after three seconds of silence or when you tap **Stop recording**. For a synthetic test, say “Plan an occlusal composite on upper right six and seven.” The draft uses the active clinic catalog and supports composite restorations, root canals, crowns and extractions.
 
-The model request carries the command text or recording. Patient and account identifiers and chart data stay in Lumin. Staff should leave patient identifiers out of the command itself.
+With **Spoken confirmation** enabled, Lumin reads a complete draft using a matching local device voice. Choose **Say confirm or cancel** to record a reply. If you edit the draft, choose **Read draft aloud** before recording a reply. A device without a matching local voice can still show the draft on screen. **Add to chart** is also available for manual confirmation.
+
+Interpretation works locally while an already-loaded patient chart is open offline. Keep the chart open and reconnect before saving the confirmed draft to the shared chart. Recordings are processed in the browser without a bridge, hosted model, or API key.

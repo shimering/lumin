@@ -6,7 +6,7 @@
   font-size: .875rem;
 }
 #chart-voice [hidden] { display: none !important; }
-#chart-voice button, #chart-voice select, #chart-voice input[type=text] {
+#chart-voice button, #chart-voice select {
   min-height: 44px;
   border-radius: .625rem;
   font: inherit;
@@ -21,14 +21,27 @@
 #chart-voice :is(button, input, select):focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 #chart-voice [data-voice-panel] { padding: .75rem 0 .25rem; }
 #chart-voice [data-voice-panel] p { margin: .25rem 0 .5rem; overflow-wrap: anywhere; }
-#chart-voice [data-voice-command], #chart-voice .chart-voice-footer {
+#chart-voice .chart-voice-actions, #chart-voice .chart-voice-footer {
   display: flex;
-  align-items: end;
+  align-items: center;
   flex-wrap: wrap;
   gap: .5rem;
 }
-#chart-voice .chart-voice-command-label { display: grid; gap: .25rem; flex: 1 1 min(100%, 17rem); min-width: 0; }
-#chart-voice :is(select, input[type=text]) {
+#chart-voice .chart-voice-model {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .5rem 1rem;
+  border-radius: .75rem;
+  padding: .75rem;
+  margin-block-end: .75rem;
+  background: #f1f5f9;
+}
+#chart-voice .chart-voice-model p { margin-block-end: 0; }
+#chart-voice progress { display: block; width: min(100%, 16rem); margin-block-start: .375rem; accent-color: #2563eb; }
+#chart-voice .chart-voice-spoken { display: inline-flex; align-items: center; min-height: 44px; gap: .5rem; padding-inline: .5rem; }
+#chart-voice select {
   width: 100%;
   border: 1px solid #cbd5e1;
   padding: .5rem .625rem;
@@ -50,7 +63,7 @@
 #chart-voice li strong { padding-block: .625rem; color: #1e40af; }
 #chart-voice li :is(fieldset, p) { grid-column: 1 / -1; min-width: 0; }
 #chart-voice fieldset label { display: inline-flex; align-items: center; gap: .375rem; min-height: 44px; padding-inline-end: .75rem; }
-#chart-voice [data-voice-close] { background: #f1f5f9; color: #334155; }
+#chart-voice :is([data-voice-close], [data-voice-remove]) { background: #e2e8f0; color: #334155; }
 @media (max-width: 520px) {
   #chart-voice li { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   #chart-voice li strong { grid-column: 1 / -1; padding-block: 0; }

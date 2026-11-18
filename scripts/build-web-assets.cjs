@@ -1,6 +1,7 @@
 // Build only public frontend assets; never publish the repository or clinic server files.
 const fs = require('node:fs');
 const path = require('node:path');
+const { buildSync } = require('esbuild');
 const root = fs.realpathSync(path.resolve(__dirname,'..'));
 const output = path.resolve(root,'.cloudflare-assets');
 if (path.relative(root,output) !== '.cloudflare-assets' || fs.existsSync(output) && fs.lstatSync(output).isSymbolicLink()) throw new Error('Invalid asset output directory');
@@ -12,4 +13,13 @@ for (const entry of fs.readdirSync(root,{withFileTypes:true})) {
   }
 }
 for (const directory of ['assets','icons','vendor','push']) fs.cpSync(path.join(root,directory),path.join(output,directory),{recursive:true});
+buildSync({
+  entryPoints: [path.join(root,'workers','chart-voice-local.mjs')],
+  outfile: path.join(output,'lumin-chart-voice-engine.js'),
+  bundle: true,
+  format: 'iife',
+  platform: 'browser',
+  target: ['safari16', 'chrome108'],
+  minify: true
+});
 console.log('Prepared public frontend assets in .cloudflare-assets');
