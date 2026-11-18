@@ -1,5 +1,6 @@
 import '../lumin-public-config.js';
-import { handleR2Request } from './r2-storage.mjs';
+import { authorizeLuminRequest, handleR2Request } from './r2-storage.mjs';
+import { handleChartVoice } from './chart-voice.mjs';
 
 const config = globalThis.LuminPublicConfig;
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -64,6 +65,7 @@ function brandedHtml(html, data, url) {
 
 export async function handleRequest(request, env, fetcher = fetch) {
   const url = new URL(request.url);
+  if (url.pathname === '/api/chart-voice') return handleChartVoice(request, env, fetcher, authorizeLuminRequest);
   if (url.pathname === '/r2' || url.pathname.startsWith('/r2/')) return handleR2Request(request,env,fetcher);
   if (['/supplier-list','/supplier-list/','/supplier-list.html'].includes(url.pathname)) {
     if (!['GET','HEAD'].includes(request.method)) return new Response('Method not allowed.',{status:405,headers:{...privateHeaders,Allow:'GET, HEAD'}});

@@ -85,6 +85,10 @@ async function caller(request,url,bucket,fetcher,mediaRead,scope='patients') {
   if (!profile?.active || !(role?.is_admin === true || has(scope))) throw new StorageError('You do not have permission to access this storage.',403);
   return {token,userId:user.id,admin:role?.is_admin === true,manageInventory:role?.is_admin===true||has('inventory_manage')};
 }
+export function authorizeLuminRequest(request, fetcher, scope) {
+  return caller(request, null, null, fetcher, false, scope);
+}
+
 async function patientFor(token,id,fetcher) {
   const patients = await database(token,`/rest/v1/patients?id=eq.${uuid(id)}&select=id,name,patient_number`,fetcher);
   if (!patients[0]) throw new StorageError('Patient not found.',404);

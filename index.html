@@ -100,6 +100,7 @@
   <script src="lumin-patient-swipe.js?v=2"></script>
   <script src="lumin-patients.js?v=5"></script>
   <script src="lumin-chart-sync.js?v=2"></script>
+  <link rel="stylesheet" href="lumin-chart-voice.css?v=1" />
   <script src="lumin-chart-media.js?v=21"></script>
   <script src="lumin-xray-rotation.js?v=1"></script>
   <script src="lumin-tooth-notes.js?v=3"></script>
@@ -6776,6 +6777,34 @@
               </div>
             </div>
 
+            <div id="chart-voice" data-media-user-content hidden>
+              <button type="button" data-voice-open aria-expanded="false" aria-controls="chart-voice-panel">
+                <i data-lucide="mic" aria-hidden="true"></i>
+                <span data-en="Voice charting" data-ar="الإدخال الصوتي للمخطط">Voice charting</span>
+              </button>
+              <div id="chart-voice-panel" data-voice-panel hidden>
+                <p data-en="Online Gemma 4 processes the command. Say the tooth, procedure and status. Leave out patient names and identifiers."
+                   data-ar="يعالج Gemma 4 الأمر عبر الإنترنت. اذكر السن والإجراء والحالة دون أسماء المرضى أو بياناتهم التعريفية."></p>
+                <form data-voice-command>
+                  <label class="chart-voice-command-label">
+                    <span data-en="Chart command" data-ar="أمر المخطط">Chart command</span>
+                    <input name="command" type="text" dir="auto" maxlength="2000" autocomplete="off" />
+                  </label>
+                  <button type="submit" name="interpret" data-en="Interpret" data-ar="تفسير">Interpret</button>
+                  <button type="button" data-voice-record>Record command</button>
+                </form>
+                <p data-voice-status role="status" dir="auto"></p>
+                <p data-voice-heard dir="auto" hidden></p>
+                <form data-voice-review hidden>
+                  <ul data-voice-rows></ul>
+                  <button type="submit" data-voice-add data-en="Add to chart" data-ar="إضافة إلى المخطط">Add to chart</button>
+                </form>
+                <div class="chart-voice-footer mt-2">
+                  <button type="button" data-voice-close data-en="Close" data-ar="إغلاق">Close</button>
+                </div>
+              </div>
+            </div>
+
             <div class="space-y-3 p-3 md:p-4">
               <div class="flex flex-wrap items-center justify-between gap-2 px-1 text-[10px] font-bold text-slate-400">
                 <span>Patient right</span>
@@ -10754,6 +10783,7 @@
 
     // ================= PER-USER INTERFACE LANGUAGE =================
     let currentUiLanguage = 'en';
+    let chartVoiceControl = null;
     let currentUiTheme = 'flat';
     let currentUiTint = 'blue';
     let currentUiBackground = 'default';
@@ -11842,6 +11872,7 @@
 
     function applyUiLanguage(language, refreshViews = true) {
       currentUiLanguage = language === 'ar' ? 'ar' : 'en';
+      if (typeof chartVoiceControl !== 'undefined') chartVoiceControl?.sync();
       const isArabic = currentUiLanguage === 'ar';
       document.documentElement.lang = currentUiLanguage;
       document.documentElement.dir = isArabic ? 'rtl' : 'ltr';
@@ -30654,6 +30685,7 @@
       }
       activeWorkspacePatientId = patientId;
       activePatientId = patientId;
+      if (typeof chartVoiceControl !== 'undefined') chartVoiceControl?.sync();
       void prefetchChartPatientMedia(patientId);
       await switchView('chart');
     }
@@ -30666,6 +30698,7 @@
 
       activePatientId = patient.id;
       activeWorkspacePatientId = patient.id;
+      chartVoiceControl?.sync();
       updatePatientWorkspaceNavigation(patient, 'chart');
       void loadChartPatientMedia(patient.id);
 
@@ -31090,22 +31123,11 @@
       return patient.chartState[id];
     }
 
-    // Apply surface condition to all currently selected surfaces
-    function applySurfaceCondition(condition, operationStatus = activeClinicalOperationStatus, catalogPrice = null, procedureSteps = [], silent = false) {
-      const targets = chartSelectionTargets().filter(target => target.surfaces.length > 0);
-      if (!targets.length) {
-        if (!silent) alert('Please click on one or more tooth surfaces first.');
-        return false;
-      }
-
-      const patient = getActivePatient();
-      if (!patient) return false;
-
+    function appendChartSurfaceConditions(patient, targets, condition, operationStatus, catalogPrice, procedureSteps, createdAt) {
       const normalisedStatus = normaliseOperationStatus(operationStatus, 'P');
       const configuredPrice = catalogPrice !== null && catalogPrice !== undefined && String(catalogPrice).trim() !== ''
         ? Math.max(0, Number(catalogPrice) || 0)
         : chartFindingDefaultPrice(condition);
-      const createdAt = new Date().toISOString();
       const beginDate = (normalisedStatus === 'In' || normalisedStatus === 'C') ? createdAt : null;
       const batchId = targets.length > 1 ? createChartFindingId() : null;
 
@@ -31133,9 +31155,21 @@
             finding
           ]);
         });
-        renderToothVisuals(target.tooth);
       });
+    }
 
+    // Apply surface condition to all currently selected surfaces
+    function applySurfaceCondition(condition, operationStatus = activeClinicalOperationStatus, catalogPrice = null, procedureSteps = [], silent = false) {
+      const targets = chartSelectionTargets().filter(target => target.surfaces.length > 0);
+      if (!targets.length) {
+        if (!silent) alert('Please click on one or more tooth surfaces first.');
+        return false;
+      }
+      const patient = getActivePatient();
+      if (!patient) return false;
+      const createdAt = new Date().toISOString();
+      appendChartSurfaceConditions(patient, targets, condition, operationStatus, catalogPrice, procedureSteps, createdAt);
+      targets.forEach(target => renderToothVisuals(target.tooth));
       setChartSelectionTargets([]);
       updateSelectionUI();
       renderFindingsList();
@@ -31144,23 +31178,12 @@
       return true;
     }
 
-    // Apply a whole-tooth operation with its workflow status.
-    function applyToothStatus(operationCode, operationStatus = activeClinicalOperationStatus, catalogPrice = null, procedureSteps = [], silent = false) {
-      const targets = chartSelectionTargets();
-      if (!targets.length) {
-        if (!silent) alert('Please select one or more teeth first.');
-        return false;
-      }
-
-      const patient = getActivePatient();
-      if (!patient) return false;
-
-      const createdAt = new Date().toISOString();
+    function appendChartWholeOperations(patient, targets, operationCode, operationStatus, catalogPrice, procedureSteps, createdAt) {
       const normalisedStatus = normaliseOperationStatus(operationStatus, 'P');
       const beginDate = (normalisedStatus === 'In' || normalisedStatus === 'C') ? createdAt : null;
       const batchId = targets.length > 1 ? createChartFindingId() : null;
       const isOrthoPkg = Boolean(dentalOperationByCode(operationCode)?.isOrthoPackage);
-      targets.forEach(target => {
+      return targets.map(target => {
         const toothData = getOrCreateChartTooth(patient, target.tooth);
         const wholeOperations = ensureWholeOperations(toothData);
         const record = chartFindingStorageRecord(
@@ -31182,6 +31205,23 @@
           isOrthoPkg
         );
         wholeOperations.push(record);
+        return record;
+      });
+    }
+
+    // Apply a whole-tooth operation with its workflow status.
+    function applyToothStatus(operationCode, operationStatus = activeClinicalOperationStatus, catalogPrice = null, procedureSteps = [], silent = false) {
+      const targets = chartSelectionTargets();
+      if (!targets.length) {
+        if (!silent) alert('Please select one or more teeth first.');
+        return false;
+      }
+      const patient = getActivePatient();
+      if (!patient) return false;
+      const createdAt = new Date().toISOString();
+      const records = appendChartWholeOperations(patient, targets, operationCode, operationStatus, catalogPrice, procedureSteps, createdAt);
+      targets.forEach((target, index) => {
+        const record = records[index];
         renderToothVisuals(target.tooth);
         if (record.status === 'In' || record.status === 'C') {
           void syncImplantProgressFromChartOperation(patient, target.tooth, record, null);
@@ -31193,6 +31233,74 @@
       saveActivePatientChart();
       void window.LuminConsents?.procedureApplied(patient, operationCode, createdAt);
       return true;
+    }
+
+    function chartVoiceContext() {
+      const patient = getActivePatient();
+      if (!currentSession?.user?.id || !hasPageAccess('chart') || !patient
+          || patientWorkspaceLoadingId === patient.id || document.getElementById('view-chart').classList.contains('hidden')) return null;
+      return JSON.stringify([currentSession.user.id, patient.id]);
+    }
+
+    function chartVoiceSurfaceMap(palmer, patient = getActivePatient()) {
+      const slot = resolveToothSlotNumber(palmer);
+      if (!slot || !patient || dentitionForSlot(slot, patient) !== 'permanent') return {};
+      const names = { M: 'mesial', D: 'distal', O: 'occlusal', I: 'incisal', B: 'buccal', L: 'lingual' };
+      return Object.fromEntries(CHART_SURFACES.map(surface => [names[surfaceAbbreviation(String(slot), surface)], surface]));
+    }
+
+    async function applyChartVoiceDraft(entries, context, catalogOptions) {
+      if (!context || context !== chartVoiceContext()) return false;
+      const patient = getActivePatient();
+      const resolved = entries.map(entry => {
+        const operation = catalogOptions(entry.type, dentalOperations).find(item => item.id === entry.operationId);
+        const surfaceMap = chartVoiceSurfaceMap(entry.tooth, patient);
+        if (!operation || !Object.hasOwn(OPERATION_STATUSES, entry.status) || !Object.keys(surfaceMap).length
+            || entry.surfaces.some(surface => !Object.hasOwn(surfaceMap, surface))
+            || (operation.actionScope === 'surface') !== Boolean(entry.surfaces.length)) return null;
+        return { operation, status: entry.status, target: {
+          tooth: String(resolveToothSlotNumber(entry.tooth)), surfaces: entry.surfaces.map(surface => surfaceMap[surface])
+        } };
+      });
+      if (!resolved.length || resolved.some(entry => !entry)) return false;
+
+      const previousChartState = patient.chartState;
+      const draft = { ...patient, chartState: clonePatientChart(previousChartState) };
+      const createdAt = new Date().toISOString();
+      for (const { operation, status, target } of resolved) {
+        const append = operation.actionScope === 'surface' ? appendChartSurfaceConditions : appendChartWholeOperations;
+        append(draft, [target], operation.code, status, operation.price, operation.steps, createdAt);
+      }
+      patient.chartState = draft.chartState;
+      const saved = await saveActivePatientChart(patient, { previousChartState });
+      if (context === chartVoiceContext()) {
+        renderChartFindingTeeth(resolved.map(entry => entry.target.tooth));
+        renderFindingsList();
+      }
+      if (saved) {
+        for (const code of new Set(resolved.map(entry => entry.operation.code))) {
+          void window.LuminConsents?.procedureApplied(patient, code, createdAt);
+        }
+      }
+      return saved;
+    }
+
+    async function initChartVoice() {
+      const { bindChartVoice, voiceCatalogOptions } = await import('./lumin-chart-voice.mjs?v=1');
+      const root = document.getElementById('chart-voice');
+      chartVoiceControl = bindChartVoice(root, {
+        context: chartVoiceContext,
+        catalog: () => dentalOperations,
+        token: async () => (await db.auth.getSession()).data?.session?.access_token,
+        apply: (entries, context) => applyChartVoiceDraft(entries, context, voiceCatalogOptions),
+        language: () => currentUiLanguage,
+        surfaceNames: tooth => Object.keys(chartVoiceSurfaceMap(tooth))
+      });
+      root.hidden = false;
+      chartVoiceControl.sync();
+      new MutationObserver(() => chartVoiceControl.sync()).observe(document.getElementById('view-chart'), {
+        attributes: true, attributeFilter: ['class']
+      });
     }
 
     // Apply exactly one whole-mouth operation without consulting tooth selection.
@@ -42319,6 +42427,7 @@
 
     // Startup Initialization
     window.addEventListener('DOMContentLoaded', async () => {
+      void initChartVoice().catch(error => console.error('Could not load voice charting:', error));
       window.LuminAccounts.init({
         db,
         session: () => currentSession,

@@ -45,8 +45,8 @@ test('clinical rail preserves selection, applies correct scopes and fits desktop
     'toggleSurface', 'updateSelectionUI', 'activeDentalSpecialties', 'closeChartProcedureMenu', 'renderChartSpecialtyRail',
     'renderChartProcedureMenu', 'renderClinicalActionSelectors', 'setClinicalOperationStatus', 'renderClinicalOperationStatusSelector',
     'renderChartOperationOptions', 'updateClinicalOperationPreview', 'normaliseSpecialtyIconName', 'normaliseSpecialtyAccentColor',
-    'specialtyIconMarkup', 'isPrimaryToothId', 'palmerPositionForSlot', 'palmerQuadrantForSlot', 'palmerToothNotation', 'palmerQuadrantLabel', 'palmerNotationSVG', 'applySelectedDentalOperation', 'applySurfaceCondition',
-    'applyToothStatus', 'applyMouthOperation', 'bindGlobalClickEvents', 'getAppViewportBounds', 'updateAppViewportDimensions'].map(source).join('\n');
+    'specialtyIconMarkup', 'isPrimaryToothId', 'palmerPositionForSlot', 'palmerQuadrantForSlot', 'palmerToothNotation', 'palmerQuadrantLabel', 'palmerNotationSVG', 'applySelectedDentalOperation', 'appendChartSurfaceConditions', 'applySurfaceCondition',
+    'appendChartWholeOperations', 'applyToothStatus', 'applyMouthOperation', 'bindGlobalClickEvents', 'getAppViewportBounds', 'updateAppViewportDimensions'].map(source).join('\n');
   await page.addScriptTag({ content: `
     ${iconRegistry}
     let currentUiLanguage='en', activePatientId='patient-1', activeClinicalOperationStatus='P';
