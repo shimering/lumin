@@ -6,9 +6,9 @@ const base = 'litertlm_wasm_compat_asyncify_internal';
 const cdn = 'https://cdn.jsdelivr.net/npm/@litert-lm/core@0.19.0/wasm/';
 export const loaderFile = cdn + base + '.js';
 export const wasmFile = cdn + base + '.wasm';
-const engineFile = '/lumin-chart-voice-engine.js?v=1';
+const engineFile = '/lumin-chart-voice-engine.js?v=2';
 const captureFile = '/lumin-chart-voice-worklet.js';
-const readyMarker = '/lumin-chart-voice-engine.js?v=1&verified=1';
+const readyMarker = '/lumin-chart-voice-engine.js?v=1&verified=1'; // Verification is for the unchanged model file.
 const runtimeFiles = [engineFile, captureFile, loaderFile, wasmFile];
 
 export function createLocalChartEngine() {
@@ -16,7 +16,11 @@ export function createLocalChartEngine() {
     && navigator.locks && globalThis.Worker && globalThis.caches);
   const changes = typeof BroadcastChannel === 'function' ? new BroadcastChannel(modelCache) : null;
   const listeners = new Set();
-  changes?.addEventListener('message', () => listeners.forEach(fn => fn()));
+  let worker, idleTimer;
+  changes?.addEventListener('message', () => {
+    if (!worker?.onmessage) unload();
+    listeners.forEach(fn => fn());
+  });
   const notify = () => {
     changes?.postMessage('changed');
     listeners.forEach(fn => fn());
@@ -45,42 +49,76 @@ export function createLocalChartEngine() {
     });
   }
 
-  async function run(type, payload, { signal, onProgress } = {}) {
-    signal?.throwIfAborted();
+  function unload() {
+    clearTimeout(idleTimer);
+    worker?.terminate();
+    worker = undefined;
+  }
+
+  async function getWorker(signal) {
+    if (worker) return worker;
     const script = await caches.match(engineFile, { cacheName: modelCache });
     if (!script) throw new Error('missing');
     const url = URL.createObjectURL(await script.blob());
-    let worker;
     try {
       signal?.throwIfAborted();
       worker = new Worker(url);
-      return await new Promise((resolve, reject) => {
+      return worker;
+    } finally { URL.revokeObjectURL(url); }
+  }
+
+  async function run(type, payload, { signal, onProgress } = {}) {
+    signal?.throwIfAborted();
+    clearTimeout(idleTimer);
+    const active = await getWorker(signal);
+    try {
+      const result = await new Promise((resolve, reject) => {
         const abort = () => {
           // Let the download worker flush its current offset before releasing the lock.
-          if (type === 'setup') worker.postMessage({ type: 'cancel' });
-          else reject(signal.reason);
+          if (type === 'setup') active.postMessage({ type: 'cancel' });
+          else finish(reject, signal.reason);
         };
-        const timeout = type === 'setup' ? null : setTimeout(() => reject(new Error('unavailable')), 120000);
+        const timeout = type === 'setup' ? null : setTimeout(() => finish(reject, new Error('unavailable')), 120000);
         const finish = (fn, value) => {
           clearTimeout(timeout);
           signal?.removeEventListener('abort', abort);
+          active.onmessage = active.onerror = null;
           fn(value);
         };
-        worker.onmessage = ({ data }) => {
+        active.onmessage = ({ data }) => {
           if (data.progress !== undefined) { onProgress?.(data.progress); return; }
           if (signal?.aborted) finish(reject, signal.reason);
           else if (data.error) finish(reject, new Error(data.error));
           else finish(resolve, data.result);
         };
-        worker.onerror = () => finish(reject, new Error('unavailable'));
+        active.onerror = () => finish(reject, new Error('unavailable'));
         signal?.addEventListener('abort', abort, { once: true });
-        worker.postMessage({ type, ...payload });
+        try { active.postMessage({ type, ...payload }); }
+        catch (error) { finish(reject, error); return; }
         if (signal?.aborted) abort();
       });
-    } finally {
-      worker?.terminate();
-      URL.revokeObjectURL(url);
+      idleTimer = setTimeout(unload, 120000);
+      return result;
+    } catch (error) {
+      unload();
+      throw error;
     }
+  }
+
+  async function cacheRuntimeFile(cache, path, signal) {
+    if (await cache.match(path)) return;
+    const response = await fetch(path, { cache: 'no-store', signal, credentials: 'omit' });
+    if (!response.ok || !response.headers.get('Content-Type')?.match(path === wasmFile ? /application\/wasm/i : /javascript/i)) {
+      throw new Error('download');
+    }
+    await cache.put(path, response);
+  }
+
+  async function updateRuntime() {
+    if (!supported || navigator.onLine === false || !await caches.match(readyMarker, { cacheName: modelCache })) return;
+    await exclusive(async () => {
+      await cacheRuntimeFile(await caches.open(modelCache), engineFile);
+    });
   }
 
   async function download({ signal, report, acceptsSample }) {
@@ -97,14 +135,7 @@ export function createLocalChartEngine() {
         }
         const cache = await caches.open(modelCache);
         report('runtime');
-        for (const path of runtimeFiles) {
-          if (await cache.match(path)) continue;
-          const response = await fetch(path, { cache: 'no-store', signal, credentials: 'omit' });
-          if (!response.ok || !response.headers.get('Content-Type')?.match(path === wasmFile ? /application\/wasm/i : /javascript/i)) {
-            throw new Error('download');
-          }
-          await cache.put(path, response);
-        }
+        for (const path of runtimeFiles) await cacheRuntimeFile(cache, path, signal);
         report('model', stored.bytes);
         const sample = await run('setup', {}, {
           signal, onProgress: bytes => report(bytes === modelBytes ? 'verify' : 'model', bytes)
@@ -121,6 +152,7 @@ export function createLocalChartEngine() {
   async function remove() {
     try {
       await exclusive(async () => {
+        unload();
         const dir = await navigator.storage.getDirectory();
         try { await dir.removeEntry(modelFile); }
         catch (error) { if (error.name !== 'NotFoundError') throw error; }
@@ -144,5 +176,5 @@ export function createLocalChartEngine() {
     finally { URL.revokeObjectURL(url); }
   }
 
-  return { info, download, remove, interpret, loadRecorder, subscribe(fn) { listeners.add(fn); } };
+  return { info, updateRuntime, download, remove, interpret, loadRecorder, unload, subscribe(fn) { listeners.add(fn); } };
 }

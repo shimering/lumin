@@ -1,5 +1,5 @@
-export function createVoiceActivityDetector(sampleRate) {
-  const silenceSamples = sampleRate * 3;
+export function createVoiceActivityDetector(sampleRate, silenceSeconds = 3) {
+  const silenceSamples = sampleRate * silenceSeconds;
   const confirmationSamples = sampleRate * 0.09;
   let samplesSeen = 0;
   let activeSamples = 0;
@@ -24,6 +24,7 @@ export function createVoiceActivityDetector(sampleRate) {
       noiseFloor += (level - noiseFloor) * 0.05;
     }
     const shouldStop = lastVoiceSample > 0 && !active && samplesSeen - lastVoiceSample >= silenceSamples;
-    return { peak, shouldStop, lastVoiceSample };
+    const recentVoice = lastVoiceSample > 0 && samplesSeen - lastVoiceSample < sampleRate * 0.5;
+    return { peak, shouldStop, lastVoiceSample, recentVoice };
   };
 }

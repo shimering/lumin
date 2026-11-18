@@ -90,8 +90,8 @@ test('empty, loading and Arabic selection states remain accessible',()=>{
   context.renderFindingInvoiceToolbar([{id:'a',price:1100}]);
   assert.ok(classes.has('hidden'));assert.equal(button.disabled,true);
 });
-test('chart voice commands and duplicate chart toolbar controls are fully removed',()=>{
-  assert.doesNotMatch(html,/CHAIRSIDE VOICE|chart-voice-|settings-voice-|LUMIN_VOICE|LuminVoice|luminVoice|syncVoice|handlePatientWorkspaceVoice|voice-scribe-engine/);
+test('legacy voice commands and duplicate chart toolbar controls are fully removed',()=>{
+  assert.doesNotMatch(html,/CHAIRSIDE VOICE|settings-voice-|LUMIN_VOICE|LuminVoice|luminVoice|syncVoice|handlePatientWorkspaceVoice|voice-scribe-engine/);
   assert.doesNotMatch(html,/id="(?:findings-invoice-toolbar|findings-invoice-selection-summary|chart-attachments-button)"|class="chart-media-toolbar"/);
   assert.match(html,/function invoiceSelectedFindings\(/);
   assert.match(html,/id="setting-whatsapp-gemini-key"/,'Shared WhatsApp AI settings remain available');

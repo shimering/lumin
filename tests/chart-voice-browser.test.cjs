@@ -24,6 +24,7 @@ const fixture = `
     const command = JSON.stringify({ action:'add_procedure', heard:'Sample', operations:[
       { tooth:'UR6', procedure:'composite', status:'planned', surfaces:['occlusal'] }
     ] });
+    window.command = command;
     const track = { addEventListener() {}, stop() {} };
     Object.defineProperty(navigator.mediaDevices, 'getUserMedia', { value: async () =>
       ({ getTracks:() => [track], getAudioTracks:() => [track] }) });
@@ -73,7 +74,7 @@ const fixture = `
         async remove() { model = {supported:true, bytes:0, ready:false, hasFiles:false}; },
         async interpret({blob, confirmation}) {
           if (blob.type !== 'audio/wav' || blob.size < 44) throw Error('Invalid audio');
-          return confirmation ? window.reply : command;
+          return confirmation ? window.reply : window.command;
         }
       }
     });
@@ -117,9 +118,9 @@ test('voice charting manages storage and waits for an explicit spoken or manual 
   assert.match(await page.evaluate(() => spoken[0]), /upper right 6, Composite Restoration, Planned, Occlusal/);
   assert.equal(await page.locator('[data-voice-reply]').isDisabled(), true);
   assert.equal(await page.evaluate(() => saved.length), 0);
-  await page.evaluate(() => endSpeech());
-  await page.evaluate(() => { window.reply = 'Yes, but not that tooth'; });
-  await record('[data-voice-reply]');
+  await page.evaluate(() => { window.reply = 'Yes, but not that tooth'; endSpeech(); });
+  await page.getByText('Listening. Say confirm or cancel.', { exact: true }).waitFor();
+  await page.locator('[data-voice-reply]').click();
   await page.getByText('Say only confirm or cancel, or use the button below.', { exact: true }).waitFor();
   assert.equal(await page.evaluate(() => saved.length), 0);
   await page.evaluate(() => { window.reply = 'Cancel'; });
@@ -129,16 +130,31 @@ test('voice charting manages storage and waits for an explicit spoken or manual 
 
   await record('[data-voice-record]');
   await page.getByText('Reading the draft aloud…', { exact: true }).waitFor();
-  await page.evaluate(() => { endSpeech(); window.reply = 'Confirm'; });
-  await record('[data-voice-reply]');
+  await page.evaluate(() => { window.reply = 'Yes, go ahead'; endSpeech(); });
+  await page.getByText('Listening. Say confirm or cancel.', { exact: true }).waitFor();
+  await page.locator('[data-voice-reply]').click();
   await page.getByText('Procedures added to the chart.', { exact: true }).waitFor();
   assert.deepEqual(await page.evaluate(() => saved), [{ chart: 'patient', entries: [
     { tooth: 'UR6', type: 'composite', operationId: 'comp', status: 'P', surfaces: ['occlusal'] }
   ] }]);
 
-  await page.getByRole('checkbox', { name: 'Spoken confirmation' }).uncheck();
+  await page.getByRole('checkbox', { name: 'Read aloud and listen for confirmation' }).uncheck();
+  await page.evaluate(() => {
+    const result = JSON.parse(window.command);
+    window.command = JSON.stringify({ ...result, action:'clarify', message:'Which quadrant for seven?' });
+  });
   await record('[data-voice-record]');
   await page.locator('[data-voice-review]').waitFor();
+  await page.getByText('Which quadrant for seven?', { exact:true }).waitFor();
+  assert.equal(await page.locator('[data-voice-add]').isDisabled(), true);
+  assert.equal(await page.locator('[data-voice-rows] li').count(), 1);
+  await page.evaluate(() => {
+    const result = JSON.parse(window.command);
+    window.command = JSON.stringify({ ...result, action:'add_procedure', message:'',
+      operations: [{ ...result.operations[0], tooth:'UR7' }] });
+  });
+  await record('[data-voice-record]');
+  await page.locator('[data-voice-rows] li').nth(1).waitFor();
   assert.equal(await page.locator('[data-voice-reply]').isVisible(), false);
   assert.equal(await page.locator('[data-voice-add]').isEnabled(), true);
   assert.equal(await page.evaluate(() => saved.length), 1);
@@ -146,6 +162,10 @@ test('voice charting manages storage and waits for an explicit spoken or manual 
   await page.getByText('Reconnect to save this draft to the shared chart.', { exact:true }).waitFor();
   assert.equal(await page.locator('[data-voice-add]').isDisabled(), true);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 360);
+  await page.context().setOffline(false);
+  await page.locator('[data-voice-add]').click();
+  await page.getByText('Procedures added to the chart.', { exact: true }).waitFor();
+  assert.deepEqual(await page.evaluate(() => saved[1].entries.map(entry => entry.tooth)), ['UR6', 'UR7']);
   page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: 'Delete model' }).click();
   await page.getByText('Model deleted from this device.', { exact:true }).waitFor();

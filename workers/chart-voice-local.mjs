@@ -1,5 +1,5 @@
 import { Backend, Engine, loadLiteRtLm } from "@litert-lm/core";
-import { chartPrompt, chartSchema } from "./chart-voice-prompt.mjs";
+import { chartPrompt } from "./chart-voice-prompt.mjs";
 import { loaderFile, modelBytes, modelCache, modelFile, modelUrl, wasmFile } from "../lumin-chart-voice-model.mjs";
 
 let engine;
@@ -110,10 +110,10 @@ async function getEngine() {
 async function interpret({ prompt, blob }, confirm = false) {
   const model = await getEngine();
   const conversation = await model.createConversation({
-    sessionConfig: { maxOutputTokens: confirm ? 64 : 1200 },
+    sessionConfig: { maxOutputTokens: confirm ? 64 : 750 },
     preface: { messages: [{ role: "system", content: [{ type: "text", text: confirm
       ? "Transcribe exactly what the speaker actually said in the original language. Preserve all negations and extra words. If there is no intelligible speech, output [unclear]. Output only the transcript."
-      : chartPrompt + "\nExpected schema: " + JSON.stringify(chartSchema) }] }] },
+      : chartPrompt }] }] },
   });
   try {
     const content = blob

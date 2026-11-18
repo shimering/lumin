@@ -1,6 +1,8 @@
 import { encodeWav } from './lumin-chart-voice-wav.mjs';
-import { createVoiceActivityDetector } from './lumin-chart-voice-activity.mjs';
-import { createLocalChartEngine, modelBytes } from './lumin-chart-voice-model.mjs';
+import { createVoiceActivityDetector } from './lumin-chart-voice-activity.mjs?v=2';
+import { createLocalChartEngine, modelBytes } from './lumin-chart-voice-model.mjs?v=2';
+
+const maxChartOperations = 8;
 
 const surfaces = {
   mesial: ['Mesial', 'أنسي'], distal: ['Distal', 'بعيد'], occlusal: ['Occlusal', 'إطباقي'],
@@ -22,19 +24,21 @@ export function parseVoiceDraft(raw) {
   catch (_) { throw new Error('draft'); }
   if (typeof draft?.heard !== 'string') throw new Error('draft');
   const heard = draft.heard.slice(0, 2000);
-  if (draft.action === 'clarify' && typeof draft.message === 'string' && draft.message.trim()) {
-    return { heard, message: draft.message.slice(0, 500) };
-  }
-  if (draft.action !== 'add_procedure' || !Array.isArray(draft.operations) || !draft.operations.length
-      || draft.operations.length > 8 || !draft.operations.every(op =>
-        typeof op?.tooth === 'string' && /^(UR|UL|LR|LL)[1-8]$/.test(op.tooth)
-        && typeof op.procedure === 'string' && Object.hasOwn(presets, op.procedure)
-        && (op.status === '' || typeof op.status === 'string' && Object.hasOwn(statuses, op.status))
-        && Array.isArray(op.surfaces) && op.surfaces.length <= 6
-        && op.surfaces.every(s => typeof s === 'string' && Object.hasOwn(surfaces, s)))) throw new Error('draft');
-  return { heard, operations: draft.operations.map(({ tooth, procedure, status, surfaces }) => ({
+  const message = typeof draft.message === 'string' ? draft.message.trim().slice(0, 500) : '';
+  if (!['add_procedure', 'clarify'].includes(draft.action)) throw new Error('draft');
+  const items = draft.operations ?? [];
+  if (!Array.isArray(items) || items.length > maxChartOperations) throw new Error('draft');
+  const validItems = items.filter(op => typeof op?.tooth === 'string' && /^(UR|UL|LR|LL)[1-8]$/.test(op.tooth)
+    && typeof op.procedure === 'string' && Object.hasOwn(presets, op.procedure)
+    && (op.status === '' || typeof op.status === 'string' && Object.hasOwn(statuses, op.status))
+    && Array.isArray(op.surfaces) && op.surfaces.length <= 6
+    && op.surfaces.every(s => typeof s === 'string' && Object.hasOwn(surfaces, s)));
+  const needsDetails = draft.action === 'clarify' || Boolean(message) || validItems.length !== items.length;
+  if (!validItems.length && !needsDetails) throw new Error('draft');
+  const operations = validItems.map(({ tooth, procedure, status, surfaces }) => ({
     tooth, procedure, status, surfaces: [...new Set(surfaces)]
-  })) };
+  }));
+  return { heard, operations, needsDetails, message };
 }
 
 export function voiceCatalogOptions(procedure, catalog) {
@@ -46,9 +50,10 @@ export function voiceCatalogOptions(procedure, catalog) {
 export function voiceReply(text) {
   const phrase = text.normalize('NFKC').toLowerCase().trim()
     .replace(/[ً-ٟـ]/gu, '').replace(/[أإآ]/gu, 'ا')
-    .replace(/^[“"«]+|[.!؟?،。…“”"»]+$/gu, '').trim().replace(/\s+/gu, ' ');
-  if (['confirm', 'yes', 'yes confirm', 'yes, confirm', 'اكد', 'احفظ', 'موافق', 'نعم', 'ايوه'].includes(phrase)) return 'confirm';
-  if (['cancel', 'no', 'no cancel', 'no, cancel', 'الغ', 'الغي', 'الغاء', 'لا', 'لأ', 'مش موافق'].includes(phrase)) return 'cancel';
+    .replace(/\p{P}+/gu, ' ').trim().replace(/\s+/gu, ' ');
+  if (['confirm', 'yes', 'yes confirm', 'yes please', 'yes go ahead', 'go ahead', 'yes save it',
+    'اكد', 'احفظ', 'موافق', 'نعم', 'ايوه', 'ايوة', 'ايوه احفظ', 'ايوة احفظ', 'نعم احفظ'].includes(phrase)) return 'confirm';
+  if (['cancel', 'no', 'no cancel', 'no thanks', 'cancel it', 'الغ', 'الغي', 'الغاء', 'لا', 'لا الغي', 'مش موافق'].includes(phrase)) return 'cancel';
   return null;
 }
 
@@ -60,7 +65,7 @@ const messages = {
   storage: ['There is not enough space to save the model. Free storage and resume.', 'المساحة المتاحة لا تكفي لحفظ النموذج. حرّر مساحة ثم استأنف التنزيل.'],
   download: ['Model setup stopped. Check your connection and resume.', 'توقف إعداد النموذج. تحقّق من الاتصال ثم استأنف.'],
   sample: ['Gemma could not verify the sample command on this device. Try setup again.', 'تعذّر التحقق من الأمر التجريبي على هذا الجهاز. أعد المحاولة.'],
-  draft: ['Gemma could not interpret the full command. Try one tooth and procedure at a time.', 'تعذّر فهم الأمر بالكامل. جرّب ذكر سن وإجراء واحد في كل مرة.']
+  draft: ['Gemma could not interpret the recording. Try a shorter command.', 'تعذّر فهم التسجيل. جرّب أمرًا أقصر.']
 };
 
 export function bindChartVoice(root, { context, catalog, apply, language, surfaceNames, engine = createLocalChartEngine() }) {
@@ -80,11 +85,14 @@ export function bindChartVoice(root, { context, catalog, apply, language, surfac
   const review = root.querySelector('[data-voice-review]');
   const add = root.querySelector('[data-voice-add]');
   const rows = root.querySelector('[data-voice-rows]');
+  const details = root.querySelector('[data-voice-details]');
+  const reset = root.querySelector('[data-voice-reset]');
   let owner, work, recording, draft = [];
+  let audio, recorderReady, needsDetails = false;
   let saving = false;
   let model = { supported: true, ready: false, bytes: 0 }, modelWork, modelRevision = 0;
   let modelMessage;
-  let speech, speechTimeout, readbackReady = false, heardLanguage;
+  let speech, speechTimeout, heardLanguage;
   const speechPreference = 'lumin-chart-voice-spoken';
   try { voiceToggle.checked = localStorage.getItem(speechPreference) !== 'off'; } catch (_) {}
   const tr = ([en, ar]) => language() === 'ar' ? ar : en;
@@ -97,19 +105,21 @@ export function bindChartVoice(root, { context, catalog, apply, language, surfac
   }
 
   function controls() {
-    record.textContent = recording && !recording.confirmation
-      ? tr(['Stop recording', 'إيقاف التسجيل']) : tr(['Record command', 'تسجيل أمر']);
+    record.textContent = recording && !recording.confirmation ? tr(['Stop recording', 'إيقاف التسجيل'])
+      : needsDetails ? tr(['Record missing items', 'سجّل العناصر الناقصة']) : tr(['Record command', 'تسجيل أمر']);
     reply.textContent = recording?.confirmation
       ? tr(['Stop recording', 'إيقاف التسجيل']) : tr(['Say confirm or cancel', 'قل أكّد أو ألغِ']);
     record.disabled = !model.ready || Boolean(speech || (work && (!recording || recording.confirmation)));
     voiceToggle.disabled = Boolean(work);
     open.disabled = !context() || saving;
-    const ready = draft.length > 0 && draft.every(row => row.read());
+    const ready = !needsDetails && draft.length > 0 && draft.every(row => row.read());
     for (const field of rows.querySelectorAll('select, input')) field.disabled = Boolean(work);
     read.hidden = reply.hidden = !voiceToggle.checked;
     read.disabled = !ready || Boolean(work);
-    reply.disabled = !model.ready || !ready || !readbackReady || Boolean(speech || (work && !recording?.confirmation));
-    add.disabled = Boolean(work || speech) || !ready || navigator.onLine === false;
+    reply.disabled = !model.ready || !ready || Boolean(speech || (work && !recording?.confirmation));
+    add.disabled = Boolean(work) || !ready || navigator.onLine === false;
+    details.hidden = reset.hidden = !needsDetails;
+    reset.disabled = Boolean(work);
     connection.hidden = !(ready && navigator.onLine === false);
     review.hidden = draft.length === 0;
     modelControls();
@@ -136,7 +146,11 @@ export function bindChartVoice(root, { context, catalog, apply, language, surfac
   async function refreshModel() {
     const revision = ++modelRevision;
     try {
-      const stored = await engine.info();
+      let stored = await engine.info();
+      if (!stored.ready && stored.bytes === modelBytes && engine.updateRuntime) {
+        await engine.updateRuntime().catch(() => {});
+        stored = await engine.info();
+      }
       if (revision === modelRevision) model = stored;
     } catch (_) {
       if (revision === modelRevision) model = { supported: false, ready: false, bytes: 0 };
@@ -161,7 +175,11 @@ export function bindChartVoice(root, { context, catalog, apply, language, surfac
         signal: controller.signal,
         acceptsSample(raw) {
           let operations;
-          try { operations = parseVoiceDraft(raw).operations; } catch (_) { return false; }
+          try {
+            const sample = parseVoiceDraft(raw);
+            if (sample.needsDetails) return false;
+            operations = sample.operations;
+          } catch (_) { return false; }
           return operations?.length === 1 && operations[0].tooth === 'UR6'
             && operations[0].procedure === 'composite' && operations[0].status === 'planned';
         },
@@ -218,7 +236,8 @@ export function bindChartVoice(root, { context, catalog, apply, language, surfac
 
   function clearDraft() {
     stopSpeech();
-    readbackReady = false;
+    needsDetails = false;
+    details.textContent = '';
     draft = [];
     rows.replaceChildren();
     heard.textContent = '';
@@ -230,7 +249,7 @@ export function bindChartVoice(root, { context, catalog, apply, language, surfac
     clearTimeout(input.timer);
     input.stream?.getTracks().forEach(track => track.stop());
     input.node?.disconnect();
-    if (input.audio.state !== 'closed') void input.audio.close().catch(() => {});
+    if (input.node) input.node.port.onmessage = null;
   }
 
   function stopCapture() {
@@ -244,6 +263,9 @@ export function bindChartVoice(root, { context, catalog, apply, language, surfac
     work?.abort();
     work = null;
     stopCapture();
+    if (audio && audio.state !== 'closed') void audio.close().catch(() => {});
+    audio = recorderReady = null;
+    if (!modelWork) engine.unload?.();
     panel.hidden = true;
     open.setAttribute('aria-expanded', 'false');
     status.textContent = '';
@@ -264,9 +286,9 @@ export function bindChartVoice(root, { context, catalog, apply, language, surfac
     return select;
   }
 
-  function showDraft(operations) {
+  function appendDraft(operations) {
     const catalogItems = catalog();
-    draft = operations.map(op => {
+    const newRows = operations.map(op => {
       const row = document.createElement('li');
       const title = document.createElement('strong');
       title.textContent = op.tooth;
@@ -325,21 +347,17 @@ export function bindChartVoice(root, { context, catalog, apply, language, surfac
         }
       };
     });
-    tell('Review the procedures before adding them.', 'راجع الإجراءات قبل إضافتها.');
-    controls();
-    if (voiceToggle.checked && draft.every(row => row.read())) readBack();
+    draft.push(...newRows);
   }
 
   function draftEdited() {
     stopSpeech();
-    readbackReady = false;
     controls();
   }
 
   function readBack() {
-    if (!valid() || !voiceToggle.checked || work || !draft.length || draft.some(row => !row.read())) return;
+    if (!valid() || !voiceToggle.checked || work || needsDetails || !draft.length || draft.some(row => !row.read())) return;
     stopSpeech();
-    readbackReady = false;
     const synth = window.speechSynthesis;
     const locale = heardLanguage === 'ar' ? 'ar' : 'en';
     const voices = synth?.getVoices().filter(voice => voice.localService && voice.lang.toLowerCase().split(/[-_]/)[0] === locale) || [];
@@ -347,14 +365,14 @@ export function bindChartVoice(root, { context, catalog, apply, language, surfac
     const done = (spoken) => {
       speech = null;
       clearTimeout(speechTimeout);
-      readbackReady = true;
-      if (spoken) tell('Tap Say confirm or cancel, then speak your answer.', 'اضغط على قل أكّد أو ألغِ ثم انطق إجابتك.');
-      else tell('Read the draft on screen. A matching on-device voice could not play.', 'راجع المسودة على الشاشة. تعذّر تشغيل صوت محلي مناسب.');
       controls();
+      if (spoken && !document.hidden) void start(true);
+      else tell('Review the draft on screen, then use spoken confirmation or Add to chart.',
+        'راجع المسودة على الشاشة، ثم استخدم التأكيد الصوتي أو زر إضافة إلى المخطط.');
     };
     if (!speaker || !window.SpeechSynthesisUtterance) { done(false); return; }
     const summaries = draft.map(row => row.summary()).join('. ');
-    const question = locale === 'ar' ? 'هل تؤكد إضافة هذه الإجراءات؟' : 'Do you confirm adding these procedures?';
+    const question = locale === 'ar' ? 'قل أكّد أو ألغِ بعد انتهاء القراءة.' : 'Say confirm or cancel after I finish reading.';
     const utterance = speech = new SpeechSynthesisUtterance(summaries + '. ' + question);
     utterance.voice = speaker;
     utterance.lang = speaker.lang;
@@ -373,7 +391,6 @@ export function bindChartVoice(root, { context, catalog, apply, language, surfac
 
   async function submit(blob, confirmation) {
     if (work || !valid()) return;
-    if (!confirmation) clearDraft();
     const controller = work = new AbortController();
     if (confirmation) tell('Checking your reply…', 'جارٍ التحقق من إجابتك…');
     else tell('Gemma is interpreting on this device…', 'يفسّر Gemma الأمر على هذا الجهاز…');
@@ -394,11 +411,27 @@ export function bindChartVoice(root, { context, catalog, apply, language, surfac
         return;
       }
       const result = parseVoiceDraft(raw);
+      if (draft.length + result.operations.length > maxChartOperations) {
+        tell('This batch would exceed eight procedures. Start a new draft with a smaller batch.',
+          'ستتجاوز هذه الدفعة ثمانية إجراءات. ابدأ مسودة جديدة بدفعة أصغر.');
+        return;
+      }
       heardLanguage = /\p{Script=Arabic}/u.test(result.heard) ? 'ar' : 'en';
       heard.textContent = result.heard;
       heard.hidden = !result.heard;
-      if (result.message) status.textContent = result.message;
-      else showDraft(result.operations);
+      needsDetails = result.needsDetails;
+      details.textContent = result.message || tr(['Some items were unclear. Record the missing items with their teeth and procedures.',
+        'بعض العناصر غير واضحة. سجّل العناصر الناقصة مع تحديد الأسنان والإجراءات.']);
+      appendDraft(result.operations);
+      if (needsDetails) {
+        tell('Record only the missing items. Include the tooth and procedure for each one.',
+          'سجّل العناصر الناقصة فقط، واذكر السن والإجراء لكل عنصر.');
+      } else if (draft.some(row => !row.read())) {
+        tell('Complete the missing fields in the draft, then confirm.', 'أكمل الحقول الناقصة في المسودة ثم أكّد الإضافة.');
+      } else {
+        tell('Review the procedures before adding them.', 'راجع الإجراءات قبل إضافتها.');
+        if (voiceToggle.checked) readBack();
+      }
     } catch (error) {
       if (!valid() || controller.signal.aborted) return;
       status.textContent = tr(Object.hasOwn(messages, error.message) ? messages[error.message] : messages.unavailable);
@@ -422,9 +455,9 @@ export function bindChartVoice(root, { context, catalog, apply, language, surfac
       });
       const rate = input.audio.sampleRate;
       const limit = input.lastVoice ? input.lastVoice + Math.round(.45 * rate) : undefined;
-      const wav = encodeWav(input.chunks, rate, Math.min(15 * rate, limit ?? Infinity));
+      const wav = encodeWav(input.chunks, rate, Math.min((input.confirmation ? 6 : 25) * rate, limit ?? Infinity));
       if (!valid() || controller.signal.aborted) return;
-      if (wav.seconds < .2 || wav.peak < .004) {
+      if (wav.seconds < .2 || wav.peak < .004 || (input.confirmation && !input.voiceDetected)) {
         tell('No clear audio. Try recording again.', 'الصوت غير واضح. جرّب التسجيل مرة أخرى.');
         return;
       }
@@ -439,8 +472,9 @@ export function bindChartVoice(root, { context, catalog, apply, language, surfac
   }
 
   async function start(confirmation = false) {
-    if (work || speech || !model.ready || !valid() || (confirmation && !readbackReady)) return;
-    if (!confirmation) clearDraft();
+    if (work || speech || !model.ready || !valid() || document.hidden) return;
+    if (confirmation && (!voiceToggle.checked || needsDetails || !draft.length || draft.some(row => !row.read()))) return;
+    if (!confirmation && !needsDetails) clearDraft();
     if (!window.AudioContext || !navigator.mediaDevices?.getUserMedia) {
       tell('Recording requires a supported browser on HTTPS.', 'يتطلب التسجيل متصفحاً يدعم الميكروفون عبر HTTPS.');
       return;
@@ -450,22 +484,29 @@ export function bindChartVoice(root, { context, catalog, apply, language, surfac
     tell('Waiting for microphone access…', 'في انتظار إذن الميكروفون…');
     controls();
     try {
-      active = { audio: new AudioContext(), chunks: [], confirmation };
+      audio ||= new AudioContext();
+      active = { audio, chunks: [], confirmation };
       const resume = active.audio.resume();
       void resume.catch(() => {});
       controller.signal.addEventListener('abort', () => release(active), { once: true });
       active.stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
       if (!valid() || controller.signal.aborted || document.hidden) return;
       await resume;
-      await engine.loadRecorder(active.audio);
+      recorderReady ||= engine.loadRecorder(active.audio).catch(error => {
+        if (audio === active.audio) recorderReady = null;
+        throw error;
+      });
+      await recorderReady;
       if (!valid() || controller.signal.aborted || document.hidden) return;
-      const detect = createVoiceActivityDetector(active.audio.sampleRate);
+      const detect = createVoiceActivityDetector(active.audio.sampleRate, confirmation ? 0.8 : 3);
       const source = active.audio.createMediaStreamSource(active.stream);
       active.node = new AudioWorkletNode(active.audio, 'voice-capture');
       active.node.port.onmessage = ({ data }) => {
         if (data === 'flushed') { active.flush?.(); return; }
         active.chunks.push(data);
         const activity = detect(data);
+        active.voiceDetected = activity.lastVoiceSample > 0;
+        active.recentVoice = activity.recentVoice;
         if (activity.shouldStop && recording === active) {
           active.lastVoice = activity.lastVoiceSample;
           void finish(active);
@@ -482,7 +523,18 @@ export function bindChartVoice(root, { context, catalog, apply, language, surfac
       }, { once: true });
       source.connect(active.node).connect(active.audio.destination);
       recording = active;
-      active.timer = setTimeout(() => void finish(active), confirmation ? 8000 : 15000);
+      active.timer = setTimeout(() => {
+        if (confirmation || !active.recentVoice) {
+          void finish(active);
+          return;
+        }
+        controller.abort();
+        stopCapture();
+        work = null;
+        tell('Recording reached 25 seconds while you were speaking. Try splitting the command.',
+          'بلغ التسجيل ٢٥ ثانية أثناء حديثك. جرّب تقسيم الأمر.');
+        controls();
+      }, confirmation ? 6000 : 25000);
       if (confirmation) tell('Listening. Say confirm or cancel.', 'أستمع إليك. قل أكّد أو ألغِ.');
       else tell('Recording. Stops after three seconds of silence.', 'جارٍ التسجيل. يتوقف بعد ثلاث ثوانٍ من الصمت.');
     } catch (_) {
@@ -513,6 +565,10 @@ export function bindChartVoice(root, { context, catalog, apply, language, surfac
   record.onclick = () => recording ? void finish(recording) : void start(false);
   reply.onclick = () => recording ? void finish(recording) : void start(true);
   read.onclick = () => readBack();
+  reset.onclick = () => {
+    clearDraft();
+    tell('Start a new voice command.', 'ابدأ أمرًا صوتيًا جديدًا.');
+  };
   voiceToggle.onchange = () => {
     try { localStorage.setItem(speechPreference, voiceToggle.checked ? 'on' : 'off'); } catch (_) {}
     draftEdited();
@@ -524,13 +580,14 @@ export function bindChartVoice(root, { context, catalog, apply, language, surfac
   };
 
   async function save() {
-    if (work || !valid()) return;
+    if (work || !valid() || needsDetails) return;
     if (navigator.onLine === false) {
       tell('Confirmation received. Reconnect and tap Add to chart to save.', 'تم التأكيد. اتصل بالإنترنت واضغط إضافة إلى المخطط للحفظ.');
       return;
     }
     const entries = draft.map(row => row.read());
     if (!entries.length || entries.some(entry => !entry)) return;
+    stopSpeech();
     const controller = work = new AbortController();
     saving = true;
     controls();

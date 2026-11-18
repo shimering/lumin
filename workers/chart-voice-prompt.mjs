@@ -1,58 +1,8 @@
-export const procedures = {
-  composite: "Composite filling",
-  root_canal: "Root canal",
-  crown: "Crown",
-  extraction: "Extraction",
-};
-export const procedureStatuses = {
-  planned: "Planned",
-  in_progress: "In progress",
-  completed: "Completed",
-  existed: "Existed",
-};
-export const surfaces = {
-  mesial: "Mesial",
-  distal: "Distal",
-  occlusal: "Occlusal",
-  buccal: "Buccal",
-  lingual: "Lingual",
-  incisal: "Incisal",
-};
-export const quadrants = {
-  UR: "Upper right",
-  UL: "Upper left",
-  LR: "Lower right",
-  LL: "Lower left",
-};
-export const toothIds = Object.keys(quadrants).flatMap((quadrant) =>
-  Array.from({ length: 8 }, (_, index) => quadrant + (index + 1))
-);
-
 export const maxChartOperations = 8;
-export const chartPrompt = `Interpret a staff command for a dental chart. Recognize English and Egyptian Arabic. Never recommend treatment or claim to save records. Use Palmer notation such as UR6 for upper right six, UL4 for upper left four, LL6 for lower left six, and LR6 for lower right six. "ستة فوق يمين" means UR6. A shared quadrant applies to all numbers in its group, as in "upper right six and seven". A number without a quadrant or explicit numbering system is ambiguous. For explicitly named FDI, the first digit is 1=UR, 2=UL, 3=LL, 4=LR and the second is the Palmer position.
-Return a flat operations array with one object per tooth and procedure pair, in spoken order. "Plan crowns on UR6 and UR7" means two planned crown operations. "On UL4, add a completed root canal and a planned crown" means two operations on UL4 with different statuses. Preserve explicit mappings and apply shared modifiers only where the wording supports them.
-Procedure codes: composite (composite filling, حشو كومبوزيت), root_canal (root canal, علاج عصب), crown (crown, طربوش), extraction (extraction, خلع). Status codes: planned, in_progress, completed, existed. Use "" for an unspecified status and [] for unspecified surfaces. MOD means mesial, occlusal, distal. For a valid command with up to ${maxChartOperations} operations set action=add_procedure and message="". If any requested tooth, procedure, or mapping is unclear or unsupported, or the command exceeds ${maxChartOperations} operations, return action=clarify with operations=[] and one short question in the user's language. Always include heard as the exact wording or best transcription in the original language. Output only the required JSON.`;
 
-export const chartSchema = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    action: { type: "string", enum: ["add_procedure", "clarify"] },
-    operations: {
-      type: "array", maxItems: maxChartOperations,
-      items: {
-        type: "object", additionalProperties: false,
-        properties: {
-          tooth: { type: "string", enum: toothIds },
-          procedure: { type: "string", enum: Object.keys(procedures) },
-          status: { type: "string", enum: ["", ...Object.keys(procedureStatuses)] },
-          surfaces: { type: "array", items: { type: "string", enum: Object.keys(surfaces) }, maxItems: 6 },
-        },
-        required: ["tooth", "procedure", "status", "surfaces"],
-      },
-    },
-    message: { type: "string" },
-    heard: { type: "string" },
-  },
-  required: ["action", "operations", "message", "heard"],
-};
+export const chartPrompt = `Turn a spoken dental chart entry in English or Egyptian Arabic into JSON. Interpret the intent of natural speech, synonyms and filler words. Record only procedures the speaker requests to chart.
+Use permanent Palmer tooth IDs UR1–UR8, UL1–UL8, LR1–LR8, LL1–LL8. "ستة فوق يمين" is UR6. One quadrant can apply to several numbers. If they explicitly use FDI, its first digit 1/2/3/4 maps to UR/UL/LL/LR and the second digit is the position. Ask about a number with no clear quadrant or numbering system.
+Procedure codes: composite (filling, حشو), root_canal (nerve treatment, endo, علاج عصب, حشو عصب), crown (cap, طربوش, تلبيسة), extraction (pull the tooth, خلع, شيل الضرس). Status codes: planned (schedule, هنـعمل), in_progress (started, لسه شغال), completed (finished, خلصت), existed (already present, موجود من قبل). Surfaces: mesial, distal, occlusal, buccal, lingual, incisal. MOD means mesial, occlusal, distal. Use [] for surfaces on whole-tooth procedures or if none were said. Use an empty status if none is clear. Never infer a missing tooth, surface, or status.
+Return one operation per tooth and procedure pair, in spoken order. "Plan crowns on upper right six and seven" becomes two planned crowns. "On UL4 I finished the root canal and want to schedule a crown" becomes a completed root canal and a planned crown. Keep distinct mappings and shared modifiers where stated.
+Return only JSON in this format: {"action":"add_procedure","heard":"short transcription in original language","operations":[{"tooth":"UR6","procedure":"composite","status":"planned","surfaces":["occlusal"]}],"message":""}.
+If a requested item cannot be mapped to a unique tooth or supported procedure, keep all clear operations, use action "clarify", and ask only about the missing items in the speaker's language in message. If more than ${maxChartOperations} operations are requested, return action "clarify", no operations, and ask the speaker to split the command. Never silently omit a requested item or claim to save anything.`;

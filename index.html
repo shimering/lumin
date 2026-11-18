@@ -6799,12 +6799,14 @@
                    data-ar="اذكر السن والإجراء والحالة والأسطح. تُفسَّر التسجيلات على هذا الجهاز."></p>
                 <div class="chart-voice-actions">
                   <button type="button" data-voice-record>Record command</button>
+                  <button type="button" data-voice-reset hidden data-en="Start over" data-ar="ابدأ من جديد">Start over</button>
                   <label class="chart-voice-spoken">
                     <input type="checkbox" data-voice-spoken checked />
-                    <span data-en="Spoken confirmation" data-ar="التأكيد الصوتي">Spoken confirmation</span>
+                    <span data-en="Read aloud and listen for confirmation" data-ar="قراءة المسودة والاستماع للتأكيد">Read aloud and listen for confirmation</span>
                   </label>
                 </div>
                 <p data-voice-status role="status" dir="auto"></p>
+                <p data-voice-details role="status" dir="auto" hidden></p>
                 <p data-voice-heard dir="auto" hidden></p>
                 <form data-voice-review hidden>
                   <ul data-voice-rows></ul>
@@ -31302,7 +31304,7 @@
     }
 
     async function initChartVoice() {
-      const { bindChartVoice, voiceCatalogOptions } = await import('./lumin-chart-voice.mjs?v=2');
+      const { bindChartVoice, voiceCatalogOptions } = await import('./lumin-chart-voice.mjs?v=3');
       const root = document.getElementById('chart-voice');
       chartVoiceControl = bindChartVoice(root, {
         context: chartVoiceContext,
