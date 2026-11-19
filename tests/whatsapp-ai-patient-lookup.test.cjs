@@ -223,23 +223,72 @@ test('create_patient guards against duplicate creation and re-uses existing fetc
 });
 
 test('book_appointment re-uses fetched patient profile attached to phone number without creating duplicate', async () => {
-  // Simulate resolvePatient logic from book_appointment
+  function normalizeArabicName(name) {
+    if (!name) return "";
+    return String(name).trim().toLowerCase()
+      .replace(/[\u064B-\u065F\u0670]/g, "")
+      .replace(/^(دكتور|دكتورة|د\.?|أستاذ|أستاذة|سيد|سيدة|م\.?|mr\.?|mrs\.?|dr\.?)\s+/i, "")
+      .replace(/[إأآا]/g, "ا").replace(/[ة]/g, "ه").replace(/[ى]/g, "ي")
+      .replace(/\s+/g, " ").trim();
+  }
+  function matchPatientNameScore(targetName, candidateName) {
+    const n1 = normalizeArabicName(targetName);
+    const n2 = normalizeArabicName(candidateName);
+    if (!n1 || !n2) return 0;
+    if (n1 === n2) return 100;
+    const w1 = n1.split(" ").filter(Boolean);
+    const w2 = n2.split(" ").filter(Boolean);
+    if (w1[0] && w2[0] && w1[0] === w2[0]) {
+      if (w1.length > 1 && w2.length > 1 && w1[1] === w2[1]) return 90;
+      if (w1.length === 1 || w2.length === 1) return 60;
+    }
+    return 0;
+  }
+  function namesMatch(name1, name2) {
+    return matchPatientNameScore(name1, name2) >= 60;
+  }
+
+  // Simulate updated resolvePatient logic from book_appointment
   function resolvePatientForBooking({ patient_name, patient_id, conversation, matches }) {
     let patientId = patient_id || conversation.patient_id;
+    if (patientId && conversation.patient_id && !patient_id) {
+      if (patient_name && !namesMatch(patient_name, conversation.patient_name)) {
+        patientId = null;
+      }
+    }
     let finalPatientName = (patient_name || conversation.patient_name || "").trim();
+
+    if (patientId) {
+      const existing = matches.find(m => m.id === patientId);
+      if (existing) {
+        if (!patient_name || namesMatch(patient_name, existing.name)) {
+          finalPatientName = existing.name || finalPatientName;
+        } else {
+          patientId = null;
+        }
+      }
+    }
 
     if (!patientId) {
       if (matches.length === 1) {
-        // Exactly 1 patient attached to phone: ALWAYS re-use
-        patientId = matches[0].id;
-        finalPatientName = matches[0].name;
+        if (!finalPatientName || namesMatch(finalPatientName, matches[0].name)) {
+          patientId = matches[0].id;
+          finalPatientName = matches[0].name;
+        }
       } else if (matches.length > 1) {
-        // Multiple matches: fuzzy score match
-        const norm = (s) => (s || "").replace(/[إأآا]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").trim();
-        const matched = matches.find(m => norm(m.name).includes(norm(finalPatientName)) || norm(finalPatientName).includes(norm(m.name)));
-        if (matched) {
-          patientId = matched.id;
-          finalPatientName = matched.name;
+        // Multiple matches: fuzzy score match against finalPatientName
+        const scoredMatches = matches
+          .map(m => ({
+            patient: m,
+            score: finalPatientName
+              ? matchPatientNameScore(finalPatientName, m.name)
+              : matchPatientNameScore(conversation.patient_name, m.name),
+          }))
+          .sort((a, b) => b.score - a.score);
+
+        if (scoredMatches[0] && scoredMatches[0].score >= 60) {
+          patientId = scoredMatches[0].patient.id;
+          finalPatientName = scoredMatches[0].patient.name;
         }
       }
     }
@@ -277,6 +326,16 @@ test('book_appointment re-uses fetched patient profile attached to phone number 
     matches: [],
   });
   assert.equal(resNew.createdNewPatient, true, "Only completely new phone creates new patient");
+
+  // Case 4: Companion / family member booking: Conversation already linked to "زينب طارق", but booking for "فاطمة الزهراء حازم"
+  const resCompanion = resolvePatientForBooking({
+    patient_name: "فاطمة الزهراء حازم",
+    conversation: { phone: "01226622012", patient_id: "p-zainab", patient_name: "زينب طارق مدكور" },
+    matches: [{ id: "p-zainab", name: "زينب طارق مدكور", phone: "01226622012" }],
+  });
+  assert.equal(resCompanion.patientId, null, "Must NOT hijack Zainab's patient ID for companion Fatima");
+  assert.equal(resCompanion.finalPatientName, "فاطمة الزهراء حازم", "Must preserve Fatima's distinct name");
+  assert.equal(resCompanion.createdNewPatient, true, "Must flag for new patient creation for Fatima");
 });
 
 test('findPatientsByWhatsApp and formatWhatsAppCode correctly resolve patients by BSUID code and username', () => {
@@ -519,6 +578,114 @@ test('BSUID conversations allow matching and re-using existing patient profiles 
   assert.equal(unrelatedResult.success, false);
   assert.equal(unrelatedResult.error, 'PATIENT_IDENTITY_REQUIRED');
 });
+
+test('findPatientByName and changed-phone mismatch detection flow (Hend Abdel-Raouf case)', async () => {
+  assert.match(webhookContent, /async function findPatientByName\(supabase: any, fullName: string\)/);
+  assert.match(webhookContent, /EXISTING_PATIENT_NAME_FOUND/);
+  assert.match(webhookContent, /has_existing_profile_by_name:\s*true/);
+  assert.match(webhookContent, /old_phone_tail:\s*oldLast4/);
+
+  // Pure logic simulation of Arabic Hamza normalization (الرؤوف vs الرءوف)
+  function normalizeArabicName(name) {
+    if (!name) return "";
+    return String(name)
+      .trim()
+      .toLowerCase()
+      .replace(/[\u064B-\u065F\u0670]/g, "")
+      .replace(/^(دكتور|دكتورة|د\.?|أستاذ|أستاذة|سيد|سيدة|م\.?|mr\.?|mrs\.?|dr\.?)\s+/i, "")
+      .replace(/[إأآا]/g, "ا")
+      .replace(/[ة]/g, "ه")
+      .replace(/[ى]/g, "ي")
+      .replace(/[ؤئ]/g, "ء")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function matchPatientNameScore(targetName, candidateName) {
+    const n1 = normalizeArabicName(targetName);
+    const n2 = normalizeArabicName(candidateName);
+    if (!n1 || !n2) return 0;
+    if (n1 === n2) return 100;
+    const w1 = n1.split(" ").filter(Boolean);
+    const w2 = n2.split(" ").filter(Boolean);
+    if (w1[0] && w2[0] && w1[0] === w2[0]) {
+      if (w1.length > 1 && w2.length > 1 && w1[1] === w2[1]) {
+        if (w1.length > 2 && w2.length > 2 && w1[2] === w2[2]) {
+          if (w1.length > 3 && w2.length > 3 && w1[3] === w2[3]) return 98;
+          return 95;
+        }
+        return 90;
+      }
+      if (w1.length === 1 || w2.length === 1) return 60;
+    }
+    if (w1.length >= 2 && w2.length >= 2) {
+      const shorter = w1.length <= w2.length ? w1 : w2;
+      const longer = w1.length <= w2.length ? w2 : w1;
+      const shorterStr = shorter.join(" ");
+      const longerStr = longer.join(" ");
+      const escaped = shorterStr.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp(`(^|\\s)${escaped}(\\s|$)`);
+      if (regex.test(longerStr)) return 80;
+    }
+    return 0;
+  }
+
+  // Verify Hamza normalization matches "هند محمود عبد الرؤوف" and "هند محمود عبد الرءوف الشافعي"
+  const score = matchPatientNameScore("هند محمود عبد الرءوف الشافعي", "هند محمود عبد الرؤوف");
+  assert.ok(score >= 80, `Expected score >= 80 for Hend, got ${score}`);
+
+  // Test simulation: Patient provides a new phone 01018227239, but database has profile under +201018305063
+  const clinicDatabase = [
+    {
+      id: 'ad029e4e-95f0-415c-895f-d23df1931cc5',
+      name: 'هند محمود عبد الرؤوف',
+      patient_number: 958,
+      phone: '+201018305063',
+    },
+  ];
+
+  function simulateLookupPatient(phone, statedName) {
+    // 1. Search by phone
+    const byPhone = clinicDatabase.filter(p => p.phone.includes(phone) || phone.includes(p.phone));
+    if (byPhone.length > 0) return { found: true, patient: byPhone[0] };
+
+    // 2. Search by name if phone not found
+    if (statedName) {
+      const byName = clinicDatabase.find(p => matchPatientNameScore(statedName, p.name) >= 80);
+      if (byName && byName.phone !== phone) {
+        const last4 = byName.phone.replace(/[^\d]/g, '').slice(-4);
+        return {
+          found: false,
+          has_existing_profile_by_name: true,
+          existing_patient_id: byName.id,
+          existing_patient_name: byName.name,
+          old_phone_tail: last4,
+        };
+      }
+    }
+
+    return { found: false, has_existing_profile_by_name: false };
+  }
+
+  const lookupResult = simulateLookupPatient('01018227239', 'هند محمود عبد الرءوف الشافعي');
+  assert.equal(lookupResult.found, false);
+  assert.equal(lookupResult.has_existing_profile_by_name, true);
+  assert.equal(lookupResult.existing_patient_id, 'ad029e4e-95f0-415c-895f-d23df1931cc5');
+  assert.equal(lookupResult.old_phone_tail, '5063');
+
+  // When patient confirms old phone, assign_patient updates phone on file
+  function simulateAssignPatient(patientId, newPhone) {
+    const p = clinicDatabase.find(x => x.id === patientId);
+    if (!p) throw new Error('Patient not found');
+    p.phone = newPhone;
+    return { success: true, updatedPatient: p };
+  }
+
+  const assignResult = simulateAssignPatient(lookupResult.existing_patient_id, '01018227239');
+  assert.equal(assignResult.success, true);
+  assert.equal(assignResult.updatedPatient.phone, '01018227239');
+});
+
 
 
 

@@ -213,6 +213,7 @@ function normalizeArabicName(name: string): string {
     .replace(/[إأآا]/g, "ا") // normalize alefs to bare alef
     .replace(/[ة]/g, "ه") // normalize taa marbouta to haa
     .replace(/[ى]/g, "ي") // normalize alef maksura to yaa
+    .replace(/[ؤئ]/g, "ء") // normalize waw/nabra hamzas to bare hamza (e.g. الرؤوف <-> الرءوف)
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -226,7 +227,13 @@ function matchPatientNameScore(targetName: string, candidateName: string): numbe
   const w1 = n1.split(" ").filter(Boolean);
   const w2 = n2.split(" ").filter(Boolean);
   if (w1[0] && w2[0] && w1[0] === w2[0]) {
-    if (w1.length > 1 && w2.length > 1 && w1[1] === w2[1]) return 90;
+    if (w1.length > 1 && w2.length > 1 && w1[1] === w2[1]) {
+      if (w1.length > 2 && w2.length > 2 && w1[2] === w2[2]) {
+        if (w1.length > 3 && w2.length > 3 && w1[3] === w2[3]) return 98;
+        return 95;
+      }
+      return 90;
+    }
   }
   // Check if shorter name's words appear as consecutive whole words in the longer name (requires at least 2 words)
   if (w1.length >= 2 && w2.length >= 2) {
@@ -396,6 +403,40 @@ async function savePatientWhatsAppIdentity(
       console.warn("savePatientWhatsAppIdentity error:", err?.message || err);
     }
   }
+}
+
+// Search patients table for an existing registered patient with a matching name (requires at least 2 words and score >= 80)
+async function findPatientByName(supabase: any, fullName: string): Promise<any | null> {
+  if (!fullName) return null;
+  const norm = normalizeArabicName(fullName);
+  if (!norm) return null;
+  const words = norm.split(" ").filter(Boolean);
+  if (words.length < 2) return null; // Require at least 2 words to avoid matching generic single first names
+
+  const rawFirstWord = fullName.trim().split(/\s+/)[0];
+  const normFirstWord = words[0];
+
+  const orParts: string[] = [];
+  if (rawFirstWord) orParts.push(`name.ilike.${rawFirstWord}%`);
+  if (normFirstWord && normFirstWord !== rawFirstWord) orParts.push(`name.ilike.${normFirstWord}%`);
+
+  const { data: candidates, error } = await supabase
+    .from("patients")
+    .select("id, name, first_name, last_name, phone, patient_number, whatsapp_username, whatsapp_code")
+    .or(orParts.join(","))
+    .limit(100);
+
+  if (error || !Array.isArray(candidates) || candidates.length === 0) return null;
+
+  const scored = candidates
+    .map((c: any) => ({
+      patient: c,
+      score: matchPatientNameScore(fullName, c.name),
+    }))
+    .filter((x: any) => x.score >= 80)
+    .sort((a: any, b: any) => b.score - a.score);
+
+  return scored.length > 0 ? scored[0].patient : null;
 }
 
 // Extract sender identifier from wamid (e.g. wamid.HBgTRUcu... -> EG.1016355928130143)
@@ -1458,7 +1499,7 @@ function buildGeminiTools(doctorNames: string[] = [], visitTypeNames: string[] =
         },
         {
           name: "lookup_patient",
-          description: "Search clinic database for existing registered patient(s) ONLY by a mobile phone number explicitly given by the patient in the chat. STRICT PRIVACY RULE: NEVER suggest or reveal patient names from the database to the customer. Returns matching patient record if found, or alerts if duplicate records exist under this number.",
+          description: "Search clinic database for existing registered patient(s) by mobile phone number OR by patient full name. If a phone number is provided but no record is found under that number, provide the patient's full name to check if an existing clinic file already exists under an older or different phone number. STRICT PRIVACY RULE: NEVER suggest or reveal patient names from the database to the customer. Returns matching patient record if found, or alerts if duplicate records exist under this number.",
           parameters: {
             type: "OBJECT",
             properties: {
@@ -1466,13 +1507,17 @@ function buildGeminiTools(doctorNames: string[] = [], visitTypeNames: string[] =
                 type: "STRING",
                 description: "The mobile phone number to look up (e.g. 07701234567 or +9647701234567 or 01012345678).",
               },
+              patient_name: {
+                type: "STRING",
+                description: "Optional patient full name to check if a registered clinic file already exists under an older or different phone number.",
+              },
             },
             required: ["phone"],
           },
         },
         {
           name: "assign_patient",
-          description: "Assign and link an existing registered patient profile to this WhatsApp conversation by patient_id OR by patient_name. Call this when multiple profiles exist for a phone number and the patient clarifies which name they are.",
+          description: "Assign and link an existing registered patient profile to this WhatsApp conversation by patient_id OR by patient_name. Pass phone to update the patient's registered phone number on file when they provide a new or updated contact number.",
           parameters: {
             type: "OBJECT",
             properties: {
@@ -1486,7 +1531,7 @@ function buildGeminiTools(doctorNames: string[] = [], visitTypeNames: string[] =
               },
               phone: {
                 type: "STRING",
-                description: "Optional phone number associated with the patient profile if different from conversation channel.",
+                description: "Optional phone number associated with the patient profile or new phone number to update on their file.",
               },
             },
           },
@@ -1504,6 +1549,10 @@ function buildGeminiTools(doctorNames: string[] = [], visitTypeNames: string[] =
               phone: {
                 type: "STRING",
                 description: "Optional mobile number to assign to the new patient. If omitted, uses current conversation's phone number.",
+              },
+              force_new: {
+                type: "BOOLEAN",
+                description: "Set to true only if the user explicitly confirms they are a new patient and not an existing registered patient found under their name.",
               },
             },
             required: ["patient_name"],
@@ -1606,6 +1655,20 @@ async function whatsappPatientIsAllowed(
       }
     }
   }
+
+  // 3. Verified by stated patient name matching the target patient record
+  const nameToCheck = (candidateName || conversation.patient_name || "").trim();
+  if (nameToCheck) {
+    const { data: targetP } = await supabase
+      .from("patients")
+      .select("id, name")
+      .eq("id", patientId)
+      .maybeSingle();
+    if (targetP && namesMatch(nameToCheck, targetP.name)) {
+      return true;
+    }
+  }
+
   return false;
 }
 
@@ -2094,6 +2157,22 @@ async function handleGeminiToolCall(
     const matches = await findPatientsByPhone(supabase, rawPhone);
 
     if (matches.length === 0) {
+      const candidateName = String(args.patient_name || conversation.patient_name || "").trim();
+      const existingByName = candidateName ? await findPatientByName(supabase, candidateName) : null;
+      if (existingByName && existingByName.phone && cleanPhone(existingByName.phone) !== cleanPhone(rawPhone)) {
+        const oldTail = getPhoneTail(existingByName.phone);
+        const oldLast4 = oldTail.length >= 4 ? oldTail.slice(-4) : oldTail;
+        return {
+          found: false,
+          has_existing_profile_by_name: true,
+          existing_patient_id: existingByName.id,
+          existing_patient_name: existingByName.name,
+          patient_number: existingByName.patient_number || null,
+          old_phone_tail: oldLast4,
+          message: `تنبيه هام: لم يتم العثور على ملف برقم الهاتف الجديد (${rawPhone})، ولكن يوجد ملف مسجل مسبقاً في العيادة بنفس الاسم "${existingByName.name}" ${existingByName.patient_number ? `(ملف رقم ${existingByName.patient_number})` : ''} برقم هاتف سابق ينتهي بـ (${oldLast4}). قاعدة التعامل الإلزامية: لا تقم بإنشاء ملف جديد عبر create_patient! اسأل المريض بلطف: هل كان رقمك السابق المسجل لدينا ينتهي بـ (${oldLast4}) لنقوم بتحديث ملفك السابق بالرقم الجديد (${rawPhone}) وتأكيد الحجز عليه، أم أنك مريض جديد لأول مرة؟ إذا أكد المريض أنه رقمه القديم أو طلب تحديثه، استدعِ assign_patient(patient_id: "${existingByName.id}", phone: "${rawPhone}") لتحديث رقم هاتفه وربط ملفه وتأكيد الحجز.`,
+        };
+      }
+
       return {
         found: false,
         count: 0,
@@ -2196,6 +2275,12 @@ async function handleGeminiToolCall(
     const finalName = p.name || targetPatientName || "Patient";
     const previousName = conversation.patient_name;
 
+    if (candidatePhone && cleanPhone(candidatePhone) && cleanPhone(candidatePhone) !== cleanPhone(p.phone || "")) {
+      const formattedPhone = candidatePhone.startsWith("+") ? candidatePhone : (candidatePhone.startsWith("0") ? `+20${candidatePhone.slice(1)}` : `+${candidatePhone}`);
+      await supabase.from("patients").update({ phone: formattedPhone }).eq("id", p.id);
+      p.phone = formattedPhone;
+    }
+
     await supabase
       .from("whatsapp_conversations")
       .update({
@@ -2241,84 +2326,67 @@ async function handleGeminiToolCall(
     const rawTargetPhone = args.phone || (!isBsuid(conversation.phone) ? conversation.phone : "") || "";
     const phoneToAssign = isBsuid(rawTargetPhone) ? "" : rawTargetPhone;
 
+    // GUARD AGAINST DUPLICATE CREATION BY NAME (Patient changed phone number):
+    if (!args.force_new) {
+      const existingByName = await findPatientByName(supabase, patientName);
+      if (existingByName && existingByName.phone && cleanPhone(existingByName.phone) !== cleanPhone(phoneToAssign)) {
+        const oldTail = getPhoneTail(existingByName.phone);
+        const oldLast4 = oldTail.length >= 4 ? oldTail.slice(-4) : oldTail;
+        return {
+          success: false,
+          error: "EXISTING_PATIENT_NAME_FOUND",
+          existing_patient_id: existingByName.id,
+          existing_patient_name: existingByName.name,
+          patient_number: existingByName.patient_number || null,
+          old_phone_tail: oldLast4,
+          message: `تنبيه: يوجد ملف مسجل مسبقاً في العيادة بنفس الاسم "${existingByName.name}" ${existingByName.patient_number ? `(ملف رقم ${existingByName.patient_number})` : ''} برقم هاتف سابق ينتهي بـ (${oldLast4}). لا تقم بإنشاء ملف مكرر! اسأل المريض بلطف: هل كان رقمك السابق المسجل لدينا ينتهي بـ (${oldLast4}) لنقوم بتحديث ملفك السابق بالرقم الجديد (${phoneToAssign}) وتأكيد الحجز عليه، أم أنك مريض جديد لأول مرة؟ إذا أكد المريض، استدعِ assign_patient(patient_id: "${existingByName.id}", phone: "${phoneToAssign}") لتحديث رقم ملفه وربطه ثم تأكيد الحجز. وإذا أكد أنه مريض جديد تماماً وشخص آخر، استدعِ create_patient مع force_new: true.`,
+        };
+      }
+    }
+
     // GUARD AGAINST DUPLICATE CREATION:
-    // If patient(s) already exist with this phone number, re-use the existing profile!
+    // If patient(s) already exist with this phone number, re-use the existing profile ONLY IF name actually matches!
     const existingMatches = phoneToAssign ? await findPatientsByPhone(supabase, phoneToAssign) : [];
 
-    if (existingMatches.length === 1) {
-      const existing = existingMatches[0];
-      // For masked BSUID, verify stated patientName matches existing profile before re-using
-      if (isBsuid(conversation.phone) && !namesMatch(patientName, existing.name)) {
-        return { success: false, error: "PATIENT_IDENTITY_REQUIRED" };
+    const matchedExisting = existingMatches.find((p: any) => namesMatch(patientName, p.name))
+      || (existingMatches.length > 0
+        ? existingMatches
+            .map((p: any) => ({ p, score: matchPatientNameScore(patientName, p.name) }))
+            .sort((a: any, b: any) => b.score - a.score)
+            .find((x: any) => x.score >= 60)?.p
+        : null);
+
+    if (matchedExisting) {
+      if (!conversation.patient_id || namesMatch(matchedExisting.name, conversation.patient_name)) {
+        await supabase
+          .from("whatsapp_conversations")
+          .update({
+            patient_id: matchedExisting.id,
+            patient_name: matchedExisting.name || patientName,
+          })
+          .eq("id", conversation.id);
+
+        conversation.patient_id = matchedExisting.id;
+        conversation.patient_name = matchedExisting.name || patientName;
       }
 
-      await supabase
-        .from("whatsapp_conversations")
-        .update({
-          patient_id: existing.id,
-          patient_name: existing.name || patientName,
-        })
-        .eq("id", conversation.id);
-
-      conversation.patient_id = existing.id;
-      conversation.patient_name = existing.name || patientName;
-
-      await savePatientWhatsAppIdentity(supabase, existing.id, {
-        whatsapp_username: conversation.patient_name !== existing.name ? conversation.patient_name : null,
+      await savePatientWhatsAppIdentity(supabase, matchedExisting.id, {
+        whatsapp_username: conversation.patient_name !== matchedExisting.name ? conversation.patient_name : null,
         whatsapp_code: isBsuid(conversation.phone) ? formatWhatsAppCode(conversation.phone) : null,
         phone: phoneToAssign,
       });
 
-      const upcomingApts = await fetchPatientUpcomingAppointments(supabase, existing.id, clinicNow, timeZone);
+      const upcomingApts = await fetchPatientUpcomingAppointments(supabase, matchedExisting.id, clinicNow, timeZone);
 
       return {
         success: true,
         already_existed: true,
-        patient_id: existing.id,
-        patient_name: existing.name,
-        phone: existing.phone,
+        patient_id: matchedExisting.id,
+        patient_name: matchedExisting.name,
+        phone: matchedExisting.phone,
         upcoming_appointments: upcomingApts,
-        message: `تم استخدام الملف المسجل مسبقاً للمريض "${existing.name}" المربوط بهذا الرقم بنجاح دون إنشاء مريض مكرر. المريض لديه ملف فعلي مسجل الآن: لا تسأله عن رقم هاتفه مرة أخرى أبداً، ويمكنك فقط تأكيد رقم هاتفه المسجل معه إذا دعت الحاجة.`,
+        message: `تم استخدام الملف المسجل مسبقاً للمريض "${matchedExisting.name}" المربوط بهذا الرقم بنجاح دون إنشاء مريض مكرر. المريض لديه ملف فعلي مسجل الآن: لا تسأله عن رقم هاتفه مرة أخرى أبداً، ويمكنك فقط تأكيد رقم هاتفه المسجل معه إذا دعت الحاجة.`,
       };
-    }
-
-    if (existingMatches.length > 1) {
-      const best = existingMatches
-        .map((p: any) => ({ p, score: matchPatientNameScore(patientName, p.name) }))
-        .sort((a: any, b: any) => b.score - a.score)[0];
-
-      if (best && best.score >= 60) {
-        await supabase
-          .from("whatsapp_conversations")
-          .update({
-            patient_id: best.p.id,
-            patient_name: best.p.name,
-          })
-          .eq("id", conversation.id);
-
-        conversation.patient_id = best.p.id;
-        conversation.patient_name = best.p.name;
-
-        await savePatientWhatsAppIdentity(supabase, best.p.id, {
-          whatsapp_username: conversation.patient_name !== best.p.name ? conversation.patient_name : null,
-          whatsapp_code: isBsuid(conversation.phone) ? formatWhatsAppCode(conversation.phone) : null,
-          phone: phoneToAssign,
-        });
-
-        const upcomingApts = await fetchPatientUpcomingAppointments(supabase, best.p.id, clinicNow, timeZone);
-
-        return {
-          success: true,
-          already_existed: true,
-          patient_id: best.p.id,
-          patient_name: best.p.name,
-          phone: best.p.phone,
-          upcoming_appointments: upcomingApts,
-          message: `تم استخدام الملف المسجل مسبقاً للمريض "${best.p.name}" المربوط بهذا الرقم بنجاح دون إنشاء مريض مكرر. المريض لديه ملف فعلي مسجل الآن: لا تسأله عن رقم هاتفه مرة أخرى أبداً، ويمكنك فقط تأكيد رقم هاتفه المسجل معه إذا دعت الحاجة.`,
-        };
-      } else if (isBsuid(conversation.phone)) {
-        return { success: false, error: "PATIENT_IDENTITY_REQUIRED" };
-      }
     }
 
     const nameParts = patientName.split(/\s+/).filter(Boolean);
@@ -2349,16 +2417,18 @@ async function handleGeminiToolCall(
       return { success: false, error: createErr.message };
     }
 
-    await supabase
-      .from("whatsapp_conversations")
-      .update({
-        patient_id: newPatient.id,
-        patient_name: newPatient.name,
-      })
-      .eq("id", conversation.id);
+    if (!conversation.patient_id || namesMatch(newPatient.name, conversation.patient_name)) {
+      await supabase
+        .from("whatsapp_conversations")
+        .update({
+          patient_id: newPatient.id,
+          patient_name: newPatient.name,
+        })
+        .eq("id", conversation.id);
 
-    conversation.patient_id = newPatient.id;
-    conversation.patient_name = newPatient.name;
+      conversation.patient_id = newPatient.id;
+      conversation.patient_name = newPatient.name;
+    }
 
     return {
       success: true,
@@ -2384,6 +2454,11 @@ async function handleGeminiToolCall(
 
     // 1. Resolve patient: prioritize provided patient_id or conversation.patient_id
     let patientId = patient_id || conversation.patient_id;
+    if (patientId && conversation.patient_id && !patient_id) {
+      if (patient_name && !namesMatch(patient_name, conversation.patient_name)) {
+        patientId = null;
+      }
+    }
     if (patientId && !(await whatsappPatientIsAllowed(supabase, conversation, patientId, phoneToSearch, finalPatientName))) {
       return { success: false, error: "PATIENT_IDENTITY_REQUIRED" };
     }
@@ -2396,8 +2471,14 @@ async function handleGeminiToolCall(
         .eq("id", patientId)
         .maybeSingle();
       if (existingP) {
-        patientId = existingP.id;
-        finalPatientName = existingP.name || finalPatientName;
+        if (!patient_name || namesMatch(patient_name, existingP.name)) {
+          patientId = existingP.id;
+          finalPatientName = existingP.name || finalPatientName;
+        } else {
+          // Explicit companion/child name differs from this profile:
+          // Do NOT hijack this profile!
+          patientId = null;
+        }
       } else {
         patientId = null;
       }
@@ -2407,7 +2488,7 @@ async function handleGeminiToolCall(
     if (!patientId && phoneToSearch && !isBsuid(phoneToSearch)) {
       const matches = await findPatientsByPhone(supabase, phoneToSearch);
       if (matches.length === 1) {
-        if (!isBsuid(conversation.phone) || namesMatch(finalPatientName, matches[0].name)) {
+        if (!finalPatientName || namesMatch(finalPatientName, matches[0].name)) {
           patientId = matches[0].id;
           finalPatientName = matches[0].name || finalPatientName;
         }
@@ -2416,21 +2497,20 @@ async function handleGeminiToolCall(
         const scoredMatches = matches
           .map((m: any) => ({
             patient: m,
-            score: Math.max(
-              matchPatientNameScore(finalPatientName, m.name),
-              matchPatientNameScore(conversation.patient_name, m.name)
-            ),
+            score: finalPatientName
+              ? matchPatientNameScore(finalPatientName, m.name)
+              : matchPatientNameScore(conversation.patient_name, m.name),
           }))
           .sort((a: any, b: any) => b.score - a.score);
 
         if (scoredMatches[0] && scoredMatches[0].score >= 60) {
           patientId = scoredMatches[0].patient.id;
           finalPatientName = scoredMatches[0].patient.name;
-        } else if (conversation.patient_id && matches.some((m: any) => m.id === conversation.patient_id)) {
+        } else if (!finalPatientName && conversation.patient_id && matches.some((m: any) => m.id === conversation.patient_id)) {
           patientId = conversation.patient_id;
           const matched = matches.find((m: any) => m.id === conversation.patient_id);
           finalPatientName = matched?.name || finalPatientName;
-        } else if (!isBsuid(conversation.phone)) {
+        } else if (!isBsuid(conversation.phone) && !finalPatientName) {
           return {
             success: false,
             error: "DUPLICATE_PATIENTS_EXIST",
@@ -2506,12 +2586,14 @@ async function handleGeminiToolCall(
     }
 
     if (patientId) {
-      await supabase
-        .from("whatsapp_conversations")
-        .update({ patient_id: patientId, patient_name: finalPatientName })
-        .eq("id", conversation.id);
-      conversation.patient_id = patientId;
-      conversation.patient_name = finalPatientName;
+      if (!conversation.patient_id || conversation.patient_id === patientId || namesMatch(finalPatientName, conversation.patient_name)) {
+        await supabase
+          .from("whatsapp_conversations")
+          .update({ patient_id: patientId, patient_name: finalPatientName })
+          .eq("id", conversation.id);
+        conversation.patient_id = patientId;
+        conversation.patient_name = finalPatientName;
+      }
 
       const waCode = isBsuid(conversation.phone) ? formatWhatsAppCode(conversation.phone) : null;
       if (waCode) {
@@ -2521,7 +2603,7 @@ async function handleGeminiToolCall(
         });
       }
     } else {
-      if (conversation.patient_id !== patientId || conversation.patient_name !== finalPatientName) {
+      if (!conversation.patient_id) {
         conversation.patient_id = patientId;
         conversation.patient_name = finalPatientName;
         await supabase
@@ -2674,7 +2756,7 @@ async function handleGeminiToolCall(
     // Fire push notification asynchronously without blocking AI response
     sendAppointmentPushNotification(supabase, {
       appointmentId: apt.id,
-      patientName: patient_name || conversation.patient_name || "Patient",
+      patientName: finalPatientName || patient_name || conversation.patient_name || "Patient",
       doctorName: confirmedDoctorName,
       date,
       time,
@@ -2690,7 +2772,7 @@ async function handleGeminiToolCall(
     return {
       success: true,
       appointment_id: apt.id,
-      patient_name: patient_name || conversation.patient_name,
+      patient_name: finalPatientName || patient_name || conversation.patient_name,
       patient_phone: conversation.phone || null,
       date,
       time,
@@ -3124,7 +3206,7 @@ PHONE NUMBER LOOKUP & ASSIGNMENT RULES:
      * You MAY confirm with him the phone number associated with his profile (e.g. "هل رقم التواصل المسجل هو ...؟" / "الموعد مسجل لرقم هاتفك ..."), but NEVER ask him to provide or re-enter it from scratch.
      * Book appointments and manage requests directly using his existing profile and associated phone number.
 2. When a patient provides a mobile number in the chat (or if the sender's phone is masked and they provide their phone number):
-   - You MUST call \`lookup_patient(phone)\` with the explicitly provided mobile number. Patient matching must ONLY occur if a mobile phone number explicitly given by the patient in the chat matches a record in the database.
+   - You MUST call \`lookup_patient(phone, patient_name)\` with the explicitly provided mobile number and their full stated name if available.
    - STRICT PRIVACY RULE - NEVER SUGGEST NAMES FROM THE DATABASE: Under NO circumstances should you list, suggest, guess, or recite names found in the database to the patient! Just ask the patient for their full name and mobile number.
    - If 1 patient is found:
      * If the patient already provided their full name in the chat and it matches the profile (or is clearly the same person), call \`assign_patient\` and greet them warmly by name. Since their profile is now identified, DO NOT ask for their phone number again; you may only confirm the number on file if needed.
@@ -3133,6 +3215,17 @@ PHONE NUMBER LOOKUP & ASSIGNMENT RULES:
    - If duplicate patients are found:
      * You MUST ask the patient for their full name (without listing or suggesting any names from the database).
      * When they provide their full name, internally match it with the duplicate records and call \`assign_patient\`.
+   - CHANGED PHONE NUMBER / EXISTING PROFILE BY NAME:
+     * If \`lookup_patient\` returns \`has_existing_profile_by_name: true\` or \`create_patient\` returns \`EXISTING_PATIENT_NAME_FOUND\`:
+       - This indicates that an existing file already exists for this patient under an older or different phone number ending in \`old_phone_tail\` (e.g. 5063).
+       - DO NOT call \`create_patient\` to create a duplicate profile!
+       - Ask the patient politely to confirm if their previous registered phone number ends in those digits:
+         "أهلاً بحضرتك يا فندم! وجدنا ملفاً مسجلاً في العيادة باسم حضرتك برقم هاتف سابق ينتهي بـ [XXXX]. هل هذا رقمك السابق لنقوم بتحديث ملفك السابق برقمك الجديد [الرقم الجديد] وتأكيد الحجز عليه؟"
+       - If the patient confirms (e.g. "أيوة ده رقمي القديم", "اه تمام حدثه", "نعم"):
+         * Call \`assign_patient(patient_id: "...", phone: "...")\` passing their existing profile ID and their new phone number. This updates their phone number on file and links the chat!
+         * Then proceed to book their appointment via \`book_appointment\`.
+       - If the patient clarifies that they are a completely new patient who never visited the clinic before, or that it is not their file:
+         * Call \`create_patient(patient_name: "...", phone: "...", force_new: true)\`.
    - ONLY IF they clarify that they are a new patient or their name does not match any registered profile, ask for their full name (if not yet provided), and ONLY THEN call \`create_patient\` to make a new patient and assign this number to him.
 ================================================================================
 
