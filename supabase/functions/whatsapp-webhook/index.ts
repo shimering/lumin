@@ -490,7 +490,7 @@ async function getClinicWhatsAppSettings(supabase: any) {
     verifyToken: String(data?.whatsapp_verify_token || Deno.env.get("WHATSAPP_VERIFY_TOKEN") || "").trim(),
     geminiApiKey: String(data?.gemini_api_key || Deno.env.get("GEMINI_API_KEY") || "").trim(),
     aiInstructions: compileWhatsAppAiInstructions(data?.whatsapp_ai_instruction_blocks, data?.whatsapp_ai_instructions),
-    aiModel: String(data?.whatsapp_ai_model || "gemini-3.5-flash-lite").trim(),
+    aiModel: String(data?.whatsapp_ai_model || "gemini-4-hydrogen").trim(),
     aiMaxTurns: Number.isFinite(Number(data?.whatsapp_ai_max_turns)) && Number(data?.whatsapp_ai_max_turns) >= 3 && Number(data?.whatsapp_ai_max_turns) <= 20 ? Number(data?.whatsapp_ai_max_turns) : 8,
     attendanceTimezone: String(data?.attendance_timezone || "Africa/Cairo").trim(),
     oneSignalApiKey: String(data?.onesignal_rest_api_key || Deno.env.get("ONESIGNAL_REST_API_KEY") || "").trim(),
@@ -2936,7 +2936,7 @@ async function runGeminiAgent(
   customInstructions: string,
   conversation: any,
   conversationHistory: any[],
-  preferredModel: string = "gemini-3.5-flash-lite",
+  preferredModel: string = "gemini-4-hydrogen",
   incomingAudioPart: any = null,
   timeZone: string = "Africa/Cairo",
   maxTurns: number = 8
@@ -3384,12 +3384,10 @@ ${customInstructions ? `Additional clinic instruction sections:\n${customInstruc
   // Resilient multi-model fallback chain prioritizing multimodal audio understanding & fast models
   const modelsToTry = [
     preferredModel,
-    "gemini-3.5-flash",
+    "gemini-4-hydrogen",
     "gemini-3.8-flash",
-    "gemini-3.5-flash-lite",
-    "gemini-flash-lite-latest",
-    "gemini-3-flash-preview",
-    "gemini-3.6-flash",
+    "gemini-4-neon",
+    "gemini-4-carbon",
   ].filter((v, i, a) => v && a.indexOf(v) === i);
 
   let lastError: any = null;
@@ -4154,7 +4152,7 @@ Deno.serve(async (req: Request) => {
                         settings.aiInstructions,
                         conv,
                         history,
-                        settings.aiModel || "gemini-3.5-flash-lite",
+                        settings.aiModel || "gemini-4-hydrogen",
                         currentAudioPart,
                         settings.attendanceTimezone || "Africa/Cairo",
                         settings.aiMaxTurns || 8

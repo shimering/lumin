@@ -8857,11 +8857,10 @@
                 <label class="wa-settings-field is-wide">
                   <span class="wa-settings-label">Gemini AI Model <small>Auto fallback enabled</small></span>
                   <select id="setting-whatsapp-model" class="wa-settings-input">
-                    <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash Lite — fastest, recommended</option>
-                    <option value="gemini-flash-lite-latest">Gemini Flash Lite Latest — high availability</option>
-                    <option value="gemini-3.5-flash">Gemini 3.5 Flash — standard</option>
-                    <option value="gemini-3.6-flash">Gemini 3.6 Flash — fast, quota limited</option>
-                    <option value="gemini-3.8-flash">Gemini 3.8 Flash — deeper reasoning</option>
+                    <option value="gemini-4-hydrogen">Gemini 4 Hydrogen — ultra-fast, high efficiency (Recommended)</option>
+                    <option value="gemini-3.8-flash">Gemini 3.8 Flash — fast, deep reasoning</option>
+                    <option value="gemini-4-neon">Gemini 4 Neon — advanced analytical reasoning</option>
+                    <option value="gemini-4-carbon">Gemini 4 Carbon — flagship frontier reasoning</option>
                   </select>
                 </label>
                 <label class="wa-settings-field is-wide">
@@ -41821,7 +41820,7 @@
         document.getElementById('setting-whatsapp-verify-token').value = data.whatsapp_verify_token || '';
         document.getElementById('setting-whatsapp-gemini-key').value = data.gemini_api_key || '';
         const modelSelect = document.getElementById('setting-whatsapp-model');
-        if (modelSelect) modelSelect.value = data.whatsapp_ai_model || 'gemini-3.5-flash-lite';
+        if (modelSelect) modelSelect.value = data.whatsapp_ai_model || 'gemini-4-hydrogen';
         const turnsSelect = document.getElementById('setting-whatsapp-max-turns');
         if (turnsSelect) turnsSelect.value = String(data.whatsapp_ai_max_turns || 8);
         document.getElementById('setting-whatsapp-access-token').value = data.whatsapp_access_token || '';
@@ -41936,7 +41935,7 @@
         whatsapp_business_account_id: String(document.getElementById('setting-whatsapp-waba-id')?.value || '').trim(),
         whatsapp_verify_token: String(document.getElementById('setting-whatsapp-verify-token')?.value || '').trim(),
         gemini_api_key: String(document.getElementById('setting-whatsapp-gemini-key')?.value || '').trim(),
-        whatsapp_ai_model: String(document.getElementById('setting-whatsapp-model')?.value || 'gemini-3.5-flash-lite').trim(),
+        whatsapp_ai_model: String(document.getElementById('setting-whatsapp-model')?.value || 'gemini-4-hydrogen').trim(),
         whatsapp_ai_max_turns: Math.min(Math.max(parseInt(document.getElementById('setting-whatsapp-max-turns')?.value || '8', 10) || 8, 3), 20),
         whatsapp_access_token: String(document.getElementById('setting-whatsapp-access-token')?.value || '').trim(),
         updated_at: new Date().toISOString()
