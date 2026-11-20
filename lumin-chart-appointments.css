@@ -63,7 +63,7 @@
 
 /* Compact the viewer's controls without shrinking their touch targets. */
 .has-chart-appointments .chart-media-panel-body { padding: 12px; scrollbar-width: thin; }
-.has-chart-appointments .chart-media-tools { display: flex; flex-wrap: wrap; align-items: start; gap: 8px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #f1f5f9; }
+.has-chart-appointments .chart-media-tools { display: flex; flex-wrap: wrap; align-items: start; gap: 8px; margin-top: 8px; padding-top: 8px; }
 .has-chart-appointments .chart-media-add { flex: 1 1 auto; margin-bottom: 0; }
 .has-chart-appointments .chart-media-filter { display: contents; }
 .has-chart-appointments .chart-media-filter-heading { flex: 1 1 auto; }

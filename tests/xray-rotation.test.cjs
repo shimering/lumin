@@ -77,11 +77,12 @@ test('chart and enlarged viewer save, reopen, fit rotated images, recover errors
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
   await page.addScriptTag({path:path.join(root,'lumin-dates.js')});await page.addScriptTag({path:path.join(root,'vendor/lucide.min.js')});
   const helpers=['escapeHtml','patientMediaDisplayName','patientMediaDownloadName','patientMediaFileUrl','persistPatientMediaDetails','renderPatientMediaGrid',
-    'setupLightboxInteractions','openMediaLightbox','closeMediaLightbox','lightboxZoom','lightboxResetZoom','lightboxRotate','lightboxToggleInvert','updateLightboxTransform'].map(source).join('\n');
+    'setupLightboxInteractions','setMediaLightboxFullscreen','openMediaLightbox','closeMediaLightbox','lightboxZoom','lightboxResetZoom','lightboxRotate','lightboxToggleInvert','updateLightboxTransform'].map(source).join('\n');
   await page.addScriptTag({content:`
     let currentUiLanguage='en',activePatientId='patient-1',activeWorkspacePatientId='patient-1',activePatientMediaPatientId='patient-1';
     let currentLightboxPatientId=null,currentLightboxRelativePath='',currentLightboxOriginalUrl='',patientMediaDetailsError=false,patientMediaToothPicker=null;
     let lightboxScale=1,lightboxRotation=0,lightboxInverted=false,lightboxPanX=0,lightboxPanY=0,lightboxIsDragging=false,lightboxDragStartX=0,lightboxDragStartY=0,lightboxTouchDistStart=0,lightboxTouchScaleStart=1,lightboxEventsSetup=false;
+    let lightboxReturnFocus=null;
     let activePatientMediaFilter='ALL',allowed=true;
     const initial={display_name:'UR6 before treatment',note:'Clinical note preserved',tooth_ids:['3','A'],scan_config:{other:'kept'}};
     window.savedDetails=structuredClone(initial);window.failSave=false;window.holdSave=false;window.saveCalls=0;
@@ -123,7 +124,30 @@ test('chart and enlarged viewer save, reopen, fit rotated images, recover errors
   await page.waitForFunction(()=>[...document.querySelectorAll('#chart-media-panel img')].every(image=>image.naturalWidth>0));
   await page.evaluate(()=>fitPatientMediaRotations());
   for(const box of await page.locator('#chart-media-panel img').evaluateAll(nodes=>nodes.map(image=>({image:image.getBoundingClientRect().toJSON(),parent:image.parentElement.getBoundingClientRect().toJSON()}))))assert.ok(box.image.x>=box.parent.x&&box.image.y>=box.parent.y&&box.image.right<=box.parent.right+1&&box.image.bottom<=box.parent.bottom+1,JSON.stringify(box));
-  await page.locator('.chart-media-preview').click();await page.waitForFunction(()=>document.getElementById('lightbox-img').naturalWidth>0);
+  assert.ok(await page.locator('.chart-media-thumbnails').evaluate(node =>
+    Boolean(node.compareDocumentPosition(document.querySelector('.chart-media-tools')) & Node.DOCUMENT_POSITION_FOLLOWING)));
+  const fullscreenButton = page.locator('[data-chart-fullscreen-xray]');
+  const fullscreenToggle = page.locator('#lightbox-fullscreen-btn');
+  const preview = page.locator('.chart-media-preview');
+  const fullDialog = page.locator('#patient-media-lightbox.is-fullscreen > [role="dialog"]');
+  const previewBox = await preview.boundingBox();
+  const fullscreenButtonBox = await fullscreenButton.boundingBox();
+  assert.ok(fullscreenButtonBox.width >= 44 && fullscreenButtonBox.height >= 44);
+  assert.ok(Math.abs(previewBox.x + previewBox.width - fullscreenButtonBox.x - fullscreenButtonBox.width - 8) <= 1);
+  assert.ok(Math.abs(fullscreenButtonBox.y - previewBox.y - 8) <= 1);
+  await fullscreenButton.click();
+  await fullDialog.waitFor();
+  assert.deepEqual(await fullDialog.boundingBox(), { x: 0, y: 0, ...page.viewportSize() });
+  assert.equal(await fullscreenToggle.textContent(), 'Exit fullscreen');
+  await page.evaluate(() => closeMediaLightbox());
+  assert.equal(await fullscreenButton.evaluate(button => button === document.activeElement), true);
+  await preview.click();
+  assert.equal(await fullscreenToggle.textContent(), 'Fullscreen');
+  await fullscreenToggle.click();
+  await fullDialog.waitFor();
+  await fullscreenToggle.click();
+  await fullDialog.waitFor({ state: 'hidden' });
+  await page.waitForFunction(()=>document.getElementById('lightbox-img').naturalWidth>0);
   assert.equal(await page.evaluate(()=>lightboxRotation),90);
   await page.locator('#lightbox-rotate-btn').click();await page.waitForFunction(()=>window.savedDetails.scan_config.image_rotation===180);
   await page.evaluate(()=>{lightboxZoom(.5);lightboxToggleInvert();lightboxResetZoom();});assert.equal(await page.evaluate(()=>lightboxRotation),180);
@@ -144,6 +168,10 @@ test('chart and enlarged viewer save, reopen, fit rotated images, recover errors
       for(const box of await page.locator('#patient-media-lightbox > [role="dialog"] > :first-child button, #patient-media-lightbox > [role="dialog"] > :first-child a').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().toJSON())))assert.ok(box.x>=modal.x&&box.y>=modal.y&&box.right<=modal.x+modal.width+1&&box.bottom<=modal.y+modal.height+1,JSON.stringify({viewport,box,modal}));
       assert.match(await page.locator('#lightbox-rotate-btn').getAttribute('aria-label'),language==='ar'?/يُحفظ تلقائيًا/:/saves automatically/);
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+      await fullscreenToggle.click();
+      assert.deepEqual(await fullDialog.boundingBox(), { x: 0, y: 0, ...viewport });
+      assert.equal(await fullscreenToggle.textContent(), language === 'ar' ? 'خروج من ملء الشاشة' : 'Exit fullscreen');
+      await fullscreenToggle.click();
       if((viewport.width===1440&&language==='en')||(viewport.width===390&&language==='ar'))await page.screenshot({path:path.join(screenshots,`rotation-${viewport.width}-${language}.png`)});
     }
   }

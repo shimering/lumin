@@ -129,10 +129,12 @@ function setChartMediaBackgroundInert(panel, locked) {
     return;
   }
   const lock = element => {
+    // The lightbox sits above the chart sheet and can be opened from it.
+    if (element.id === 'patient-media-lightbox') return;
     if (!chartMediaBackgroundInert.has(element)) chartMediaBackgroundInert.set(element, element.inert);
     element.inert = true;
   };
-  // Keep separate upload/lightbox dialogs under body available above the sheet.
+  // Keep dialogs mounted under body available above the sheet.
   for (let branch = panel; branch.parentElement && branch.parentElement !== document.body; branch = branch.parentElement) {
     [...branch.parentElement.children].filter(element => element !== branch).forEach(lock);
   }
@@ -552,7 +554,7 @@ function renderChartMediaPanel() {
     body.innerHTML = `<div class="chart-media-empty"><i data-lucide="${configured ? 'cloud-off' : 'hard-drive'}"></i><h4>${chartMediaText('Patient files unavailable', 'ملفات المريض غير متاحة')}</h4><p>${chartPatientMedia.status === 'unavailable' ? chartMediaText('Patient record access is required.', 'يلزم توفر صلاحية الوصول إلى سجل المريض.') : configured ? chartMediaText('Check the clinic storage connection and try again.', 'تحقق من اتصال خادم التخزين ثم أعد المحاولة.') : chartMediaText('Connect your clinic storage in Settings.', 'اربط خادم تخزين العيادة من الإعدادات.')}</p>${chartPatientMedia.status === 'unavailable' ? '' : `<button type="button" class="chart-media-button" onclick="${configured ? 'loadChartPatientMedia()' : 'openStorageSettings()'}"><i data-lucide="${configured ? 'refresh-cw' : 'settings'}"></i>${configured ? chartMediaText('Retry', 'إعادة المحاولة') : chartMediaText('Storage settings', 'إعدادات التخزين')}</button>`}</div>`;
   } else if (!xrays.length) {
     chartPatientMedia.selectedPath = '';
-    body.innerHTML = `<div class="chart-media-empty"><i data-lucide="scan-line"></i><h4>${chartPatientMedia.filterToothIds.length ? chartMediaText('No X-rays assigned to the selected teeth', 'لا توجد أشعة مرتبطة بالأسنان المحددة') : chartMediaText('No X-rays yet', 'لا توجد أشعة بعد')}</h4><p>${chartMediaText('Add an X-ray above. The selected teeth will be assigned automatically.', 'أضف أشعة من الزر أعلاه. سيتم تحديد الأسنان المختارة تلقائيًا.')}</p></div>${chartMediaPanelActions()}`;
+    body.innerHTML = `<div class="chart-media-empty"><i data-lucide="scan-line"></i><h4>${chartPatientMedia.filterToothIds.length ? chartMediaText('No X-rays assigned to the selected teeth', 'لا توجد أشعة مرتبطة بالأسنان المحددة') : chartMediaText('No X-rays yet', 'لا توجد أشعة بعد')}</h4><p>${chartMediaText('Add an X-ray below. The selected teeth will be assigned automatically.', 'أضف أشعة من الزر أدناه. سيتم تحديد الأسنان المختارة تلقائيًا.')}</p></div>${chartMediaPanelActions()}`;
   } else {
     let selected = xrays.findIndex(file => file.relativePath === chartPatientMedia.selectedPath);
     // Also honor the latest tooth when files arrive after an icon was selected.
@@ -569,9 +571,13 @@ function renderChartMediaPanel() {
     const name = patientMediaDisplayName(file);
     const tooth = patientMediaTeethLabel(file.mediaDetails);
     const note = file.mediaDetails?.note ?? file.note ?? '';
+    const fullscreenLabel = chartMediaText('Fullscreen X-ray', 'عرض الأشعة بملء الشاشة');
     body.innerHTML = `
       <p class="chart-media-summary" data-media-user-content dir="auto">${escapeHtml(getKnownPatient(chartPatientMedia.patientId)?.name || '')}</p>
-      <button type="button" class="chart-media-preview" onclick="openChartPatientMediaFile(${index})" aria-label="${escapeHtml(chartMediaText('Open X-ray: ', 'فتح الأشعة: ') + name)}"><img src="${escapeHtml(patientMediaThumbnailUrl(file))}" alt="${escapeHtml(name)}" data-media-user-content ${typeof patientMediaRotationAttributes === 'function' ? patientMediaRotationAttributes(file, chartPatientMedia.patientId) : ''} onerror="fallbackChartMediaImage(this, ${index})" /></button>
+      <div class="chart-media-preview-frame">
+        <button type="button" class="chart-media-preview" onclick="openChartPatientMediaFile(${index})" aria-label="${escapeHtml(chartMediaText('Open X-ray: ', 'فتح الأشعة: ') + name)}"><img src="${escapeHtml(patientMediaThumbnailUrl(file))}" alt="${escapeHtml(name)}" data-media-user-content ${typeof patientMediaRotationAttributes === 'function' ? patientMediaRotationAttributes(file, chartPatientMedia.patientId) : ''} onerror="fallbackChartMediaImage(this, ${index})" /></button>
+        <button type="button" class="chart-media-button chart-media-fullscreen" data-chart-fullscreen-xray aria-haspopup="dialog" aria-label="${fullscreenLabel}" title="${fullscreenLabel}" onclick="openChartPatientMediaFile(${index}, true)"><i data-lucide="maximize" aria-hidden="true"></i></button>
+      </div>
       <div class="chart-media-caption"><h4 data-media-user-content dir="auto">${escapeHtml(name)}</h4>${chartXrayUploadDateMarkup(file)}${tooth ? `<span class="chart-media-tooth" dir="auto">${escapeHtml(tooth)}</span>` : ''}${note ? `<p class="chart-media-note" data-media-user-content dir="auto">${escapeHtml(note)}</p>` : ''}</div>
       <div class="chart-media-nav"><button type="button" class="chart-media-button is-neutral" onclick="stepChartPatientXray(-1)" aria-label="${chartMediaText('Previous X-ray', 'الأشعة السابقة')}" ${xrays.length < 2 ? 'disabled' : ''}><i data-lucide="chevron-left"></i></button><span dir="ltr">${selected + 1} / ${xrays.length}</span>${typeof rotateChartPatientXray === 'function' ? `<button type="button" class="chart-media-button is-neutral" data-chart-rotate-xray onclick="rotateChartPatientXray(${index})"><i data-lucide="rotate-cw" aria-hidden="true"></i></button>` : ''}<button type="button" class="chart-media-button is-neutral" onclick="openChartPatientMediaFile(${index})" aria-label="${chartMediaText('Enlarge X-ray', 'تكبير الأشعة')}"><i data-lucide="maximize-2"></i></button><button type="button" class="chart-media-button is-neutral" onclick="stepChartPatientXray(1)" aria-label="${chartMediaText('Next X-ray', 'الأشعة التالية')}" ${xrays.length < 2 ? 'disabled' : ''}><i data-lucide="chevron-right"></i></button></div>
       ${typeof rotateChartPatientXray === 'function' ? `<p class="xray-rotation-status chart-media-rotation" data-chart-rotation-status role="status" aria-live="polite" hidden></p>` : ''}
@@ -579,7 +585,8 @@ function renderChartMediaPanel() {
   }
   if (chartPatientMedia.detailsError) body.insertAdjacentHTML('afterbegin', `<p class="chart-media-summary" role="status">${chartMediaText('Saved names, tooth assignments, and notes could not be loaded.', 'تعذر تحميل الأسماء وتحديد الأسنان والملاحظات المحفوظة.')}</p>`);
   if (chartPatientMedia.patientId === activePatientId && hasPageAccess('patients')) {
-    body.insertAdjacentHTML('afterbegin', `<div class="chart-media-tools"><div class="chart-media-add"><button type="button" class="chart-media-button" data-chart-add-xray onclick="openChartPatientMediaUpload()"><i data-lucide="plus" aria-hidden="true"></i>${chartMediaText('Add X-ray', 'إضافة أشعة')}</button></div>${chartMediaFilterMarkup()}</div>`);
+    const panelActions = body.querySelector('.chart-media-panel-actions');
+    (panelActions || body).insertAdjacentHTML(panelActions ? 'beforebegin' : 'beforeend', `<div class="chart-media-tools"><div class="chart-media-add"><button type="button" class="chart-media-button" data-chart-add-xray onclick="openChartPatientMediaUpload()"><i data-lucide="plus" aria-hidden="true"></i>${chartMediaText('Add X-ray', 'إضافة أشعة')}</button></div>${chartMediaFilterMarkup()}</div>`);
   }
   renderChartToothXrayIndicators();
   if (typeof renderChartToothNotesPanel === 'function') renderChartToothNotesPanel();
@@ -625,10 +632,10 @@ function stepChartPatientXray(step) {
   renderChartMediaPanel();
 }
 
-function openChartPatientMediaFile(index) {
+function openChartPatientMediaFile(index, fullscreen = false) {
   const file = chartPatientMedia.files[index];
   if (!file || chartPatientMedia.patientId !== activePatientId) return;
-  openPatientMediaFile(file, chartPatientMedia.patientId);
+  openPatientMediaFile(file, chartPatientMedia.patientId, fullscreen);
 }
 
 function openChartPatientMediaUpload(attachment = false) {
@@ -689,7 +696,7 @@ function renderPatientAttachmentList() {
   if (window.lucide) lucide.createIcons();
 }
 
-async function openPatientMediaFile(file, patientId) {
+async function openPatientMediaFile(file, patientId, fullscreen = false) {
   if (!hasPageAccess('patients')) return;
   const request = ++patientAttachmentRequest;
   try { await ensureStorageMediaGrant(); }
@@ -706,7 +713,7 @@ async function openPatientMediaFile(file, patientId) {
       activePatientMediaPatientId = patientId;
       patientMediaDetailsError = chartPatientMedia.detailsError;
     }
-    openMediaLightbox(patientMediaFileUrl(file), file.category, patientMediaDisplayName(file), file.modifiedAt?.split('T')[0] || '', patientMediaThumbnailUrl(file), file.relativePath);
+    openMediaLightbox(patientMediaFileUrl(file), file.category, patientMediaDisplayName(file), file.modifiedAt?.split('T')[0] || '', patientMediaThumbnailUrl(file), file.relativePath, patientId, fullscreen);
     return;
   }
   showPatientAttachmentModal(patientId, 'file');
